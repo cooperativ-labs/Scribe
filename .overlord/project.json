@@ -1,0 +1,24 @@
+{
+  "_warning": "STRICTLY PROTECTED: This file is managed exclusively by Overlord. Agents and users must not edit, replace, stage, commit, or delete it. Re-link the resource with Overlord to change it.",
+  "version": 3,
+  "projectId": "d77d7824-8486-415c-a53d-9b9c98e4c2c6",
+  "resourceId": "f22996e8-3e75-43d5-9e68-570cd0e2f33f",
+  "resourceKey": "scribe",
+  "resourceIdsByExecutionTarget": {
+    "cf857924-0eb4-447d-b999-307c1411f094": "f22996e8-3e75-43d5-9e68-570cd0e2f33f"
+  },
+  "isPrimary": true,
+  "linkedAt": "2026-09-03T14:21:28.004Z",
+  "projects": [
+    {
+      "projectId": "d77d7824-8486-415c-a53d-9b9c98e4c2c6",
+      "resourceId": "f22996e8-3e75-43d5-9e68-570cd0e2f33f",
+      "resourceKey": "scribe",
+      "resourceIdsByExecutionTarget": {
+        "cf857924-0eb4-447d-b999-307c1411f094": "f22996e8-3e75-43d5-9e68-570cd0e2f33f"
+      },
+      "isPrimary": true,
+      "linkedAt": "2026-09-03T14:21:28.004Z"
+    }
+  ]
+}
