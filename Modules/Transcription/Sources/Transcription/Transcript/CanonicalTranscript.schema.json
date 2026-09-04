@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://scribe.local/schemas/canonical-transcript.schema.json",
+  "title": "Scribe Canonical Transcript",
+  "type": "object",
+  "required": ["schema_version", "transcript_id", "revision", "status", "created_at", "source", "language", "language_source", "timestamp_unit", "timestamp_origin", "speakers", "segments", "processing_options", "engine_revisions", "warnings"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "transcript_id": { "type": "string", "minLength": 1 },
+    "revision": { "type": "integer", "minimum": 1 },
+    "status": { "enum": ["complete", "completeWithWarnings", "noSpeech"] },
+    "created_at": { "type": "string", "format": "date-time" },
+    "source": { "$ref": "#/$defs/source" },
+    "language": { "type": "string", "minLength": 1 },
+    "language_source": { "enum": ["detected", "user_provided", "unknown"] },
+    "timestamp_unit": { "const": "milliseconds" },
+    "timestamp_origin": { "const": "source_start" },
+    "speakers": { "type": "array", "items": { "$ref": "#/$defs/speaker" } },
+    "segments": { "type": "array", "items": { "$ref": "#/$defs/segment" } },
+    "subtitle_cue_mappings": { "type": "array", "items": { "$ref": "#/$defs/subtitleCueMapping" } },
+    "processing_options": { "type": "object", "additionalProperties": true },
+    "engine_revisions": { "type": "object", "additionalProperties": { "type": "string" } },
+    "warnings": { "type": "array", "items": { "$ref": "#/$defs/warning" } }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "source": {
+      "type": "object",
+      "required": ["filename", "duration_ms", "checksum"],
+      "properties": {
+        "filename": { "type": "string", "minLength": 1 },
+        "duration_ms": { "type": "integer", "minimum": 0 },
+        "checksum": { "type": "string", "minLength": 1 }
+      }
+    },
+    "speaker": {
+      "type": "object",
+      "required": ["id", "identity_assignment", "label_snapshot"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "profile_id": { "type": ["string", "null"] },
+        "identity_assignment": { "enum": ["manual", "automatic", "unmatched"] },
+        "label_snapshot": { "type": "string", "minLength": 1 }
+      }
+    },
+    "segment": {
+      "type": "object",
+      "required": ["id", "speaker_id", "speaker_label", "start_ms", "end_ms", "text", "overlap", "timing_quality", "speaker_confidence"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "speaker_id": { "type": ["string", "null"] },
+        "speaker_label": { "type": "string", "minLength": 1 },
+        "start_ms": { "type": "integer", "minimum": 0 },
+        "end_ms": { "type": "integer", "minimum": 1 },
+        "text": { "type": "string", "minLength": 1 },
+        "overlap": { "type": "boolean" },
+        "timing_quality": { "enum": ["asr_word", "segment_only", "forced_aligned"] },
+        "speaker_confidence": { "type": ["number", "null"] },
+        "words": { "type": "array", "items": { "$ref": "#/$defs/timedWord" } }
+      }
+    },
+    "timedWord": {
+      "type": "object",
+      "required": ["text", "start_ms", "end_ms"],
+      "properties": {
+        "text": { "type": "string", "minLength": 1 },
+        "start_ms": { "type": "integer", "minimum": 0 },
+        "end_ms": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "subtitleCueMapping": {
+      "type": "object",
+      "required": ["cue_id", "parent_segment_id", "start_ms", "end_ms"],
+      "properties": {
+        "cue_id": { "type": "string", "minLength": 1 },
+        "parent_segment_id": { "type": "string", "minLength": 1 },
+        "start_ms": { "type": "integer", "minimum": 0 },
+        "end_ms": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "warning": {
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "type": "string", "minLength": 1 },
+        "message": { "type": "string", "minLength": 1 },
+        "segment_id": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

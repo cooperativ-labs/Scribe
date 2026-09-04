@@ -1,0 +1,9 @@
+1
+00:00:00,750 --> 00:00:06,250
+Dana O'Neill: "Ship it," she said — then
+paused... didn't she?
+
+2
+00:00:06,500 --> 00:00:12,000
+Speaker 2: Log path: C:\logs\run-01 (50%
+done); check <staging> & retry!

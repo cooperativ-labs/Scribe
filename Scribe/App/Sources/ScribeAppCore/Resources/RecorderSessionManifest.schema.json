@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://scribe.app/schemas/recorder-session-manifest-1.json",
+  "title": "Scribe Recorder Session Manifest",
+  "type": "object",
+  "required": ["schemaVersion", "sessionID", "appBuild", "macOSVersion", "startedAt", "completionStatus", "capture", "tracks", "gaps", "interruptions", "processing"],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1, "description": "Stable consumer field." },
+    "sessionID": { "type": "string", "format": "uuid" },
+    "appBuild": { "type": "string" },
+    "macOSVersion": { "type": "string" },
+    "startedAt": { "type": "string", "format": "date-time" },
+    "endedAt": { "type": ["string", "null"], "format": "date-time" },
+    "durationSeconds": { "type": ["number", "null"] },
+    "completionStatus": { "enum": ["complete", "interrupted", "failed"] },
+    "capture": {
+      "type": "object",
+      "required": ["state", "scope", "microphone", "outputDeviceChanges"],
+      "properties": {
+        "state": { "enum": ["capturing", "complete", "interrupted"] },
+        "scope": { "type": "object", "required": ["applicationBundleIdentifiers", "processIdentifiers"] },
+        "microphone": { "type": "object", "required": ["uniqueID", "name"] },
+        "outputDeviceChanges": { "type": "array" }
+      }
+    },
+    "tracks": {
+      "type": "object",
+      "required": ["system", "microphone", "final"],
+      "properties": {
+        "system": { "$ref": "#/$defs/trackOrNull" },
+        "microphone": { "$ref": "#/$defs/trackOrNull" },
+        "final": { "$ref": "#/$defs/trackOrNull", "description": "Stable path: tracks.final.checksum for final.flac." }
+      }
+    },
+    "gaps": { "type": "array" },
+    "interruptions": { "type": "array" },
+    "processing": {
+      "type": "object",
+      "required": ["state", "dependencyVersions", "configuration", "resamplingCorrections", "delayCorrections", "mixGains", "errors"],
+      "properties": { "state": { "enum": ["pending", "running", "complete", "failed"], "description": "Stable consumer field." } }
+    }
+  },
+  "$defs": {
+    "trackOrNull": {
+      "oneOf": [
+        { "type": "null" },
+        { "type": "object", "required": ["sourceFormat", "firstMediaTimestampSeconds", "frameCount", "fileName", "checksum"] }
+      ]
+    }
+  }
+}

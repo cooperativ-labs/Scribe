@@ -1,0 +1,186 @@
+import Platform
+import XCTest
+@testable import ScribeUI
+
+/// Every menu state is produced from the mock coordinator, so the whole
+/// interface is verifiable before the capture core exists.
+@MainActor
+final class MenuPresentationTests: XCTestCase {
+    func testIdleStateOffersStartAndNotStop() async {
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
+
+        let presentation = presentation(for: coordinator)
+
+        XCTAssertEqual(presentation.statusTitle, "Idle")
+        XCTAssertTrue(presentation.isStartEnabled)
+        XCTAssertFalse(presentation.isStopEnabled)
+        XCTAssertNil(presentation.permissionPrompt)
+        XCTAssertTrue(presentation.processingLines.isEmpty)
+    }
+
+    func testStartingStateOffersNeitherCommand() async {
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
+        coordinator.holdsTransitions = true
+        coordinator.submit(.start)
+        await coordinator.waitUntilIdle()
+
+        let presentation = presentation(for: coordinator)
+
+        XCTAssertEqual(presentation.statusTitle, "Starting…")
+        XCTAssertFalse(presentation.isStartEnabled)
+        XCTAssertFalse(presentation.isStopEnabled)
+    }
+
+    func testRecordingStateShowsElapsedTimeAndOffersStop() async {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot(), now: { start })
+        coordinator.submit(.start)
+        await coordinator.waitUntilIdle()
+
+        let presentation = MenuPresentation(snapshot: coordinator.snapshot, at: start.addingTimeInterval(83))
+
+        XCTAssertEqual(presentation.statusTitle, "Recording — 01:23")
+        XCTAssertFalse(presentation.isStartEnabled)
+        XCTAssertTrue(presentation.isStopEnabled)
+    }
+
+    func testRecordingPastAnHourShowsHours() async {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot(), now: { start })
+        coordinator.submit(.start)
+        await coordinator.waitUntilIdle()
+
+        let presentation = MenuPresentation(snapshot: coordinator.snapshot, at: start.addingTimeInterval(3_723))
+
+        XCTAssertEqual(presentation.statusTitle, "Recording — 1:02:03")
+    }
+
+    func testStoppingStateOffersNeitherCommand() async {
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
+        coordinator.holdsTransitions = true
+        coordinator.submit(.start)
+        await coordinator.waitUntilIdle()
+        coordinator.finishPendingTransition()
+        coordinator.submit(.stop)
+        await coordinator.waitUntilIdle()
+
+        let presentation = presentation(for: coordinator)
+
+        XCTAssertEqual(presentation.statusTitle, "Stopping…")
+        XCTAssertFalse(presentation.isStartEnabled)
+        XCTAssertFalse(presentation.isStopEnabled)
+    }
+
+    func testErrorStateShowsTheFailureAndAllowsAnotherAttempt() async {
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
+        coordinator.simulateFailure(
+            RecorderFailure(code: "capture.failed", message: "The meeting app stopped sharing audio.", recoveryHint: "Try again.")
+        )
+
+        let presentation = presentation(for: coordinator)
+
+        XCTAssertEqual(presentation.statusTitle, "Recording failed")
+        XCTAssertEqual(presentation.statusDetail, "The meeting app stopped sharing audio. Try again.")
+        XCTAssertTrue(presentation.isStartEnabled)
+    }
+
+    func testBackgroundProcessingIsShownSeparatelyFromCapture() async {
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
+        coordinator.submit(.start)
+        await coordinator.waitUntilIdle()
+        coordinator.submit(.stop)
+        await coordinator.waitUntilIdle()
+
+        let presentation = presentation(for: coordinator)
+
+        // Capture is idle and startable while processing continues.
+        XCTAssertEqual(presentation.statusTitle, "Idle")
+        XCTAssertTrue(presentation.isStartEnabled)
+        XCTAssertEqual(presentation.processingLines, ["Processing recording…"])
+    }
+
+    func testProcessingProgressIsShownAsAPercentage() {
+        var snapshot = readySnapshot()
+        snapshot.processing.jobs = [
+            BackgroundProcessingJob(id: UUID(), title: "Processing recording", fractionCompleted: 0.42)
+        ]
+
+        XCTAssertEqual(MenuPresentation(snapshot: snapshot, at: Date()).processingLines, ["Processing recording — 42%"])
+    }
+
+    func testRecoveryFeedbackIsShownSeparatelyFromProcessingProgress() {
+        var snapshot = readySnapshot()
+        snapshot.recoveryNotice = "Recovered 2 recordings from an interrupted session; finishing them now."
+        snapshot.processing.jobs = [BackgroundProcessingJob(id: UUID(), title: "Processing recording")]
+
+        let presentation = MenuPresentation(snapshot: snapshot, at: Date())
+
+        XCTAssertEqual(presentation.recoveryNotice, "Recovered 2 recordings from an interrupted session; finishing them now.")
+        // The notice explains where the work came from; it is not a job row.
+        XCTAssertEqual(presentation.processingLines, ["Processing recording…"])
+        // Recovered work never blocks the next meeting.
+        XCTAssertTrue(presentation.isStartEnabled)
+    }
+
+    func testABackgroundFailureIsReadWithoutAPrefixThatWouldMisnameIt() {
+        var snapshot = readySnapshot()
+        snapshot.processing.lastFailure = RecorderFailure(
+            code: "handoff.cleanupFailed",
+            message: "Audio cleanup failed, so there is no final recording to transcribe: the delay could not be trusted",
+            recoveryHint: "The original tracks were kept. Reprocess the session to try again."
+        )
+
+        let presentation = MenuPresentation(snapshot: snapshot, at: Date())
+
+        XCTAssertEqual(presentation.processingLines, [
+            "Audio cleanup failed, so there is no final recording to transcribe: the delay could not be trusted The original tracks were kept. Reprocess the session to try again."
+        ])
+        // A background failure is not a recording failure.
+        XCTAssertEqual(presentation.statusTitle, "Idle")
+        XCTAssertTrue(presentation.isStartEnabled)
+    }
+
+    func testMissingPermissionsBlockStartAndOfferBothRoutes() {
+        let snapshot = RecorderSnapshot(
+            permissions: PermissionSnapshot(screenAndSystemAudio: .denied, microphone: .notDetermined)
+        )
+
+        let presentation = MenuPresentation(snapshot: snapshot, at: Date())
+        let prompt = try? XCTUnwrap(presentation.permissionPrompt)
+
+        XCTAssertFalse(presentation.isStartEnabled)
+        XCTAssertEqual(prompt?.title, "Scribe needs permission to record")
+        XCTAssertTrue(prompt?.canRequestInApp == true)
+        // After a denial System Settings is the only way back, so it is always offered.
+        XCTAssertEqual(prompt?.settingsRoutes, [.screenRecording, .microphone])
+    }
+
+    func testShortcutConflictsAreShownWithoutDisablingMenuCommands() {
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
+        let registrar = ConflictingRegistrar()
+        let hotkeys = HotkeyService(coordinator: coordinator, registrar: registrar)
+        coordinator.reportShortcutRegistration(hotkeys.register(start: .defaultStart, stop: .defaultStop))
+
+        let presentation = presentation(for: coordinator)
+
+        XCTAssertEqual(presentation.shortcutIssues.count, 2)
+        XCTAssertTrue(presentation.isStartEnabled)
+    }
+
+    private func presentation(for coordinator: MockRecordingCoordinator) -> MenuPresentation {
+        MenuPresentation(snapshot: coordinator.snapshot, at: Date())
+    }
+
+    private func readySnapshot() -> RecorderSnapshot {
+        RecorderSnapshot(permissions: .allGranted, recordingsFolderURL: URL(fileURLWithPath: "/tmp/scribe", isDirectory: true))
+    }
+}
+
+@MainActor
+private final class ConflictingRegistrar: HotKeyRegistering {
+    func register(_ shortcut: GlobalShortcut, identifier: UInt32, action: @escaping @MainActor () -> Void) throws {
+        throw HotkeyRegistrationFailure.systemConflict(status: -9878)
+    }
+
+    func unregisterAll() {}
+}

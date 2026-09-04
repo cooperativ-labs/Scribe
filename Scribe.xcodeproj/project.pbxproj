@@ -1,0 +1,118 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		100000000000000000000101 /* ScribeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000001 /* ScribeApp.swift */; };
+		100000000000000000000102 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000002 /* AppDelegate.swift */; };
+		100000000000000000000117 /* ScribeAppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000007 /* ScribeAppEnvironment.swift */; };
+		100000000000000000000118 /* TranscriptionHostService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000008 /* TranscriptionHostService.swift */; };
+		100000000000000000000103 /* ScribeAppCore in Frameworks */ = {isa = PBXBuildFile; productRef = 100000000000000000000201 /* ScribeAppCore */; };
+		100000000000000000000104 /* Capture in Frameworks */ = {isa = PBXBuildFile; productRef = 100000000000000000000202 /* Capture */; };
+		100000000000000000000105 /* Storage in Frameworks */ = {isa = PBXBuildFile; productRef = 100000000000000000000203 /* Storage */; };
+		100000000000000000000106 /* Processing in Frameworks */ = {isa = PBXBuildFile; productRef = 100000000000000000000204 /* Processing */; };
+		100000000000000000000107 /* Platform in Frameworks */ = {isa = PBXBuildFile; productRef = 100000000000000000000205 /* Platform */; };
+		100000000000000000000108 /* ScribeUI in Frameworks */ = {isa = PBXBuildFile; productRef = 100000000000000000000206 /* ScribeUI */; };
+		100000000000000000000109 /* WebRTCBridge in Frameworks */ = {isa = PBXBuildFile; productRef = 100000000000000000000207 /* WebRTCBridge */; };
+		100000000000000000000110 /* FLACBridge in Frameworks */ = {isa = PBXBuildFile; productRef = 100000000000000000000208 /* FLACBridge */; };
+		100000000000000000000111 /* Speakers in Frameworks */ = {isa = PBXBuildFile; productRef = 100000000000000000000209 /* Speakers */; };
+		100000000000000000000112 /* Transcription in Frameworks */ = {isa = PBXBuildFile; productRef = 100000000000000000000210 /* Transcription */; };
+		100000000000000000000113 /* TranscriptionWorkerSupport in Frameworks */ = {isa = PBXBuildFile; productRef = 100000000000000000000211 /* TranscriptionWorkerSupport */; };
+		100000000000000000000114 /* ScribeProcessSupport in Frameworks */ = {isa = PBXBuildFile; productRef = 100000000000000000000212 /* ScribeProcessSupport */; };
+		100000000000000000000115 /* ScribeAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000004 /* ScribeAppTests.swift */; };
+		100000000000000000000116 /* ScribeAppCore in Frameworks */ = {isa = PBXBuildFile; productRef = 100000000000000000000201 /* ScribeAppCore */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		100000000000000000000001 /* ScribeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScribeApp.swift; sourceTree = "<group>"; };
+		100000000000000000000002 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		100000000000000000000007 /* ScribeAppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScribeAppEnvironment.swift; sourceTree = "<group>"; };
+		100000000000000000000008 /* TranscriptionHostService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionHostService.swift; sourceTree = "<group>"; };
+		100000000000000000000003 /* Scribe.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Scribe.entitlements; sourceTree = "<group>"; };
+		100000000000000000000004 /* ScribeAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScribeAppTests.swift; sourceTree = "<group>"; };
+		100000000000000000000005 /* Scribe.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Scribe.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		100000000000000000000006 /* ScribeAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ScribeAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		100000000000000000000301 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (100000000000000000000103 /* ScribeAppCore in Frameworks */, 100000000000000000000104 /* Capture in Frameworks */, 100000000000000000000105 /* Storage in Frameworks */, 100000000000000000000106 /* Processing in Frameworks */, 100000000000000000000107 /* Platform in Frameworks */, 100000000000000000000108 /* ScribeUI in Frameworks */, 100000000000000000000109 /* WebRTCBridge in Frameworks */, 100000000000000000000110 /* FLACBridge in Frameworks */, 100000000000000000000111 /* Speakers in Frameworks */, 100000000000000000000112 /* Transcription in Frameworks */, 100000000000000000000113 /* TranscriptionWorkerSupport in Frameworks */, 100000000000000000000114 /* ScribeProcessSupport in Frameworks */); runOnlyForDeploymentPostprocessing = 0; };
+		100000000000000000000302 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (100000000000000000000116 /* ScribeAppCore in Frameworks */); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		100000000000000000000401 = {isa = PBXGroup; children = (100000000000000000000402 /* Scribe */, 100000000000000000000403 /* Tests */, 100000000000000000000404 /* Products */); sourceTree = "<group>"; };
+		100000000000000000000402 /* Scribe */ = {isa = PBXGroup; children = (100000000000000000000405 /* App */); path = Scribe; sourceTree = "<group>"; };
+		100000000000000000000403 /* Tests */ = {isa = PBXGroup; children = (100000000000000000000406 /* ScribeAppTests */); path = Tests; sourceTree = "<group>"; };
+		100000000000000000000404 /* Products */ = {isa = PBXGroup; children = (100000000000000000000005 /* Scribe.app */, 100000000000000000000006 /* ScribeAppTests.xctest */); name = Products; sourceTree = "<group>"; };
+		100000000000000000000405 /* App */ = {isa = PBXGroup; children = (100000000000000000000001 /* ScribeApp.swift */, 100000000000000000000002 /* AppDelegate.swift */, 100000000000000000000007 /* ScribeAppEnvironment.swift */, 100000000000000000000008 /* TranscriptionHostService.swift */, 100000000000000000000003 /* Scribe.entitlements */); path = App; sourceTree = "<group>"; };
+		100000000000000000000406 /* ScribeAppTests */ = {isa = PBXGroup; children = (100000000000000000000004 /* ScribeAppTests.swift */); path = ScribeAppTests; sourceTree = "<group>"; };
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		100000000000000000000501 /* Scribe */ = {isa = PBXNativeTarget; buildConfigurationList = 100000000000000000000601 /* Build configuration list for PBXNativeTarget "Scribe" */; buildPhases = (100000000000000000000701 /* Sources */, 100000000000000000000301 /* Frameworks */); buildRules = (); dependencies = (); name = Scribe; packageProductDependencies = (100000000000000000000201 /* ScribeAppCore */, 100000000000000000000202 /* Capture */, 100000000000000000000203 /* Storage */, 100000000000000000000204 /* Processing */, 100000000000000000000205 /* Platform */, 100000000000000000000206 /* ScribeUI */, 100000000000000000000207 /* WebRTCBridge */, 100000000000000000000208 /* FLACBridge */, 100000000000000000000209 /* Speakers */, 100000000000000000000210 /* Transcription */, 100000000000000000000211 /* TranscriptionWorkerSupport */, 100000000000000000000212 /* ScribeProcessSupport */); productName = Scribe; productReference = 100000000000000000000005 /* Scribe.app */; productType = "com.apple.product-type.application"; };
+		100000000000000000000502 /* ScribeAppTests */ = {isa = PBXNativeTarget; buildConfigurationList = 100000000000000000000602 /* Build configuration list for PBXNativeTarget "ScribeAppTests" */; buildPhases = (100000000000000000000702 /* Sources */, 100000000000000000000302 /* Frameworks */); buildRules = (); dependencies = (100000000000000000001301 /* PBXTargetDependency */); name = ScribeAppTests; packageProductDependencies = (100000000000000000000201 /* ScribeAppCore */); productName = ScribeAppTests; productReference = 100000000000000000000006 /* ScribeAppTests.xctest */; productType = "com.apple.product-type.bundle.unit-test"; };
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		100000000000000000000801 /* Project object */ = {isa = PBXProject; attributes = {BuildIndependentTargetsInParallel = 1; LastSwiftUpdateCheck = 2700; LastUpgradeCheck = 2700; TargetAttributes = {100000000000000000000501 = {CreatedOnToolsVersion = 27.0;}; 100000000000000000000502 = {CreatedOnToolsVersion = 27.0; TestTargetID = 100000000000000000000501;};};}; buildConfigurationList = 100000000000000000000603 /* Build configuration list for PBXProject "Scribe" */; compatibilityVersion = "Xcode 16.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, Base); mainGroup = 100000000000000000000401; packageReferences = (100000000000000000000901, 100000000000000000000902, 100000000000000000000903, 100000000000000000000904, 100000000000000000000905, 100000000000000000000906, 100000000000000000000907, 100000000000000000000908, 100000000000000000000909, 100000000000000000000910, 100000000000000000000911, 100000000000000000000912); preferredProjectObjectVersion = 77; productRefGroup = 100000000000000000000404 /* Products */; projectDirPath = ""; projectRoot = ""; targets = (100000000000000000000501 /* Scribe */, 100000000000000000000502 /* ScribeAppTests */); };
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		100000000000000000000701 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (100000000000000000000101 /* ScribeApp.swift in Sources */, 100000000000000000000102 /* AppDelegate.swift in Sources */, 100000000000000000000117 /* ScribeAppEnvironment.swift in Sources */, 100000000000000000000118 /* TranscriptionHostService.swift in Sources */); runOnlyForDeploymentPostprocessing = 0; };
+		100000000000000000000702 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (100000000000000000000115 /* ScribeAppTests.swift in Sources */); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		100000000000000000001301 /* PBXTargetDependency */ = {isa = PBXTargetDependency; target = 100000000000000000000501 /* Scribe */; };
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		100000000000000000001001 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {CLANG_ENABLE_MODULES = YES; SWIFT_VERSION = 6.0;}; name = Debug; };
+		100000000000000000001002 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {CLANG_ENABLE_MODULES = YES; SWIFT_VERSION = 6.0;}; name = Release; };
+		100000000000000000001101 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {ARCHS = arm64; CODE_SIGN_ENTITLEMENTS = Scribe/App/Scribe.entitlements; CODE_SIGN_STYLE = Automatic; DEVELOPMENT_TEAM = ""; ENABLE_HARDENED_RUNTIME = NO; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = Scribe/App/Info.plist; MACOSX_DEPLOYMENT_TARGET = 15.0; PRODUCT_BUNDLE_IDENTIFIER = com.scribe.app; PRODUCT_NAME = Scribe; SDKROOT = macosx; SWIFT_VERSION = 6.0; }; name = Debug; };
+		100000000000000000001102 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {ARCHS = arm64; CODE_SIGN_ENTITLEMENTS = Scribe/App/Scribe.entitlements; CODE_SIGN_IDENTITY = "Developer ID Application"; CODE_SIGN_STYLE = Manual; DEVELOPMENT_TEAM = ""; ENABLE_HARDENED_RUNTIME = YES; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = Scribe/App/Info.plist; MACOSX_DEPLOYMENT_TARGET = 15.0; PRODUCT_BUNDLE_IDENTIFIER = com.scribe.app; PRODUCT_NAME = Scribe; PROVISIONING_PROFILE_SPECIFIER = ""; SDKROOT = macosx; SWIFT_VERSION = 6.0; }; name = Release; };
+		100000000000000000001201 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {ARCHS = arm64; BUNDLE_LOADER = "$(TEST_HOST)"; GENERATE_INFOPLIST_FILE = YES; MACOSX_DEPLOYMENT_TARGET = 15.0; PRODUCT_BUNDLE_IDENTIFIER = com.scribe.app.tests; PRODUCT_NAME = ScribeAppTests; SWIFT_VERSION = 6.0; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Scribe.app/Contents/MacOS/Scribe"; }; name = Debug; };
+		100000000000000000001202 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {ARCHS = arm64; BUNDLE_LOADER = "$(TEST_HOST)"; GENERATE_INFOPLIST_FILE = YES; MACOSX_DEPLOYMENT_TARGET = 15.0; PRODUCT_BUNDLE_IDENTIFIER = com.scribe.app.tests; PRODUCT_NAME = ScribeAppTests; SWIFT_VERSION = 6.0; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Scribe.app/Contents/MacOS/Scribe"; }; name = Release; };
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		100000000000000000000601 /* Build configuration list for PBXNativeTarget "Scribe" */ = {isa = XCConfigurationList; buildConfigurations = (100000000000000000001101 /* Debug */, 100000000000000000001102 /* Release */); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		100000000000000000000602 /* Build configuration list for PBXNativeTarget "ScribeAppTests" */ = {isa = XCConfigurationList; buildConfigurations = (100000000000000000001201 /* Debug */, 100000000000000000001202 /* Release */); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		100000000000000000000603 /* Build configuration list for PBXProject "Scribe" */ = {isa = XCConfigurationList; buildConfigurations = (100000000000000000001001 /* Debug */, 100000000000000000001002 /* Release */); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		100000000000000000000901 = {isa = XCLocalSwiftPackageReference; relativePath = Scribe/App; };
+		100000000000000000000902 = {isa = XCLocalSwiftPackageReference; relativePath = Scribe/Capture; };
+		100000000000000000000903 = {isa = XCLocalSwiftPackageReference; relativePath = Scribe/Storage; };
+		100000000000000000000904 = {isa = XCLocalSwiftPackageReference; relativePath = Scribe/Processing; };
+		100000000000000000000905 = {isa = XCLocalSwiftPackageReference; relativePath = Scribe/Platform; };
+		100000000000000000000906 = {isa = XCLocalSwiftPackageReference; relativePath = Scribe/UI; };
+		100000000000000000000907 = {isa = XCLocalSwiftPackageReference; relativePath = Native/WebRTCBridge; };
+		100000000000000000000908 = {isa = XCLocalSwiftPackageReference; relativePath = Native/FLACBridge; };
+		100000000000000000000909 = {isa = XCLocalSwiftPackageReference; relativePath = Modules/Speakers; };
+		100000000000000000000910 = {isa = XCLocalSwiftPackageReference; relativePath = Modules/Transcription; };
+		100000000000000000000911 = {isa = XCLocalSwiftPackageReference; relativePath = Workers/TranscriptionWorker; };
+		100000000000000000000912 = {isa = XCLocalSwiftPackageReference; relativePath = Tools/ScribeProcess; };
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		100000000000000000000201 /* ScribeAppCore */ = {isa = XCSwiftPackageProductDependency; package = 100000000000000000000901; productName = ScribeAppCore; };
+		100000000000000000000202 /* Capture */ = {isa = XCSwiftPackageProductDependency; package = 100000000000000000000902; productName = Capture; };
+		100000000000000000000203 /* Storage */ = {isa = XCSwiftPackageProductDependency; package = 100000000000000000000903; productName = Storage; };
+		100000000000000000000204 /* Processing */ = {isa = XCSwiftPackageProductDependency; package = 100000000000000000000904; productName = Processing; };
+		100000000000000000000205 /* Platform */ = {isa = XCSwiftPackageProductDependency; package = 100000000000000000000905; productName = Platform; };
+		100000000000000000000206 /* ScribeUI */ = {isa = XCSwiftPackageProductDependency; package = 100000000000000000000906; productName = ScribeUI; };
+		100000000000000000000207 /* WebRTCBridge */ = {isa = XCSwiftPackageProductDependency; package = 100000000000000000000907; productName = WebRTCBridge; };
+		100000000000000000000208 /* FLACBridge */ = {isa = XCSwiftPackageProductDependency; package = 100000000000000000000908; productName = FLACBridge; };
+		100000000000000000000209 /* Speakers */ = {isa = XCSwiftPackageProductDependency; package = 100000000000000000000909; productName = Speakers; };
+		100000000000000000000210 /* Transcription */ = {isa = XCSwiftPackageProductDependency; package = 100000000000000000000910; productName = Transcription; };
+		100000000000000000000211 /* TranscriptionWorkerSupport */ = {isa = XCSwiftPackageProductDependency; package = 100000000000000000000911; productName = TranscriptionWorkerSupport; };
+		100000000000000000000212 /* ScribeProcessSupport */ = {isa = XCSwiftPackageProductDependency; package = 100000000000000000000912; productName = ScribeProcessSupport; };
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 100000000000000000000801 /* Project object */;
+}

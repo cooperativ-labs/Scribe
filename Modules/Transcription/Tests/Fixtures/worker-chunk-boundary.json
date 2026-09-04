@@ -1,0 +1,45 @@
+{
+  "text": "Please wait. The weather today is fine.",
+  "tokens": [],
+  "chunks": [
+    {
+      "chunkIndex": 0,
+      "chunkStartSeconds": 0,
+      "timesAreAbsolute": true,
+      "tokens": [
+        { "text": " Please", "tokenID": 10, "startSeconds": 1.0, "endSeconds": 1.4, "confidence": 0.9 },
+        { "text": " wait", "tokenID": 11, "startSeconds": 1.5, "endSeconds": 1.9, "confidence": 0.9 },
+        { "text": ".", "tokenID": 7883, "startSeconds": 1.9, "endSeconds": 1.98, "confidence": 0.8 },
+        { "text": " The", "tokenID": 20, "startSeconds": 13.2, "endSeconds": 13.5, "confidence": 0.9 },
+        { "text": " weather", "tokenID": 21, "startSeconds": 13.6, "endSeconds": 14.0, "confidence": 0.9 }
+      ]
+    },
+    {
+      "chunkIndex": 1,
+      "chunkStartSeconds": 12.88,
+      "timesAreAbsolute": true,
+      "tokens": [
+        { "text": " The", "tokenID": 20, "startSeconds": 13.2, "endSeconds": 13.5, "confidence": 0.9 },
+        { "text": " weather", "tokenID": 21, "startSeconds": 13.6, "endSeconds": 14.0, "confidence": 0.9 },
+        { "text": " today", "tokenID": 22, "startSeconds": 15.0, "endSeconds": 15.5, "confidence": 0.9 },
+        { "text": " is", "tokenID": 23, "startSeconds": 26.0, "endSeconds": 26.3, "confidence": 0.9 },
+        { "text": " fine", "tokenID": 24, "startSeconds": 26.5, "endSeconds": 26.9, "confidence": 0.9 },
+        { "text": ".", "tokenID": 7883, "startSeconds": 26.9, "endSeconds": 26.98, "confidence": 0.8 }
+      ]
+    },
+    {
+      "chunkIndex": 2,
+      "chunkStartSeconds": 25.76,
+      "timesAreAbsolute": true,
+      "tokens": [
+        { "text": " is", "tokenID": 23, "startSeconds": 26.0, "endSeconds": 26.3, "confidence": 0.9 },
+        { "text": " fine", "tokenID": 24, "startSeconds": 26.5, "endSeconds": 26.9, "confidence": 0.9 },
+        { "text": ".", "tokenID": 7883, "startSeconds": 26.9, "endSeconds": 26.98, "confidence": 0.8 }
+      ]
+    }
+  ],
+  "sourceDurationSeconds": 40.603,
+  "processingTimeSeconds": 0.732,
+  "usedChunkedProcessing": true,
+  "timestampUnit": "seconds"
+}

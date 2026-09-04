@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleIdentifier</key>
+	<string>io.cooperativ.scribe.captureharness</string>
+	<key>CFBundleName</key>
+	<string>capture-harness</string>
+	<key>CFBundleExecutable</key>
+	<string>capture-harness</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>15.0</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>The Scribe capture harness records the microphone alongside system audio to measure ScreenCaptureKit dual-track capture timing.</string>
+</dict>
+</plist>

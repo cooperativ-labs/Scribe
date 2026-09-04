@@ -1,0 +1,153 @@
+{
+  "callbackThreads" : [
+    "audio: queue=io.cooperativ.scribe.captureharness.audio tid=12505916 main=false qos=25",
+    "audio: queue=io.cooperativ.scribe.captureharness.audio tid=12505917 main=false qos=25",
+    "audio: queue=io.cooperativ.scribe.captureharness.audio tid=12506241 main=false qos=25",
+    "audio: queue=io.cooperativ.scribe.captureharness.audio tid=12506438 main=false qos=25",
+    "microphone: queue=io.cooperativ.scribe.captureharness.microphone tid=12505916 main=false qos=25",
+    "microphone: queue=io.cooperativ.scribe.captureharness.microphone tid=12505917 main=false qos=25",
+    "microphone: queue=io.cooperativ.scribe.captureharness.microphone tid=12506241 main=false qos=25",
+    "microphone: queue=io.cooperativ.scribe.captureharness.microphone tid=12506438 main=false qos=25"
+  ],
+  "devices" : "MacBook Pro built-in speakers (idle), MacBook Pro built-in microphone (BuiltInMicrophoneDevice)",
+  "expectation" : "System track is silent or digital silence; microphone track carries near-end speech only. Used to check that AEC does not attenuate local speech.",
+  "files" : [
+    {
+      "bytes" : 2887680,
+      "channels" : 2,
+      "file" : "system.wav",
+      "frames" : 723840,
+      "sampleRate" : 48000,
+      "sourceSegments" : [
+        "system-0001.caf"
+      ],
+      "track" : "system"
+    },
+    {
+      "bytes" : 1443840,
+      "channels" : 1,
+      "file" : "microphone.wav",
+      "frames" : 719872,
+      "sampleRate" : 48000,
+      "sourceSegments" : [
+        "microphone-0001.caf"
+      ],
+      "track" : "microphone"
+    }
+  ],
+  "filter" : "display 3 including all applications (all system audio)",
+  "formatChangedMidTake" : false,
+  "id" : "builtin-near-end-only",
+  "macOS" : "Version 27.0 (Build 26A5425a)",
+  "microphone" : "system default input (MacBook Pro Microphone, uid BuiltInMicrophoneDevice)",
+  "notes" : "Operator spoke continuously into the built-in microphone with no playback of any kind. System track is expected to be digital silence.",
+  "rawCaptureDirectory" : "/Users/jake/Development/Tooling/Scribe/captures/fixture builtin-near-end-only 2026-09-03 21-01-43",
+  "recordedAt" : "2026-09-03T21:02:10.085",
+  "recordedSeconds" : 15.065594124986092,
+  "requestedSeconds" : 15,
+  "scenario" : "near-end-only",
+  "schemaVersion" : 1,
+  "scope" : "all-system-audio",
+  "timing" : {
+    "clockRelationship" : "both tracks declare SCStream.presentationTimeStamp; compare presentation timestamps on that common timeline",
+    "ignoredLines" : 0,
+    "journal" : "/Users/jake/Development/Tooling/Scribe/captures/fixture builtin-near-end-only 2026-09-03 21-01-43/timeline.jsonl",
+    "parsedBuffers" : 2160,
+    "timelineRule" : "Use each buffer's presentation timestamp (not callback arrival time) mapped with rational CMTime arithmetic to a session origin. Preserve each track's initial offset; insert silence only for documented positive gaps and retain overlaps for explicit resolution. Resample only a processing copy when measured timestamp/sample-count drift requires it.",
+    "tracks" : {
+      "audio" : {
+        "bufferCount" : 754,
+        "deliveredDurationSeconds" : 15.079999999999767,
+        "deliveredFrames" : 723840,
+        "driftPPM" : -8.3375687727288905e-07,
+        "driftSeconds" : -1.2573053709274973e-11,
+        "finalTimestampSeconds" : 208508.33546545799,
+        "formatChanges" : [
+
+        ],
+        "formats" : [
+          "{\"mBitsPerChannel\":32,\"mBytesPerFrame\":4,\"mBytesPerPacket\":4,\"mChannelsPerFrame\":2,\"mFormatFlagNames\":[\"Float\",\"Packed\",\"NonInterleaved\"],\"mFormatFlags\":41,\"mFormatID\":1819304813,\"mFormatIDString\":\"lpcm\",\"mFramesPerPacket\":1,\"mSampleRate\":48000}"
+        ],
+        "gaps" : [
+
+        ],
+        "initialTimestampSeconds" : 208493.255465458,
+        "missingSampleRateBuffers" : 0,
+        "overlaps" : [
+
+        ],
+        "timestampSpanSeconds" : 15.079999999987194
+      },
+      "microphone" : {
+        "bufferCount" : 1406,
+        "deliveredDurationSeconds" : 14.997333333333644,
+        "deliveredFrames" : 719872,
+        "driftPPM" : -5.6971971000500275e-08,
+        "driftSeconds" : -8.5442763975152047e-13,
+        "finalTimestampSeconds" : 208508.37845833335,
+        "formatChanges" : [
+
+        ],
+        "formats" : [
+          "{\"channelLayoutTag\":6553601,\"mBitsPerChannel\":32,\"mBytesPerFrame\":4,\"mBytesPerPacket\":4,\"mChannelsPerFrame\":1,\"mFormatFlagNames\":[\"Float\",\"Packed\"],\"mFormatFlags\":9,\"mFormatID\":1819304813,\"mFormatIDString\":\"lpcm\",\"mFramesPerPacket\":1,\"mSampleRate\":48000}"
+        ],
+        "gaps" : [
+
+        ],
+        "initialTimestampSeconds" : 208493.38112500001,
+        "missingSampleRateBuffers" : 0,
+        "overlaps" : [
+
+        ],
+        "timestampSpanSeconds" : 14.99733333333279
+      }
+    },
+    "warnings" : [
+
+    ]
+  },
+  "title" : "Near-end only",
+  "tool" : "capture-harness fixture",
+  "tracks" : {
+    "audio" : {
+      "buffers" : 754,
+      "firstPresentationTimestampSeconds" : 208493.255465458,
+      "frames" : 723840,
+      "lastPresentationTimestampSeconds" : 208508.315465458,
+      "level" : {
+        "digitalSilence" : true,
+        "peak" : 0,
+        "peakDBFS" : -200,
+        "rms" : 0,
+        "rmsDBFS" : -200,
+        "samples" : 1447680
+      },
+      "segments" : [
+        "system-0001.caf"
+      ],
+      "writeFailures" : [
+
+      ]
+    },
+    "microphone" : {
+      "buffers" : 1406,
+      "firstPresentationTimestampSeconds" : 208493.38112500001,
+      "frames" : 719872,
+      "lastPresentationTimestampSeconds" : 208508.36779166668,
+      "level" : {
+        "digitalSilence" : false,
+        "peak" : 0.098513148725032806,
+        "peakDBFS" : -20.130115991546447,
+        "rms" : 0.011551924844705968,
+        "rmsDBFS" : -38.746912904553227,
+        "samples" : 719872
+      },
+      "segments" : [
+        "microphone-0001.caf"
+      ],
+      "writeFailures" : [
+
+      ]
+    }
+  }
+}

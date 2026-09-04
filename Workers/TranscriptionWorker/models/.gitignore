@@ -1,0 +1,4 @@
+# Development-only model snapshots are downloaded by
+# Scripts/package-transcription-models.sh and are never source-controlled.
+*
+!.gitignore

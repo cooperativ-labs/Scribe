@@ -1,0 +1,12 @@
+1
+00:00:01,000 --> 00:00:09,000
+Speaker 1: I think we should ship the
+release today. It was verified last night.
+Noor: Wait, the migration has not been
+verified yet.
+Speaker 3: Both of you are talking over
+the summary.
+
+2
+00:00:09,500 --> 00:00:11,000
+Speaker 1: Sorry, go ahead.

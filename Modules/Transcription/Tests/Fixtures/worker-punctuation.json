@@ -1,0 +1,13 @@
+{
+  "text": "Hello, world!",
+  "tokens": [
+    { "text": "Hello", "tokenID": 1, "startSeconds": 0.08, "endSeconds": 0.4, "confidence": 0.9 },
+    { "text": ",", "tokenID": 2, "startSeconds": 0.4, "endSeconds": 0.48, "confidence": 0.8 },
+    { "text": "world", "tokenID": 3, "startSeconds": 0.56, "endSeconds": 0.88, "confidence": 0.9 },
+    { "text": "!", "tokenID": 4, "startSeconds": 0.88, "endSeconds": 0.96, "confidence": 0.8 }
+  ],
+  "sourceDurationSeconds": 2,
+  "processingTimeSeconds": 0.1,
+  "usedChunkedProcessing": false,
+  "timestampUnit": "seconds"
+}

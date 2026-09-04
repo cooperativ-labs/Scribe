@@ -1,0 +1,12 @@
+{
+  "text": "Café naïve!",
+  "tokens": [
+    { "text": " Café", "tokenID": 40, "startSeconds": 0.2, "endSeconds": 0.6, "confidence": 0.9 },
+    { "text": " naïve", "tokenID": 41, "startSeconds": 0.7, "endSeconds": 1.1, "confidence": 0.9 },
+    { "text": "!", "tokenID": 7948, "startSeconds": 1.1, "endSeconds": 1.18, "confidence": 0.8 }
+  ],
+  "sourceDurationSeconds": 13.109,
+  "processingTimeSeconds": 0.303,
+  "usedChunkedProcessing": false,
+  "timestampUnit": "seconds"
+}

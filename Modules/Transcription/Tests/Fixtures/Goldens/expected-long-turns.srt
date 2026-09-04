@@ -1,0 +1,11 @@
+1
+00:00:00,000 --> 00:00:29,500
+Speaker 1: This is a deliberately long
+speaking turn that remains a single
+canonical segment.
+
+2
+00:00:30,200 --> 00:00:59,800
+Speaker 1: A later builder may split
+export cues without changing canonical
+chronology.

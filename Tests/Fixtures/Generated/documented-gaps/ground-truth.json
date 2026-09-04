@@ -1,0 +1,61 @@
+{
+  "caseID" : "documented-gaps",
+  "delaySegments" : [
+    {
+      "delaySamples" : 1440,
+      "endSeconds" : 10,
+      "startSeconds" : 0
+    }
+  ],
+  "description" : "Far-end echo and local speech with two explicit microphone capture gaps.",
+  "driftRatio" : 1,
+  "durationSeconds" : 10,
+  "echo" : {
+    "channels" : 1,
+    "file" : "echo.wav",
+    "sampleRate" : 48000
+  },
+  "gapIntervals" : [
+    {
+      "endSeconds" : 2.25,
+      "startSeconds" : 2
+    },
+    {
+      "endSeconds" : 7.1,
+      "startSeconds" : 7
+    }
+  ],
+  "localSpeech" : {
+    "channels" : 1,
+    "file" : "local-speech.wav",
+    "sampleRate" : 48000,
+    "variant" : "independent-speech-like"
+  },
+  "microphone" : {
+    "channels" : 1,
+    "file" : "microphone.wav",
+    "sampleRate" : 48000
+  },
+  "nearEndRegions" : [
+    {
+      "endSeconds" : 10,
+      "startSeconds" : 0
+    }
+  ],
+  "playback" : {
+    "channels" : 1,
+    "file" : "playback.wav",
+    "sampleRate" : 48000,
+    "variant" : "speech-like"
+  },
+  "reverbTaps" : [
+    0.65,
+    0.31,
+    0.17,
+    0.09,
+    0.045
+  ],
+  "schemaVersion" : 1,
+  "seed" : "0x5C71BE5ED",
+  "trueDelaySamples" : 1440
+}

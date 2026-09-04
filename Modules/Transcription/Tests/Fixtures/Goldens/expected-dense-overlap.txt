@@ -1,0 +1,9 @@
+[00:00:01.000 --> 00:00:05.000] [overlap] Speaker 1: I think we should ship the release today.
+
+[00:00:02.800 --> 00:00:06.200] [overlap] Noor: Wait, the migration has not been verified yet.
+
+[00:00:05.500 --> 00:00:09.000] [overlap] Speaker 3: Both of you are talking over the summary.
+
+[00:00:06.500 --> 00:00:08.000] [overlap] Speaker 1: It was verified last night.
+
+[00:00:09.500 --> 00:00:11.000] Speaker 1: Sorry, go ahead.

@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "transcript_id": "overlap",
+  "revision": 1,
+  "status": "completeWithWarnings",
+  "created_at": "2026-09-03T12:03:00Z",
+  "source": { "filename": "overlap.flac", "duration_ms": 15000, "checksum": "sha256:overlap" },
+  "language": "en",
+  "language_source": "detected",
+  "timestamp_unit": "milliseconds",
+  "timestamp_origin": "source_start",
+  "speakers": [{ "id": "speaker_1", "identity_assignment": "unmatched", "label_snapshot": "Speaker 1" }, { "id": "speaker_2", "identity_assignment": "unmatched", "label_snapshot": "Speaker 2" }],
+  "segments": [{ "id": "segment_001", "speaker_id": "speaker_1", "speaker_label": "Speaker 1", "start_ms": 1000, "end_ms": 5000, "text": "I think we should ship today.", "overlap": true, "timing_quality": "asr_word", "speaker_confidence": null }, { "id": "segment_002", "speaker_id": "speaker_2", "speaker_label": "Speaker 2", "start_ms": 2800, "end_ms": 5500, "text": "Wait, we need one more test.", "overlap": true, "timing_quality": "asr_word", "speaker_confidence": null }],
+  "processing_options": { "diarization": true },
+  "engine_revisions": { "asr": "parakeet-v1" },
+  "warnings": [{ "code": "overlap_detected", "message": "Two speakers overlap between 2800 and 5000 milliseconds." }]
+}

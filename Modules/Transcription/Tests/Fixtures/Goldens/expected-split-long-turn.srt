@@ -1,0 +1,18 @@
+1
+00:00:02,000 --> 00:00:07,450
+Priya Raman: Today we are going to walk
+through the entire deployment checklist
+
+2
+00:00:07,500 --> 00:00:13,450
+Priya Raman: from start to finish, and I
+want everyone to follow along in
+
+3
+00:00:13,500 --> 00:00:16,950
+Priya Raman: their own terminal so nothing
+is missed.
+
+4
+00:00:18,150 --> 00:00:19,930
+Speaker 2: Sounds good to me.

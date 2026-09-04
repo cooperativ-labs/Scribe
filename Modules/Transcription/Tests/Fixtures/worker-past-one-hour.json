@@ -1,0 +1,12 @@
+{
+  "text": "Still speaking.",
+  "tokens": [
+    { "text": " Still", "tokenID": 30, "startSeconds": 3600.08, "endSeconds": 3600.4, "confidence": 0.9 },
+    { "text": " speaking", "tokenID": 31, "startSeconds": 3600.5, "endSeconds": 3601.1, "confidence": 0.9 },
+    { "text": ".", "tokenID": 7883, "startSeconds": 3601.1, "endSeconds": 3601.18, "confidence": 0.8 }
+  ],
+  "sourceDurationSeconds": 3700,
+  "processingTimeSeconds": 1.2,
+  "usedChunkedProcessing": true,
+  "timestampUnit": "seconds"
+}

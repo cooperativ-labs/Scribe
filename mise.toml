@@ -1,0 +1,32 @@
+# Project commands for mise (https://mise.jdx.dev).
+#
+# Scribe is an Xcode macOS app: Xcode supplies the Apple SDK and the Swift
+# toolchain. Do not use mise's standalone Swift toolchain for app builds.
+
+[tasks.build]
+description = "Build the Debug macOS app"
+run = "Scripts/build-app.sh"
+
+[tasks.test]
+description = "Run the host-app unit tests"
+run = "Scripts/test-app.sh"
+
+[tasks.test-platform]
+description = "Run the Platform Swift package tests"
+run = "cd Scribe/Platform && swift test"
+
+[tasks.test-ui]
+description = "Run the UI Swift package tests"
+run = "cd Scribe/UI && swift test"
+
+[tasks.version]
+description = "Set the next UTC timestamp-based marketing and build version"
+run = "Scripts/bump-minor-version.sh"
+
+[tasks.package]
+description = "Build, sign, notarize, and archive from reviewed local release inputs"
+run = "Scripts/package-app.sh --inputs Scripts/release-inputs.local.env"
+
+[tasks.release]
+description = "Publish the committed, notarized archive and checksum as a GitHub release"
+run = "Scripts/release-app.sh --inputs Scripts/release-inputs.local.env"

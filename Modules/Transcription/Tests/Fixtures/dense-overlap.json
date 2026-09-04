@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "transcript_id": "dense-overlap",
+  "revision": 1,
+  "status": "completeWithWarnings",
+  "created_at": "2026-09-03T12:12:00Z",
+  "source": {
+    "filename": "crosstalk.flac",
+    "duration_ms": 20000,
+    "checksum": "sha256:dense"
+  },
+  "language": "en",
+  "language_source": "detected",
+  "timestamp_unit": "milliseconds",
+  "timestamp_origin": "source_start",
+  "speakers": [
+    {
+      "id": "speaker_1",
+      "identity_assignment": "unmatched",
+      "label_snapshot": "Speaker 1"
+    },
+    {
+      "id": "speaker_2",
+      "profile_id": "profile-noor",
+      "identity_assignment": "automatic",
+      "label_snapshot": "Noor"
+    },
+    {
+      "id": "speaker_3",
+      "identity_assignment": "unmatched",
+      "label_snapshot": "Speaker 3"
+    }
+  ],
+  "segments": [
+    {
+      "id": "segment_001",
+      "speaker_id": "speaker_1",
+      "speaker_label": "Speaker 1",
+      "start_ms": 1000,
+      "end_ms": 5000,
+      "text": "I think we should ship the release today.",
+      "overlap": true,
+      "timing_quality": "asr_word",
+      "speaker_confidence": null
+    },
+    {
+      "id": "segment_002",
+      "speaker_id": "speaker_2",
+      "speaker_label": "Noor",
+      "start_ms": 2800,
+      "end_ms": 6200,
+      "text": "Wait, the migration has not been verified yet.",
+      "overlap": true,
+      "timing_quality": "asr_word",
+      "speaker_confidence": null
+    },
+    {
+      "id": "segment_003",
+      "speaker_id": "speaker_3",
+      "speaker_label": "Speaker 3",
+      "start_ms": 5500,
+      "end_ms": 9000,
+      "text": "Both of you are talking over the summary.",
+      "overlap": true,
+      "timing_quality": "asr_word",
+      "speaker_confidence": null
+    },
+    {
+      "id": "segment_004",
+      "speaker_id": "speaker_1",
+      "speaker_label": "Speaker 1",
+      "start_ms": 6500,
+      "end_ms": 8000,
+      "text": "It was verified last night.",
+      "overlap": true,
+      "timing_quality": "asr_word",
+      "speaker_confidence": null
+    },
+    {
+      "id": "segment_005",
+      "speaker_id": "speaker_1",
+      "speaker_label": "Speaker 1",
+      "start_ms": 9500,
+      "end_ms": 11000,
+      "text": "Sorry, go ahead.",
+      "overlap": false,
+      "timing_quality": "asr_word",
+      "speaker_confidence": null
+    }
+  ],
+  "processing_options": {
+    "diarization": true
+  },
+  "engine_revisions": {
+    "asr": "parakeet-v1",
+    "diarization": "offline-v1"
+  },
+  "warnings": [
+    {
+      "code": "overlap_detected",
+      "message": "Three speakers overlap between 2800 and 9000 milliseconds."
+    }
+  ]
+}

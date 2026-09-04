@@ -1,0 +1,54 @@
+{
+  "caseID" : "double-talk",
+  "delaySegments" : [
+    {
+      "delaySamples" : 1440,
+      "endSeconds" : 10,
+      "startSeconds" : 0
+    }
+  ],
+  "description" : "Concurrent tonal playback echo and independent local speech.",
+  "driftRatio" : 1,
+  "durationSeconds" : 10,
+  "echo" : {
+    "channels" : 1,
+    "file" : "echo.wav",
+    "sampleRate" : 48000
+  },
+  "gapIntervals" : [
+
+  ],
+  "localSpeech" : {
+    "channels" : 1,
+    "file" : "local-speech.wav",
+    "sampleRate" : 48000,
+    "variant" : "independent-speech-like"
+  },
+  "microphone" : {
+    "channels" : 1,
+    "file" : "microphone.wav",
+    "sampleRate" : 48000
+  },
+  "nearEndRegions" : [
+    {
+      "endSeconds" : 10,
+      "startSeconds" : 0
+    }
+  ],
+  "playback" : {
+    "channels" : 1,
+    "file" : "playback.wav",
+    "sampleRate" : 48000,
+    "variant" : "tonal"
+  },
+  "reverbTaps" : [
+    0.65,
+    0.31,
+    0.17,
+    0.09,
+    0.045
+  ],
+  "schemaVersion" : 1,
+  "seed" : "0x5C71BE5ED",
+  "trueDelaySamples" : 1440
+}

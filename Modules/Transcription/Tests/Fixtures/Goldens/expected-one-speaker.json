@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "transcript_id": "one-speaker",
+  "revision": 1,
+  "status": "complete",
+  "created_at": "2026-09-03T12:00:00Z",
+  "source": {
+    "filename": "one-speaker.flac",
+    "duration_ms": 12000,
+    "checksum": "sha256:one"
+  },
+  "language": "en",
+  "language_source": "detected",
+  "timestamp_unit": "milliseconds",
+  "timestamp_origin": "source_start",
+  "speakers": [
+    {
+      "id": "speaker_1",
+      "profile_id": null,
+      "identity_assignment": "unmatched",
+      "label_snapshot": "Speaker 1"
+    }
+  ],
+  "segments": [
+    {
+      "id": "segment_001",
+      "speaker_id": "speaker_1",
+      "speaker_label": "Speaker 1",
+      "start_ms": 1000,
+      "end_ms": 4200,
+      "text": "Welcome to the meeting.",
+      "overlap": false,
+      "timing_quality": "asr_word",
+      "speaker_confidence": null,
+      "words": [
+        {
+          "text": "Welcome",
+          "start_ms": 1000,
+          "end_ms": 1800
+        },
+        {
+          "text": "to",
+          "start_ms": 1850,
+          "end_ms": 2000
+        },
+        {
+          "text": "the",
+          "start_ms": 2050,
+          "end_ms": 2200
+        },
+        {
+          "text": "meeting.",
+          "start_ms": 2250,
+          "end_ms": 4200
+        }
+      ]
+    }
+  ],
+  "subtitle_cue_mappings": [
+    {
+      "cue_id": "cue_001",
+      "parent_segment_id": "segment_001",
+      "start_ms": 1000,
+      "end_ms": 4200
+    }
+  ],
+  "processing_options": {
+    "diarization": true,
+    "punctuation": true
+  },
+  "engine_revisions": {
+    "asr": "parakeet-v1",
+    "diarization": "offline-v1"
+  },
+  "warnings": []
+}

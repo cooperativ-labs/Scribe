@@ -1,0 +1,12 @@
+{
+  "text": "Hello world",
+  "tokens": [
+    { "text": "▁Hello", "tokenID": 10, "startSeconds": 0.0, "endSeconds": 0.08, "confidence": 1 },
+    { "text": "▁wor", "tokenID": 11, "startSeconds": 0.16, "endSeconds": 0.24, "confidence": 1 },
+    { "text": "ld", "tokenID": 12, "startSeconds": 0.24, "endSeconds": 0.32, "confidence": 1 }
+  ],
+  "sourceDurationSeconds": 2,
+  "processingTimeSeconds": 0.1,
+  "usedChunkedProcessing": false,
+  "timestampUnit": "seconds"
+}

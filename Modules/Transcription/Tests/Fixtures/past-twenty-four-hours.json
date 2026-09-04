@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "transcript_id": "past-twenty-four-hours",
+  "revision": 1,
+  "status": "complete",
+  "created_at": "2026-09-03T12:09:00Z",
+  "source": { "filename": "day-plus.flac", "duration_ms": 97200000, "checksum": "sha256:day" },
+  "language": "en",
+  "language_source": "detected",
+  "timestamp_unit": "milliseconds",
+  "timestamp_origin": "source_start",
+  "speakers": [{ "id": "speaker_1", "identity_assignment": "unmatched", "label_snapshot": "Speaker 1" }],
+  "segments": [{ "id": "segment_001", "speaker_id": "speaker_1", "speaker_label": "Speaker 1", "start_ms": 90061250, "end_ms": 90064500, "text": "This starts more than twenty-four hours into the source.", "overlap": false, "timing_quality": "asr_word", "speaker_confidence": null }],
+  "processing_options": {},
+  "engine_revisions": { "asr": "parakeet-v1" },
+  "warnings": []
+}

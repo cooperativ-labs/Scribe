@@ -1,0 +1,219 @@
+{
+  "schemaVersion": 1,
+  "profileID": "parakeet-v3-offline-diarization-v1",
+  "fluidAudio": {
+    "repository": "https://github.com/FluidInference/FluidAudio.git",
+    "revision": "v0.12.4 (9830ce835881c0d0d40f90aabfaae3a6da5bebfb)"
+  },
+  "telemetry": {
+    "enabled": false,
+    "runtimeDownloadsAllowed": false
+  },
+  "asrRuntime": {
+    "adapter": "ParakeetAdapter",
+    "input": "16 kHz mono PCM file",
+    "timestampUnit": "seconds",
+    "chosenComputeUnits": "cpuAndNeuralEngine",
+    "allowLowPrecisionAccumulationOnGPU": true,
+    "longFileProcessing": {
+      "implementation": "FluidAudio v0.12.4 disk-backed ChunkProcessor",
+      "modelWindowSeconds": 14.88,
+      "overlapSeconds": 2.0,
+      "leftContextSeconds": 0.08,
+      "absoluteOffsets": "decoder frame timestamps are rebased by chunkStart / 1,280 samples"
+    },
+    "benchmark": {
+      "machine": "Apple Silicon (arm64), macOS 27.0",
+      "fixtureGenerator": "macOS local speech voices; 16 kHz mono Float32 WAV",
+      "measurement": "ASRBenchmark under /usr/bin/time -l; ASR throughput excludes model load, peak RSS includes it",
+      "selected": {
+        "computeUnits": "cpuAndNeuralEngine",
+        "allowLowPrecisionAccumulationOnGPU": true,
+        "windowSeconds": 14.88,
+        "overlapSeconds": 2.0,
+        "english": { "durationSeconds": 12.4536875, "asrProcessingSeconds": 0.278975, "throughputRTFx": 44.64, "peakRSSBytes": 464994304 },
+        "german": { "durationSeconds": 13.1090625, "asrProcessingSeconds": 0.303109, "throughputRTFx": 43.25, "peakRSSBytes": 465518592 },
+        "longLeadingContext": { "durationSeconds": 40.602875, "asrProcessingSeconds": 0.73231, "throughputRTFx": 55.45, "peakRSSBytes": 466518016, "chunked": true }
+      },
+      "comparison": {
+        "computeUnits": "cpuAndGPU",
+        "english": { "durationSeconds": 12.4536875, "asrProcessingSeconds": 0.917875, "throughputRTFx": 13.57, "peakRSSBytes": 2397061120 },
+        "decision": "Rejected: slower ASR and materially higher peak memory than CPU+ANE."
+      }
+    }
+  },
+  "diarizationRuntime": {
+    "adapter": "OfflineDiarizationAdapter",
+    "pipeline": "FluidAudio v0.12.4 OfflineDiarizerManager with pyannote segmentation, WeSpeaker embeddings, and global VBx clustering",
+    "input": "any locally readable audio; streaming conversion to 16 kHz mono Float32 disk-backed PCM",
+    "knownSpeakerCount": "OfflineDiarizerConfig.withSpeakers(exactly:) when supplied; otherwise automatic global clustering",
+    "overlap": "postProcessing.exclusiveSegments=false preserves pinned-build overlapping TimedSpeakerSegment intervals",
+    "embedding": {
+      "modelID": "wespeaker-embedding-coreml",
+      "preprocessingVersion": "fluidaudio-offline-fbank-16khz-mono-v0.12.4",
+      "normalizationVersion": "l2-unit-v1",
+      "source": "DiarizationResult.speakerDatabase, re-normalized after FluidAudio's centroid averaging"
+    },
+    "benchmark": {
+      "machine": "Apple Silicon (arm64), macOS 27.0",
+      "measurement": "DiarizationBenchmark under /usr/bin/time -l; peak RSS includes staged Core ML model loading",
+      "twoSpeaker": {
+        "fixture": "51.1255 s alternating local English/German speech fixture, knownSpeakerCount=2",
+        "result": "four chronological intervals with speaker_1 → speaker_2 → speaker_1 → speaker_2",
+        "processingSeconds": 1.548719048500061,
+        "peakRSSBytes": 469876736,
+        "diskBackedAudio": true
+      },
+      "fourSpeaker": {
+        "fixture": "101.3049375 s four-voice synthetic stress fixture, knownSpeakerCount=4",
+        "result": "seven intervals covering speaker_1 through speaker_4; four versioned embeddings exported",
+        "processingSeconds": 2.5939481258392334,
+        "peakRSSBytes": 469942272,
+        "diskBackedAudio": true
+      },
+      "twoHourProfile": {
+        "fixture": "7200 s 16 kHz mono Float32 looped speech source (451122376 byte disk-backed PCM)",
+        "result": "did not complete in the available validation run after disk-backed conversion and model initialization; do not claim a two-hour peak-RSS figure for the pinned pipeline",
+        "followUp": "profile with consented long-form speech under a dedicated process monitor before release; keep the disk-backed source path mandatory"
+      }
+    }
+  },
+  "totalDeclaredOnDiskBytes": 505044116,
+  "totalDeclaredOnDiskSize": "505.0 MB (481.6 MiB; exact staged file bytes, before filesystem allocation)",
+  "vad": {
+    "separateModelRequired": false,
+    "reason": "The pinned pyannote segmentation bundle supplies speech activity and overlap decisions for the offline VBx pipeline."
+  },
+  "assets": [
+    {
+      "id": "parakeet-v3-preprocessor",
+      "relativePath": "parakeet-tdt-0.6b-v3-coreml",
+      "upstream": { "repository": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml", "revision": "7dd20fe6b1797d35f5e3307e8b1732d9a178edfe" },
+      "checksum": { "algorithm": "SHA-256", "value": "129b76e3aeafa8afa3ea76d995b964b145fe83700d579f6ff42c4c38fa0968ea", "scope": "Preprocessor.mlmodelc/weights/weight.bin" },
+      "license": "CC-BY-4.0",
+      "requiredFiles": [
+        { "relativePath": "Preprocessor.mlmodelc/coremldata.bin", "bytes": 486 },
+        { "relativePath": "Preprocessor.mlmodelc/model.mil", "bytes": 28181 },
+        { "relativePath": "Preprocessor.mlmodelc/metadata.json", "bytes": 2841 },
+        { "relativePath": "Preprocessor.mlmodelc/weights/weight.bin", "sha256": "129b76e3aeafa8afa3ea76d995b964b145fe83700d579f6ff42c4c38fa0968ea", "bytes": 491072 }
+      ]
+    },
+    {
+      "id": "parakeet-v3-encoder",
+      "relativePath": "parakeet-tdt-0.6b-v3-coreml",
+      "upstream": { "repository": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml", "revision": "7dd20fe6b1797d35f5e3307e8b1732d9a178edfe" },
+      "checksum": { "algorithm": "SHA-256", "value": "e2020f323703477a5b21d7c2d282c403e371afb5962e79877e3033e73ba6f421", "scope": "Encoder.mlmodelc/weights/weight.bin" },
+      "license": "CC-BY-4.0",
+      "requiredFiles": [
+        { "relativePath": "Encoder.mlmodelc/coremldata.bin", "bytes": 485 },
+        { "relativePath": "Encoder.mlmodelc/model.mil", "bytes": 959769 },
+        { "relativePath": "Encoder.mlmodelc/metadata.json", "bytes": 2921 },
+        { "relativePath": "Encoder.mlmodelc/weights/weight.bin", "sha256": "e2020f323703477a5b21d7c2d282c403e371afb5962e79877e3033e73ba6f421", "bytes": 445187200 }
+      ]
+    },
+    {
+      "id": "parakeet-v3-decoder",
+      "relativePath": "parakeet-tdt-0.6b-v3-coreml",
+      "upstream": { "repository": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml", "revision": "7dd20fe6b1797d35f5e3307e8b1732d9a178edfe" },
+      "checksum": { "algorithm": "SHA-256", "value": "48adf0f0d47c406c8253d4f7fef967436a39da14f5a65e66d5a4b407be355d41", "scope": "Decoder.mlmodelc/weights/weight.bin" },
+      "license": "CC-BY-4.0",
+      "requiredFiles": [
+        { "relativePath": "Decoder.mlmodelc/coremldata.bin", "bytes": 554 },
+        { "relativePath": "Decoder.mlmodelc/model.mil", "bytes": 13110 },
+        { "relativePath": "Decoder.mlmodelc/metadata.json", "bytes": 3427 },
+        { "relativePath": "Decoder.mlmodelc/weights/weight.bin", "sha256": "48adf0f0d47c406c8253d4f7fef967436a39da14f5a65e66d5a4b407be355d41", "bytes": 23604992 }
+      ]
+    },
+    {
+      "id": "parakeet-v3-joint-decision",
+      "relativePath": "parakeet-tdt-0.6b-v3-coreml",
+      "upstream": { "repository": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml", "revision": "7dd20fe6b1797d35f5e3307e8b1732d9a178edfe" },
+      "checksum": { "algorithm": "SHA-256", "value": "4e0e63d840032f7f07ddb1d64446051166281e5491bf22da8a945c41f6eedb3e", "scope": "JointDecision.mlmodelc/weights/weight.bin" },
+      "license": "CC-BY-4.0",
+      "requiredFiles": [
+        { "relativePath": "JointDecision.mlmodelc/coremldata.bin", "bytes": 534 },
+        { "relativePath": "JointDecision.mlmodelc/model.mil", "bytes": 9723 },
+        { "relativePath": "JointDecision.mlmodelc/metadata.json", "bytes": 2936 },
+        { "relativePath": "JointDecision.mlmodelc/weights/weight.bin", "sha256": "4e0e63d840032f7f07ddb1d64446051166281e5491bf22da8a945c41f6eedb3e", "bytes": 12642764 }
+      ]
+    },
+    {
+      "id": "parakeet-v3-vocabulary",
+      "relativePath": "parakeet-tdt-0.6b-v3-coreml",
+      "upstream": { "repository": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml", "revision": "7dd20fe6b1797d35f5e3307e8b1732d9a178edfe" },
+      "checksum": { "algorithm": "SHA-256", "value": "7ec60e05f1b24480736ec0eed40900f4626bce1fa9a60fd700ec7e2a59198735", "scope": "parakeet_vocab.json" },
+      "license": "CC-BY-4.0",
+      "requiredFiles": [
+        { "relativePath": "parakeet_vocab.json", "sha256": "7ec60e05f1b24480736ec0eed40900f4626bce1fa9a60fd700ec7e2a59198735", "bytes": 151122 }
+      ]
+    },
+    {
+      "id": "pyannote-segmentation-vad-overlap",
+      "relativePath": "speaker-diarization-coreml",
+      "upstream": { "repository": "https://huggingface.co/FluidInference/speaker-diarization-coreml", "revision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594" },
+      "checksum": { "algorithm": "SHA-256", "value": "c3189a64946c75bc24fcb98afe89ad78c52bdbadfdf65e857fb1b81e2cc9fbb2", "scope": "Segmentation.mlmodelc/weights/weight.bin" },
+      "license": "CC-BY-4.0 (converted model; upstream pyannote/segmentation-3.0 is MIT)",
+      "requiredFiles": [
+        { "relativePath": "Segmentation.mlmodelc/coremldata.bin", "bytes": 812 },
+        { "relativePath": "Segmentation.mlmodelc/model.mil", "bytes": 43063 },
+        { "relativePath": "Segmentation.mlmodelc/metadata.json", "bytes": 3410 },
+        { "relativePath": "Segmentation.mlmodelc/weights/weight.bin", "sha256": "c3189a64946c75bc24fcb98afe89ad78c52bdbadfdf65e857fb1b81e2cc9fbb2", "bytes": 5959360 }
+      ]
+    },
+    {
+      "id": "wespeaker-embeddings",
+      "relativePath": "speaker-diarization-coreml",
+      "upstream": { "repository": "https://huggingface.co/FluidInference/speaker-diarization-coreml", "revision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594" },
+      "checksum": { "algorithm": "SHA-256", "value": "99356b2985b8d43880a657024d941d450b38820451ccff903f76ed4e52d1868b", "scope": "Embedding.mlmodelc/weights/weight.bin" },
+      "license": "CC-BY-4.0 (converted model; verify upstream WeSpeaker notices before distribution)",
+      "requiredFiles": [
+        { "relativePath": "Embedding.mlmodelc/coremldata.bin", "bytes": 704 },
+        { "relativePath": "Embedding.mlmodelc/model.mil", "bytes": 78432 },
+        { "relativePath": "Embedding.mlmodelc/metadata.json", "bytes": 2818 },
+        { "relativePath": "Embedding.mlmodelc/weights/weight.bin", "sha256": "99356b2985b8d43880a657024d941d450b38820451ccff903f76ed4e52d1868b", "bytes": 13412288 }
+      ]
+    },
+    {
+      "id": "wespeaker-filterbank",
+      "relativePath": "speaker-diarization-coreml",
+      "upstream": { "repository": "https://huggingface.co/FluidInference/speaker-diarization-coreml", "revision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594" },
+      "checksum": { "algorithm": "SHA-256", "value": "9e83fdd3ea78064b078069e4d9141603c61c47a27fd19e7e3142ff7476f8db36", "scope": "FBank.mlmodelc/weights/weight.bin" },
+      "license": "CC-BY-4.0",
+      "requiredFiles": [
+        { "relativePath": "FBank.mlmodelc/coremldata.bin", "bytes": 853 },
+        { "relativePath": "FBank.mlmodelc/model.mil", "bytes": 15667 },
+        { "relativePath": "FBank.mlmodelc/metadata.json", "bytes": 3409 },
+        { "relativePath": "FBank.mlmodelc/weights/weight.bin", "sha256": "9e83fdd3ea78064b078069e4d9141603c61c47a27fd19e7e3142ff7476f8db36", "bytes": 1776896 }
+      ]
+    },
+    {
+      "id": "vbx-rho-model",
+      "relativePath": "speaker-diarization-coreml",
+      "upstream": { "repository": "https://huggingface.co/FluidInference/speaker-diarization-coreml", "revision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594" },
+      "checksum": { "algorithm": "SHA-256", "value": "80f7d229202636d372428c90596f11a91545f07da77259f07153aaf225914a36", "scope": "PldaRho.mlmodelc/weights/weight.bin" },
+      "license": "CC-BY-4.0",
+      "requiredFiles": [
+        { "relativePath": "PldaRho.mlmodelc/coremldata.bin", "bytes": 763 },
+        { "relativePath": "PldaRho.mlmodelc/model.mil", "bytes": 7613 },
+        { "relativePath": "PldaRho.mlmodelc/metadata.json", "bytes": 2749 },
+        { "relativePath": "PldaRho.mlmodelc/weights/weight.bin", "sha256": "80f7d229202636d372428c90596f11a91545f07da77259f07153aaf225914a36", "bytes": 200192 }
+      ]
+    },
+    {
+      "id": "vbx-plda-parameters",
+      "relativePath": "speaker-diarization-coreml",
+      "upstream": { "repository": "https://huggingface.co/FluidInference/speaker-diarization-coreml", "revision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594" },
+      "checksum": { "algorithm": "SHA-256", "value": "38ee28d4269c076cef254ee760bbd811f0738a92e0f01f9699ad372828c5de8f", "scope": "plda-parameters.json" },
+      "license": "CC-BY-4.0",
+      "requiredFiles": [ { "relativePath": "plda-parameters.json", "sha256": "38ee28d4269c076cef254ee760bbd811f0738a92e0f01f9699ad372828c5de8f", "bytes": 89416 } ]
+    },
+    {
+      "id": "vbx-xvector-transform",
+      "relativePath": "speaker-diarization-coreml",
+      "upstream": { "repository": "https://huggingface.co/FluidInference/speaker-diarization-coreml", "revision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594" },
+      "checksum": { "algorithm": "SHA-256", "value": "f7cd5cc16e63e2d89db052a23018ecfc47a311998ed1e9e39838fbac65048688", "scope": "xvector-transform.json" },
+      "license": "CC-BY-4.0",
+      "requiredFiles": [ { "relativePath": "xvector-transform.json", "sha256": "f7cd5cc16e63e2d89db052a23018ecfc47a311998ed1e9e39838fbac65048688", "bytes": 177499 } ]
+    }
+  ]
+}

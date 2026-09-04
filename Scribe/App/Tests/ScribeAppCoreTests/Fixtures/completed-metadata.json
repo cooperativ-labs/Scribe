@@ -1,0 +1,24 @@
+{
+  "schemaVersion" : 1,
+  "sessionID" : "8C1B7D49-5E63-421B-8720-62F7B8D5181B",
+  "appBuild" : "42",
+  "macOSVersion" : "15.0",
+  "startedAt" : "2026-09-03T10:00:00Z",
+  "endedAt" : "2026-09-03T10:30:00Z",
+  "durationSeconds" : 1800,
+  "completionStatus" : "complete",
+  "capture" : {
+    "state" : "complete",
+    "scope" : { "applicationBundleIdentifiers" : ["us.zoom.xos"], "processIdentifiers" : [1234] },
+    "microphone" : { "uniqueID" : "BuiltInMicrophoneDevice", "name" : "MacBook Pro Microphone" },
+    "outputDeviceChanges" : []
+  },
+  "tracks" : {
+    "system" : { "sourceFormat" : { "sampleRate" : 48000, "channelCount" : 2, "formatDescription" : "pcm-f32" }, "firstMediaTimestampSeconds" : 0, "frameCount" : 86400000, "fileName" : "system.flac", "checksum" : "system-sha256", "journalReference" : "capture/timeline.jsonl" },
+    "microphone" : { "sourceFormat" : { "sampleRate" : 48000, "channelCount" : 1, "formatDescription" : "pcm-f32" }, "firstMediaTimestampSeconds" : 0, "frameCount" : 86400000, "fileName" : "microphone.flac", "checksum" : "microphone-sha256", "journalReference" : "capture/timeline.jsonl" },
+    "final" : { "sourceFormat" : { "sampleRate" : 48000, "channelCount" : 2, "formatDescription" : "flac-24" }, "firstMediaTimestampSeconds" : 0, "frameCount" : 86400000, "fileName" : "final.flac", "checksum" : "final-sha256" }
+  },
+  "gaps" : [],
+  "interruptions" : [],
+  "processing" : { "state" : "complete", "dependencyVersions" : { "libFLAC" : "1.4.3" }, "configuration" : { "aecEnabled" : true }, "resamplingCorrections" : [], "delayCorrections" : [], "mixGains" : { "system" : 1, "microphone" : 1 }, "errors" : [] }
+}

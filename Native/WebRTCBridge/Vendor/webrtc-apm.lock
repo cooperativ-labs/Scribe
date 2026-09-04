@@ -1,0 +1,60 @@
+# Pinned upstream sources for the Scribe WebRTC Audio Processing Module bridge.
+#
+# This file is the single source of truth for what gets built. It is sourced by
+# Native/WebRTCBridge/Scripts/build-webrtc-apm.sh. Changing a version here
+# without changing the matching checksum makes the build fail loudly, which is
+# the intended behaviour: an unverified audio DSP dependency must never be
+# linked into a recording that a user believes is private and local.
+#
+# Provenance of the primary dependency
+# ------------------------------------
+# Project : webrtc-audio-processing (freedesktop.org / PulseAudio maintainers)
+# Purpose : a standalone, build-system-independent extraction of the WebRTC
+#           Audio Processing Module, including AEC3, without depot_tools, GN,
+#           or the rest of the Chromium tree.
+# Release : 2.1, released 2025-01-22.
+# Upstream WebRTC branch the 2.x series was synced from: M131.
+# Git tag  : v2.1
+# Git rev  : 846fe90a289f58b7c9303a635142aa2c7caa93e5
+#            (gitlab.freedesktop.org/pulseaudio/webrtc-audio-processing)
+# Tarball  : the signed release tarball published on freedesktop.org, not a
+#            GitLab auto-generated archive. Auto-generated archives are not
+#            byte-stable across server-side regeneration, so they cannot be
+#            checksum-pinned.
+
+WEBRTC_APM_NAME="webrtc-audio-processing"
+WEBRTC_APM_VERSION="2.1"
+WEBRTC_APM_ABI_MAJOR="2"
+WEBRTC_APM_GIT_TAG="v2.1"
+WEBRTC_APM_GIT_REV="846fe90a289f58b7c9303a635142aa2c7caa93e5"
+WEBRTC_APM_UPSTREAM_WEBRTC_BRANCH="M131"
+WEBRTC_APM_URL="https://freedesktop.org/software/pulseaudio/webrtc-audio-processing/webrtc-audio-processing-2.1.tar.xz"
+WEBRTC_APM_SHA256="ae9302824b2038d394f10213cab05312c564a038434269f11dbf68f511f9f9fe"
+WEBRTC_APM_ARCHIVE="webrtc-audio-processing-2.1.tar.xz"
+WEBRTC_APM_SRCDIR="webrtc-audio-processing-2.1"
+
+# Abseil is the only external dependency of the module. Upstream resolves it
+# through a meson wrap; we pre-seed the wrap's package cache with these exact
+# files so the build never reaches the network on its own terms, and so the
+# revision is recorded here rather than only inside the tarball.
+# Both entries are copied verbatim from subprojects/abseil-cpp.wrap in the
+# pinned webrtc-audio-processing release.
+ABSEIL_VERSION="20240722.0"
+ABSEIL_URL="https://github.com/abseil/abseil-cpp/releases/download/20240722.0/abseil-cpp-20240722.0.tar.gz"
+ABSEIL_SHA256="f50e5ac311a81382da7fa75b97310e4b9006474f9560ac46f54a9967f07d4ae3"
+ABSEIL_ARCHIVE="abseil-cpp-20240722.0.tar.gz"
+
+# The meson wrapdb patch that adds meson build files to the abseil release.
+ABSEIL_PATCH_URL="https://wrapdb.mesonbuild.com/v2/abseil-cpp_20240722.0-3/get_patch"
+ABSEIL_PATCH_SHA256="12dd8df1488a314c53e3751abd2750cf233b830651d168b6a9f15e7d0cf71f7b"
+ABSEIL_PATCH_ARCHIVE="abseil-cpp_20240722.0-3_patch.zip"
+
+# Build toolchain. Pinned so two machines produce the same build graph.
+# Both are pure-Python/wheel installs into a private virtualenv; nothing is
+# installed system-wide and Homebrew is not required.
+MESON_VERSION="1.7.2"
+NINJA_VERSION="1.11.1.4"
+
+# Deployment target for the produced static library. Matches the macOS 15
+# floor in IMPLEMENTATION_PLAN.md section 1.
+MACOS_DEPLOYMENT_TARGET="15.0"

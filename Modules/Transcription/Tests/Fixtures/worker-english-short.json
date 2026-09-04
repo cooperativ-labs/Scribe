@@ -1,0 +1,15 @@
+{
+  "text": "The weather today is fine.",
+  "tokens": [
+    { "text": " The", "tokenID": 20, "startSeconds": 1.0, "endSeconds": 1.3, "confidence": 0.9 },
+    { "text": " weather", "tokenID": 21, "startSeconds": 1.4, "endSeconds": 1.8, "confidence": 0.9 },
+    { "text": " today", "tokenID": 22, "startSeconds": 1.9, "endSeconds": 2.4, "confidence": 0.9 },
+    { "text": " is", "tokenID": 23, "startSeconds": 2.5, "endSeconds": 2.7, "confidence": 0.9 },
+    { "text": " fine", "tokenID": 24, "startSeconds": 2.8, "endSeconds": 3.2, "confidence": 0.9 },
+    { "text": ".", "tokenID": 7883, "startSeconds": 3.2, "endSeconds": 3.28, "confidence": 0.8 }
+  ],
+  "sourceDurationSeconds": 12.454,
+  "processingTimeSeconds": 0.279,
+  "usedChunkedProcessing": false,
+  "timestampUnit": "seconds"
+}

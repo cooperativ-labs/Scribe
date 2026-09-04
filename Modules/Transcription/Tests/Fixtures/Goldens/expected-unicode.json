@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "transcript_id": "unicode",
+  "revision": 1,
+  "status": "complete",
+  "created_at": "2026-09-03T12:07:00Z",
+  "source": {
+    "filename": "こんにちは-مرحبا.flac",
+    "duration_ms": 16000,
+    "checksum": "sha256:unicode"
+  },
+  "language": "ja",
+  "language_source": "user_provided",
+  "timestamp_unit": "milliseconds",
+  "timestamp_origin": "source_start",
+  "speakers": [
+    {
+      "id": "speaker_1",
+      "profile_id": "profile-山田",
+      "identity_assignment": "manual",
+      "label_snapshot": "山田さん"
+    }
+  ],
+  "segments": [
+    {
+      "id": "segment_001",
+      "speaker_id": "speaker_1",
+      "speaker_label": "山田さん",
+      "start_ms": 1000,
+      "end_ms": 5000,
+      "text": "こんにちは、世界！ Café déjà vu — مرحبًا.",
+      "overlap": false,
+      "timing_quality": "asr_word",
+      "speaker_confidence": null
+    }
+  ],
+  "processing_options": {
+    "punctuation": true
+  },
+  "engine_revisions": {
+    "asr": "parakeet-v1"
+  },
+  "warnings": []
+}

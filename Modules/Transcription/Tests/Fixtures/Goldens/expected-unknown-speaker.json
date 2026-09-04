@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "transcript_id": "unknown-speaker",
+  "revision": 1,
+  "status": "completeWithWarnings",
+  "created_at": "2026-09-03T12:04:00Z",
+  "source": {
+    "filename": "uncertain.flac",
+    "duration_ms": 10000,
+    "checksum": "sha256:unknown"
+  },
+  "language": "en",
+  "language_source": "unknown",
+  "timestamp_unit": "milliseconds",
+  "timestamp_origin": "source_start",
+  "speakers": [
+    {
+      "id": "speaker_1",
+      "profile_id": null,
+      "identity_assignment": "unmatched",
+      "label_snapshot": "Speaker 1"
+    }
+  ],
+  "segments": [
+    {
+      "id": "segment_001",
+      "speaker_id": null,
+      "speaker_label": "Unknown speaker",
+      "start_ms": 1500,
+      "end_ms": 3700,
+      "text": "This voice could not be assigned.",
+      "overlap": false,
+      "timing_quality": "segment_only",
+      "speaker_confidence": null
+    }
+  ],
+  "processing_options": {
+    "diarization": true
+  },
+  "engine_revisions": {
+    "asr": "parakeet-v1"
+  },
+  "warnings": [
+    {
+      "code": "speaker_unassigned",
+      "message": "The segment did not have adequate diarization evidence.",
+      "segment_id": "segment_001"
+    }
+  ]
+}

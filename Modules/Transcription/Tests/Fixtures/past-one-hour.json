@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "transcript_id": "past-one-hour",
+  "revision": 1,
+  "status": "complete",
+  "created_at": "2026-09-03T12:08:00Z",
+  "source": { "filename": "hour-plus.flac", "duration_ms": 5400000, "checksum": "sha256:hour" },
+  "language": "en",
+  "language_source": "detected",
+  "timestamp_unit": "milliseconds",
+  "timestamp_origin": "source_start",
+  "speakers": [{ "id": "speaker_1", "identity_assignment": "unmatched", "label_snapshot": "Speaker 1" }],
+  "segments": [{ "id": "segment_001", "speaker_id": "speaker_1", "speaker_label": "Speaker 1", "start_ms": 3661250, "end_ms": 3667800, "text": "This starts after one hour.", "overlap": false, "timing_quality": "asr_word", "speaker_confidence": null }],
+  "processing_options": {},
+  "engine_revisions": { "asr": "parakeet-v1" },
+  "warnings": []
+}

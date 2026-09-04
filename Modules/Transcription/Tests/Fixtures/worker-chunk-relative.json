@@ -1,0 +1,32 @@
+{
+  "text": "The weather today is fine.",
+  "tokens": [],
+  "chunks": [
+    {
+      "chunkIndex": 0,
+      "chunkStartSeconds": 0,
+      "timesAreAbsolute": false,
+      "tokens": [
+        { "text": " The", "tokenID": 20, "startSeconds": 13.2, "endSeconds": 13.5, "confidence": 0.9 },
+        { "text": " weather", "tokenID": 21, "startSeconds": 13.6, "endSeconds": 14.0, "confidence": 0.9 }
+      ]
+    },
+    {
+      "chunkIndex": 1,
+      "chunkStartSeconds": 12.88,
+      "timesAreAbsolute": false,
+      "tokens": [
+        { "text": " The", "tokenID": 20, "startSeconds": 0.32, "endSeconds": 0.62, "confidence": 0.9 },
+        { "text": " weather", "tokenID": 21, "startSeconds": 0.72, "endSeconds": 1.12, "confidence": 0.9 },
+        { "text": " today", "tokenID": 22, "startSeconds": 2.12, "endSeconds": 2.62, "confidence": 0.9 },
+        { "text": " is", "tokenID": 23, "startSeconds": 13.12, "endSeconds": 13.42, "confidence": 0.9 },
+        { "text": " fine", "tokenID": 24, "startSeconds": 13.62, "endSeconds": 14.02, "confidence": 0.9 },
+        { "text": ".", "tokenID": 7883, "startSeconds": 14.02, "endSeconds": 14.1, "confidence": 0.8 }
+      ]
+    }
+  ],
+  "sourceDurationSeconds": 40.603,
+  "processingTimeSeconds": 0.732,
+  "usedChunkedProcessing": true,
+  "timestampUnit": "seconds"
+}
