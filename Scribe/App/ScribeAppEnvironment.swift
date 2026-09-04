@@ -27,6 +27,7 @@ final class ScribeAppEnvironment: ObservableObject {
     let transcription: TranscriptionHostService?
     /// Mirrors the transcription service's status into the menu.
     @Published private(set) var transcriptionStatus = TranscriptionHostService.Status()
+    @Published private(set) var updateState: UpdateMenuState = .idle
     private var transcriptWindow: NSWindow?
     private var speakersWindow: NSWindow?
 
@@ -34,6 +35,8 @@ final class ScribeAppEnvironment: ObservableObject {
     private var firstRunWindow: NSWindow?
     private var selectionObservation: RecorderObservationToken?
     private var queueEventTask: Task<Void, Never>?
+    private var updateTask: Task<Void, Never>?
+    private var availableRelease: GitHubRelease?
     /// Sessions this launch adopted rather than started, so the recovery notice
     /// can be retired once the last one is finished with.
     private var adoptedSessionIDs: Set<UUID> = []
@@ -96,7 +99,51 @@ final class ScribeAppEnvironment: ObservableObject {
         }
     }
 
-    deinit { queueEventTask?.cancel() }
+    deinit {
+        queueEventTask?.cancel()
+        updateTask?.cancel()
+    }
+
+    var updateMenuCommands: UpdateMenuCommands {
+        UpdateMenuCommands(
+            state: updateState,
+            checkForUpdates: { [weak self] in self?.checkForUpdates() },
+            downloadUpdate: { [weak self] in self?.openAvailableRelease() }
+        )
+    }
+
+    /// Looks only at GitHub's published latest release. A failed check leaves
+    /// recording and every local feature usable, and a successful check never
+    /// downloads anything until the person explicitly chooses to do so.
+    func checkForUpdates() {
+        updateTask?.cancel()
+        updateState = .checking
+        availableRelease = nil
+        let currentVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
+
+        updateTask = Task { [weak self] in
+            do {
+                let release = try await GitHubReleaseClient.fetchLatestRelease()
+                guard !Task.isCancelled else { return }
+                if ScribeReleaseVersion.isNewer(release.version, than: currentVersion) {
+                    self?.availableRelease = release
+                    self?.updateState = .updateAvailable(version: release.version)
+                } else {
+                    self?.updateState = .upToDate
+                }
+            } catch is CancellationError {
+                // A subsequent request owns the visible state.
+            } catch {
+                guard !Task.isCancelled else { return }
+                self?.updateState = .failed(message: "Could not check for updates")
+            }
+        }
+    }
+
+    private func openAvailableRelease() {
+        guard let availableRelease else { return }
+        NSWorkspace.shared.open(availableRelease.downloadURL)
+    }
 
     /// Applies whatever changed while the Settings window was open. Shortcut
     /// conflicts are shown in the menu; the menu commands are never affected.

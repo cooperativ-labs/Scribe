@@ -32,7 +32,8 @@ private struct ScribeMenuBarContents: View {
     var body: some View {
         ScribeMenuBarContent(
             model: environment.menuModel,
-            transcription: environment.transcriptionMenuCommands
+            transcription: environment.transcriptionMenuCommands,
+            updates: environment.updateMenuCommands
         )
     }
 }

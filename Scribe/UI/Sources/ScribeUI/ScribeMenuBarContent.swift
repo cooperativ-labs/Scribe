@@ -11,10 +11,16 @@ public struct ScribeMenuBarContent: View {
     /// Absent when the transcription module is not composed into this build; the
     /// menu then shows exactly what it showed before transcription existed.
     private let transcription: TranscriptionMenuCommands?
+    private let updates: UpdateMenuCommands?
 
-    public init(model: RecorderMenuModel, transcription: TranscriptionMenuCommands? = nil) {
+    public init(
+        model: RecorderMenuModel,
+        transcription: TranscriptionMenuCommands? = nil,
+        updates: UpdateMenuCommands? = nil
+    ) {
         self.model = model
         self.transcription = transcription
+        self.updates = updates
     }
 
     public var body: some View {
@@ -103,10 +109,37 @@ public struct ScribeMenuBarContent: View {
             Button("Open Recordings Folder") { model.openRecordingsFolder() }
             SettingsLink { Text("Settings…") }
 
+            if let updates {
+                Divider()
+                updateSection(updates)
+            }
+
             Divider()
             Button("Quit Scribe") { model.quit() }
         }
         .onAppear { model.menuDidAppear() }
         .onDisappear { model.menuDidDisappear() }
+    }
+
+    @ViewBuilder
+    private func updateSection(_ updates: UpdateMenuCommands) -> some View {
+        switch updates.state {
+        case .idle:
+            Button("Check for Updates…") { updates.checkForUpdates() }
+        case .checking:
+            Text("Checking for updates…")
+            Button("Check for Updates…") { updates.checkForUpdates() }
+                .disabled(true)
+        case .upToDate:
+            Text("Scribe is up to date")
+            Button("Check for Updates…") { updates.checkForUpdates() }
+        case .updateAvailable(let version):
+            Text("Scribe \(version) is available")
+            Button("Download Scribe \(version)…") { updates.downloadUpdate() }
+            Button("Check for Updates…") { updates.checkForUpdates() }
+        case .failed(let message):
+            Text(message)
+            Button("Check for Updates…") { updates.checkForUpdates() }
+        }
     }
 }

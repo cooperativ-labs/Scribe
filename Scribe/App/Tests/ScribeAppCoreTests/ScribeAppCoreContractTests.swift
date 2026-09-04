@@ -3,6 +3,45 @@ import XCTest
 @testable import ScribeAppCore
 
 final class ScribeAppCoreContractTests: XCTestCase {
+    func testGitHubReleaseUsesPublishedMacOSArchiveAndNormalizesTagVersion() throws {
+        let data = Data("""
+        {
+          "tag_name": "v1.2.3",
+          "html_url": "https://github.com/cooperativ-labs/scribe/releases/tag/v1.2.3",
+          "assets": [
+            {"name": "Scribe-1.2.3-macos.zip", "browser_download_url": "https://github.com/cooperativ-labs/scribe/releases/download/v1.2.3/Scribe-1.2.3-macos.zip"}
+          ]
+        }
+        """.utf8)
+
+        let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
+
+        XCTAssertEqual(release.version, "1.2.3")
+        XCTAssertEqual(release.downloadURL.absoluteString, "https://github.com/cooperativ-labs/scribe/releases/download/v1.2.3/Scribe-1.2.3-macos.zip")
+    }
+
+    func testGitHubReleaseFallsBackToReleasePageWhenThereIsNoArchive() throws {
+        let data = Data("""
+        {
+          "tag_name": "v1.2.3",
+          "html_url": "https://github.com/cooperativ-labs/scribe/releases/tag/v1.2.3",
+          "assets": []
+        }
+        """.utf8)
+
+        let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
+
+        XCTAssertEqual(release.downloadURL, release.htmlURL)
+    }
+
+    func testReleaseVersionComparisonAcceptsOnlyNewerNumericVersions() {
+        XCTAssertTrue(ScribeReleaseVersion.isNewer("v1.10.0", than: "1.9.9"))
+        XCTAssertTrue(ScribeReleaseVersion.isNewer("1.2.1", than: "1.2"))
+        XCTAssertFalse(ScribeReleaseVersion.isNewer("1.2.0", than: "1.2"))
+        XCTAssertFalse(ScribeReleaseVersion.isNewer("1.2.0", than: "1.3"))
+        XCTAssertFalse(ScribeReleaseVersion.isNewer("nightly", than: "1.2.0"))
+    }
+
     func testManifestRoundTripAndStableConsumerFields() throws {
         let manifest = try fixture(named: "completed-metadata")
         let decoded = try RecorderSessionManifestCodec.decode(try RecorderSessionManifestCodec.encode(manifest))

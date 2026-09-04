@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         environment.presentFirstRunPermissionsIfNeeded()
+        environment.checkForUpdates()
     }
 
     /// Quitting during capture performs a normal stop and saves the originals.

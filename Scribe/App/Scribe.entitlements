@@ -3,5 +3,16 @@
 <plist version="1.0">
 <dict>
     <!-- Intentionally no App Sandbox entitlement: direct Developer ID distribution. -->
+    <!--
+        Release builds enable the hardened runtime, which refuses microphone
+        access outright unless this entitlement is present: tccd logs
+        "requires entitlement com.apple.security.device.audio-input but it is
+        missing … Policy disallows prompt … access to kTCCServiceMicrophone
+        denied", and System Settings never offers a switch to turn on. Debug
+        builds do not use the hardened runtime, so the omission only shows in
+        the notarized app.
+    -->
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
 </dict>
 </plist>
