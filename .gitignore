@@ -67,3 +67,6 @@ Tools/*/bin/
 # Workers/TranscriptionWorker/models/.gitignore also enforces this.
 Workers/TranscriptionWorker/models/*
 !Workers/TranscriptionWorker/models/.gitignore
+
+
+/dist
