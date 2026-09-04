@@ -191,6 +191,7 @@ public final class LiveRecordingCoordinator: RecordingCoordinating {
         case .refreshSources:
             snapshot.applications = (try? await sourceProvider.shareableApplications()) ?? snapshot.applications
             snapshot.microphones = await sourceProvider.availableMicrophones()
+            snapshot.systemDefaultMicrophoneID = await sourceProvider.systemDefaultMicrophone()?.uniqueID
         case .openRecordingsFolder: openFolder(snapshot.recordingsFolderURL)
         case .requestPermissions: snapshot.permissions = await permissions.requestMissingPermissions()
         case .openSystemSettings(let pane): permissions.openSystemSettings(pane)

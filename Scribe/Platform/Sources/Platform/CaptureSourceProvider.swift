@@ -9,6 +9,14 @@ public protocol CaptureSourceProviding: Sendable {
     func shareableApplications() async throws -> [CaptureApplicationOption]
     /// Audio input devices currently available for capture.
     func availableMicrophones() async -> [CaptureMicrophoneOption]
+    /// The device macOS currently treats as the default input, so a "System
+    /// Default" choice can say which microphone it will actually record from.
+    /// `nil` when no input device exists.
+    func systemDefaultMicrophone() async -> CaptureMicrophoneOption?
+}
+
+extension CaptureSourceProviding {
+    public func systemDefaultMicrophone() async -> CaptureMicrophoneOption? { nil }
 }
 
 /// The live provider: `SCShareableContent` for applications, the audio capture
@@ -38,5 +46,11 @@ public struct SystemCaptureSourceProvider: CaptureSourceProviding {
             position: .unspecified
         )
         return session.devices.map { CaptureMicrophoneOption(uniqueID: $0.uniqueID, name: $0.localizedName) }
+    }
+
+    /// The same lookup `CaptureService` uses when it resolves a nil selection at
+    /// stream start, so what Settings shows as the default is what gets recorded.
+    public func systemDefaultMicrophone() async -> CaptureMicrophoneOption? {
+        AVCaptureDevice.default(for: .audio).map { CaptureMicrophoneOption(uniqueID: $0.uniqueID, name: $0.localizedName) }
     }
 }

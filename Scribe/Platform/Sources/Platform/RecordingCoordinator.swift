@@ -176,7 +176,11 @@ public struct RecorderSnapshot: Equatable, Sendable {
     public var applications: [CaptureApplicationOption]
     public var microphones: [CaptureMicrophoneOption]
     public var selectedApplicationID: String?
+    /// `nil` means the system default input, resolved at each start.
     public var selectedMicrophoneID: String?
+    /// Which of `microphones` macOS currently uses as its default input, so the
+    /// pickers can name the device a nil selection will record from.
+    public var systemDefaultMicrophoneID: String?
     public var recordingsFolderURL: URL
     /// Human-readable shortcut registration problems; the menu commands stay
     /// usable regardless, so these are informational only.
@@ -195,7 +199,8 @@ public struct RecorderSnapshot: Equatable, Sendable {
         selectedMicrophoneID: String? = nil,
         recordingsFolderURL: URL = ScribeSettings.defaultRecordingsFolderURL,
         shortcutIssues: [String] = [],
-        recoveryNotice: String? = nil
+        recoveryNotice: String? = nil,
+        systemDefaultMicrophoneID: String? = nil
     ) {
         self.state = state
         self.processing = processing
@@ -207,6 +212,7 @@ public struct RecorderSnapshot: Equatable, Sendable {
         self.recordingsFolderURL = recordingsFolderURL
         self.shortcutIssues = shortcutIssues
         self.recoveryNotice = recoveryNotice
+        self.systemDefaultMicrophoneID = systemDefaultMicrophoneID
     }
 }
 

@@ -68,12 +68,18 @@ public struct ScribeMenuBarContent: View {
             Divider()
             Picker("Application", selection: model.selectedApplication) {
                 Text("Choose…").tag(String?.none)
+                if let unavailable = presentation.unavailableSelectedApplication {
+                    Text(InstalledApplicationName.unavailableLabel(for: unavailable)).tag(String?.some(unavailable.id))
+                }
                 ForEach(presentation.applications) { application in
                     Text(application.name).tag(String?.some(application.id))
                 }
             }
             Picker("Microphone", selection: model.selectedMicrophone) {
-                Text("Choose…").tag(String?.none)
+                Text(presentation.systemDefaultMicrophoneLabel).tag(String?.none)
+                if let unavailable = presentation.unavailableSelectedMicrophone {
+                    Text(unavailable.label).tag(String?.some(unavailable.id))
+                }
                 ForEach(presentation.microphones) { microphone in
                     Text(microphone.name).tag(String?.some(microphone.id))
                 }

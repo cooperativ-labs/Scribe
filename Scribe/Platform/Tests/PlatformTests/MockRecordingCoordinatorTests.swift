@@ -150,7 +150,8 @@ final class MockRecordingCoordinatorTests: XCTestCase {
     func testSourcesRefreshFromTheProviderAndSelectionsPersistInTheSnapshot() async {
         let provider = CaptureSourceProviderStub(
             applications: [CaptureApplicationOption(bundleIdentifier: "us.zoom.xos", name: "Zoom")],
-            microphones: [CaptureMicrophoneOption(uniqueID: "mic-1", name: "Built-in Microphone")]
+            microphones: [CaptureMicrophoneOption(uniqueID: "mic-1", name: "Built-in Microphone")],
+            systemDefaultMicrophoneID: "mic-1"
         )
         let coordinator = MockRecordingCoordinator(snapshot: readySnapshot(), sourceProvider: provider)
 
@@ -161,6 +162,7 @@ final class MockRecordingCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(coordinator.snapshot.applications.map(\.id), ["us.zoom.xos"])
         XCTAssertEqual(coordinator.snapshot.microphones.map(\.id), ["mic-1"])
+        XCTAssertEqual(coordinator.snapshot.systemDefaultMicrophoneID, "mic-1")
         XCTAssertEqual(coordinator.snapshot.selectedApplicationID, "us.zoom.xos")
         XCTAssertEqual(coordinator.snapshot.selectedMicrophoneID, "mic-1")
     }
@@ -240,7 +242,11 @@ private final class HotKeyRegistrarSpy: HotKeyRegistering {
 private struct CaptureSourceProviderStub: CaptureSourceProviding {
     let applications: [CaptureApplicationOption]
     let microphones: [CaptureMicrophoneOption]
+    var systemDefaultMicrophoneID: String?
 
     func shareableApplications() async throws -> [CaptureApplicationOption] { applications }
     func availableMicrophones() async -> [CaptureMicrophoneOption] { microphones }
+    func systemDefaultMicrophone() async -> CaptureMicrophoneOption? {
+        microphones.first { $0.uniqueID == systemDefaultMicrophoneID }
+    }
 }

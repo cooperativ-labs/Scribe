@@ -19,7 +19,11 @@ public struct MenuPresentation: Equatable, Sendable {
     public let applications: [CaptureApplicationOption]
     public let microphones: [CaptureMicrophoneOption]
     public let selectedApplicationID: String?
+    /// `nil` is the system default input, resolved when a recording starts.
     public let selectedMicrophoneID: String?
+    /// The device a `nil` microphone selection will record from right now, or
+    /// `nil` when the coordinator has not reported one (or no input exists).
+    public let systemDefaultMicrophoneName: String?
     public let shortcutIssues: [String]
     /// What launch recovery found, if anything.
     public let recoveryNotice: String?
@@ -72,9 +76,35 @@ public struct MenuPresentation: Equatable, Sendable {
         microphones = snapshot.microphones
         selectedApplicationID = snapshot.selectedApplicationID
         selectedMicrophoneID = snapshot.selectedMicrophoneID
+        systemDefaultMicrophoneName = snapshot.microphones.first { $0.uniqueID == snapshot.systemDefaultMicrophoneID }?.name
         shortcutIssues = snapshot.shortcutIssues
         recoveryNotice = snapshot.recoveryNotice
         recordingsFolderName = snapshot.recordingsFolderURL.lastPathComponent
+    }
+
+    // MARK: Source pickers
+
+    /// The label for the microphone picker's default row. It names the device
+    /// so a person can tell what "default" means before recording.
+    public var systemDefaultMicrophoneLabel: String {
+        guard let systemDefaultMicrophoneName else { return "System Default" }
+        return "System Default (\(systemDefaultMicrophoneName))"
+    }
+
+    /// A remembered application that is not running right now. It is kept in
+    /// the picker as its own row rather than silently clearing the choice, since
+    /// a meeting application is usually launched after Scribe.
+    public var unavailableSelectedApplication: UnavailableSource? {
+        guard let selectedApplicationID, !applications.contains(where: { $0.id == selectedApplicationID }) else { return nil }
+        return UnavailableSource(id: selectedApplicationID, label: "\(selectedApplicationID) (not running)")
+    }
+
+    /// A remembered microphone that is not connected. Shown rather than
+    /// substituted: capture binds the chosen device and never falls back to
+    /// another one, so the picker must not pretend a different device is chosen.
+    public var unavailableSelectedMicrophone: UnavailableSource? {
+        guard let selectedMicrophoneID, !microphones.contains(where: { $0.id == selectedMicrophoneID }) else { return nil }
+        return UnavailableSource(id: selectedMicrophoneID, label: "\(selectedMicrophoneID) (not connected)")
     }
 
     /// `MM:SS` below an hour, `H:MM:SS` above it.
@@ -86,6 +116,17 @@ public struct MenuPresentation: Equatable, Sendable {
         return hours > 0
             ? String(format: "%d:%02d:%02d", hours, minutes, seconds)
             : String(format: "%02d:%02d", minutes, seconds)
+    }
+}
+
+/// A remembered source the pickers must keep showing while it is absent.
+public struct UnavailableSource: Equatable, Sendable, Identifiable {
+    public let id: String
+    public let label: String
+
+    public init(id: String, label: String) {
+        self.id = id
+        self.label = label
     }
 }
 

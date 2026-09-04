@@ -31,6 +31,7 @@ public final class MockRecordingCoordinator: RecordingCoordinating {
     /// Applications and microphones offered when no live provider is attached.
     public var scriptedApplications: [CaptureApplicationOption] = []
     public var scriptedMicrophones: [CaptureMicrophoneOption] = []
+    public var scriptedSystemDefaultMicrophoneID: String?
     /// Called when the user chooses Quit, after capture has been stopped.
     public var terminationHandler: (@MainActor () -> Void)?
 
@@ -210,10 +211,12 @@ public final class MockRecordingCoordinator: RecordingCoordinating {
         guard let sourceProvider else {
             snapshot.applications = scriptedApplications
             snapshot.microphones = scriptedMicrophones
+            snapshot.systemDefaultMicrophoneID = scriptedSystemDefaultMicrophoneID
             return
         }
         snapshot.applications = (try? await sourceProvider.shareableApplications()) ?? scriptedApplications
         snapshot.microphones = await sourceProvider.availableMicrophones()
+        snapshot.systemDefaultMicrophoneID = await sourceProvider.systemDefaultMicrophone()?.uniqueID
     }
 
     private func requestPermissions() async {

@@ -2,16 +2,25 @@ import Platform
 import SwiftUI
 
 /// The compact settings pane used by the menu-bar app.
+///
+/// Source selection reads from and writes to the same `RecorderMenuModel` as
+/// the menu, so the pickers here show the applications and microphones that
+/// exist right now, by name, and a choice made in either place is the one that
+/// gets remembered.
 public struct ScribeSettingsView: View {
     @ObservedObject private var settings: ScribeSettings
+    @ObservedObject private var sources: RecorderMenuModel
     @State private var isChoosingRecordingsFolder = false
     @State private var folderSelectionError: String?
 
-    public init(settings: ScribeSettings) {
+    public init(settings: ScribeSettings, sources: RecorderMenuModel) {
         self.settings = settings
+        self.sources = sources
     }
 
     public var body: some View {
+        let presentation = sources.presentation
+
         Form {
             Section("Recordings") {
                 LabeledContent("Folder") {
@@ -30,9 +39,35 @@ public struct ScribeSettingsView: View {
                 }
             }
 
-            Section("Remembered sources") {
-                TextField("Application bundle ID", text: optionalStringBinding(\.rememberedApplicationBundleIdentifier))
-                TextField("Microphone ID", text: optionalStringBinding(\.rememberedMicrophoneID))
+            Section {
+                Picker("Application", selection: sources.selectedApplication) {
+                    Text("None").tag(String?.none)
+                    if let unavailable = presentation.unavailableSelectedApplication {
+                        Text(InstalledApplicationName.unavailableLabel(for: unavailable)).tag(String?.some(unavailable.id))
+                    }
+                    ForEach(presentation.applications) { application in
+                        Text(application.name).tag(String?.some(application.id))
+                    }
+                }
+                Picker("Microphone", selection: sources.selectedMicrophone) {
+                    Text(presentation.systemDefaultMicrophoneLabel).tag(String?.none)
+                    if let unavailable = presentation.unavailableSelectedMicrophone {
+                        Text(unavailable.label).tag(String?.some(unavailable.id))
+                    }
+                    ForEach(presentation.microphones) { microphone in
+                        Text(microphone.name).tag(String?.some(microphone.id))
+                    }
+                }
+                Text(sourcesFootnote(presentation))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } header: {
+                HStack {
+                    Text("Sources")
+                    Spacer()
+                    Button("Refresh") { sources.refreshSources() }
+                        .controlSize(.small)
+                }
             }
 
             Section("Global shortcuts") {
@@ -57,6 +92,9 @@ public struct ScribeSettingsView: View {
         }
         .formStyle(.grouped)
         .frame(width: 500)
+        // Enumerated on open, as the menu does, so an application launched after
+        // Scribe and a microphone plugged in a moment ago both appear.
+        .onAppear { sources.refreshSources() }
         .fileImporter(
             isPresented: $isChoosingRecordingsFolder,
             allowedContentTypes: [.folder],
@@ -77,10 +115,14 @@ public struct ScribeSettingsView: View {
         }
     }
 
-    private func optionalStringBinding(_ keyPath: ReferenceWritableKeyPath<ScribeSettings, String?>) -> Binding<String> {
-        Binding(
-            get: { settings[keyPath: keyPath] ?? "" },
-            set: { settings[keyPath: keyPath] = $0.isEmpty ? nil : $0 }
-        )
+    private func sourcesFootnote(_ presentation: MenuPresentation) -> String {
+        var lines = [
+            "Scribe records one application's audio alongside the microphone. Only applications that are running now are listed; open the meeting application first if it is missing.",
+        ]
+        if presentation.applications.isEmpty, presentation.permissionPrompt != nil {
+            lines.append("Applications appear once Screen & System Audio Recording access is granted.")
+        }
+        lines.append("System Default follows whichever input macOS has selected when the recording starts.")
+        return lines.joined(separator: " ")
     }
 }

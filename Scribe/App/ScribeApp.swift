@@ -15,7 +15,7 @@ struct ScribeApp: App {
         .menuBarExtraStyle(.menu)
 
         Settings {
-            ScribeSettingsView(settings: appDelegate.environment.settings)
+            ScribeSettingsView(settings: appDelegate.environment.settings, sources: appDelegate.environment.menuModel)
                 .onDisappear { appDelegate.environment.settingsWindowDidClose() }
         }
     }

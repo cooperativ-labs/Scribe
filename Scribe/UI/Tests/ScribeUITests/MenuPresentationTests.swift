@@ -167,6 +167,62 @@ final class MenuPresentationTests: XCTestCase {
         XCTAssertTrue(presentation.isStartEnabled)
     }
 
+    // MARK: Source pickers
+
+    func testTheDefaultMicrophoneRowNamesTheCurrentSystemDefault() {
+        var snapshot = readySnapshot()
+        snapshot.microphones = [
+            CaptureMicrophoneOption(uniqueID: "BuiltInMicrophoneDevice", name: "MacBook Pro Microphone"),
+            CaptureMicrophoneOption(uniqueID: "USB-Podmic-01", name: "Podcast Microphone"),
+        ]
+        snapshot.systemDefaultMicrophoneID = "USB-Podmic-01"
+
+        let presentation = MenuPresentation(snapshot: snapshot, at: Date())
+
+        XCTAssertNil(presentation.selectedMicrophoneID, "Nothing remembered means the system default is the choice.")
+        XCTAssertEqual(presentation.systemDefaultMicrophoneName, "Podcast Microphone")
+        XCTAssertEqual(presentation.systemDefaultMicrophoneLabel, "System Default (Podcast Microphone)")
+    }
+
+    func testTheDefaultMicrophoneRowIsPlainWhenNoDefaultIsKnown() {
+        var snapshot = readySnapshot()
+        snapshot.microphones = [CaptureMicrophoneOption(uniqueID: "mic-1", name: "Built-in Microphone")]
+
+        XCTAssertEqual(MenuPresentation(snapshot: snapshot, at: Date()).systemDefaultMicrophoneLabel, "System Default")
+
+        // A default that is not among the listed devices is not named either:
+        // the list is what the person can choose from.
+        snapshot.systemDefaultMicrophoneID = "gone"
+        XCTAssertEqual(MenuPresentation(snapshot: snapshot, at: Date()).systemDefaultMicrophoneLabel, "System Default")
+    }
+
+    func testARememberedSourceThatIsAbsentStaysVisibleInThePickers() {
+        var snapshot = readySnapshot()
+        snapshot.applications = [CaptureApplicationOption(bundleIdentifier: "com.apple.Safari", name: "Safari")]
+        snapshot.microphones = [CaptureMicrophoneOption(uniqueID: "mic-1", name: "Built-in Microphone")]
+        snapshot.selectedApplicationID = "us.zoom.xos"
+        snapshot.selectedMicrophoneID = "USB-Podmic-01"
+
+        let presentation = MenuPresentation(snapshot: snapshot, at: Date())
+
+        XCTAssertEqual(presentation.unavailableSelectedApplication, UnavailableSource(id: "us.zoom.xos", label: "us.zoom.xos (not running)"))
+        XCTAssertEqual(presentation.unavailableSelectedMicrophone, UnavailableSource(id: "USB-Podmic-01", label: "USB-Podmic-01 (not connected)"))
+    }
+
+    func testAvailableSelectionsNeedNoPlaceholderRow() {
+        var snapshot = readySnapshot()
+        snapshot.applications = [CaptureApplicationOption(bundleIdentifier: "us.zoom.xos", name: "Zoom")]
+        snapshot.microphones = [CaptureMicrophoneOption(uniqueID: "mic-1", name: "Built-in Microphone")]
+        snapshot.selectedApplicationID = "us.zoom.xos"
+        snapshot.selectedMicrophoneID = "mic-1"
+
+        let presentation = MenuPresentation(snapshot: snapshot, at: Date())
+
+        XCTAssertNil(presentation.unavailableSelectedApplication)
+        XCTAssertNil(presentation.unavailableSelectedMicrophone)
+        XCTAssertNil(MenuPresentation(snapshot: readySnapshot(), at: Date()).unavailableSelectedMicrophone, "The system default is never a placeholder.")
+    }
+
     private func presentation(for coordinator: MockRecordingCoordinator) -> MenuPresentation {
         MenuPresentation(snapshot: coordinator.snapshot, at: Date())
     }
