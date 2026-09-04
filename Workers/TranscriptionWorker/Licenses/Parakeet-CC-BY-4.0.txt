@@ -1,0 +1,17 @@
+Parakeet TDT 0.6B v3 (Core ML)
+
+This release uses the FluidInference Core ML conversion of NVIDIA Parakeet TDT
+0.6B v3 for on-device automatic speech recognition.
+
+Upstream: https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml
+Revision: 7dd20fe6b1797d35f5e3307e8b1732d9a178edfe
+License: Creative Commons Attribution 4.0 International (CC-BY-4.0)
+License URI: https://creativecommons.org/licenses/by/4.0/
+
+You are free to share and adapt the licensed material under the terms of
+CC-BY-4.0, including the requirement to give appropriate credit, provide a
+link to the license, and indicate if changes were made. The full legal code is
+available at the license URI above.
+
+Attribution:
+NVIDIA Parakeet TDT 0.6B v3, converted to Core ML by FluidInference.
