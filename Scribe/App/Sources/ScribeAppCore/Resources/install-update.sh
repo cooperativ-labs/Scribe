@@ -25,7 +25,7 @@ if kill -0 "$parent_pid" 2>/dev/null; then
 fi
 
 # Revalidate immediately before installation, including nested shipped helpers.
-if ! /usr/bin/codesign --verify --deep --strict -R "$requirement" "$candidate" ||
+if ! /usr/bin/codesign --verify --deep --strict -R="$requirement" "$candidate" ||
    ! /usr/sbin/spctl --assess --type execute "$candidate"; then
     /usr/bin/open "$destination" || true
     /bin/rm -rf "$staging"

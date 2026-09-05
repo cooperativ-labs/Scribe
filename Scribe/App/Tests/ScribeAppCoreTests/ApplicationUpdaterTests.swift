@@ -45,6 +45,15 @@ final class ApplicationUpdaterTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("escaped").path))
     }
 
+    func testSigningVerificationPassesRequirementInline() {
+        let arguments = ApplicationUpdater.signingVerificationArguments(
+            requirement: "anchor apple generic",
+            application: URL(fileURLWithPath: "/Applications/Scribe.app")
+        )
+
+        XCTAssertEqual(arguments, ["--verify", "--deep", "--strict", "-R=anchor apple generic", "/Applications/Scribe.app"])
+    }
+
     func testExtractionReadsReleasePackagingFormat() throws {
         let root = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }

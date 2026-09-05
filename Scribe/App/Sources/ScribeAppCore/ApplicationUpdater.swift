@@ -52,7 +52,7 @@ public actor ApplicationUpdater {
             try Self.extractArchive(archive, to: extracted)
             let candidate = extracted.appendingPathComponent("Scribe.app", isDirectory: true)
             try Self.validateBundle(candidate, current: destination, version: release.version)
-            try Self.run("/usr/bin/codesign", ["--verify", "--deep", "--strict", "-R", requirement, candidate.path])
+            try Self.run("/usr/bin/codesign", Self.signingVerificationArguments(requirement: requirement, application: candidate))
             try Self.run("/usr/sbin/spctl", ["--assess", "--type", "execute", candidate.path])
             try Task.checkCancellation()
             try fm.removeItem(at: archive)
@@ -74,7 +74,7 @@ public actor ApplicationUpdater {
     /// Start before requesting normal AppKit termination. The helper waits for
     /// the process (including recording finalization) and never kills it.
     public func launchInstaller(_ update: PreparedUpdate, processID: Int32) throws {
-        try Self.run("/usr/bin/codesign", ["--verify", "--deep", "--strict", "-R", update.requirement, update.application.path])
+        try Self.run("/usr/bin/codesign", Self.signingVerificationArguments(requirement: update.requirement, application: update.application))
         guard let resource = Self.installerResource else {
             throw ApplicationUpdateError("The update installer is missing. Please try again.")
         }
@@ -130,6 +130,12 @@ public actor ApplicationUpdater {
         }
         // The installed release's identity pins both bundle ID and signing team.
         return "(\(text)) and anchor apple generic"
+    }
+
+    /// `codesign` treats `-R <value>` as a path to a requirements file. Keep
+    /// the requirement attached to the flag so it is parsed as an expression.
+    static func signingVerificationArguments(requirement: String, application: URL) -> [String] {
+        ["--verify", "--deep", "--strict", "-R=\(requirement)", application.path]
     }
 
     private static func run(_ executable: String, _ arguments: [String]) throws {
