@@ -11,6 +11,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         environment.checkForUpdates()
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        environment.cleanUpPendingUpdateOnTermination()
+    }
+
     /// Quitting during capture performs a normal stop and saves the originals.
     ///
     /// The reply is deferred until the stop has actually drained. Exiting as soon

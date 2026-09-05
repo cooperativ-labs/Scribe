@@ -1,8 +1,7 @@
 import Foundation
 
 /// The small, stable portion of GitHub's release response Scribe needs to
-/// offer an update. The app deliberately opens the published release instead
-/// of downloading or replacing itself in the background.
+/// download and install a signed application update.
 public struct GitHubRelease: Decodable, Sendable, Equatable {
     public struct Asset: Decodable, Sendable, Equatable {
         public let name: String
@@ -24,11 +23,15 @@ public struct GitHubRelease: Decodable, Sendable, Equatable {
         case assets
     }
 
-    /// Prefers the signed macOS archive published by Scribe's release script.
-    /// Falling back to the release page keeps the action useful if a publisher
-    /// changes the archive name or publishes a release before attaching files.
-    public var downloadURL: URL {
-        assets.first(where: { $0.name.lowercased().hasSuffix(".zip") })?.browserDownloadURL ?? htmlURL
+    /// Only the archive produced by the release pipeline is installable.
+    /// A release page or an unrelated ZIP must never enter the installer.
+    public var installableArchiveURL: URL? {
+        assets.first {
+            $0.name == "Scribe-\(version)-macos.zip" &&
+            $0.browserDownloadURL.scheme == "https" &&
+            $0.browserDownloadURL.host == "github.com" &&
+            $0.browserDownloadURL.path.hasPrefix("/cooperativ-labs/scribe/releases/download/")
+        }?.browserDownloadURL
     }
 
     public var version: String {

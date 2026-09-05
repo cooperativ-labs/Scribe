@@ -145,3 +145,26 @@ package products, so parallel workstreams do not need to edit
 The `Native/`, `Modules/`, `Workers/`, and `Tools/` packages start as compileable
 placeholders only; their future owners replace the placeholder APIs without
 adding feature logic to the host application.
+
+### In-app updates
+
+Scribe checks the latest published GitHub release at launch and from **Check for
+Updates…**. Choose **Download Update…** to download and verify the release, then
+**Restart and Install** to replace the application in place and reopen it.
+Active recordings finish saving before installation; background processing
+resumes after relaunch. Quitting normally discards an update that is ready to
+install.
+
+Updates require a Developer ID signed release in a writable Applications folder
+and the `Scribe-<version>-macos.zip` asset produced by the release script. The
+installer checks the bundle identifier, newer version, installed app's signing
+identity, nested code signatures, and Gatekeeper assessment. It preserves the
+previous app and restores it if replacement or reopening fails. Unsigned debug
+builds, translocated apps, and read-only installations show an actionable error.
+No additional feed or signing secret is required by the existing release pipeline.
+
+Before shipping updater changes, exercise a signed older-to-newer release update
+on macOS, including an active recording, a cancelled/failed download, and an
+unwritable installation. Automated tests cover archive selection/extraction,
+bundle identity/version rejection, replacement, and rollback; they substitute
+code-signing assessment and Launch Services in the transaction fixtures.

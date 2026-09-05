@@ -141,8 +141,15 @@ public struct ScribeMenuBarContent: View {
             Button("Check for Updates…") { updates.checkForUpdates() }
         case .updateAvailable(let version):
             Text("Scribe \(version) is available")
-            Button("Download Scribe \(version)…") { updates.downloadUpdate() }
+            Button("Download Update…") { updates.downloadUpdate() }
             Button("Check for Updates…") { updates.checkForUpdates() }
+        case .downloading:
+            Text("Downloading and verifying update…")
+        case .readyToInstall(let version):
+            Text("Scribe \(version) is ready to install")
+            Button("Restart and Install") { updates.installUpdate() }
+        case .installing:
+            Text("Restarting to install update…")
         case .failed(let message):
             Text(message)
             Button("Check for Updates…") { updates.checkForUpdates() }

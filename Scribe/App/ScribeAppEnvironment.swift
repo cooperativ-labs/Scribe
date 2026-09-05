@@ -37,6 +37,8 @@ final class ScribeAppEnvironment: ObservableObject {
     private var queueEventTask: Task<Void, Never>?
     private var updateTask: Task<Void, Never>?
     private var availableRelease: GitHubRelease?
+    private let updater = ApplicationUpdater()
+    private var preparedUpdate: ApplicationUpdater.PreparedUpdate?
     /// Sessions this launch adopted rather than started, so the recovery notice
     /// can be retired once the last one is finished with.
     private var adoptedSessionIDs: Set<UUID> = []
@@ -108,7 +110,8 @@ final class ScribeAppEnvironment: ObservableObject {
         UpdateMenuCommands(
             state: updateState,
             checkForUpdates: { [weak self] in self?.checkForUpdates() },
-            downloadUpdate: { [weak self] in self?.openAvailableRelease() }
+            downloadUpdate: { [weak self] in self?.downloadAvailableUpdate() },
+            installUpdate: { [weak self] in self?.installPreparedUpdate() }
         )
     }
 
@@ -116,6 +119,7 @@ final class ScribeAppEnvironment: ObservableObject {
     /// recording and every local feature usable, and a successful check never
     /// downloads anything until the person explicitly chooses to do so.
     func checkForUpdates() {
+        guard updateState != .downloading, updateState != .installing, preparedUpdate == nil else { return }
         updateTask?.cancel()
         updateState = .checking
         availableRelease = nil
@@ -140,9 +144,47 @@ final class ScribeAppEnvironment: ObservableObject {
         }
     }
 
-    private func openAvailableRelease() {
-        guard let availableRelease else { return }
-        NSWorkspace.shared.open(availableRelease.downloadURL)
+    func cleanUpPendingUpdateOnTermination() {
+        updateTask?.cancel()
+        if updateState != .installing, let preparedUpdate {
+            updater.discard(preparedUpdate)
+        }
+    }
+
+    private func downloadAvailableUpdate() {
+        guard let release = availableRelease, updateState != .downloading,
+              updateState != .installing, preparedUpdate == nil else { return }
+        updateState = .downloading
+        let application = Bundle.main.bundleURL
+        updateTask = Task { [weak self, updater] in
+            do {
+                let prepared = try await updater.prepare(release: release, application: application)
+                guard let self, !Task.isCancelled else {
+                    updater.discard(prepared)
+                    return
+                }
+                self.preparedUpdate = prepared
+                self.updateState = .readyToInstall(version: release.version)
+            } catch {
+                self?.updateState = .failed(message: error.localizedDescription)
+            }
+        }
+    }
+
+    private func installPreparedUpdate() {
+        guard let preparedUpdate, updateState != .installing else { return }
+        updateState = .installing
+        updateTask = Task { [weak self, updater] in
+            do {
+                try await updater.launchInstaller(preparedUpdate, processID: ProcessInfo.processInfo.processIdentifier)
+                // AppDelegate drains and saves any active recording before exit.
+                NSApplication.shared.terminate(nil)
+            } catch {
+                updater.discard(preparedUpdate)
+                self?.preparedUpdate = nil
+                self?.updateState = .failed(message: error.localizedDescription)
+            }
+        }
     }
 
     /// Applies whatever changed while the Settings window was open. Shortcut
