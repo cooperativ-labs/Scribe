@@ -103,6 +103,7 @@ private let slack = MeetingApplication.catalog.first { $0.id == "slack" }!
         let (settings, cleanup) = try makeSettings()
         defer { cleanup() }
         #expect(settings.meetingDetectionEnabled)
+        #expect(!settings.stopRecordingWhenMeetingEnds)
         for application in MeetingApplication.catalog {
             #expect(settings.isMeetingDetectionEnabled(for: application))
         }
@@ -117,6 +118,7 @@ private let slack = MeetingApplication.catalog.first { $0.id == "slack" }!
         let first = ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: FileManager.default.temporaryDirectory)
         first.setMeetingDetection(false, for: slack)
         first.meetingDetectionEnabled = false
+        first.stopRecordingWhenMeetingEnds = true
         #expect(first.addMeetingDomain("https://zoom.us/j/123") == "zoom.us")
         #expect(first.addMeetingDomain("zoom.us") == "zoom.us", "a duplicate is accepted but stored once")
         #expect(first.addMeetingDomain("   ") == nil)
@@ -124,6 +126,7 @@ private let slack = MeetingApplication.catalog.first { $0.id == "slack" }!
 
         let second = ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: FileManager.default.temporaryDirectory)
         #expect(!second.meetingDetectionEnabled)
+        #expect(second.stopRecordingWhenMeetingEnds)
         #expect(!second.isMeetingDetectionEnabled(for: slack))
         #expect(second.isMeetingDetectionEnabled(for: zoom))
         #expect(second.meetingDomains == ["zoom.us"])

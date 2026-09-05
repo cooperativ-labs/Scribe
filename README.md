@@ -117,8 +117,10 @@ answers for that call only: the next meeting is offered again.
 Accepting scopes the recording to the application that was noticed — the same
 choice the **Application** submenu makes — and turns the chip into that
 recording's transport: the elapsed time on the left, pause and stop on the
-right. It stays until the recording is stopped, which is deliberate, since
-hanging up does not save the file. Stopping from the chip is taken as the answer
+right. By default it stays until the recording is stopped. Enable **Stop
+recording automatically when the meeting ends** in Settings to have a recording
+started from this prompt stop and save after Scribe observes the call end. Brief
+microphone reconnects are ignored. Stopping from the chip is taken as the answer
 for that call, so it does not immediately ask again.
 
 The chip is its own floating panel rather than a row in the menu: it has to

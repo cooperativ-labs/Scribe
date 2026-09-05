@@ -89,7 +89,14 @@ xcrun notarytool store-credentials "$NOTARYTOOL_PROFILE" \
   --password "$APPLE_APP_SPECIFIC_PASSWORD" \
   --team-id "$APPLE_TEAM_ID"
 
-archive_path="$repo_root/dist/Scribe-$version-macos.zip"
+distribution_dir="$repo_root/dist"
+# Keep the distribution directory limited to the artifacts from this release.
+# The archive is versioned, so removing only the current path would leave
+# archives and checksums from earlier releases behind.
+rm -f -- \
+  "$distribution_dir"/Scribe-*-macos.zip \
+  "$distribution_dir"/Scribe-*-macos.zip.sha256
+archive_path="$distribution_dir/Scribe-$version-macos.zip"
 rm -f -- "$archive_path" "$archive_path.sha256"
 Scripts/package-app.sh --inputs "$inputs_file" --notary-profile "$NOTARYTOOL_PROFILE" --output "$archive_path"
 [[ -f "$archive_path" ]] || die "notarization completed but no release archive was produced"

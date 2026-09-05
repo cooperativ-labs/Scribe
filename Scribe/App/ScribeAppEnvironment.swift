@@ -84,7 +84,12 @@ final class ScribeAppEnvironment: ObservableObject {
         )
         self.coordinator = coordinator
         menuModel = RecorderMenuModel(coordinator: coordinator)
-        meetingChipModel = MeetingChipModel(coordinator: coordinator)
+        meetingChipModel = MeetingChipModel(
+            coordinator: coordinator,
+            shouldStopWhenMeetingEnds: {
+                settings.meetingDetectionEnabled && settings.stopRecordingWhenMeetingEnds
+            }
+        )
         hotkeys = HotkeyService(coordinator: coordinator)
         meetingDetector = MeetingDetector(settings: settings)
 
@@ -110,8 +115,9 @@ final class ScribeAppEnvironment: ObservableObject {
             self.settings.rememberedMicrophoneID = snapshot.selectedMicrophoneID
         }
 
-        // Detection only reports. The chip is what turns that report into an
-        // offer; stopping when the call ends is still a separate step.
+        // Detection only reports. The chip turns that report into an offer and,
+        // when the person opted in, finishes the recording it started after the
+        // detector's end-of-call grace period has elapsed.
         meetingDetector.onChange = { [weak self] meeting in
             self?.detectedMeeting = meeting
             self?.meetingChipModel.meetingWasDetected(meeting)

@@ -137,6 +137,58 @@ final class MeetingChipTests: XCTestCase {
         guard case .session = model.presentation else { return XCTFail("expected the transport") }
     }
 
+    func testAnOptedInMeetingRecordingStopsWhenTheCallEnds() async {
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
+        let model = MeetingChipModel(
+            coordinator: coordinator,
+            shouldStopWhenMeetingEnds: { true }
+        )
+        model.meetingWasDetected(zoomCall())
+        model.record()
+        await coordinator.waitUntilIdle()
+
+        model.meetingWasDetected(nil)
+        await coordinator.waitUntilIdle()
+
+        XCTAssertEqual(coordinator.snapshot.state, .idle)
+        XCTAssertEqual(coordinator.performedCommands.filter { $0 == .stop }, [.stop])
+        XCTAssertEqual(model.presentation, .hidden)
+    }
+
+    func testAutomaticStopDoesNotTouchARecordingStartedFromTheMenu() async {
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
+        let model = MeetingChipModel(
+            coordinator: coordinator,
+            shouldStopWhenMeetingEnds: { true }
+        )
+        coordinator.submit(.start)
+        await coordinator.waitUntilIdle()
+        model.meetingWasDetected(zoomCall())
+
+        model.meetingWasDetected(nil)
+        await coordinator.waitUntilIdle()
+
+        XCTAssertTrue(coordinator.snapshot.state.isRecording)
+        XCTAssertFalse(coordinator.performedCommands.contains(.stop))
+    }
+
+    func testAReplacementCallStopsTheRecordingForThePreviousCall() async {
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
+        let model = MeetingChipModel(
+            coordinator: coordinator,
+            shouldStopWhenMeetingEnds: { true }
+        )
+        model.meetingWasDetected(zoomCall())
+        model.record()
+        await coordinator.waitUntilIdle()
+
+        model.meetingWasDetected(browserCall(domain: "meet.google.com", at: Date(timeIntervalSince1970: 2_000)))
+        await coordinator.waitUntilIdle()
+
+        XCTAssertEqual(coordinator.snapshot.state, .idle)
+        XCTAssertEqual(coordinator.performedCommands.filter { $0 == .stop }, [.stop])
+    }
+
     // MARK: The transport
 
     func testTheHoldButtonPausesAndThenResumes() async {

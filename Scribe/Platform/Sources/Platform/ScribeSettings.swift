@@ -42,6 +42,12 @@ public final class ScribeSettings: ObservableObject {
     @Published public var meetingDetectionEnabled: Bool {
         didSet { defaults.set(meetingDetectionEnabled, forKey: Key.meetingDetectionEnabled) }
     }
+    /// Finishes a recording started from the meeting chip when its detected
+    /// call ends. Opt-in because an automatic finalization should never be a
+    /// surprise, even though detection has its own reconnect grace period.
+    @Published public var stopRecordingWhenMeetingEnds: Bool {
+        didSet { defaults.set(stopRecordingWhenMeetingEnds, forKey: Key.stopRecordingWhenMeetingEnds) }
+    }
     /// Catalog applications the person has unchecked. Stored as the exceptions
     /// so every application, including one added to the catalog by a later
     /// update, is watched until someone says otherwise.
@@ -77,6 +83,7 @@ public final class ScribeSettings: ObservableObject {
         stopShortcut = Self.loadShortcut(from: defaults, key: Key.stopShortcut) ?? .defaultStop
         transcribeWhenFinalRecordingIsReady = defaults.object(forKey: Key.transcribeWhenFinalRecordingIsReady) as? Bool ?? false
         meetingDetectionEnabled = defaults.object(forKey: Key.meetingDetectionEnabled) as? Bool ?? true
+        stopRecordingWhenMeetingEnds = defaults.object(forKey: Key.stopRecordingWhenMeetingEnds) as? Bool ?? false
         disabledMeetingApplicationIDs = Set(defaults.stringArray(forKey: Key.disabledMeetingApplicationIDs) ?? [])
         meetingDomains = defaults.stringArray(forKey: Key.meetingDomains) ?? MeetingDomain.defaults
 
@@ -192,6 +199,7 @@ public final class ScribeSettings: ObservableObject {
         static let stopShortcut = "scribe.settings.stopShortcut"
         static let transcribeWhenFinalRecordingIsReady = "scribe.settings.transcribeWhenFinalRecordingIsReady"
         static let meetingDetectionEnabled = "scribe.settings.meetingDetectionEnabled"
+        static let stopRecordingWhenMeetingEnds = "scribe.settings.stopRecordingWhenMeetingEnds"
         static let disabledMeetingApplicationIDs = "scribe.settings.disabledMeetingApplicationIDs"
         static let meetingDomains = "scribe.settings.meetingDomains"
     }

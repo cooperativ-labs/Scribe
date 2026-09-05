@@ -14,6 +14,7 @@ public final class MeetingChipModel: ObservableObject {
 
     private let coordinator: any RecordingCoordinating
     private let now: @MainActor () -> Date
+    private let shouldStopWhenMeetingEnds: @MainActor () -> Bool
     private var snapshot: RecorderSnapshot
     private var meeting: DetectedMeeting?
     /// The call whose offer was waved away, remembered so the same call is not
@@ -41,9 +42,11 @@ public final class MeetingChipModel: ObservableObject {
 
     public init(
         coordinator: any RecordingCoordinating,
+        shouldStopWhenMeetingEnds: @escaping @MainActor () -> Bool = { false },
         now: @escaping @MainActor () -> Date = { Date() }
     ) {
         self.coordinator = coordinator
+        self.shouldStopWhenMeetingEnds = shouldStopWhenMeetingEnds
         self.now = now
         snapshot = coordinator.snapshot
         observation = coordinator.observeSnapshot { [weak self] snapshot in
@@ -69,12 +72,24 @@ public final class MeetingChipModel: ObservableObject {
 
     /// What the detector found, or `nil` when the call ended.
     public func meetingWasDetected(_ meeting: DetectedMeeting?) {
+        let previousCall = self.meeting.map(DismissedCall.init)
+        let detectedCall = meeting.map(DismissedCall.init)
         self.meeting = meeting
         // A dismissal covers one call. Anything else arriving — the call ending,
         // or a different one starting — retires it, so the next meeting is
         // offered normally rather than being silently skipped.
-        if meeting.map({ DismissedCall($0) }) != dismissedCall {
+        if detectedCall != dismissedCall {
             dismissedCall = nil
+        }
+
+        // The detector has already absorbed brief microphone reconnects before
+        // publishing an end. A different call also ends the recording tied to
+        // the old one, even when both apps overlap for one polling pass.
+        if previousCall != nil,
+           detectedCall != previousCall,
+           startedFromChip,
+           shouldStopWhenMeetingEnds() {
+            coordinator.submit(.stop)
         }
         refreshPresentation()
     }

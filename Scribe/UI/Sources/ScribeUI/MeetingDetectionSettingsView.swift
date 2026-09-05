@@ -31,6 +31,9 @@ public struct MeetingDetectionSettingsView: View {
         Section {
             Toggle("Detect meetings and calls", isOn: $settings.meetingDetectionEnabled)
 
+            Toggle("Stop recording automatically when the meeting ends", isOn: $settings.stopRecordingWhenMeetingEnds)
+                .disabled(!settings.meetingDetectionEnabled)
+
             if let meeting = detector.detectedMeeting {
                 Label("Call in progress: \(meeting.displayName)", systemImage: "phone.fill")
                     .foregroundStyle(.secondary)
@@ -50,7 +53,7 @@ public struct MeetingDetectionSettingsView: View {
                 .disabled(!settings.meetingDetectionEnabled)
             }
 
-            Text("A call is detected when one of these applications has the microphone open. Muting does not end a call; quitting or hanging up does.")
+            Text("A call is detected when one of these applications has the microphone open. Muting does not end a call; quitting or hanging up does. Automatic stop applies only to recordings started from the meeting prompt.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         } header: {
