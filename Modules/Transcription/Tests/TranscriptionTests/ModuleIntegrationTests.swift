@@ -126,6 +126,36 @@ final class ModuleIntegrationTests: XCTestCase {
         XCTAssertEqual(seeks, [segment.startMs])
     }
 
+    /// Deleting from review removes the whole meeting from the store: the
+    /// snapshot and its runs, so nothing older resurfaces in the list.
+    func testDeletingAReviewedFileRemovesItsMeetingFromTheStore() async throws {
+        let source = try writeAudio(named: "call.wav", in: root, seconds: 4)
+        let coordinator = try TranscriptionCoordinator(
+            configuration: .init(transcriptStoreURL: storeURL),
+            stageRunner: ScriptedWorkerStageRunner(hostStageRunner: TranscriptAssemblyStageRunner())
+        )
+        _ = try await coordinator.enqueue(TranscriptionRequest(sourceURL: source, modelProfileID: "parakeet-v3"))
+        await coordinator.runPending()
+
+        let store = TranscriptStore(storeDirectoryURL: storeURL)
+        let run = try XCTUnwrap(store.latestRunPerSource().first)
+        let meeting = run.runDirectoryURL.deletingLastPathComponent().deletingLastPathComponent()
+        XCTAssertTrue(FileManager.default.fileExists(atPath: meeting.path))
+
+        let model = await TranscriptViewModel(
+            files: store.latestRunPerSource().map(TranscriptReviewFile.init),
+            playback: RecordingPlayback(),
+            fileDeleter: TranscriptStoreFileDeleter(store: store)
+        )
+        await MainActor.run { model.delete(fileID: run.job.runID.uuidString) }
+
+        let remaining = await MainActor.run { model.files }
+        XCTAssertTrue(remaining.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: meeting.path))
+        XCTAssertTrue(store.runs().isEmpty)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: source.path), "the original the user chose is untouched")
+    }
+
     /// A run that fails mid-pipeline keeps its earlier checkpoints and is
     /// presented as failed rather than as an empty transcript.
     func testAFailedAssemblyIsReportedWithoutInventingATranscript() async throws {

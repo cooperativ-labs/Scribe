@@ -76,6 +76,14 @@ public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
         }
     }
 
+    /// Where the status item is on screen, for anything that has to appear
+    /// under it. `nil` when the item is not on the menu bar — a bar with no
+    /// room left hides items rather than shrinking them.
+    public var statusItemAnchor: NSRect? {
+        guard let button = statusItem.button, let window = button.window, statusItem.isVisible else { return nil }
+        return window.convertToScreen(button.convert(button.bounds, to: nil))
+    }
+
     // MARK: NSMenuDelegate
 
     public func menuNeedsUpdate(_ menu: NSMenu) {

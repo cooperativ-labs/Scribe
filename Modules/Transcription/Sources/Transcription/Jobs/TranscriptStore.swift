@@ -80,6 +80,24 @@ public struct TranscriptStore: Sendable {
         return url
     }
 
+    /// Removes the meeting that produced this run: its source snapshot and every
+    /// run made from it, not only the one review was showing.
+    ///
+    /// Review lists the newest run per source, so removing a single run would
+    /// only resurface the one before it. A person deleting a transcript means
+    /// the recording is done with, and that is the meeting directory.
+    public func deleteMeeting(containingRunID runID: UUID) throws {
+        guard let run = run(withRunID: runID) else {
+            throw TranscriptAssemblyError.missingArtifact("the run directory for \(runID.uuidString)")
+        }
+        // <store>/meeting--<source>/runs/<runID> → the meeting directory is two levels up.
+        let meeting = run.runDirectoryURL.deletingLastPathComponent().deletingLastPathComponent()
+        guard meeting.lastPathComponent.hasPrefix(SourceSnapshotService.meetingDirectoryPrefix) else {
+            throw TranscriptAssemblyError.missingArtifact("the meeting directory for \(runID.uuidString)")
+        }
+        try fileManager.removeItem(at: meeting)
+    }
+
     /// The `TranscriptionResult` a completed run reports back to its caller.
     public func result(for run: StoredTranscriptRun) -> TranscriptionResult? {
         guard let transcript = run.transcript else { return nil }
@@ -180,5 +198,21 @@ public struct TranscriptStoreRevisionWriter: TranscriptRevisionStoring {
             throw TranscriptAssemblyError.missingArtifact("the run directory for \(fileID)")
         }
         try store.save(transcript, forRunAt: run.runDirectoryURL)
+    }
+}
+
+/// Deletes a reviewed file by removing the meeting its run belongs to.
+public struct TranscriptStoreFileDeleter: TranscriptFileDeleting {
+    private let store: TranscriptStore
+
+    public init(store: TranscriptStore) {
+        self.store = store
+    }
+
+    public func delete(fileID: TranscriptReviewFile.ID) throws {
+        guard let runID = UUID(uuidString: fileID) else {
+            throw TranscriptAssemblyError.missingArtifact("the run directory for \(fileID)")
+        }
+        try store.deleteMeeting(containingRunID: runID)
     }
 }

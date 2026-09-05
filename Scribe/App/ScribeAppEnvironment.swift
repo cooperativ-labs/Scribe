@@ -22,6 +22,10 @@ final class ScribeAppEnvironment: ObservableObject {
     /// Watches the chosen applications for a call in progress. Runs for the life
     /// of the app; what it finds is offered to the person, never acted on alone.
     let meetingDetector: MeetingDetector
+    /// The chip that offers to record a noticed call, and becomes its transport
+    /// once one is running. Owns no detection of its own: it is told what was
+    /// found and decides only what to show.
+    let meetingChipModel: MeetingChipModel
     @Published private(set) var detectedMeeting: DetectedMeeting?
     private let processingQueue: ProcessingQueue?
     private let outbox: TranscriptionRequestOutbox
@@ -80,6 +84,7 @@ final class ScribeAppEnvironment: ObservableObject {
         )
         self.coordinator = coordinator
         menuModel = RecorderMenuModel(coordinator: coordinator)
+        meetingChipModel = MeetingChipModel(coordinator: coordinator)
         hotkeys = HotkeyService(coordinator: coordinator)
         meetingDetector = MeetingDetector(settings: settings)
 
@@ -105,10 +110,11 @@ final class ScribeAppEnvironment: ObservableObject {
             self.settings.rememberedMicrophoneID = snapshot.selectedMicrophoneID
         }
 
-        // Detection only reports. Offering to record what it found, and
-        // stopping when the call ends, are separate steps built on this value.
+        // Detection only reports. The chip is what turns that report into an
+        // offer; stopping when the call ends is still a separate step.
         meetingDetector.onChange = { [weak self] meeting in
             self?.detectedMeeting = meeting
+            self?.meetingChipModel.meetingWasDetected(meeting)
         }
         meetingDetector.start()
     }

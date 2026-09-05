@@ -260,7 +260,8 @@ final class TranscriptionHostService {
             files: reviewFiles(),
             playback: AVFoundationTranscriptPlayback(),
             directory: speakerDirectory(),
-            revisionStore: TranscriptStoreRevisionWriter(store: store)
+            revisionStore: TranscriptStoreRevisionWriter(store: store),
+            fileDeleter: TranscriptStoreFileDeleter(store: store)
         )
         reviewModel = model
         return model

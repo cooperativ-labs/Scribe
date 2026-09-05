@@ -81,11 +81,32 @@ public struct TranscriptReviewFile: Identifiable, Equatable, Sendable {
     }
 }
 
+/// What playback reports back to review as the source plays.
+public enum TranscriptPlaybackEvent: Equatable, Sendable {
+    /// The play head moved; sent repeatedly while playing.
+    case timeChanged(milliseconds: Int)
+    /// The source ran out, so playback stopped on its own.
+    case ended
+}
+
 /// Playback is injected so review remains testable and does not depend on the job pipeline.
+///
+/// Transport control and progress reporting have default no-op implementations so a
+/// seek-only test double still satisfies the contract.
 @MainActor
 public protocol TranscriptPlaybackSeeking: AnyObject {
     func load(sourceSnapshotURL: URL)
     func seek(toMilliseconds milliseconds: Int)
+    func play()
+    func pause()
+    /// Registers the single observer that receives progress and end-of-source events.
+    func setPlaybackObserver(_ observer: (@MainActor (TranscriptPlaybackEvent) -> Void)?)
+}
+
+public extension TranscriptPlaybackSeeking {
+    func play() {}
+    func pause() {}
+    func setPlaybackObserver(_: (@MainActor (TranscriptPlaybackEvent) -> Void)?) {}
 }
 
 /// AVFoundation-backed playback of the source snapshot retained with a transcript.
@@ -93,15 +114,22 @@ public protocol TranscriptPlaybackSeeking: AnyObject {
 public final class AVFoundationTranscriptPlayback: TranscriptPlaybackSeeking {
     public let player: AVPlayer
     private var loadedURL: URL?
+    private var observer: (@MainActor (TranscriptPlaybackEvent) -> Void)?
+    private var timeObserverToken: Any?
+    private var endObserverToken: (any NSObjectProtocol)?
 
     public init(player: AVPlayer = AVPlayer()) {
         self.player = player
+        // Seeking between spoken turns must land exactly where the transcript says,
+        // so the player is not allowed to trade accuracy for a faster start.
+        player.automaticallyWaitsToMinimizeStalling = false
     }
 
     public func load(sourceSnapshotURL: URL) {
         guard loadedURL != sourceSnapshotURL else { return }
         loadedURL = sourceSnapshotURL
         player.replaceCurrentItem(with: AVPlayerItem(url: sourceSnapshotURL))
+        observeEndOfCurrentItem()
     }
 
     public func seek(toMilliseconds milliseconds: Int) {
@@ -110,6 +138,44 @@ public final class AVFoundationTranscriptPlayback: TranscriptPlaybackSeeking {
             toleranceBefore: .zero,
             toleranceAfter: .zero
         )
+    }
+
+    public func play() { player.play() }
+
+    public func pause() { player.pause() }
+
+    public func setPlaybackObserver(_ observer: (@MainActor (TranscriptPlaybackEvent) -> Void)?) {
+        self.observer = observer
+        if let timeObserverToken {
+            player.removeTimeObserver(timeObserverToken)
+            self.timeObserverToken = nil
+        }
+        guard observer != nil else { return }
+        // A tenth of a second is fine enough that the current-speaker readout
+        // changes on the turn boundary rather than visibly after it.
+        let interval = CMTime(value: 1, timescale: 10)
+        timeObserverToken = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
+            guard time.isNumeric else { return }
+            let milliseconds = Int((time.seconds * 1_000).rounded())
+            MainActor.assumeIsolated {
+                self?.observer?(.timeChanged(milliseconds: milliseconds))
+            }
+        }
+    }
+
+    private func observeEndOfCurrentItem() {
+        if let endObserverToken {
+            NotificationCenter.default.removeObserver(endObserverToken)
+        }
+        endObserverToken = NotificationCenter.default.addObserver(
+            forName: AVPlayerItem.didPlayToEndTimeNotification,
+            object: player.currentItem,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.observer?(.ended)
+            }
+        }
     }
 }
 
@@ -170,4 +236,13 @@ public struct FileTranscriptExportWriter: TranscriptExportWriting {
 /// against fixtures with no store attached.
 public protocol TranscriptRevisionStoring: Sendable {
     func save(_ transcript: CanonicalTranscript, forFileID fileID: TranscriptReviewFile.ID) throws
+}
+
+/// Removes a reviewed file from wherever the host keeps it.
+///
+/// Deleting is the one review action that discards data rather than adding a
+/// revision, so it stays behind its own contract: a fixture-backed window with
+/// no deleter attached simply removes the row from the list.
+public protocol TranscriptFileDeleting: Sendable {
+    func delete(fileID: TranscriptReviewFile.ID) throws
 }

@@ -7,6 +7,7 @@ public struct TranscriptWindow: View {
     @State private var isChoosingExportDirectory = false
     @State private var pendingFormats: Set<TranscriptExportFormat> = []
     @State private var turnPickerSegmentID: TranscriptSegment.ID?
+    @State private var fileAwaitingDeletion: TranscriptReviewFile?
 
     public init(viewModel: TranscriptViewModel) {
         self.viewModel = viewModel
@@ -16,12 +17,28 @@ public struct TranscriptWindow: View {
         NavigationSplitView {
             List(selection: $viewModel.selectedFileID) {
                 ForEach(viewModel.files) { file in
-                    TranscriptFileRow(file: file)
-                        .tag(file.id)
+                    TranscriptFileRow(file: file, canDelete: viewModel.canDelete(file)) {
+                        fileAwaitingDeletion = file
+                    }
+                    .tag(file.id)
                 }
             }
             .navigationTitle("Transcripts")
             .frame(minWidth: 230)
+            .confirmationDialog(
+                "Delete \u{201C}\(fileAwaitingDeletion?.filename ?? "")\u{201D}?",
+                isPresented: Binding(
+                    get: { fileAwaitingDeletion != nil },
+                    set: { if !$0 { fileAwaitingDeletion = nil } }
+                ),
+                titleVisibility: .visible,
+                presenting: fileAwaitingDeletion
+            ) { file in
+                Button("Delete", role: .destructive) { viewModel.delete(fileID: file.id) }
+                Button("Cancel", role: .cancel) {}
+            } message: { _ in
+                Text("The transcript and the copy of the recording kept beside it are removed. Exported files are left alone.")
+            }
         } detail: {
             if let file = viewModel.selectedFile, let transcript = file.transcript {
                 transcriptDetail(file: file, transcript: transcript)
@@ -77,8 +94,12 @@ public struct TranscriptWindow: View {
                             .frame(maxWidth: .infinity, minHeight: 240)
                     }
                     ForEach(viewModel.chronologicalSegments) { segment in
-                        TranscriptSegmentRow(segment: segment, isSelected: segment.id == viewModel.selectedSegmentID) {
-                            viewModel.select(segment: segment)
+                        TranscriptSegmentRow(
+                            segment: segment,
+                            isSelected: segment.id == viewModel.selectedSegmentID,
+                            isPlaying: viewModel.isPlaying && segment.id == viewModel.playingSegmentID
+                        ) {
+                            viewModel.play(segment: segment)
                         }
                         .contextMenu {
                             Button("Assign Speaker for This Turn…") { turnPickerSegmentID = segment.id }
@@ -98,7 +119,11 @@ public struct TranscriptWindow: View {
         .navigationTitle(file.filename)
         .toolbar { exportToolbar }
         .safeAreaInset(edge: .bottom) {
-            TranscriptExportResults(outcomes: viewModel.exportOutcomes)
+            VStack(spacing: 0) {
+                TranscriptExportResults(outcomes: viewModel.exportOutcomes)
+                TranscriptTransportBar(viewModel: viewModel)
+            }
+            .animation(.snappy, value: viewModel.playbackStatus == nil)
         }
     }
 
@@ -140,16 +165,99 @@ public struct TranscriptWindow: View {
 
 private struct TranscriptFileRow: View {
     let file: TranscriptReviewFile
+    let canDelete: Bool
+    let requestDeletion: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(file.filename).lineLimit(1)
-            if let progress = file.jobState.progress {
-                ProgressView(value: progress)
+        HStack(alignment: .center, spacing: 8) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(file.filename).lineLimit(1)
+                if let progress = file.jobState.progress {
+                    ProgressView(value: progress)
+                }
+                Text(file.jobState.displayName)
+                    .font(.caption)
+                    .foregroundStyle(file.jobState.isFailure ? .red : .secondary)
             }
-            Text(file.jobState.displayName)
-                .font(.caption)
-                .foregroundStyle(file.jobState.isFailure ? .red : .secondary)
+            Spacer(minLength: 0)
+            Button(action: requestDeletion) {
+                Image(systemName: "trash")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.borderless)
+            .disabled(!canDelete)
+            .help(canDelete ? "Delete this transcript" : "This transcript is still being processed.")
+            .accessibilityLabel("Delete \(file.filename)")
+        }
+    }
+}
+
+/// The floating play/pause control at the foot of the transcript.
+///
+/// It reads as a small capsule of glass over the words: who is speaking on the
+/// first line, the bounds of their turn beneath. Hidden while stopped so the
+/// transcript is the whole panel until someone starts listening.
+private struct TranscriptTransportBar: View {
+    let viewModel: TranscriptViewModel
+
+    var body: some View {
+        if let status = viewModel.playbackStatus {
+            HStack(spacing: 12) {
+                Button {
+                    viewModel.togglePlayback()
+                } label: {
+                    Image(systemName: status.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.title3)
+                        .frame(width: 22, height: 22)
+                        .contentTransition(.symbolEffect(.replace))
+                }
+                .buttonStyle(.plain)
+                .help(status.isPlaying ? "Pause" : "Play")
+                .accessibilityLabel(status.isPlaying ? "Pause" : "Play")
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(status.speakerLabel)
+                        .font(.callout.weight(.semibold))
+                        .lineLimit(1)
+                    Text(status.timestamp)
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Button {
+                    viewModel.stopPlayback()
+                } label: {
+                    Image(systemName: "stop.fill")
+                        .frame(width: 22, height: 22)
+                }
+                .buttonStyle(.plain)
+                .help("Stop")
+                .accessibilityLabel("Stop")
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .frame(maxWidth: 360)
+            .modifier(TranscriptGlassCapsule())
+            .padding(.horizontal)
+            .padding(.bottom, 12)
+            .frame(maxWidth: .infinity)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .animation(.snappy, value: status.isPlaying)
+        }
+    }
+}
+
+/// Liquid glass on systems that draw it, a material capsule everywhere else.
+private struct TranscriptGlassCapsule: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 26, *) {
+            content.glassEffect(.regular.interactive(), in: .capsule)
+        } else {
+            content
+                .background(.regularMaterial, in: Capsule())
+                .overlay(Capsule().strokeBorder(.white.opacity(0.18), lineWidth: 0.5))
+                .shadow(color: .black.opacity(0.18), radius: 12, y: 4)
         }
     }
 }
@@ -176,12 +284,17 @@ private struct TranscriptMetadataView: View {
 private struct TranscriptSegmentRow: View {
     let segment: TranscriptSegment
     let isSelected: Bool
+    let isPlaying: Bool
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 7) {
+                    Image(systemName: isPlaying ? "speaker.wave.2.fill" : "play.circle")
+                        .font(.caption)
+                        .foregroundStyle(isPlaying ? Color.accentColor : .secondary)
+                        .contentTransition(.symbolEffect(.replace))
                     Text("\(TranscriptTimecode.string(fromMilliseconds: segment.startMs)) – \(TranscriptTimecode.string(fromMilliseconds: segment.endMs))")
                         .font(.caption.monospacedDigit())
                     if segment.speakerID == nil {
@@ -210,7 +323,7 @@ private struct TranscriptSegmentRow: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(segment.speakerLabel), \(segment.text)")
-        .accessibilityHint("Select to seek playback to \(TranscriptTimecode.string(fromMilliseconds: segment.startMs))")
+        .accessibilityHint("Plays from \(TranscriptTimecode.string(fromMilliseconds: segment.startMs)) through the turns that follow")
     }
 }
 

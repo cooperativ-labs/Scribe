@@ -107,6 +107,28 @@ application.
 
 Detection only reports what it sees; it never starts a recording on its own.
 
+### The meeting chip
+
+When a call is noticed, a small chip appears under the menu bar icon asking
+*"Record this Zoom meeting?"*, with a Record button and a dismiss button. For a
+call in a browser it also names the website the tab was matched on. Dismissing
+answers for that call only: the next meeting is offered again.
+
+Accepting scopes the recording to the application that was noticed — the same
+choice the **Application** submenu makes — and turns the chip into that
+recording's transport: the elapsed time on the left, pause and stop on the
+right. It stays until the recording is stopped, which is deliberate, since
+hanging up does not save the file. Stopping from the chip is taken as the answer
+for that call, so it does not immediately ask again.
+
+The chip is its own floating panel rather than a row in the menu: it has to
+reach somebody who is looking at their meeting, not at Scribe. It never takes
+keyboard focus away from the call, and it appears over full-screen windows and
+on every Space. On macOS 26 it is drawn in Liquid Glass; on macOS 15 the same
+shapes are drawn in the system material.
+
+A recording started from the menu, with no call noticed, gets no chip.
+
 ### Model storage and offline operation
 
 Open **Settings → Transcription model → Install Model** to install the recommended

@@ -10,6 +10,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The status item and its menu. Held here because it is the app's only
     /// visible surface until a window is opened from it.
     private var menuBar: ScribeMenuBarController?
+    /// The chip that hangs under the status item when a call is noticed. Its own
+    /// window, so it can reach a person who is looking at their meeting rather
+    /// than at Scribe's menu.
+    private var meetingChip: MeetingChipController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         menuBar = ScribeMenuBarController(
@@ -19,6 +23,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             transcription: { [environment] in environment.transcriptionMenuCommands },
             updates: { [environment] in environment.updateMenuCommands },
             openSettings: { Self.openSettings() }
+        )
+        // The anchor is read at each appearance rather than captured: the menu
+        // bar rearranges itself as other items come and go.
+        meetingChip = MeetingChipController(
+            model: environment.meetingChipModel,
+            anchor: { [weak menuBar] in menuBar?.statusItemAnchor }
         )
         environment.presentFirstRunPermissionsIfNeeded()
         environment.checkForUpdates()

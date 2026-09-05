@@ -52,6 +52,26 @@ public struct TranscriptSpeakerActionMessage: Equatable, Sendable {
     }
 }
 
+/// What the transport bar shows while the selected source is playing.
+public struct TranscriptPlaybackStatus: Equatable, Sendable {
+    /// The turn whose words are being spoken, or the last one that started
+    /// when the play head is in a pause between turns.
+    public let segment: TranscriptSegment
+    public let isPlaying: Bool
+
+    public init(segment: TranscriptSegment, isPlaying: Bool) {
+        self.segment = segment
+        self.isPlaying = isPlaying
+    }
+
+    public var speakerLabel: String { segment.speakerLabel }
+
+    /// The turn's own bounds, which is what a listener is placing the words against.
+    public var timestamp: String {
+        "\(TranscriptTimecode.string(fromMilliseconds: segment.startMs)) – \(TranscriptTimecode.string(fromMilliseconds: segment.endMs))"
+    }
+}
+
 /// Fixture-first state and actions for the transcript review window.
 @MainActor
 @Observable
@@ -71,10 +91,16 @@ public final class TranscriptViewModel {
     public private(set) var enrollmentSpeakerID: String?
     public private(set) var isEnrolling = false
 
+    /// The turn playback is on, or nil when stopped. Set only through the
+    /// transport actions so the bar, the rows, and the player never disagree.
+    public private(set) var playingSegmentID: TranscriptSegment.ID?
+    public private(set) var isPlaying = false
+
     @ObservationIgnored private let playback: any TranscriptPlaybackSeeking
     @ObservationIgnored private let exportWriter: any TranscriptExportWriting
     @ObservationIgnored private let directory: (any TranscriptSpeakerDirectory)?
     @ObservationIgnored private let revisionStore: (any TranscriptRevisionStoring)?
+    @ObservationIgnored private let fileDeleter: (any TranscriptFileDeleting)?
 
     public init(
         files: [TranscriptReviewFile],
@@ -82,7 +108,8 @@ public final class TranscriptViewModel {
         playback: any TranscriptPlaybackSeeking,
         exportWriter: any TranscriptExportWriting = FileTranscriptExportWriter(),
         directory: (any TranscriptSpeakerDirectory)? = nil,
-        revisionStore: (any TranscriptRevisionStoring)? = nil
+        revisionStore: (any TranscriptRevisionStoring)? = nil,
+        fileDeleter: (any TranscriptFileDeleting)? = nil
     ) {
         self.files = files
         self.selectedFileID = selectedFileID ?? files.first?.id
@@ -90,7 +117,9 @@ public final class TranscriptViewModel {
         self.exportWriter = exportWriter
         self.directory = directory
         self.revisionStore = revisionStore
+        self.fileDeleter = fileDeleter
         selectFileIfNeeded()
+        playback.setPlaybackObserver { [weak self] event in self?.handle(event) }
     }
 
     /// Replaces the list as the job pipeline reports new state.
@@ -153,6 +182,112 @@ public final class TranscriptViewModel {
     public func select(segment: TranscriptSegment) {
         selectedSegmentID = segment.id
         playback.seek(toMilliseconds: segment.startMs)
+        // A seek while playing moves the readout with the audio; a seek while
+        // paused or stopped is only a selection and must not start sound.
+        if isPlaying { playingSegmentID = segment.id }
+    }
+
+    // MARK: - Playback
+
+    /// What the transport bar shows, or nil when playback is stopped.
+    public var playbackStatus: TranscriptPlaybackStatus? {
+        guard let playingSegmentID,
+              let segment = chronologicalSegments.first(where: { $0.id == playingSegmentID })
+        else { return nil }
+        return TranscriptPlaybackStatus(segment: segment, isPlaying: isPlaying)
+    }
+
+    /// Starts playing from this turn and keeps going through the turns that
+    /// follow until the transcript ends or the person stops it.
+    public func play(segment: TranscriptSegment) {
+        selectedSegmentID = segment.id
+        playingSegmentID = segment.id
+        playback.seek(toMilliseconds: segment.startMs)
+        playback.play()
+        isPlaying = true
+    }
+
+    /// The bar's one button: pause while playing, resume while paused, and
+    /// otherwise start from the selected turn or the top of the transcript.
+    public func togglePlayback() {
+        if isPlaying {
+            playback.pause()
+            isPlaying = false
+            return
+        }
+        if playingSegmentID != nil {
+            playback.play()
+            isPlaying = true
+            return
+        }
+        let segments = chronologicalSegments
+        guard let start = segments.first(where: { $0.id == selectedSegmentID }) ?? segments.first else { return }
+        play(segment: start)
+    }
+
+    /// Stops and forgets the position, so the next play starts from the
+    /// selected turn rather than resuming mid-word.
+    public func stopPlayback() {
+        guard isPlaying || playingSegmentID != nil else { return }
+        playback.pause()
+        isPlaying = false
+        playingSegmentID = nil
+    }
+
+    private func handle(_ event: TranscriptPlaybackEvent) {
+        guard isPlaying else { return }
+        switch event {
+        case .ended:
+            stopPlayback()
+        case .timeChanged(let milliseconds):
+            let segments = chronologicalSegments
+            guard let last = segments.last else { return }
+            if milliseconds >= last.endMs {
+                stopPlayback()
+                return
+            }
+            // The turn that most recently started owns the play head; during a
+            // pause between turns the readout keeps the speaker who just spoke
+            // rather than blanking.
+            guard let current = segments.last(where: { $0.startMs <= milliseconds }) else { return }
+            if current.id != playingSegmentID {
+                playingSegmentID = current.id
+                selectedSegmentID = current.id
+            }
+        }
+    }
+
+    // MARK: - Deleting
+
+    /// Whether the sidebar offers to delete this file. A job still in flight is
+    /// left to the coordinator: pulling its directory out from under it is
+    /// worse than waiting for it to finish or fail.
+    public func canDelete(_ file: TranscriptReviewFile) -> Bool {
+        switch file.jobState {
+        case .ready, .queued, .processing: false
+        case .complete, .completeWithWarnings, .noSpeech, .failed: true
+        }
+    }
+
+    /// Removes the file from the host store and the list. When it was the one
+    /// on screen, playback stops and the selection moves to its neighbour.
+    public func delete(fileID: TranscriptReviewFile.ID) {
+        guard let index = files.firstIndex(where: { $0.id == fileID }), canDelete(files[index]) else { return }
+        let file = files[index]
+        do {
+            try fileDeleter?.delete(fileID: fileID)
+        } catch {
+            speakerActionMessage = TranscriptSpeakerActionMessage(
+                text: "Could not delete \(file.filename): \(Self.describe(error))",
+                isFailure: true
+            )
+            return
+        }
+        files.remove(at: index)
+        if selectedFileID == fileID {
+            let neighbour = files.indices.contains(index) ? files[index] : files.last
+            selectedFileID = neighbour?.id
+        }
     }
 
     /// Exports each requested format separately so an SRT failure does not lose valid TXT/JSON.
@@ -395,6 +530,7 @@ public final class TranscriptViewModel {
 
     private func selectFileIfNeeded() {
         cancelRememberingVoice()
+        stopPlayback()
         guard let file = selectedFile else {
             selectedSegmentID = nil
             return
