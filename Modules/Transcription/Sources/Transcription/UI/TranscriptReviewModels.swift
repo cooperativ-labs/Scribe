@@ -68,6 +68,12 @@ public struct TranscriptReviewFile: Identifiable, Equatable, Sendable {
         transcript?.source.filename ?? sourceSnapshotURL.lastPathComponent
     }
 
+    /// The name shown for this file: the title a person gave it, or the source
+    /// filename until they do.
+    public var displayName: String {
+        transcript?.title ?? filename
+    }
+
     /// Replaces the stored transcript with a newer revision, keeping identity and job state.
     public func replacingTranscript(_ transcript: CanonicalTranscript) -> TranscriptReviewFile {
         TranscriptReviewFile(
@@ -99,6 +105,8 @@ public protocol TranscriptPlaybackSeeking: AnyObject {
     func seek(toMilliseconds milliseconds: Int)
     func play()
     func pause()
+    /// Sets the speed later play calls use; 1 is natural speed.
+    func setRate(_ rate: Float)
     /// Registers the single observer that receives progress and end-of-source events.
     func setPlaybackObserver(_ observer: (@MainActor (TranscriptPlaybackEvent) -> Void)?)
 }
@@ -106,6 +114,7 @@ public protocol TranscriptPlaybackSeeking: AnyObject {
 public extension TranscriptPlaybackSeeking {
     func play() {}
     func pause() {}
+    func setRate(_: Float) {}
     func setPlaybackObserver(_: (@MainActor (TranscriptPlaybackEvent) -> Void)?) {}
 }
 
@@ -117,6 +126,7 @@ public final class AVFoundationTranscriptPlayback: TranscriptPlaybackSeeking {
     private var observer: (@MainActor (TranscriptPlaybackEvent) -> Void)?
     private var timeObserverToken: Any?
     private var endObserverToken: (any NSObjectProtocol)?
+    private var rate: Float = 1
 
     public init(player: AVPlayer = AVPlayer()) {
         self.player = player
@@ -140,9 +150,16 @@ public final class AVFoundationTranscriptPlayback: TranscriptPlaybackSeeking {
         )
     }
 
-    public func play() { player.play() }
+    /// Plays at the chosen speed. `AVPlayer.play()` would reset to natural
+    /// speed, so the rate is set directly.
+    public func play() { player.rate = rate }
 
     public func pause() { player.pause() }
+
+    public func setRate(_ rate: Float) {
+        self.rate = rate
+        if player.rate != 0 { player.rate = rate }
+    }
 
     public func setPlaybackObserver(_ observer: (@MainActor (TranscriptPlaybackEvent) -> Void)?) {
         self.observer = observer
@@ -206,12 +223,23 @@ public protocol TranscriptExportWriting: Sendable {
 public struct FileTranscriptExportWriter: TranscriptExportWriting {
     public init() {}
 
+    /// Exports are named after the transcript's title when it has one, with
+    /// characters a filesystem rejects replaced, and after the source otherwise.
+    public static func basename(for transcript: CanonicalTranscript) -> String {
+        if let title = transcript.title?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty {
+            let cleaned = title.map { $0 == "/" || $0 == ":" ? "-" : $0 }
+            let name = String(cleaned).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !name.isEmpty { return name }
+        }
+        return (transcript.source.filename as NSString).deletingPathExtension
+    }
+
     public func write(
         _ transcript: CanonicalTranscript,
         formats: Set<TranscriptExportFormat>,
         to directoryURL: URL
     ) -> [TranscriptExportOutcome] {
-        let basename = (transcript.source.filename as NSString).deletingPathExtension
+        let basename = Self.basename(for: transcript)
 
         return TranscriptExportFormat.allCases.compactMap { format in
             guard formats.contains(format) else { return nil }

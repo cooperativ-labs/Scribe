@@ -104,6 +104,7 @@ public struct RecordingCoordinatorConfiguration: Sendable {
     public let macOSVersion: String
     public let selectedApplicationBundleIdentifier: String?
     public let selectedMicrophoneID: String?
+    public let recordingMode: RecordingMode
     public let minimumFreeBytes: Int64
 
     public init(
@@ -112,6 +113,7 @@ public struct RecordingCoordinatorConfiguration: Sendable {
         macOSVersion: String,
         selectedApplicationBundleIdentifier: String?,
         selectedMicrophoneID: String?,
+        recordingMode: RecordingMode = .systemAudioAndMicrophone,
         minimumFreeBytes: Int64 = 512 * 1_024 * 1_024
     ) {
         self.recordingsDirectory = recordingsDirectory
@@ -119,6 +121,7 @@ public struct RecordingCoordinatorConfiguration: Sendable {
         self.macOSVersion = macOSVersion
         self.selectedApplicationBundleIdentifier = selectedApplicationBundleIdentifier
         self.selectedMicrophoneID = selectedMicrophoneID
+        self.recordingMode = recordingMode
         self.minimumFreeBytes = minimumFreeBytes
     }
 }
@@ -195,7 +198,7 @@ public actor RecordingCoordinator {
         transition(to: .starting)
         do {
             let permissionSnapshot = permissions.currentStatus()
-            if let failure = permissionSnapshot.blockingFailure { throw CoordinatorError.failure(failure) }
+            if let failure = permissionSnapshot.blockingFailure(for: configuration.recordingMode) { throw CoordinatorError.failure(failure) }
             try preflightDestination()
 
             let sessionID = UUID()

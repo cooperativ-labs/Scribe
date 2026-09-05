@@ -107,6 +107,20 @@ public struct BackgroundProcessingStatus: Equatable, Sendable {
 
 // MARK: - Sources
 
+/// The kind of audio a recording includes. Microphone-only recording does not
+/// select an application or require Screen & System Audio Recording access.
+public enum RecordingMode: String, CaseIterable, Equatable, Sendable {
+    case systemAudioAndMicrophone
+    case microphoneOnly
+
+    public var menuTitle: String {
+        switch self {
+        case .systemAudioAndMicrophone: "System Audio + Microphone"
+        case .microphoneOnly: "Microphone Only"
+        }
+    }
+}
+
 /// A capturable application enumerated from `SCShareableContent`.
 public struct CaptureApplicationOption: Equatable, Sendable, Identifiable, Hashable {
     public let bundleIdentifier: String
@@ -159,6 +173,13 @@ public struct PermissionSnapshot: Equatable, Sendable {
     public var isReadyToRecord: Bool {
         screenAndSystemAudio.isGranted && microphone.isGranted
     }
+
+    public func isReadyToRecord(for mode: RecordingMode) -> Bool {
+        switch mode {
+        case .systemAudioAndMicrophone: isReadyToRecord
+        case .microphoneOnly: microphone.isGranted
+        }
+    }
 }
 
 /// The System Settings privacy panes Scribe can route the person back to.
@@ -196,6 +217,7 @@ public struct RecorderSnapshot: Equatable, Sendable {
     public var applications: [CaptureApplicationOption]
     public var microphones: [CaptureMicrophoneOption]
     public var selectedApplicationID: String?
+    public var recordingMode: RecordingMode
     /// `nil` means the system default input, resolved at each start.
     public var selectedMicrophoneID: String?
     /// Which of `microphones` macOS currently uses as its default input, so the
@@ -216,6 +238,7 @@ public struct RecorderSnapshot: Equatable, Sendable {
         applications: [CaptureApplicationOption] = [],
         microphones: [CaptureMicrophoneOption] = [],
         selectedApplicationID: String? = nil,
+        recordingMode: RecordingMode = .systemAudioAndMicrophone,
         selectedMicrophoneID: String? = nil,
         recordingsFolderURL: URL = ScribeSettings.defaultRecordingsFolderURL,
         shortcutIssues: [String] = [],
@@ -228,6 +251,7 @@ public struct RecorderSnapshot: Equatable, Sendable {
         self.applications = applications
         self.microphones = microphones
         self.selectedApplicationID = selectedApplicationID
+        self.recordingMode = recordingMode
         self.selectedMicrophoneID = selectedMicrophoneID
         self.recordingsFolderURL = recordingsFolderURL
         self.shortcutIssues = shortcutIssues
@@ -248,12 +272,16 @@ public enum RecordingCommand: Equatable, Sendable {
     case pause
     case resume
     case selectApplication(String?)
+    case selectRecordingMode(RecordingMode)
     case selectMicrophone(String?)
     case refreshSources
     case openRecordingsFolder
     case requestPermissions
     case openSystemSettings(SystemSettingsPane)
     case quit
+    /// Copies the current recording's elapsed time for notes. A no-op when
+    /// nothing is being recorded.
+    case copyTimestamp
 }
 
 // MARK: - Coordinator
@@ -335,4 +363,5 @@ extension RecordingCoordinating {
     /// menu and keyboard commands must not be able to interleave differently.
     public func startRecordingFromShortcut() { submit(.start) }
     public func stopRecordingFromShortcut() { submit(.stop) }
+    public func copyTimestampFromShortcut() { submit(.copyTimestamp) }
 }

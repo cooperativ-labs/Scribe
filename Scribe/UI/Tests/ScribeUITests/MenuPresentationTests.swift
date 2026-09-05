@@ -164,6 +164,28 @@ final class MenuPresentationTests: XCTestCase {
         XCTAssertFalse(presentation.isStartEnabled)
     }
 
+    func testMicrophoneOnlyIsReadyWithoutScreenRecordingPermission() {
+        var snapshot = readySnapshot()
+        snapshot.recordingMode = .microphoneOnly
+        snapshot.permissions = PermissionSnapshot(screenAndSystemAudio: .denied, microphone: .granted)
+
+        let presentation = MenuPresentation(snapshot: snapshot, at: Date())
+
+        XCTAssertEqual(presentation.recordingMode, .microphoneOnly)
+        XCTAssertTrue(presentation.isStartEnabled)
+        XCTAssertNil(presentation.permissionPrompt)
+    }
+
+    func testMicrophoneOnlyExplainsThatOnlyMicrophonePermissionIsNeeded() {
+        var snapshot = readySnapshot()
+        snapshot.recordingMode = .microphoneOnly
+        snapshot.permissions = PermissionSnapshot(screenAndSystemAudio: .denied, microphone: .notDetermined)
+
+        let prompt = MenuPresentation(snapshot: snapshot, at: Date()).permissionPrompt
+
+        XCTAssertEqual(prompt?.requirements.map(\.pane), [.microphone])
+    }
+
     func testErrorStateShowsTheFailureAndAllowsAnotherAttempt() async {
         let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
         coordinator.simulateFailure(
@@ -256,8 +278,26 @@ final class MenuPresentationTests: XCTestCase {
 
         let presentation = presentation(for: coordinator)
 
-        XCTAssertEqual(presentation.shortcutIssues.count, 2)
+        XCTAssertEqual(presentation.shortcutIssues.count, 3)
         XCTAssertTrue(presentation.isStartEnabled)
+    }
+
+    func testCopyTimestampIsOfferedWhileARecordingHasAnElapsedFigure() async {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot(), now: { start })
+        var now = start
+        let presentationAt: () -> MenuPresentation = {
+            MenuPresentation(snapshot: coordinator.snapshot, at: now, copyTimestampShortcut: .defaultCopyTimestamp)
+        }
+
+        XCTAssertFalse(presentationAt().isCopyTimestampEnabled)
+
+        coordinator.submit(.start)
+        await coordinator.waitUntilIdle()
+        now = start.addingTimeInterval(83)
+        let recording = presentationAt()
+        XCTAssertTrue(recording.isCopyTimestampEnabled)
+        XCTAssertEqual(recording.copyTimestampShortcut, .defaultCopyTimestamp)
     }
 
     // MARK: Source pickers

@@ -156,6 +156,30 @@ import Testing
         #expect(manifest.capture.state == .interrupted)
     }
 
+    @Test func microphoneOnlyStartsWithMicrophonePermissionAlone() async throws {
+        let root = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let capture = FakeCapture()
+        let coordinator = RecordingCoordinator(
+            configuration: RecordingCoordinatorConfiguration(
+                recordingsDirectory: root,
+                appBuild: "tests",
+                macOSVersion: "tests",
+                selectedApplicationBundleIdentifier: nil,
+                selectedMicrophoneID: "mic",
+                recordingMode: .microphoneOnly
+            ),
+            permissions: MicrophoneOnlyPermissions(),
+            captureFactory: { _, _, _ in capture },
+            freeSpace: { _ in Int64.max }
+        )
+
+        await coordinator.start()
+
+        #expect(await coordinator.state().activity != nil)
+        #expect(capture.startCount == 1)
+    }
+
     private func makeCoordinator(root: URL, capture: FakeCapture) -> RecordingCoordinator {
         RecordingCoordinator(
             configuration: RecordingCoordinatorConfiguration(
@@ -196,6 +220,14 @@ import Testing
 private final class GrantedPermissions: RecordingPermissionProviding, @unchecked Sendable {
     func currentStatus() -> PermissionSnapshot { .allGranted }
     func requestMissingPermissions() async -> PermissionSnapshot { .allGranted }
+    @MainActor func openSystemSettings(_: SystemSettingsPane) {}
+}
+
+private final class MicrophoneOnlyPermissions: RecordingPermissionProviding, @unchecked Sendable {
+    func currentStatus() -> PermissionSnapshot {
+        PermissionSnapshot(screenAndSystemAudio: .denied, microphone: .granted)
+    }
+    func requestMissingPermissions() async -> PermissionSnapshot { currentStatus() }
     @MainActor func openSystemSettings(_: SystemSettingsPane) {}
 }
 

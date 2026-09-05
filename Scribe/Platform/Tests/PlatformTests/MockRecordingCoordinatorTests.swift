@@ -147,6 +147,26 @@ final class MockRecordingCoordinatorTests: XCTestCase {
         XCTAssertTrue(coordinator.snapshot.state.isRecording)
     }
 
+    func testCopyTimestampWritesElapsedTextAndIsIgnoredWhileIdle() async {
+        let start = Date(timeIntervalSince1970: 1_000)
+        var now = start
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot(), now: { now })
+
+        coordinator.submit(.copyTimestamp)
+        await coordinator.waitUntilIdle()
+        XCTAssertTrue(coordinator.copiedTimestamps.isEmpty)
+        XCTAssertTrue(coordinator.performedCommands.isEmpty)
+
+        coordinator.submit(.start)
+        await coordinator.waitUntilIdle()
+        now = start.addingTimeInterval(83)
+        coordinator.submit(.copyTimestamp)
+        await coordinator.waitUntilIdle()
+
+        XCTAssertEqual(coordinator.copiedTimestamps, ["01:23"])
+        XCTAssertEqual(coordinator.performedCommands, [.start, .copyTimestamp])
+    }
+
     func testSourcesRefreshFromTheProviderAndSelectionsPersistInTheSnapshot() async {
         let provider = CaptureSourceProviderStub(
             applications: [CaptureApplicationOption(bundleIdentifier: "us.zoom.xos", name: "Zoom")],

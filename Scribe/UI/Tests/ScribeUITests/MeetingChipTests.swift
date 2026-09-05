@@ -293,6 +293,35 @@ final class MeetingChipTests: XCTestCase {
         XCTAssertEqual(model.presentation, .hidden)
     }
 
+    func testCopyingTheElapsedFigureWritesTheClockOnTheChip() async {
+        let start = Date(timeIntervalSince1970: 1_000)
+        var now = start
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot(), now: { now })
+        let model = makeModel(coordinator, now: { now })
+        model.meetingWasDetected(zoomCall())
+        model.record()
+        await coordinator.waitUntilIdle()
+        now = start.addingTimeInterval(83)
+        model.refreshPresentation()
+
+        model.copyTimestamp()
+        await coordinator.waitUntilIdle()
+
+        XCTAssertEqual(coordinator.copiedTimestamps, ["01:23"])
+    }
+
+    func testCopyingDoesNothingWhileTheChipIsOnlyAnOffer() async {
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
+        let model = makeModel(coordinator)
+        model.meetingWasDetected(zoomCall())
+
+        model.copyTimestamp()
+        await coordinator.waitUntilIdle()
+
+        XCTAssertTrue(coordinator.copiedTimestamps.isEmpty)
+        XCTAssertFalse(coordinator.performedCommands.contains(.copyTimestamp))
+    }
+
     // MARK: The panel
 
     func testThePanelIsOrderedInAndOutWithTheChip() {

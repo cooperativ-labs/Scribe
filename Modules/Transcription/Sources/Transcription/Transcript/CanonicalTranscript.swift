@@ -7,6 +7,9 @@ public struct CanonicalTranscript: Codable, Sendable, Equatable, Identifiable {
     public let schemaVersion: Int
     public let transcriptID: String
     public let revision: Int
+    /// A name a person gave this transcript in review, or nil to go by the
+    /// source filename. Renaming is a revision like any other label edit.
+    public let title: String?
     public let status: TranscriptStatus
     public let createdAt: String
     public let source: TranscriptSource
@@ -26,7 +29,7 @@ public struct CanonicalTranscript: Codable, Sendable, Equatable, Identifiable {
     private enum CodingKeys: String, CodingKey {
         case schemaVersion = "schema_version"
         case transcriptID = "transcript_id"
-        case revision, status
+        case revision, status, title
         case createdAt = "created_at"
         case source, language
         case languageSource = "language_source"
@@ -43,6 +46,7 @@ public struct CanonicalTranscript: Codable, Sendable, Equatable, Identifiable {
         schemaVersion: Int = CanonicalTranscript.currentSchemaVersion,
         transcriptID: String,
         revision: Int,
+        title: String? = nil,
         status: TranscriptStatus,
         createdAt: String,
         source: TranscriptSource,
@@ -60,6 +64,7 @@ public struct CanonicalTranscript: Codable, Sendable, Equatable, Identifiable {
         self.schemaVersion = schemaVersion
         self.transcriptID = transcriptID
         self.revision = revision
+        self.title = title
         self.status = status
         self.createdAt = createdAt
         self.source = source

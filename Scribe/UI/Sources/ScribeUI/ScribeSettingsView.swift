@@ -25,6 +25,25 @@ public struct ScribeSettingsView: View {
         let presentation = sources.presentation
 
         Form {
+            Section("General") {
+                Toggle(
+                    "Launch Scribe at login",
+                    isOn: Binding(
+                        get: { settings.launchAtLogin },
+                        set: { settings.setLaunchAtLogin($0) }
+                    )
+                )
+                if let launchAtLoginError = settings.launchAtLoginError {
+                    Text(launchAtLoginError)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                } else {
+                    Text("Start Scribe automatically when you sign in to your Mac.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             Section("Recordings") {
                 LabeledContent("Folder") {
                     Text(settings.recordingsFolderURL.path)
@@ -94,7 +113,12 @@ public struct ScribeSettingsView: View {
                         Text(shortcut.displayName).tag(shortcut)
                     }
                 }
-                Text("Choose different shortcuts for starting and stopping. If another app already owns one, Scribe will show the conflict and keep its menu commands available.")
+                Picker("Copy timestamp", selection: $settings.copyTimestampShortcut) {
+                    ForEach(GlobalShortcut.commonChoices) { shortcut in
+                        Text(shortcut.displayName).tag(shortcut)
+                    }
+                }
+                Text("Choose a different shortcut for each action. Copy timestamp puts the recording's elapsed time on the clipboard so it can be pasted into notes. If another app already owns one, Scribe will show the conflict and keep its menu commands available.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -105,6 +129,7 @@ public struct ScribeSettingsView: View {
         // Enumerated on open, as the menu does, so an application launched after
         // Scribe and a microphone plugged in a moment ago both appear.
         .onAppear { sources.refreshSources() }
+        .onAppear { settings.refreshLaunchAtLoginStatus() }
         .fileImporter(
             isPresented: $isChoosingRecordingsFolder,
             allowedContentTypes: [.folder],

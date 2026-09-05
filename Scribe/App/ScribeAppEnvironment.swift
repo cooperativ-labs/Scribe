@@ -66,6 +66,7 @@ final class ScribeAppEnvironment: ObservableObject {
             snapshot: RecorderSnapshot(
                 permissions: permissions.currentStatus(),
                 selectedApplicationID: settings.rememberedApplicationBundleIdentifier,
+                recordingMode: settings.rememberedRecordingMode,
                 selectedMicrophoneID: settings.rememberedMicrophoneID,
                 recordingsFolderURL: settings.recordingsFolderURL
             ),
@@ -83,7 +84,10 @@ final class ScribeAppEnvironment: ObservableObject {
             }
         )
         self.coordinator = coordinator
-        menuModel = RecorderMenuModel(coordinator: coordinator)
+        menuModel = RecorderMenuModel(
+            coordinator: coordinator,
+            copyTimestampShortcut: { settings.copyTimestampShortcut }
+        )
         meetingChipModel = MeetingChipModel(
             coordinator: coordinator,
             shouldStopWhenMeetingEnds: {
@@ -100,7 +104,11 @@ final class ScribeAppEnvironment: ObservableObject {
             self?.reportRepairedCaptures(recovered)
         }
         coordinator.reportShortcutRegistration(
-            hotkeys.register(start: settings.startShortcut, stop: settings.stopShortcut)
+            hotkeys.register(
+                start: settings.startShortcut,
+                stop: settings.stopShortcut,
+                copyTimestamp: settings.copyTimestampShortcut
+            )
         )
         observeProcessingQueue()
         adoptWorkFoundAtLaunch()
@@ -113,6 +121,7 @@ final class ScribeAppEnvironment: ObservableObject {
             guard let self else { return }
             self.settings.rememberedApplicationBundleIdentifier = snapshot.selectedApplicationID
             self.settings.rememberedMicrophoneID = snapshot.selectedMicrophoneID
+            self.settings.rememberedRecordingMode = snapshot.recordingMode
         }
 
         // Detection only reports. The chip turns that report into an offer and,
@@ -216,7 +225,11 @@ final class ScribeAppEnvironment: ObservableObject {
     func settingsWindowDidClose() {
         coordinator.setRecordingsFolder(settings.recordingsFolderURL)
         coordinator.reportShortcutRegistration(
-            hotkeys.register(start: settings.startShortcut, stop: settings.stopShortcut)
+            hotkeys.register(
+                start: settings.startShortcut,
+                stop: settings.stopShortcut,
+                copyTimestamp: settings.copyTimestampShortcut
+            )
         )
     }
 

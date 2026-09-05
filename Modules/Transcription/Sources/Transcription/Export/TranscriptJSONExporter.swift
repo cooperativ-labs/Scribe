@@ -23,6 +23,11 @@ public enum TranscriptJSONExporter {
             .init("schema_version", .integer(transcript.schemaVersion)),
             .init("transcript_id", .string(transcript.transcriptID)),
             .init("revision", .integer(transcript.revision)),
+        ]
+        if let title = transcript.title {
+            members.append(.init("title", .string(title)))
+        }
+        members += [
             .init("status", .string(transcript.status.rawValue)),
             .init("created_at", .string(transcript.createdAt)),
             .init("source", source(transcript.source)),

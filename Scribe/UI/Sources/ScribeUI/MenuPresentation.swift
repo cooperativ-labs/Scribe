@@ -22,6 +22,7 @@ public struct MenuPresentation: Equatable, Sendable {
     public let processingLines: [String]
     public let permissionPrompt: PermissionPrompt?
     public let applications: [CaptureApplicationOption]
+    public let recordingMode: RecordingMode
     public let microphones: [CaptureMicrophoneOption]
     public let selectedApplicationID: String?
     /// `nil` is the system default input, resolved when a recording starts.
@@ -30,13 +31,19 @@ public struct MenuPresentation: Equatable, Sendable {
     /// `nil` when the coordinator has not reported one (or no input exists).
     public let systemDefaultMicrophoneName: String?
     public let shortcutIssues: [String]
+    /// The global shortcut shown beside Copy Timestamp. The menu does not
+    /// register it; Carbon does. This is only the badge a person uses to learn
+    /// the key.
+    public let copyTimestampShortcut: GlobalShortcut
+    /// True while a recording has an elapsed figure that can be copied.
+    public let isCopyTimestampEnabled: Bool
     /// What launch recovery found, if anything.
     public let recoveryNotice: String?
     public let recordingsFolderName: String
 
-    public init(snapshot: RecorderSnapshot, at date: Date) {
+    public init(snapshot: RecorderSnapshot, at date: Date, copyTimestampShortcut: GlobalShortcut = .defaultCopyTimestamp) {
         let permissions = snapshot.permissions
-        let isReady = permissions.isReadyToRecord
+        let isReady = permissions.isReadyToRecord(for: snapshot.recordingMode)
 
         switch snapshot.state {
         case .idle:
@@ -88,13 +95,16 @@ public struct MenuPresentation: Equatable, Sendable {
         }
         processingLines = lines
 
-        permissionPrompt = PermissionPrompt(requirements: permissions.blockingRequirements)
+        permissionPrompt = PermissionPrompt(requirements: permissions.blockingRequirements(for: snapshot.recordingMode))
         applications = snapshot.applications
+        recordingMode = snapshot.recordingMode
         microphones = snapshot.microphones
         selectedApplicationID = snapshot.selectedApplicationID
         selectedMicrophoneID = snapshot.selectedMicrophoneID
         systemDefaultMicrophoneName = snapshot.microphones.first { $0.uniqueID == snapshot.systemDefaultMicrophoneID }?.name
         shortcutIssues = snapshot.shortcutIssues
+        self.copyTimestampShortcut = copyTimestampShortcut
+        isCopyTimestampEnabled = RecordingTimestamp.copyableText(state: snapshot.state, at: date) != nil
         recoveryNotice = snapshot.recoveryNotice
         recordingsFolderName = snapshot.recordingsFolderURL.lastPathComponent
     }
@@ -126,13 +136,7 @@ public struct MenuPresentation: Equatable, Sendable {
 
     /// `MM:SS` below an hour, `H:MM:SS` above it.
     static func elapsedText(_ interval: TimeInterval) -> String {
-        let total = Int(interval.rounded(.down))
-        let seconds = total % 60
-        let minutes = (total / 60) % 60
-        let hours = total / 3600
-        return hours > 0
-            ? String(format: "%d:%02d:%02d", hours, minutes, seconds)
-            : String(format: "%02d:%02d", minutes, seconds)
+        RecordingTimestamp.elapsedText(interval)
     }
 }
 

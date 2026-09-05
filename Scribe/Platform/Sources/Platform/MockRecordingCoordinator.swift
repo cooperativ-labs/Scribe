@@ -46,6 +46,8 @@ public final class MockRecordingCoordinator: RecordingCoordinating {
     public var acceptedCommands: [RecordingCommand] { queue.acceptedCommands }
     /// Commands that actually changed capture state.
     public private(set) var performedCommands: [RecordingCommand] = []
+    /// Elapsed figures copied for notes. Empty when copy was a no-op.
+    public private(set) var copiedTimestamps: [String] = []
 
     private let queue = RecordingCommandQueue()
     private let broadcaster = RecorderSnapshotBroadcaster()
@@ -78,11 +80,7 @@ public final class MockRecordingCoordinator: RecordingCoordinating {
     }
 
     public func reportShortcutRegistration(_ report: HotkeyRegistrationReport) {
-        snapshot.shortcutIssues = HotkeyAction.allCases.compactMap { action in
-            guard let failure = report.failures[action] else { return nil }
-            let label = action == .start ? "Start" : "Stop"
-            return "\(label) shortcut: \(failure.errorDescription ?? "unavailable")"
-        }
+        snapshot.shortcutIssues = report.issueDescriptions
     }
 
     public func observeSnapshot(_ observer: @escaping @MainActor (RecorderSnapshot) -> Void) -> RecorderObservationToken {
@@ -135,6 +133,9 @@ public final class MockRecordingCoordinator: RecordingCoordinating {
         case .selectApplication(let id):
             snapshot.selectedApplicationID = id
             performedCommands.append(command)
+        case .selectRecordingMode(let mode):
+            snapshot.recordingMode = mode
+            performedCommands.append(command)
         case .selectMicrophone(let id):
             snapshot.selectedMicrophoneID = id
             performedCommands.append(command)
@@ -149,6 +150,7 @@ public final class MockRecordingCoordinator: RecordingCoordinating {
             permissions?.openSystemSettings(pane)
             performedCommands.append(command)
         case .quit: quit()
+        case .copyTimestamp: copyTimestamp()
         }
     }
 
@@ -220,6 +222,12 @@ public final class MockRecordingCoordinator: RecordingCoordinating {
         guard case .paused(let activity) = snapshot.state else { return }
         performedCommands.append(.resume)
         snapshot.state = .recording(activity)
+    }
+
+    private func copyTimestamp() {
+        guard let text = RecordingTimestamp.copyableText(state: snapshot.state, at: now()) else { return }
+        copiedTimestamps.append(text)
+        performedCommands.append(.copyTimestamp)
     }
 
     private func refreshSources() async {

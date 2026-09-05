@@ -54,7 +54,15 @@ public extension PermissionSnapshot {
     /// Everything that must change before a recording can start, in the order to
     /// ask. Empty when both permissions are granted.
     var blockingRequirements: [PermissionRequirement] {
-        SystemSettingsPane.allCases.compactMap { pane in
+        blockingRequirements(for: .systemAudioAndMicrophone)
+    }
+
+    func blockingRequirements(for mode: RecordingMode) -> [PermissionRequirement] {
+        let panes: [SystemSettingsPane] = switch mode {
+        case .systemAudioAndMicrophone: SystemSettingsPane.allCases
+        case .microphoneOnly: [.microphone]
+        }
+        return panes.compactMap { pane in
             let status = self.status(of: pane)
             guard !status.isGranted else { return nil }
             return PermissionRequirement(
@@ -78,7 +86,11 @@ public extension PermissionSnapshot {
 
     /// The blocking requirements as one failure the menu can present directly.
     var blockingFailure: RecorderFailure? {
-        let requirements = blockingRequirements
+        blockingFailure(for: .systemAudioAndMicrophone)
+    }
+
+    func blockingFailure(for mode: RecordingMode) -> RecorderFailure? {
+        let requirements = blockingRequirements(for: mode)
         guard let first = requirements.first else { return nil }
         return RecorderFailure(
             code: "permission.missing." + requirements.map(\.pane.rawValue).joined(separator: "+"),

@@ -8,6 +8,7 @@
     "schema_version": { "const": 1 },
     "transcript_id": { "type": "string", "minLength": 1 },
     "revision": { "type": "integer", "minimum": 1 },
+    "title": { "type": ["string", "null"], "minLength": 1 },
     "status": { "enum": ["complete", "completeWithWarnings", "noSpeech"] },
     "created_at": { "type": "string", "format": "date-time" },
     "source": { "$ref": "#/$defs/source" },

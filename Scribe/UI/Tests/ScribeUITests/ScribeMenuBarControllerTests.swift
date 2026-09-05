@@ -82,6 +82,18 @@ final class ScribeMenuBarControllerTests: XCTestCase {
         XCTAssertEqual(checked, ["Podcast Microphone"])
     }
 
+    func testRecordingModePickerMakesMicrophoneOnlyDiscoverable() {
+        var snapshot = readySnapshot()
+        snapshot.recordingMode = .microphoneOnly
+        let controller = makeController(MockRecordingCoordinator(snapshot: snapshot))
+
+        controller.menuNeedsUpdate(controller.menu)
+        controller.menuNeedsUpdate(controller.recordingModeMenu)
+
+        XCTAssertTrue(controller.menu.items.contains { $0.title == "Microphone-only recording — no application needed" })
+        XCTAssertEqual(controller.recordingModeMenu.items.filter { $0.state == .on }.map(\.title), ["Microphone Only"])
+    }
+
     func testARememberedMicrophoneThatIsGoneKeepsItsOwnCheckedRow() async {
         let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
         coordinator.submit(.selectMicrophone("USB-Podmic-01"))
@@ -94,6 +106,41 @@ final class ScribeMenuBarControllerTests: XCTestCase {
         // menu must not show the default as chosen instead.
         XCTAssertEqual(controller.microphoneMenu.items.map(\.title), ["System Default", "USB-Podmic-01 (not connected)"])
         XCTAssertEqual(controller.microphoneMenu.items.filter { $0.state == .on }.map(\.title), ["USB-Podmic-01 (not connected)"])
+    }
+
+    func testCopyTimestampShowsItsShortcutAndIsEnabledWhileRecording() async throws {
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
+        let controller = makeController(coordinator)
+        controller.menuNeedsUpdate(controller.menu)
+
+        let idle = try XCTUnwrap(controller.menu.items.first { $0.title == "Copy Timestamp" })
+        XCTAssertFalse(idle.isEnabled)
+        XCTAssertEqual(idle.keyEquivalent, "t")
+        XCTAssertTrue(idle.keyEquivalentModifierMask.contains(.command))
+        XCTAssertTrue(idle.keyEquivalentModifierMask.contains(.shift))
+
+        coordinator.submit(.start)
+        await coordinator.waitUntilIdle()
+        controller.menuNeedsUpdate(controller.menu)
+
+        let recording = try XCTUnwrap(controller.menu.items.first { $0.title == "Copy Timestamp" })
+        XCTAssertTrue(recording.isEnabled)
+    }
+
+    func testCopyTimestampWritesTheElapsedFigure() async {
+        let start = Date(timeIntervalSince1970: 1_000)
+        var now = start
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot(), now: { now })
+        let model = RecorderMenuModel(coordinator: coordinator, now: { now })
+        coordinator.submit(.start)
+        await coordinator.waitUntilIdle()
+        now = start.addingTimeInterval(83)
+
+        model.copyTimestamp()
+        await coordinator.waitUntilIdle()
+
+        XCTAssertEqual(coordinator.copiedTimestamps, ["01:23"])
+        XCTAssertEqual(coordinator.performedCommands, [.start, .copyTimestamp])
     }
 
     // MARK: Helpers

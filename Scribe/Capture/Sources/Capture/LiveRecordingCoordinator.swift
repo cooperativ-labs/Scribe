@@ -63,20 +63,31 @@ public final class LiveRecordingCoordinator: RecordingCoordinating {
             configuration: initialConfiguration,
             permissions: permissions,
             captureFactory: { configuration, store, events in
-                CaptureService(
-                    configuration: CaptureConfiguration(
-                        applicationBundleIdentifier: configuration.selectedApplicationBundleIdentifier,
-                        microphoneUniqueID: configuration.selectedMicrophoneID
-                    ),
-                    sourceProvider: sourceProvider,
-                    sink: { buffer in
-                        // `SessionStore` signals a clean low-space stop through
-                        // its configured requester. Other I/O failures leave
-                        // recoverable originals rather than blocking callbacks.
-                        try? store.append(buffer)
-                    },
-                    events: events
-                )
+                let sink: @Sendable (OwnedPCMBuffer) -> Void = { buffer in
+                    // `SessionStore` signals a clean low-space stop through its
+                    // configured requester. Other I/O failures leave recoverable
+                    // originals rather than blocking callbacks.
+                    try? store.append(buffer)
+                }
+                return switch configuration.recordingMode {
+                case .systemAudioAndMicrophone:
+                    CaptureService(
+                        configuration: CaptureConfiguration(
+                            applicationBundleIdentifier: configuration.selectedApplicationBundleIdentifier,
+                            microphoneUniqueID: configuration.selectedMicrophoneID
+                        ),
+                        sourceProvider: sourceProvider,
+                        sink: sink,
+                        events: events
+                    )
+                case .microphoneOnly:
+                    MicrophoneCaptureService(
+                        microphoneUniqueID: configuration.selectedMicrophoneID,
+                        sourceProvider: sourceProvider,
+                        sink: sink,
+                        events: events
+                    )
+                }
             },
             scheduler: scheduler
         )
@@ -116,10 +127,7 @@ public final class LiveRecordingCoordinator: RecordingCoordinating {
     }
 
     public func reportShortcutRegistration(_ report: HotkeyRegistrationReport) {
-        snapshot.shortcutIssues = HotkeyAction.allCases.compactMap { action in
-            guard let failure = report.failures[action] else { return nil }
-            return "\(action == .start ? "Start" : "Stop") shortcut: \(failure.errorDescription ?? "unavailable")"
-        }
+        snapshot.shortcutIssues = report.issueDescriptions
     }
 
     public func observeSnapshot(_ observer: @escaping @MainActor (RecorderSnapshot) -> Void) -> RecorderObservationToken {
@@ -189,6 +197,7 @@ public final class LiveRecordingCoordinator: RecordingCoordinating {
         case .pause: await engine.pause()
         case .resume: await engine.resume()
         case .selectApplication(let id): snapshot.selectedApplicationID = id
+        case .selectRecordingMode(let mode): snapshot.recordingMode = mode
         case .selectMicrophone(let id): snapshot.selectedMicrophoneID = id
         case .refreshSources:
             snapshot.applications = (try? await sourceProvider.shareableApplications()) ?? snapshot.applications
@@ -200,6 +209,8 @@ public final class LiveRecordingCoordinator: RecordingCoordinating {
         case .quit:
             await engine.stop()
             terminationHandler?()
+        case .copyTimestamp:
+            copyTimestamp()
         }
     }
 
@@ -236,7 +247,8 @@ public final class LiveRecordingCoordinator: RecordingCoordinating {
             appBuild: appBuild,
             macOSVersion: macOSVersion,
             selectedApplicationBundleIdentifier: snapshot.selectedApplicationID,
-            selectedMicrophoneID: snapshot.selectedMicrophoneID
+            selectedMicrophoneID: snapshot.selectedMicrophoneID,
+            recordingMode: snapshot.recordingMode
         )
     }
 
@@ -249,6 +261,12 @@ public final class LiveRecordingCoordinator: RecordingCoordinating {
         case .stopping: .stopping
         case .error(let failure): .failed(failure)
         }
+    }
+
+    private func copyTimestamp() {
+        guard let text = RecordingTimestamp.copyableText(state: snapshot.state, at: Date()) else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
     }
 
     private func installInterruptionObservers() {

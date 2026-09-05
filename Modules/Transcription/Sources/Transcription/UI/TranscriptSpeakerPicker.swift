@@ -1,86 +1,169 @@
 import Speakers
 import SwiftUI
 
-/// Assigns a turn or a verified cluster to a saved person or a new one.
+/// The dropdown that names who is speaking, for one turn or for a whole
+/// recording-local speaker.
 ///
-/// Naming someone here never enrolls their voice: "Remember this voice" is a
-/// separate action so a label correction cannot silently train a profile.
-struct TranscriptSpeakerPicker: View {
+/// Every choice is a menu item, so the list of existing speakers is the
+/// control rather than something a person has to discover. For a turn the
+/// first section is the speakers this recording already has, which is the
+/// common correction: diarization filed the turn under the wrong voice. Saved
+/// people not yet heard in this recording follow, then a new name, then
+/// "unknown". Naming someone here never enrolls their voice: "Remember this
+/// voice" is a separate action so a label correction cannot silently train a
+/// profile.
+struct TranscriptSpeakerMenu<Label: View>: View {
     let viewModel: TranscriptViewModel
     let scope: TranscriptSpeakerScope
-    let currentProfileID: String?
+    /// Called when "New Person…" is chosen; the caller presents the name popover
+    /// from a stable anchor, because a menu item is gone by the time it fires.
+    let onNewPerson: () -> Void
+    @ViewBuilder let label: () -> Label
 
-    @State private var newPersonName = ""
+    var body: some View {
+        Menu {
+            TranscriptSpeakerMenuItems(viewModel: viewModel, scope: scope, onNewPerson: onNewPerson)
+        } label: {
+            label()
+        }
+        .menuIndicator(.visible)
+        .fixedSize()
+    }
+}
+
+/// The items of the speaker dropdown, shared by the row menu and the context menu.
+struct TranscriptSpeakerMenuItems: View {
+    let viewModel: TranscriptViewModel
+    let scope: TranscriptSpeakerScope
+    let onNewPerson: () -> Void
+
+    var body: some View {
+        switch scope {
+        case let .turn(segmentID):
+            turnItems(segmentID: segmentID)
+        case let .cluster(speakerID):
+            clusterItems(speakerID: speakerID)
+        }
+    }
+
+    // MARK: - One turn
+
+    @ViewBuilder
+    private func turnItems(segmentID: String) -> some View {
+        let segment = viewModel.chronologicalSegments.first { $0.id == segmentID }
+        let speakers = viewModel.recordingSpeakers
+        let inRecording = Set(speakers.compactMap(\.profileID))
+        let others = viewModel.people.filter { !inRecording.contains($0.profileID.uuidString) }
+
+        if !speakers.isEmpty {
+            Section("In this recording") {
+                ForEach(speakers) { speaker in
+                    Toggle(isOn: Binding(
+                        get: { segment?.speakerID == speaker.id },
+                        set: { if $0 { viewModel.move(segmentID: segmentID, toSpeakerID: speaker.id) } }
+                    )) {
+                        Text(speaker.labelSnapshot)
+                    }
+                }
+            }
+        }
+        if !others.isEmpty {
+            Section("From your speaker library") {
+                ForEach(others) { person in
+                    Button(person.displayName) { viewModel.assign(person, scope: scope) }
+                }
+            }
+        }
+        Divider()
+        Button("New Person…", action: onNewPerson)
+        Button("Unknown Speaker") { viewModel.assign(nil, scope: scope) }
+            .disabled(segment?.speakerID == nil)
+    }
+
+    // MARK: - A whole speaker
+
+    @ViewBuilder
+    private func clusterItems(speakerID: String) -> some View {
+        let speaker = viewModel.recordingSpeakers.first { $0.id == speakerID }
+        let others = viewModel.recordingSpeakers.filter { $0.id != speakerID }
+
+        if viewModel.people.isEmpty {
+            Text("No saved people yet")
+        } else {
+            Section("Name every turn as") {
+                ForEach(viewModel.people) { person in
+                    Toggle(isOn: Binding(
+                        get: { speaker?.profileID == person.profileID.uuidString },
+                        set: { if $0 { viewModel.assign(person, scope: scope) } }
+                    )) {
+                        Text(person.displayName)
+                    }
+                }
+            }
+        }
+        Button("New Person…", action: onNewPerson)
+        if !others.isEmpty {
+            Divider()
+            Menu("Merge Into") {
+                ForEach(others) { other in
+                    Button(other.labelSnapshot) { viewModel.mergeSpeaker(speakerID, into: other.id) }
+                }
+            }
+        }
+        Divider()
+        Button("Clear Name") { viewModel.assign(nil, scope: scope) }
+            .disabled(speaker?.profileID == nil)
+    }
+}
+
+/// Adds a person to the library by name and assigns them in one step.
+struct TranscriptNewPersonPopover: View {
+    let viewModel: TranscriptViewModel
+    let scope: TranscriptSpeakerScope
+
+    @State private var name = ""
+    @FocusState private var isFocused: Bool
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(scopeDescription).font(.headline)
-
-            if viewModel.people.isEmpty {
-                Text("No saved people yet. Add one below.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 2) {
-                        ForEach(viewModel.people) { person in
-                            Button {
-                                viewModel.assign(person, scope: scope)
-                                dismiss()
-                            } label: {
-                                HStack {
-                                    Text(person.displayName)
-                                    Spacer()
-                                    if person.profileID.uuidString == currentProfileID {
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-                .frame(maxHeight: 180)
-            }
-
-            Divider()
-
-            HStack {
-                TextField("New person", text: $newPersonName)
-                    .onSubmit(addPerson)
-                Button("Add", action: addPerson)
-                    .disabled(newPersonName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
+            TextField("Name", text: $name)
+                .textFieldStyle(.roundedBorder)
+                .focused($isFocused)
+                .onSubmit(add)
             Text("A new person is added by name only and is never matched automatically until you enroll their voice.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-
-            Divider()
-
-            Button("Clear Name", role: .destructive) {
-                viewModel.assign(nil, scope: scope)
-                dismiss()
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Button("Add", action: add)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(trimmedName.isEmpty)
             }
-            .disabled(currentProfileID == nil)
         }
         .padding(12)
         .frame(width: 300)
-        .task { await viewModel.loadPeople() }
+        .onAppear { isFocused = true }
     }
 
     private var scopeDescription: String {
         switch scope {
-        case let .cluster(speakerID): "Assign every turn of \(speakerID)"
-        case .turn: "Assign this turn only"
+        case let .cluster(speakerID):
+            let label = viewModel.recordingSpeakers.first { $0.id == speakerID }?.labelSnapshot ?? speakerID
+            return "Name every turn of \(label)"
+        case .turn:
+            return "Name this turn"
         }
     }
 
-    private func addPerson() {
-        let name = newPersonName.trimmingCharacters(in: .whitespacesAndNewlines)
+    private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    private func add() {
+        let name = trimmedName
         guard !name.isEmpty else { return }
-        newPersonName = ""
         Task {
             await viewModel.assignNewPerson(named: name, scope: scope)
             dismiss()
@@ -118,35 +201,52 @@ struct TranscriptSuggestionBanner: View {
     }
 }
 
-/// The recording-local speakers of the selected transcript, with the picker and
-/// the separate enrollment action.
+/// The recording-local speakers of the selected transcript, each with its
+/// naming dropdown, a filter shortcut, and the separate enrollment action.
 struct TranscriptSpeakersInspector: View {
-    let viewModel: TranscriptViewModel
-    @State private var pickerScope: TranscriptSpeakerScope?
+    @Bindable var viewModel: TranscriptViewModel
+    @State private var newPersonSpeakerID: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if !viewModel.speakerRows.isEmpty {
-                Text("Speakers in this recording").font(.headline)
-            }
+        VStack(alignment: .leading, spacing: 4) {
             ForEach(viewModel.speakerRows) { row in
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(row.label)
-                        Text("\(row.statusDescription) · \(row.segmentCount) turn(s)")
+                HStack(alignment: .center, spacing: 8) {
+                    Button {
+                        viewModel.speakerFilterID = viewModel.speakerFilterID == row.speakerID ? nil : row.speakerID
+                    } label: {
+                        Image(systemName: viewModel.speakerFilterID == row.speakerID ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                            .foregroundStyle(viewModel.speakerFilterID == row.speakerID ? Color.accentColor : Color.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help(viewModel.speakerFilterID == row.speakerID ? "Show every speaker" : "Show only this speaker's turns")
+                    .accessibilityLabel("Filter to \(row.label)")
+
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(row.label).fontWeight(.medium)
+                        Text("\(row.statusDescription) · \(row.segmentCount) turn\(row.segmentCount == 1 ? "" : "s")")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button("Assign…") { pickerScope = .cluster(speakerID: row.speakerID) }
-                        .popover(isPresented: isPresentingPicker(for: .cluster(speakerID: row.speakerID))) {
-                            TranscriptSpeakerPicker(
-                                viewModel: viewModel,
-                                scope: .cluster(speakerID: row.speakerID),
-                                currentProfileID: row.profileID
-                            )
-                        }
-                    Button("Remember This Voice…") { viewModel.beginRememberingVoice(speakerID: row.speakerID) }
+                    TranscriptSpeakerMenu(
+                        viewModel: viewModel,
+                        scope: .cluster(speakerID: row.speakerID),
+                        onNewPerson: { newPersonSpeakerID = row.speakerID }
+                    ) {
+                        Text(row.profileID == nil ? "Name…" : "Rename…")
+                    }
+                    .help("Name every turn of this speaker, merge them into another speaker, or clear the name.")
+                    .popover(
+                        isPresented: Binding(
+                            get: { newPersonSpeakerID == row.speakerID },
+                            set: { if !$0, newPersonSpeakerID == row.speakerID { newPersonSpeakerID = nil } }
+                        ),
+                        arrowEdge: .bottom
+                    ) {
+                        TranscriptNewPersonPopover(viewModel: viewModel, scope: .cluster(speakerID: row.speakerID))
+                    }
+                    Button("Remember Voice…") { viewModel.beginRememberingVoice(speakerID: row.speakerID) }
+                        .help("Enroll confirmed excerpts so this person is recognised in future recordings.")
                 }
                 .padding(.vertical, 2)
             }
@@ -159,13 +259,6 @@ struct TranscriptSpeakersInspector: View {
         ) {
             TranscriptEnrollmentSheet(viewModel: viewModel)
         }
-    }
-
-    private func isPresentingPicker(for scope: TranscriptSpeakerScope) -> Binding<Bool> {
-        Binding(
-            get: { pickerScope == scope },
-            set: { if !$0, pickerScope == scope { pickerScope = nil } }
-        )
     }
 }
 

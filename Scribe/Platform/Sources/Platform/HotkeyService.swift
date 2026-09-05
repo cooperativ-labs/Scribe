@@ -15,10 +15,13 @@ public struct GlobalShortcut: Codable, Hashable, Sendable, Identifiable {
 
     public static let defaultStart = GlobalShortcut(keyCode: UInt32(kVK_ANSI_R), modifiers: UInt32(cmdKey | shiftKey))
     public static let defaultStop = GlobalShortcut(keyCode: UInt32(kVK_ANSI_S), modifiers: UInt32(cmdKey | shiftKey))
+    public static let defaultCopyTimestamp = GlobalShortcut(keyCode: UInt32(kVK_ANSI_T), modifiers: UInt32(cmdKey | shiftKey))
 
     public static let commonChoices: [GlobalShortcut] = [
         .defaultStart,
         .defaultStop,
+        .defaultCopyTimestamp,
+        GlobalShortcut(keyCode: UInt32(kVK_ANSI_C), modifiers: UInt32(cmdKey | shiftKey)),
         GlobalShortcut(keyCode: UInt32(kVK_ANSI_1), modifiers: UInt32(cmdKey | shiftKey)),
         GlobalShortcut(keyCode: UInt32(kVK_ANSI_2), modifiers: UInt32(cmdKey | shiftKey))
     ]
@@ -37,11 +40,32 @@ public struct GlobalShortcut: Codable, Hashable, Sendable, Identifiable {
         switch keyCode {
         case UInt32(kVK_ANSI_R): "R"
         case UInt32(kVK_ANSI_S): "S"
+        case UInt32(kVK_ANSI_T): "T"
+        case UInt32(kVK_ANSI_C): "C"
         case UInt32(kVK_ANSI_1): "1"
         case UInt32(kVK_ANSI_2): "2"
         default: "Key \(keyCode)"
         }
     }
+
+    /// Character AppKit menus use for `NSMenuItem.keyEquivalent`. Empty when the
+    /// key is not one of the shortcuts Scribe offers.
+    public var keyEquivalentCharacter: String {
+        switch keyCode {
+        case UInt32(kVK_ANSI_R): "r"
+        case UInt32(kVK_ANSI_S): "s"
+        case UInt32(kVK_ANSI_T): "t"
+        case UInt32(kVK_ANSI_C): "c"
+        case UInt32(kVK_ANSI_1): "1"
+        case UInt32(kVK_ANSI_2): "2"
+        default: ""
+        }
+    }
+
+    public var usesControl: Bool { modifiers & UInt32(controlKey) != 0 }
+    public var usesOption: Bool { modifiers & UInt32(optionKey) != 0 }
+    public var usesShift: Bool { modifiers & UInt32(shiftKey) != 0 }
+    public var usesCommand: Bool { modifiers & UInt32(cmdKey) != 0 }
 }
 
 /// The coordinator boundary used by both global shortcuts and the future menu.
@@ -49,11 +73,31 @@ public struct GlobalShortcut: Codable, Hashable, Sendable, Identifiable {
 public protocol RecordingShortcutCoordinating: AnyObject {
     func startRecordingFromShortcut()
     func stopRecordingFromShortcut()
+    func copyTimestampFromShortcut()
 }
 
 public enum HotkeyAction: String, CaseIterable, Sendable {
     case start
     case stop
+    case copyTimestamp
+
+    public var displayName: String {
+        switch self {
+        case .start: "Start"
+        case .stop: "Stop"
+        case .copyTimestamp: "Copy timestamp"
+        }
+    }
+
+    /// Carbon `RegisterEventHotKey` identifier. Stable so tests can fire a
+    /// specific action without depending on registration order.
+    var hotKeyIdentifier: UInt32 {
+        switch self {
+        case .start: 1
+        case .stop: 2
+        case .copyTimestamp: 3
+        }
+    }
 }
 
 public enum HotkeyRegistrationFailure: Error, Equatable, Sendable, LocalizedError {
@@ -64,7 +108,7 @@ public enum HotkeyRegistrationFailure: Error, Equatable, Sendable, LocalizedErro
     public var errorDescription: String? {
         switch self {
         case .duplicateShortcut:
-            "Start and stop cannot use the same global shortcut."
+            "Each action needs its own global shortcut."
         case .systemConflict:
             "That global shortcut is already registered by another application."
         case .systemError:
@@ -83,6 +127,13 @@ public struct HotkeyRegistrationReport: Equatable, Sendable {
     }
 
     public var hasConflicts: Bool { !failures.isEmpty }
+
+    public var issueDescriptions: [String] {
+        HotkeyAction.allCases.compactMap { action in
+            guard let failure = failures[action] else { return nil }
+            return "\(action.displayName) shortcut: \(failure.errorDescription ?? "unavailable")"
+        }
+    }
 }
 
 /// Testable abstraction around `RegisterEventHotKey`.
@@ -92,7 +143,7 @@ public protocol HotKeyRegistering: AnyObject {
     func unregisterAll()
 }
 
-/// Registers independent start/stop shortcuts and routes them to one coordinator.
+/// Registers independent start, stop, and copy-timestamp shortcuts and routes them to one coordinator.
 /// Repeated hardware events for the same action are suppressed for a short window.
 @MainActor
 public final class HotkeyService {
@@ -116,23 +167,41 @@ public final class HotkeyService {
     /// Replaces the current registrations. Failures are returned to the caller
     /// so menu recording remains available and the user can choose another key.
     @discardableResult
-    public func register(start: GlobalShortcut, stop: GlobalShortcut) -> HotkeyRegistrationReport {
+    public func register(
+        start: GlobalShortcut,
+        stop: GlobalShortcut,
+        copyTimestamp: GlobalShortcut = .defaultCopyTimestamp
+    ) -> HotkeyRegistrationReport {
         registrar.unregisterAll()
         lastEventDate.removeAll()
 
-        guard start != stop else {
-            let report = HotkeyRegistrationReport(
-                activeActions: [],
-                failures: [.start: .duplicateShortcut, .stop: .duplicateShortcut]
-            )
-            lastRegistrationReport = report
-            return report
+        let assignments: [(HotkeyAction, GlobalShortcut)] = [
+            (.start, start),
+            (.stop, stop),
+            (.copyTimestamp, copyTimestamp)
+        ]
+
+        var failures: [HotkeyAction: HotkeyRegistrationFailure] = [:]
+        for i in assignments.indices {
+            for j in assignments.indices where j > i {
+                if assignments[i].1 == assignments[j].1 {
+                    failures[assignments[i].0] = .duplicateShortcut
+                    failures[assignments[j].0] = .duplicateShortcut
+                }
+            }
         }
 
         var active = Set<HotkeyAction>()
-        var failures: [HotkeyAction: HotkeyRegistrationFailure] = [:]
-        register(start, action: .start, identifier: 1, active: &active, failures: &failures)
-        register(stop, action: .stop, identifier: 2, active: &active, failures: &failures)
+        for (action, shortcut) in assignments {
+            guard failures[action] == nil else { continue }
+            register(
+                shortcut,
+                action: action,
+                identifier: action.hotKeyIdentifier,
+                active: &active,
+                failures: &failures
+            )
+        }
         let report = HotkeyRegistrationReport(activeActions: active, failures: failures)
         lastRegistrationReport = report
         return report
@@ -153,6 +222,7 @@ public final class HotkeyService {
         switch action {
         case .start: coordinator?.startRecordingFromShortcut()
         case .stop: coordinator?.stopRecordingFromShortcut()
+        case .copyTimestamp: coordinator?.copyTimestampFromShortcut()
         }
     }
 

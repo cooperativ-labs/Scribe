@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// What the chip's buttons do. A struct rather than four parameters so the view
+/// What the chip's buttons do. A struct rather than a pile of parameters so the view
 /// can be rendered from a plain presentation in a preview or a test without a
 /// coordinator behind it.
 struct MeetingChipActions {
@@ -8,6 +8,7 @@ struct MeetingChipActions {
     var dismiss: @MainActor () -> Void = {}
     var hold: @MainActor () -> Void = {}
     var stop: @MainActor () -> Void = {}
+    var copyTimestamp: @MainActor () -> Void = {}
 }
 
 /// The floating chip that appears under the menu bar icon.
@@ -98,12 +99,9 @@ struct MeetingChipView: View {
                 Image(systemName: session.isPaused ? "circle" : "circle.fill")
                     .font(.system(size: 9))
                     .foregroundStyle(session.isPaused ? AnyShapeStyle(.secondary) : AnyShapeStyle(Color.red))
-                Text(session.elapsedText)
-                    .font(.system(size: 14, weight: .medium))
-                    .monospacedDigit()
+                    .accessibilityLabel(session.isPaused ? "Paused" : "Recording")
+                ElapsedTimestampButton(elapsedText: session.elapsedText, copy: actions.copyTimestamp)
             }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(session.isPaused ? "Paused at \(session.elapsedText)" : "Recording, \(session.elapsedText)")
 
             Spacer(minLength: 16)
 
@@ -152,6 +150,42 @@ struct MeetingChipView: View {
         .chipCircleButton()
         .accessibilityLabel(label)
         .help(help)
+    }
+}
+
+/// The elapsed clock is also the copy control: notes taken during a meeting
+/// need the current time, and the figure itself is the thing a person looks at
+/// to get it.
+private struct ElapsedTimestampButton: View {
+    let elapsedText: String
+    var copy: @MainActor () -> Void
+
+    @State private var didCopy = false
+    @State private var resetTask: Task<Void, Never>?
+
+    var body: some View {
+        Button(action: copyAndAcknowledge) {
+            Text(didCopy ? "Copied" : elapsedText)
+                .font(.system(size: 14, weight: .medium))
+                .monospacedDigit()
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("Copy timestamp")
+        .accessibilityLabel(didCopy ? "Timestamp copied" : "Copy timestamp \(elapsedText)")
+        .accessibilityHint("Copies the current recording time for notes")
+        .onDisappear { resetTask?.cancel() }
+    }
+
+    private func copyAndAcknowledge() {
+        copy()
+        didCopy = true
+        resetTask?.cancel()
+        resetTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.2))
+            guard !Task.isCancelled else { return }
+            didCopy = false
+        }
     }
 }
 
@@ -205,7 +239,8 @@ struct MeetingChipHost: View {
                 record: { model.record() },
                 dismiss: { model.dismiss() },
                 hold: { model.toggleHold() },
-                stop: { model.stop() }
+                stop: { model.stop() },
+                copyTimestamp: { model.copyTimestamp() }
             )
         )
     }

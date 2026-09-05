@@ -9,15 +9,17 @@ final class HotkeyServiceTests: XCTestCase {
         let service = HotkeyService(coordinator: coordinator, registrar: registrar, debounceInterval: 1)
 
         let report = service.register(start: .defaultStart, stop: .defaultStop)
-        XCTAssertEqual(report.activeActions, [.start, .stop])
+        XCTAssertEqual(report.activeActions, [.start, .stop, .copyTimestamp])
 
         let instant = Date()
         registrar.fire(identifier: 1)
         service.handleEvent(for: .start, at: instant.addingTimeInterval(0.5))
         service.handleEvent(for: .stop, at: instant.addingTimeInterval(0.5))
+        registrar.fire(identifier: 3)
 
         XCTAssertEqual(coordinator.startInvocations, 1)
         XCTAssertEqual(coordinator.stopInvocations, 1)
+        XCTAssertEqual(coordinator.copyInvocations, 1)
     }
 
     func testConflictsAreReportedWithoutPreventingTheOtherShortcut() {
@@ -27,7 +29,7 @@ final class HotkeyServiceTests: XCTestCase {
 
         let report = service.register(start: .defaultStart, stop: .defaultStop)
 
-        XCTAssertEqual(report.activeActions, [.start])
+        XCTAssertEqual(report.activeActions, [.start, .copyTimestamp])
         XCTAssertEqual(report.failures[.stop], .systemConflict(status: -9878))
     }
 
@@ -39,7 +41,24 @@ final class HotkeyServiceTests: XCTestCase {
 
         XCTAssertEqual(report.failures[.start], .duplicateShortcut)
         XCTAssertEqual(report.failures[.stop], .duplicateShortcut)
-        XCTAssertTrue(registrar.registeredActions.isEmpty)
+        XCTAssertNil(report.failures[.copyTimestamp])
+        XCTAssertEqual(Set(registrar.registeredActions.keys), [3])
+    }
+
+    func testCopyTimestampCannotShareAShortcutWithStartOrStop() {
+        let registrar = HotKeyRegistrarHarness()
+        let service = HotkeyService(coordinator: RecordingCoordinatorHarness(), registrar: registrar)
+
+        let report = service.register(
+            start: .defaultCopyTimestamp,
+            stop: .defaultStop,
+            copyTimestamp: .defaultCopyTimestamp
+        )
+
+        XCTAssertEqual(report.failures[.start], .duplicateShortcut)
+        XCTAssertEqual(report.failures[.copyTimestamp], .duplicateShortcut)
+        XCTAssertNil(report.failures[.stop])
+        XCTAssertEqual(Set(registrar.registeredActions.keys), [2])
     }
 }
 
@@ -47,9 +66,11 @@ final class HotkeyServiceTests: XCTestCase {
 private final class RecordingCoordinatorHarness: RecordingShortcutCoordinating {
     var startInvocations = 0
     var stopInvocations = 0
+    var copyInvocations = 0
 
     func startRecordingFromShortcut() { startInvocations += 1 }
     func stopRecordingFromShortcut() { stopInvocations += 1 }
+    func copyTimestampFromShortcut() { copyInvocations += 1 }
 }
 
 @MainActor

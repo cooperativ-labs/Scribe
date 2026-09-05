@@ -14,11 +14,13 @@ public enum TranscriptSpeakerScope: Equatable, Sendable {
 public enum TranscriptSpeakerLabelError: Error, Equatable, Sendable, LocalizedError {
     case unknownSpeaker(String)
     case unknownSegment(String)
+    case sameSpeaker(String)
 
     public var errorDescription: String? {
         switch self {
         case let .unknownSpeaker(id): "This transcript has no speaker \(id)."
         case let .unknownSegment(id): "This transcript has no segment \(id)."
+        case let .sameSpeaker(id): "\(id) cannot be merged into itself."
         }
     }
 }
@@ -87,6 +89,48 @@ public enum TranscriptSpeakerLabelEditor {
         }
         guard changed else { return nil }
         return transcript.nextRevision(speakers: speakers, segments: relabeledSegments(transcript.segments, from: speakers))
+    }
+
+    /// Moves one turn under another speaker this recording already has, named
+    /// or not. This is the fix for a turn diarization filed under the wrong
+    /// cluster when neither cluster is matched to a saved person yet.
+    public static func moving(
+        segmentID: String,
+        toSpeakerID speakerID: String,
+        in transcript: CanonicalTranscript
+    ) throws -> CanonicalTranscript {
+        guard let segmentIndex = transcript.segments.firstIndex(where: { $0.id == segmentID }) else {
+            throw TranscriptSpeakerLabelError.unknownSegment(segmentID)
+        }
+        guard let speaker = transcript.speakers.first(where: { $0.id == speakerID }) else {
+            throw TranscriptSpeakerLabelError.unknownSpeaker(speakerID)
+        }
+        var segments = transcript.segments
+        segments[segmentIndex] = segments[segmentIndex].withSpeaker(id: speaker.id, label: speaker.labelSnapshot)
+        return transcript.nextRevision(segments: segments)
+    }
+
+    /// Folds every turn of `speakerID` into `targetSpeakerID` and drops the
+    /// emptied speaker from the table. This is the fix for diarization that
+    /// split one person into two clusters; the target keeps its own name and
+    /// assignment.
+    public static func merging(
+        speakerID: String,
+        into targetSpeakerID: String,
+        in transcript: CanonicalTranscript
+    ) throws -> CanonicalTranscript {
+        guard speakerID != targetSpeakerID else { throw TranscriptSpeakerLabelError.sameSpeaker(speakerID) }
+        guard transcript.speakers.contains(where: { $0.id == speakerID }) else {
+            throw TranscriptSpeakerLabelError.unknownSpeaker(speakerID)
+        }
+        guard let target = transcript.speakers.first(where: { $0.id == targetSpeakerID }) else {
+            throw TranscriptSpeakerLabelError.unknownSpeaker(targetSpeakerID)
+        }
+        let segments = transcript.segments.map { segment in
+            segment.speakerID == speakerID ? segment.withSpeaker(id: target.id, label: target.labelSnapshot) : segment
+        }
+        let speakers = transcript.speakers.filter { $0.id != speakerID }
+        return transcript.nextRevision(speakers: speakers, segments: segments)
     }
 
     private static func assigningCluster(
@@ -189,13 +233,40 @@ public enum TranscriptSpeakerLabelEditor {
     }
 }
 
+extension TranscriptSegment {
+    /// The same words and timing under another speaker.
+    func withSpeaker(id speakerID: String?, label: String) -> TranscriptSegment {
+        TranscriptSegment(
+            id: id,
+            speakerID: speakerID,
+            speakerLabel: label,
+            startMs: startMs,
+            endMs: endMs,
+            text: text,
+            overlap: overlap,
+            timingQuality: timingQuality,
+            speakerConfidence: speakerConfidence,
+            words: words
+        )
+    }
+}
+
 extension CanonicalTranscript {
-    /// Copies this transcript with a new speaker table and segments at the next revision.
-    func nextRevision(speakers: [TranscriptSpeaker], segments: [TranscriptSegment]) -> CanonicalTranscript {
+    /// Copies this transcript at the next revision, replacing only what an edit
+    /// changed. A structural edit passes `subtitleCueMappings: nil` because the
+    /// cues it carried described segments that no longer exist; export rebuilds
+    /// them from the segments that do.
+    func nextRevision(
+        title: String?? = nil,
+        speakers: [TranscriptSpeaker]? = nil,
+        segments: [TranscriptSegment]? = nil,
+        subtitleCueMappings: [SubtitleCueMapping]?? = nil
+    ) -> CanonicalTranscript {
         CanonicalTranscript(
             schemaVersion: schemaVersion,
             transcriptID: transcriptID,
             revision: revision + 1,
+            title: title ?? self.title,
             status: status,
             createdAt: createdAt,
             source: source,
@@ -203,9 +274,9 @@ extension CanonicalTranscript {
             languageSource: languageSource,
             timestampUnit: timestampUnit,
             timestampOrigin: timestampOrigin,
-            speakers: speakers,
-            segments: segments,
-            subtitleCueMappings: subtitleCueMappings,
+            speakers: speakers ?? self.speakers,
+            segments: segments ?? self.segments,
+            subtitleCueMappings: subtitleCueMappings ?? self.subtitleCueMappings,
             processingOptions: processingOptions,
             engineRevisions: engineRevisions,
             warnings: warnings

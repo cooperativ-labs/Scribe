@@ -2,7 +2,7 @@ import Combine
 import Foundation
 import Platform
 
-/// Drives the meeting chip: what it shows, and what its four buttons do.
+/// Drives the meeting chip: what it shows, and what its buttons do.
 ///
 /// Like `RecorderMenuModel` it never mutates recorder state itself. Every
 /// button becomes a `RecordingCommand`, so accepting the offer takes exactly
@@ -148,6 +148,12 @@ public final class MeetingChipModel: ObservableObject {
         coordinator.submit(.stop)
         if let meeting { dismissedCall = DismissedCall(meeting) }
         refreshPresentation()
+    }
+
+    /// Copies the elapsed figure currently on the chip, for pasting into notes.
+    public func copyTimestamp() {
+        guard case .session = presentation else { return }
+        coordinator.submit(.copyTimestamp)
     }
 
     // MARK: Elapsed time

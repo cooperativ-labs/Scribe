@@ -26,15 +26,23 @@ public final class ScribeSettings: ObservableObject {
     @Published public var rememberedMicrophoneID: String? {
         didSet { storeOptionalString(rememberedMicrophoneID, forKey: Key.microphoneID) }
     }
+    @Published public var rememberedRecordingMode: RecordingMode {
+        didSet { defaults.set(rememberedRecordingMode.rawValue, forKey: Key.recordingMode) }
+    }
     @Published public var startShortcut: GlobalShortcut {
         didSet { storeShortcut(startShortcut, forKey: Key.startShortcut) }
     }
     @Published public var stopShortcut: GlobalShortcut {
         didSet { storeShortcut(stopShortcut, forKey: Key.stopShortcut) }
     }
+    @Published public var copyTimestampShortcut: GlobalShortcut {
+        didSet { storeShortcut(copyTimestampShortcut, forKey: Key.copyTimestampShortcut) }
+    }
     @Published public var transcribeWhenFinalRecordingIsReady: Bool {
         didSet { defaults.set(transcribeWhenFinalRecordingIsReady, forKey: Key.transcribeWhenFinalRecordingIsReady) }
     }
+    @Published public private(set) var launchAtLogin: Bool
+    @Published public private(set) var launchAtLoginError: String?
 
     // MARK: Meeting detection
 
@@ -63,11 +71,13 @@ public final class ScribeSettings: ObservableObject {
         defaults: UserDefaults = .standard,
         defaultRecordingsFolderURL: URL = ScribeSettings.defaultRecordingsFolderURL,
         fileManager: FileManager = .default,
-        modelManifestURL: URL? = Bundle.main.url(forResource: "model_manifest", withExtension: "json")
+        modelManifestURL: URL? = Bundle.main.url(forResource: "model_manifest", withExtension: "json"),
+        loginItemManager: LoginItemManaging = SystemLoginItemManager()
     ) {
         self.defaults = defaults
         self.defaultRecordingsFolderURL = defaultRecordingsFolderURL
         self.fileManager = fileManager
+        self.loginItemManager = loginItemManager
         modelInstaller = TranscriptionModelInstaller(manifestURL: modelManifestURL)
         do {
             modelsFolderURL = try Self.resolveBookmark(from: defaults, fileManager: fileManager, key: Key.modelsFolderBookmark)
@@ -79,9 +89,13 @@ public final class ScribeSettings: ObservableObject {
 
         rememberedApplicationBundleIdentifier = defaults.string(forKey: Key.applicationBundleIdentifier)
         rememberedMicrophoneID = defaults.string(forKey: Key.microphoneID)
+        rememberedRecordingMode = defaults.string(forKey: Key.recordingMode).flatMap(RecordingMode.init(rawValue:)) ?? .systemAudioAndMicrophone
         startShortcut = Self.loadShortcut(from: defaults, key: Key.startShortcut) ?? .defaultStart
         stopShortcut = Self.loadShortcut(from: defaults, key: Key.stopShortcut) ?? .defaultStop
+        copyTimestampShortcut = Self.loadShortcut(from: defaults, key: Key.copyTimestampShortcut) ?? .defaultCopyTimestamp
         transcribeWhenFinalRecordingIsReady = defaults.object(forKey: Key.transcribeWhenFinalRecordingIsReady) as? Bool ?? false
+        launchAtLogin = loginItemManager.status == .enabled
+        launchAtLoginError = nil
         meetingDetectionEnabled = defaults.object(forKey: Key.meetingDetectionEnabled) as? Bool ?? true
         stopRecordingWhenMeetingEnds = defaults.object(forKey: Key.stopRecordingWhenMeetingEnds) as? Bool ?? false
         disabledMeetingApplicationIDs = Set(defaults.stringArray(forKey: Key.disabledMeetingApplicationIDs) ?? [])
@@ -108,6 +122,44 @@ public final class ScribeSettings: ObservableObject {
             } catch {
                 recordingsFolderError = error as? ScribeSettingsError ?? .cannotCreateBookmark(error.localizedDescription)
             }
+        }
+    }
+
+    /// Updates macOS Login Items and reflects the result in the settings UI.
+    /// The system service is authoritative because approval can also change in
+    /// System Settings while Scribe is not running.
+    public func setLaunchAtLogin(_ enabled: Bool) {
+        launchAtLoginError = nil
+
+        do {
+            if enabled {
+                try loginItemManager.register()
+            } else {
+                try loginItemManager.unregister()
+            }
+            refreshLaunchAtLoginStatus()
+            if enabled, !launchAtLogin {
+                launchAtLoginError = launchAtLoginStatusMessage
+            }
+        } catch {
+            refreshLaunchAtLoginStatus()
+            launchAtLoginError = error.localizedDescription
+        }
+    }
+
+    /// Re-reads the system state after returning from Login Items settings.
+    public func refreshLaunchAtLoginStatus() {
+        launchAtLogin = loginItemManager.status == .enabled
+    }
+
+    public var launchAtLoginStatusMessage: String {
+        switch loginItemManager.status {
+        case .requiresApproval:
+            "Approve Scribe in System Settings > General > Login Items."
+        case .notFound:
+            "Scribe must be installed as an app before it can launch at login."
+        case .notRegistered, .enabled:
+            "Scribe could not be registered to launch at login."
         }
     }
 
@@ -195,8 +247,10 @@ public final class ScribeSettings: ObservableObject {
         static let recordingsFolderBookmark = "scribe.settings.recordingsFolderBookmark"
         static let applicationBundleIdentifier = "scribe.settings.rememberedApplicationBundleIdentifier"
         static let microphoneID = "scribe.settings.rememberedMicrophoneID"
+        static let recordingMode = "scribe.settings.rememberedRecordingMode"
         static let startShortcut = "scribe.settings.startShortcut"
         static let stopShortcut = "scribe.settings.stopShortcut"
+        static let copyTimestampShortcut = "scribe.settings.copyTimestampShortcut"
         static let transcribeWhenFinalRecordingIsReady = "scribe.settings.transcribeWhenFinalRecordingIsReady"
         static let meetingDetectionEnabled = "scribe.settings.meetingDetectionEnabled"
         static let stopRecordingWhenMeetingEnds = "scribe.settings.stopRecordingWhenMeetingEnds"
@@ -207,6 +261,7 @@ public final class ScribeSettings: ObservableObject {
     private let defaults: UserDefaults
     private let defaultRecordingsFolderURL: URL
     private let fileManager: FileManager
+    private let loginItemManager: LoginItemManaging
 
     private func storeOptionalString(_ value: String?, forKey key: String) {
         if let value, !value.isEmpty {

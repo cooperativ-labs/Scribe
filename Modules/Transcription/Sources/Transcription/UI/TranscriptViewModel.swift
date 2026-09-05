@@ -72,6 +72,53 @@ public struct TranscriptPlaybackStatus: Equatable, Sendable {
     }
 }
 
+/// Which turns the transcript list shows.
+public enum TranscriptReviewFilter: String, CaseIterable, Identifiable, Sendable {
+    case all
+    case needsReview
+    case unknownSpeaker
+    case overlap
+    case estimatedTiming
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .all: "All turns"
+        case .needsReview: "Needs review"
+        case .unknownSpeaker: "Unknown speaker"
+        case .overlap: "Overlapping speech"
+        case .estimatedTiming: "Estimated timing"
+        }
+    }
+
+    public func matches(_ segment: TranscriptSegment) -> Bool {
+        switch self {
+        case .all: true
+        case .needsReview: segment.needsReview
+        case .unknownSpeaker: segment.speakerID == nil
+        case .overlap: segment.overlap
+        case .estimatedTiming: segment.timingQuality == .segmentOnly
+        }
+    }
+}
+
+public extension TranscriptSegment {
+    /// Below this the diarizer was guessing, which is worth a second listen.
+    static let lowSpeakerConfidence = 0.5
+
+    var hasLowSpeakerConfidence: Bool {
+        guard let speakerConfidence else { return false }
+        return speakerConfidence < Self.lowSpeakerConfidence
+    }
+
+    /// A turn a reviewer should look at: no speaker, an uncertain one,
+    /// overlapping speech, or timing that was estimated rather than measured.
+    var needsReview: Bool {
+        speakerID == nil || hasLowSpeakerConfidence || overlap || timingQuality == .segmentOnly
+    }
+}
+
 /// Fixture-first state and actions for the transcript review window.
 @MainActor
 @Observable
@@ -95,6 +142,23 @@ public final class TranscriptViewModel {
     /// transport actions so the bar, the rows, and the player never disagree.
     public private(set) var playingSegmentID: TranscriptSegment.ID?
     public private(set) var isPlaying = false
+    /// Where the play head is in the source, updated as it moves and on seek.
+    public private(set) var playheadMilliseconds = 0
+    public private(set) var playbackRate: Float = 1
+    /// Whether the list scrolls to keep the playing turn in view.
+    public var followsPlayback = true
+
+    /// Words to find in the transcript; empty shows every turn.
+    public var searchText = ""
+    /// Show only this recording-local speaker's turns, or nil for everyone.
+    public var speakerFilterID: String?
+    public var reviewFilter: TranscriptReviewFilter = .all
+
+    /// Earlier revisions of each file, most recent last, for undo; and the
+    /// ones undone, for redo. Kept in memory only: every step is also a saved
+    /// revision, so nothing is lost when the window closes.
+    @ObservationIgnored private var undoStacks: [TranscriptReviewFile.ID: [CanonicalTranscript]] = [:]
+    @ObservationIgnored private var redoStacks: [TranscriptReviewFile.ID: [CanonicalTranscript]] = [:]
 
     @ObservationIgnored private let playback: any TranscriptPlaybackSeeking
     @ObservationIgnored private let exportWriter: any TranscriptExportWriting
@@ -156,6 +220,51 @@ public final class TranscriptViewModel {
         }
     }
 
+    /// The speakers this recording has, in table order.
+    public var recordingSpeakers: [TranscriptSpeaker] { selectedTranscript?.speakers ?? [] }
+
+    public var sourceDurationMilliseconds: Int { selectedTranscript?.source.durationMs ?? 0 }
+
+    /// The turns the list shows after search and filters.
+    public var visibleSegments: [TranscriptSegment] {
+        let query = Self.normalizedSearch(searchText)
+        return chronologicalSegments.filter { segment in
+            if let speakerFilterID, segment.speakerID != speakerFilterID { return false }
+            guard reviewFilter.matches(segment) else { return false }
+            guard !query.isEmpty else { return true }
+            return Self.normalizedSearch(segment.text).contains(query)
+                || Self.normalizedSearch(segment.speakerLabel).contains(query)
+        }
+    }
+
+    public var isFiltering: Bool {
+        !Self.normalizedSearch(searchText).isEmpty || speakerFilterID != nil || reviewFilter != .all
+    }
+
+    public var segmentsNeedingReviewCount: Int {
+        chronologicalSegments.filter(\.needsReview).count
+    }
+
+    /// A one-line account of the recording: turns, speakers, and length.
+    public var reviewSummary: String? {
+        guard let transcript = selectedTranscript else { return nil }
+        let turns = transcript.segments.count
+        let speakers = transcript.speakers.count
+        var parts = [
+            "\(turns) turn\(turns == 1 ? "" : "s")",
+            "\(speakers) speaker\(speakers == 1 ? "" : "s")",
+            TranscriptTimecode.string(fromMilliseconds: transcript.source.durationMs).replacingOccurrences(of: #"\.\d{3}$"#, with: "", options: .regularExpression),
+        ]
+        if transcript.title != nil { parts.append(transcript.source.filename) }
+        return parts.joined(separator: " · ")
+    }
+
+    /// Case- and accent-insensitive comparison key for search.
+    public static func normalizedSearch(_ text: String) -> String {
+        text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     public var languageDescription: String? {
         guard let transcript = selectedTranscript else { return nil }
         let provenance: String = switch transcript.languageSource {
@@ -181,6 +290,7 @@ public final class TranscriptViewModel {
 
     public func select(segment: TranscriptSegment) {
         selectedSegmentID = segment.id
+        playheadMilliseconds = segment.startMs
         playback.seek(toMilliseconds: segment.startMs)
         // A seek while playing moves the readout with the audio; a seek while
         // paused or stopped is only a selection and must not start sound.
@@ -202,6 +312,7 @@ public final class TranscriptViewModel {
     public func play(segment: TranscriptSegment) {
         selectedSegmentID = segment.id
         playingSegmentID = segment.id
+        playheadMilliseconds = segment.startMs
         playback.seek(toMilliseconds: segment.startMs)
         playback.play()
         isPlaying = true
@@ -234,7 +345,71 @@ public final class TranscriptViewModel {
         playingSegmentID = nil
     }
 
+    /// Moves the play head to a time in the source, whether or not it is playing.
+    ///
+    /// While playing or paused the readout follows to the turn at that time.
+    /// While stopped the turn there becomes the selection, so the next play
+    /// starts where the scrubber was left.
+    public func seek(toMilliseconds milliseconds: Int) {
+        let clamped = max(0, min(milliseconds, max(0, sourceDurationMilliseconds)))
+        playheadMilliseconds = clamped
+        playback.seek(toMilliseconds: clamped)
+        guard let current = chronologicalSegments.last(where: { $0.startMs <= clamped }) ?? chronologicalSegments.first else { return }
+        selectedSegmentID = current.id
+        if playingSegmentID != nil { playingSegmentID = current.id }
+    }
+
+    /// Nudges the play head by `milliseconds`, negative to go back.
+    public func skip(byMilliseconds milliseconds: Int) {
+        seek(toMilliseconds: playheadMilliseconds + milliseconds)
+    }
+
+    public func setPlaybackRate(_ rate: Float) {
+        playbackRate = rate
+        playback.setRate(rate)
+    }
+
+    /// Plays the selected turn, or pauses when it is already playing.
+    public func playSelectedOrToggle() {
+        if isPlaying { togglePlayback(); return }
+        if let playingSegmentID, playingSegmentID == selectedSegmentID { togglePlayback(); return }
+        guard let segment = chronologicalSegments.first(where: { $0.id == selectedSegmentID }) else {
+            togglePlayback()
+            return
+        }
+        play(segment: segment)
+    }
+
+    /// Moves the selection through the visible turns; the play head follows
+    /// only while playback is running, so browsing stays silent.
+    public func selectNeighbouringSegment(offset: Int) {
+        let segments = visibleSegments
+        guard !segments.isEmpty else { return }
+        guard let selectedSegmentID, let index = segments.firstIndex(where: { $0.id == selectedSegmentID }) else {
+            select(segment: offset < 0 ? segments[segments.count - 1] : segments[0])
+            return
+        }
+        let target = max(0, min(segments.count - 1, index + offset))
+        guard target != index else { return }
+        if isPlaying { play(segment: segments[target]) } else { select(segment: segments[target]) }
+    }
+
+    /// Selects the next turn after the selection that needs a look, wrapping
+    /// to the top; returns false when nothing does.
+    @discardableResult
+    public func selectNextSegmentNeedingReview() -> Bool {
+        let segments = chronologicalSegments
+        let candidates = segments.filter(\.needsReview)
+        guard !candidates.isEmpty else { return false }
+        let start = segments.firstIndex { $0.id == selectedSegmentID } ?? -1
+        let next = segments.enumerated().first { $0.offset > start && $0.element.needsReview }?.element
+            ?? candidates[0]
+        select(segment: next)
+        return true
+    }
+
     private func handle(_ event: TranscriptPlaybackEvent) {
+        if case .timeChanged(let milliseconds) = event { playheadMilliseconds = milliseconds }
         guard isPlaying else { return }
         switch event {
         case .ended:
@@ -305,6 +480,114 @@ public final class TranscriptViewModel {
     public func exportRefreshingLabels(_ formats: Set<TranscriptExportFormat>, to directoryURL: URL) async {
         await refreshLabelsFromLibrary(announceUnchanged: false)
         export(formats, to: directoryURL)
+    }
+
+    // MARK: - Naming
+
+    /// Gives the transcript a name of its own, or clears it back to the source
+    /// filename with nil. Like every edit, this is a saved revision.
+    public func rename(to title: String?) {
+        applyEdit({ try TranscriptSegmentEditor.renaming(to: title, in: $0) }) { revised in
+            revised.title.map { "Renamed to \u{201C}\($0)\u{201D}." } ?? "Cleared the name; the transcript goes by its source filename."
+        }
+    }
+
+    // MARK: - Editing turns
+
+    /// The units a turn can be split between, for the split sheet.
+    public func splitTokens(for segment: TranscriptSegment) -> [TranscriptSplitToken] {
+        TranscriptSegmentEditor.splitTokens(for: segment)
+    }
+
+    /// Splits a turn into two before the token at `tokenIndex`; the earlier
+    /// half stays selected.
+    public func split(segmentID: String, beforeToken tokenIndex: Int) {
+        applyEdit({ try TranscriptSegmentEditor.splitting(segmentID: segmentID, beforeToken: tokenIndex, in: $0) }) { _ in
+            "Split the turn in two."
+        }
+        selectedSegmentID = chronologicalSegments.first { $0.id.hasPrefix(segmentID + ".") }?.id ?? selectedSegmentID
+    }
+
+    /// The turn after this one in time, if any.
+    public func segment(after segmentID: String) -> TranscriptSegment? {
+        let segments = chronologicalSegments
+        guard let index = segments.firstIndex(where: { $0.id == segmentID }), index + 1 < segments.count else { return nil }
+        return segments[index + 1]
+    }
+
+    /// The turn before this one in time, if any.
+    public func segment(before segmentID: String) -> TranscriptSegment? {
+        let segments = chronologicalSegments
+        guard let index = segments.firstIndex(where: { $0.id == segmentID }), index > 0 else { return nil }
+        return segments[index - 1]
+    }
+
+    /// Combines a turn with its neighbour into one. The earlier turn's speaker
+    /// is kept; when the two disagreed the message says so.
+    public func merge(segmentID: String, withNext: Bool) {
+        guard let neighbour = withNext ? segment(after: segmentID) : segment(before: segmentID),
+              let segment = chronologicalSegments.first(where: { $0.id == segmentID }) else {
+            speakerActionMessage = TranscriptSpeakerActionMessage(
+                text: withNext ? "This is already the last turn." : "This is already the first turn.",
+                isFailure: true
+            )
+            return
+        }
+        let earlier = withNext ? segment : neighbour
+        let later = withNext ? neighbour : segment
+        applyEdit({ try TranscriptSegmentEditor.merging(segmentID: segmentID, with: neighbour.id, in: $0) }) { _ in
+            earlier.speakerID == later.speakerID
+                ? "Combined two turns into one."
+                : "Combined two turns as \(earlier.speakerLabel); reassign it if \(later.speakerLabel) was speaking."
+        }
+        selectedSegmentID = earlier.id
+    }
+
+    /// Replaces the words of a turn.
+    public func replaceText(of segmentID: String, with text: String) {
+        applyEdit({ try TranscriptSegmentEditor.replacingText(of: segmentID, with: text, in: $0) }) { _ in
+            "Updated the words of this turn."
+        }
+    }
+
+    /// Files one turn under another speaker this recording already has.
+    public func move(segmentID: String, toSpeakerID speakerID: String) {
+        applyEdit({ try TranscriptSpeakerLabelEditor.moving(segmentID: segmentID, toSpeakerID: speakerID, in: $0) }) { revised in
+            let label = revised.speakers.first { $0.id == speakerID }?.labelSnapshot ?? speakerID
+            return "Moved this turn to \(label)."
+        }
+    }
+
+    /// Folds one recording-local speaker into another.
+    public func mergeSpeaker(_ speakerID: String, into targetSpeakerID: String) {
+        let sourceLabel = recordingSpeakers.first { $0.id == speakerID }?.labelSnapshot ?? speakerID
+        applyEdit({ try TranscriptSpeakerLabelEditor.merging(speakerID: speakerID, into: targetSpeakerID, in: $0) }) { revised in
+            let label = revised.speakers.first { $0.id == targetSpeakerID }?.labelSnapshot ?? targetSpeakerID
+            return "Merged \(sourceLabel) into \(label)."
+        }
+        if speakerFilterID == speakerID { speakerFilterID = targetSpeakerID }
+    }
+
+    // MARK: - Undo
+
+    public var canUndo: Bool { !(undoStacks[selectedFileID ?? ""] ?? []).isEmpty }
+    public var canRedo: Bool { !(redoStacks[selectedFileID ?? ""] ?? []).isEmpty }
+
+    /// Returns to the state before the last edit, as a new saved revision.
+    public func undo() {
+        guard let fileID = selectedFileID, let current = selectedTranscript,
+              let previous = undoStacks[fileID]?.popLast() else { return }
+        redoStacks[fileID, default: []].append(current)
+        replaceSelectedTranscript(previous.asRevision(current.revision + 1))
+        speakerActionMessage = TranscriptSpeakerActionMessage(text: "Undid the last edit.", isFailure: false)
+    }
+
+    public func redo() {
+        guard let fileID = selectedFileID, let current = selectedTranscript,
+              let next = redoStacks[fileID]?.popLast() else { return }
+        undoStacks[fileID, default: []].append(current)
+        replaceSelectedTranscript(next.asRevision(current.revision + 1))
+        speakerActionMessage = TranscriptSpeakerActionMessage(text: "Redid the last edit.", isFailure: false)
     }
 
     // MARK: - Speakers
@@ -493,14 +776,28 @@ public final class TranscriptViewModel {
         _ edit: (CanonicalTranscript) throws -> CanonicalTranscript,
         success: () -> String
     ) {
-        guard let transcript = selectedTranscript else {
-            speakerActionMessage = TranscriptSpeakerActionMessage(text: "This file has no transcript to relabel.", isFailure: true)
+        let message = success()
+        applyEdit(edit) { _ in message }
+    }
+
+    /// Runs one edit against the selected transcript and records the result.
+    /// An edit that returns the transcript unchanged is not a revision and
+    /// does not enter the undo history.
+    private func applyEdit(
+        _ edit: (CanonicalTranscript) throws -> CanonicalTranscript,
+        success: (CanonicalTranscript) -> String
+    ) {
+        guard let fileID = selectedFileID, let transcript = selectedTranscript else {
+            speakerActionMessage = TranscriptSpeakerActionMessage(text: "This file has no transcript to edit.", isFailure: true)
             return
         }
         do {
             let revised = try edit(transcript)
+            guard revised != transcript else { return }
+            undoStacks[fileID, default: []].append(transcript)
+            redoStacks[fileID] = []
             replaceSelectedTranscript(revised)
-            speakerActionMessage = TranscriptSpeakerActionMessage(text: success(), isFailure: false)
+            speakerActionMessage = TranscriptSpeakerActionMessage(text: success(revised), isFailure: false)
         } catch {
             speakerActionMessage = TranscriptSpeakerActionMessage(text: Self.describe(error), isFailure: true)
         }
@@ -531,6 +828,8 @@ public final class TranscriptViewModel {
     private func selectFileIfNeeded() {
         cancelRememberingVoice()
         stopPlayback()
+        speakerFilterID = nil
+        playheadMilliseconds = 0
         guard let file = selectedFile else {
             selectedSegmentID = nil
             return

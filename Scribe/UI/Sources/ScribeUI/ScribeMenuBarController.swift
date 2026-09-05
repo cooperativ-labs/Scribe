@@ -33,8 +33,10 @@ public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
     private let transportView = RecordingTransportView()
     private let transportRow = NSMenuItem()
     private let statusItemRow = NSMenuItem()
+    private let copyTimestampRow = NSMenuItem()
     let applicationMenu = NSMenu()
     let microphoneMenu = NSMenu()
+    let recordingModeMenu = NSMenu()
     private var presentationObservation: AnyCancellable?
 
     public init(
@@ -58,7 +60,7 @@ public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
         statusItem.button?.image = image
         statusItem.button?.setAccessibilityLabel(accessibilityLabel)
 
-        for submenu in [menu, applicationMenu, microphoneMenu] {
+        for submenu in [menu, applicationMenu, microphoneMenu, recordingModeMenu] {
             // Rows are enabled from the presentation, not inferred from whether
             // something can respond to their action.
             submenu.autoenablesItems = false
@@ -70,6 +72,9 @@ public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
         transportView.pauseAction = { [weak self] in self?.perform { $0.pauseRecording() } }
         transportView.resumeAction = { [weak self] in self?.perform { $0.resumeRecording() } }
         transportView.stopAction = { [weak self] in self?.perform { $0.stopRecording() } }
+
+        copyTimestampRow.target = self
+        copyTimestampRow.action = #selector(copyTimestamp)
 
         presentationObservation = model.$presentation.sink { [weak self] presentation in
             self?.applyLiveState(presentation)
@@ -91,6 +96,7 @@ public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
         case self.menu: rebuildRootMenu()
         case applicationMenu: rebuildApplicationMenu()
         case microphoneMenu: rebuildMicrophoneMenu()
+        case recordingModeMenu: rebuildRecordingModeMenu()
         default: break
         }
     }
@@ -117,6 +123,7 @@ public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
         transportView.apply(presentation)
         statusItemRow.title = presentation.statusTitle
         statusItemRow.image = NSImage(systemSymbolName: presentation.statusSymbol, accessibilityDescription: nil)
+        applyCopyTimestampItem(copyTimestampRow, presentation: presentation)
     }
 
     private func perform(_ action: (RecorderMenuModel) -> Void) {
@@ -142,6 +149,9 @@ public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
         if let detail = presentation.statusDetail {
             menu.addItem(.disabled(detail))
         }
+
+        applyCopyTimestampItem(copyTimestampRow, presentation: presentation)
+        menu.addItem(copyTimestampRow)
 
         if let prompt = presentation.permissionPrompt {
             menu.addItem(.separator())
@@ -171,7 +181,12 @@ public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
         }
 
         menu.addItem(.separator())
-        menu.addItem(submenuItem(title: "Application", submenu: applicationMenu))
+        menu.addItem(submenuItem(title: "Recording Mode", submenu: recordingModeMenu))
+        if presentation.recordingMode == .systemAudioAndMicrophone {
+            menu.addItem(submenuItem(title: "Application", submenu: applicationMenu))
+        } else {
+            menu.addItem(.disabled("Microphone-only recording — no application needed"))
+        }
         menu.addItem(submenuItem(title: "Microphone", submenu: microphoneMenu))
 
         // Shortcut registration can fail without disabling anything here.
@@ -242,6 +257,18 @@ public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
         }
     }
 
+    @objc private func copyTimestamp() {
+        model.copyTimestamp()
+    }
+
+    private func applyCopyTimestampItem(_ item: NSMenuItem, presentation: MenuPresentation) {
+        item.title = "Copy Timestamp"
+        item.isEnabled = presentation.isCopyTimestampEnabled
+        let shortcut = presentation.copyTimestampShortcut
+        item.keyEquivalent = shortcut.keyEquivalentCharacter
+        item.keyEquivalentModifierMask = shortcut.menuModifierMask
+    }
+
     private func submenuItem(title: String, submenu: NSMenu) -> NSMenuItem {
         let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
         item.submenu = submenu
@@ -295,6 +322,23 @@ public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
         }
     }
 
+    private func rebuildRecordingModeMenu() {
+        let selected = model.presentation.recordingMode
+        recordingModeMenu.removeAllItems()
+        recordingModeMenu.addItem(selection(
+            title: RecordingMode.systemAudioAndMicrophone.menuTitle,
+            isSelected: selected == .systemAudioAndMicrophone
+        ) { [weak self] in
+            self?.perform { $0.selectRecordingMode(.systemAudioAndMicrophone) }
+        })
+        recordingModeMenu.addItem(selection(
+            title: RecordingMode.microphoneOnly.menuTitle,
+            isSelected: selected == .microphoneOnly
+        ) { [weak self] in
+            self?.perform { $0.selectRecordingMode(.microphoneOnly) }
+        })
+    }
+
     private func selection(title: String, isSelected: Bool, handler: @escaping () -> Void) -> NSMenuItem {
         let item = ActionMenuItem(title: title, handler: handler)
         item.state = isSelected ? .on : .off
@@ -325,5 +369,16 @@ private extension NSMenuItem {
         let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
         item.isEnabled = false
         return item
+    }
+}
+
+private extension GlobalShortcut {
+    var menuModifierMask: NSEvent.ModifierFlags {
+        var mask: NSEvent.ModifierFlags = []
+        if usesControl { mask.insert(.control) }
+        if usesOption { mask.insert(.option) }
+        if usesShift { mask.insert(.shift) }
+        if usesCommand { mask.insert(.command) }
+        return mask
     }
 }

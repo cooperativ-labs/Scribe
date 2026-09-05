@@ -14,18 +14,25 @@ public final class RecorderMenuModel: ObservableObject {
 
     private let coordinator: any RecordingCoordinating
     private let now: @MainActor () -> Date
+    private let copyTimestampShortcut: @MainActor () -> GlobalShortcut
     private var snapshot: RecorderSnapshot
     private var observation: RecorderObservationToken?
     private var elapsedTimeTicker: Timer?
 
     public init(
         coordinator: any RecordingCoordinating,
-        now: @escaping @MainActor () -> Date = { Date() }
+        now: @escaping @MainActor () -> Date = { Date() },
+        copyTimestampShortcut: @escaping @MainActor () -> GlobalShortcut = { .defaultCopyTimestamp }
     ) {
         self.coordinator = coordinator
         self.now = now
+        self.copyTimestampShortcut = copyTimestampShortcut
         snapshot = coordinator.snapshot
-        presentation = MenuPresentation(snapshot: coordinator.snapshot, at: now())
+        presentation = MenuPresentation(
+            snapshot: coordinator.snapshot,
+            at: now(),
+            copyTimestampShortcut: copyTimestampShortcut()
+        )
         observation = coordinator.observeSnapshot { [weak self] snapshot in
             guard let self else { return }
             self.snapshot = snapshot
@@ -36,7 +43,11 @@ public final class RecorderMenuModel: ObservableObject {
     /// Recomputes the presentation against the current time. The elapsed timer
     /// calls this every second; tests call it directly with a stubbed clock.
     public func refreshPresentation() {
-        presentation = MenuPresentation(snapshot: snapshot, at: now())
+        presentation = MenuPresentation(
+            snapshot: snapshot,
+            at: now(),
+            copyTimestampShortcut: copyTimestampShortcut()
+        )
     }
 
     // MARK: Menu lifecycle
@@ -69,6 +80,7 @@ public final class RecorderMenuModel: ObservableObject {
     public func stopRecording() { coordinator.submit(.stop) }
     public func pauseRecording() { coordinator.submit(.pause) }
     public func resumeRecording() { coordinator.submit(.resume) }
+    public func copyTimestamp() { coordinator.submit(.copyTimestamp) }
     public func openRecordingsFolder() { coordinator.submit(.openRecordingsFolder) }
     public func requestPermissions() { coordinator.submit(.requestPermissions) }
     public func openSystemSettings(_ pane: SystemSettingsPane) { coordinator.submit(.openSystemSettings(pane)) }
@@ -76,6 +88,7 @@ public final class RecorderMenuModel: ObservableObject {
     public func refreshSources() { coordinator.submit(.refreshSources) }
 
     public func selectApplication(_ id: String?) { coordinator.submit(.selectApplication(id)) }
+    public func selectRecordingMode(_ mode: RecordingMode) { coordinator.submit(.selectRecordingMode(mode)) }
     public func selectMicrophone(_ id: String?) { coordinator.submit(.selectMicrophone(id)) }
 
     public var selectedApplication: Binding<String?> {
