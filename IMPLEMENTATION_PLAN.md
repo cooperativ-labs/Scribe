@@ -80,8 +80,6 @@ Silence is valid input. A silent meeting must not be mistaken for a capture fail
 ```text
 ~/Meeting Recordings/
   2026-09-03 15-30-12/
-    system.flac
-    microphone.flac
     final.flac
     metadata.json
     capture/
@@ -92,11 +90,11 @@ Silence is valid input. A silent meeting must not be mistaken for a capture fail
 
 Use an atomic directory-creation operation and add a short UUID suffix if the timestamp name collides. Store timestamps with their time-zone offset in metadata. `metadata.json` is the session manifest referred to throughout this document. The session directory is owned by the recorder; other modules read from it but write their own output elsewhere.
 
-Write native PCM to recoverable CAF segments during recording. Rotate at a bounded interval, initially 60 seconds, and on format changes. Checkpoint the timing journal so a crash cannot invalidate the whole meeting. Verify recovery of the active segment from persisted format and byte-count information.
+Write transcription-oriented 48 kHz mono 16-bit PCM to recoverable CAF segments during recording. Downmix and quantize float input during the owned-buffer copy without changing frame counts or timestamps. Rotate at a bounded interval, initially 60 seconds, and on format changes. Checkpoint the timing journal so a crash cannot invalidate the whole meeting. Verify recovery of the active segment from persisted format and byte-count information.
 
-After capture, generate 24-bit FLAC exports without AEC, denoising, normalization, or mixing. Preserve source sample rates and channel layouts where possible; use the journal to describe offsets and format transitions. If a track changes format, export it at a documented canonical format and retain the native segments.
+After capture, normally generate only the mixed `final.flac`. The recoverable CAF tracks remain the source archive, while explicit diagnostic or recovery tooling may generate separate source FLACs on demand. Avoid retaining redundant automatic exports.
 
-FLAC encodes integer PCM. Converting floating-point capture to 24-bit PCM introduces quantization, so retain the native CAF archive for exact original-sample preservation and future reprocessing. FLAC remains lossless relative to its integer input. Bundle a pinned `libFLAC` build and use its verification mode when encoding. See the [FLAC encoder interface](https://xiph.org/flac/api/group__flac__stream__encoder.html). During milestone 1, also evaluate the system FLAC encoder in AudioToolbox (`kAudioFormatFLAC` through `AVAudioFile`/`ExtAudioFile`): if it produces verified 24-bit output at the required rates, it removes a bundled dependency and its notices. Keep `libFLAC` as the default until that is measured.
+FLAC remains lossless relative to the transcription-grade 16-bit integer mix supplied to it. Verify the encoded stream before publication and retain the CAF archive for reprocessing.
 
 The manifest should include:
 
@@ -112,13 +110,13 @@ The manifest is also the contract consumers rely on. The transcription module’
 
 On launch, scan incomplete manifests, recover available raw audio, and resume pending processing. Reprocessing writes a new temporary result and replaces `final.flac` only on success. Originals are never overwritten. Provide a small local `scribe-process <session-directory>` developer tool so recovery and reruns are testable without the UI.
 
-Budget disk space for native PCM, FLAC exports, and temporary output simultaneously. Three channels of 48 kHz float32 PCM alone require about 2.1 GB per hour; FLAC size depends on content. Monitor actual free space and stop cleanly before exhaustion.
+Budget disk space for two 48 kHz mono 16-bit CAF tracks plus one mono 16-bit FLAC. This is about 691 MB per hour before FLAC compression, versus several gigabytes for native multi-channel float capture. Stream the final encode directly without a session-length mix scratch file. Monitor actual free space and stop cleanly before exhaustion.
 
 ## 5. Offline echo cancellation and mixdown
 
 Use a pinned WebRTC Audio Processing Module build with AEC3 enabled and a reproducible build script. Expose construction, configuration, render-frame analysis, capture-frame processing, reset, and metrics through a narrow bridge. Include dependency notices and licenses in the app bundle.
 
-At 48 kHz, feed the module 480 samples per channel per 10 ms block. Supply system playback through the reverse/render path before processing the corresponding microphone block. Configure stereo render input and mono microphone processing initially; keep the archived tracks at their original channel counts. Disable automatic gain control and optional noise suppression initially to isolate AEC behavior. These API requirements are documented in the [WebRTC audio-processing interface](https://webrtc.googlesource.com/src/+/refs/heads/main/api/audio/audio_processing.h).
+At 48 kHz, feed the module 480 samples per channel per 10 ms block. Supply system playback through the reverse/render path before processing the corresponding microphone block. Configure mono microphone processing and widen the mono render signal only where the pinned WebRTC interface requires it. Disable automatic gain control and optional noise suppression initially to isolate AEC behavior. These API requirements are documented in the [WebRTC audio-processing interface](https://webrtc.googlesource.com/src/+/refs/heads/main/api/audio/audio_processing.h).
 
 The offline processor should:
 
@@ -129,8 +127,8 @@ The offline processor should:
 5. Preserve double-talk: local speech must survive when meeting participants are speaking simultaneously. Do not use a rule that simply mutes the microphone whenever system audio is active.
 6. Treat uncertain delay estimates conservatively. A failed AEC job retains originals and reports failure; it must not publish a raw doubled mix as a successfully cleaned result.
 7. Keep cleaned microphone output on its original capture timeline, compensating only for introduced DSP latency. Echo-reference alignment must not move the user’s speech earlier in the meeting.
-8. Mix the original system signal with the cleaned microphone, centered in stereo. Start with conservative fixed gains, then apply peak control with a proposed ceiling of −1 dBTP. Avoid unrelated loudness processing in the MVP.
-9. Encode `final.flac` at 48 kHz, stereo, 24-bit PCM. Flush partial final blocks and trim padding so the output retains the session duration.
+8. Mix the original system signal with the cleaned microphone into mono using conservative fixed gains that reserve sample headroom. Avoid a scratch-file peak-normalization pass and unrelated loudness processing.
+9. Stream `final.flac` directly at 48 kHz, mono, 16-bit PCM. Flush partial final blocks and trim padding so the output retains the session duration.
 
 AEC only knows about audio present in its reference. In application-specific mode, unrelated notifications or music reaching the microphone may remain. System volume, speaker processing, Bluetooth latency, and existing device microphone processing can also change the echo path. Validate these cases explicitly; do not assume captured playback is identical to the physical speaker signal.
 

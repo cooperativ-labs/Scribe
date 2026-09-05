@@ -5,21 +5,15 @@ import ScribeAppCore
 import WebRTCBridge
 
 /// Produces `final.flac`: the original system signal mixed with the echo-cancelled
-/// microphone, 48 kHz stereo 24-bit.
+/// microphone, 48 kHz mono 16-bit for transcription.
 ///
-/// The shape of the job follows section 5 directly. Both tracks are already on one
-/// 48 kHz grid from ``TimelineBuilder``, so block *i* of each is simultaneous by
-/// construction and the only remaining unknown is the acoustic delay, which
-/// ``RenderDelayEstimator`` measures from the session's own audio. Three passes
-/// keep it streaming and memory-bounded at any session length:
+/// Both tracks are already on one 48 kHz grid from ``TimelineBuilder``, so block
+/// *i* of each is simultaneous by construction and the only remaining unknown is
+/// the acoustic delay, which ``RenderDelayEstimator`` measures from the session's
+/// own audio. Two streaming passes keep work bounded at any session length:
 ///
 /// 1. estimate the render-to-capture delay across the whole session;
-/// 2. cancel and mix into a scratch file while metering true peak;
-/// 3. apply one static gain for the −1 dBTP ceiling and encode.
-///
-/// The ceiling is a single static gain rather than a compressor because section 5
-/// asks for peak control and explicitly not for loudness processing: a linear gain
-/// changes no relative level anywhere in the meeting and is exactly invertible.
+/// 2. cancel, mix with conservative fixed gains, and encode directly to FLAC.
 ///
 /// Failure is a first-class outcome. A job that cannot establish a delay while
 /// evidently having an echo to cancel does not publish anything: the originals
@@ -30,9 +24,9 @@ public struct MixdownService: Sendable {
     public static let outputFileName = "final.flac"
 
     public struct Options: Sendable, Equatable {
-        /// Conservative fixed gains, per section 5. Both tracks are attenuated by
-        /// the same 3 dB so neither is favoured before the mix, and the microphone
-        /// is centred by taking that same amplitude to both channels.
+        /// Conservative fixed gains. At 0.44 each, two full-scale sources sum to
+        /// 0.88 (about −1.1 dBFS), so transcription audio can be streamed directly
+        /// without a scratch-file peak-normalization pass.
         public var systemGain: Float
         public var microphoneGain: Float
         /// Section 5's proposed ceiling.
@@ -41,8 +35,8 @@ public struct MixdownService: Sendable {
         public var delayEstimator: RenderDelayEstimator.Options
 
         public init(
-            systemGain: Float = 0.708_0,
-            microphoneGain: Float = 0.708_0,
+            systemGain: Float = 0.44,
+            microphoneGain: Float = 0.44,
             truePeakCeilingDbTP: Double = -1,
             echoCanceller: EchoCanceller.Configuration = EchoCanceller.Configuration(),
             delayEstimator: RenderDelayEstimator.Options = RenderDelayEstimator.Options()
@@ -53,8 +47,6 @@ public struct MixdownService: Sendable {
             self.echoCanceller = echoCanceller
             self.delayEstimator = delayEstimator
         }
-
-        var truePeakCeilingLinear: Double { pow(10, truePeakCeilingDbTP / 20) }
     }
 
     public init() {}
@@ -143,17 +135,20 @@ public struct MixdownService: Sendable {
             outputFrameCount: totalFrames
         )
 
-        // Pass 2 — cancel and mix to a scratch file, metering true peak.
+        // Pass 2 — cancel, mix, and encode directly. The conservative fixed gains
+        // make the former scratch-file true-peak pass unnecessary for speech.
         var systemReader = try blockReader(builder, .system, frames: totalFrames, blockFrames: blockFrames)
         var microphoneReader = try blockReader(builder, .microphone, frames: totalFrames, blockFrames: blockFrames)
-        let scratchURL = sessionDirectory.appendingPathComponent(".final.mix.\(UUID().uuidString).f32")
-        FileManager.default.createFile(atPath: scratchURL.path, contents: nil)
-        guard let scratch = try? FileHandle(forWritingTo: scratchURL) else {
-            throw MixdownError.scratchUnavailable(scratchURL.path)
-        }
-        defer { try? FileManager.default.removeItem(at: scratchURL) }
-
-        var meter = TruePeakMeter(channelCount: 2)
+        guard let outputFormat = AVAudioFormat(
+            commonFormat: .pcmFormatFloat32,
+            sampleRate: Double(timelineSampleRate),
+            channels: 1,
+            interleaved: false
+        ) else { throw MixdownError.invalidOutputFormat }
+        let encoder = try FLACEncoder(
+            outputURL: sessionDirectory.appendingPathComponent(Self.outputFileName),
+            configuration: FLACEncoderConfiguration(sampleRate: timelineSampleRate, channelCount: 1, bitDepth: .bits16)
+        )
         // The system side is held as a flat sample queue rather than a queue of
         // blocks. The canceller's output blocks do not have to line up one-for-one
         // with its input blocks — a measured DSP latency shifts them, and the final
@@ -168,44 +163,35 @@ public struct MixdownService: Sendable {
                 cleanedMicrophone?(block)
                 let system = Self.take(block.count, from: &pendingSystem)
                 let mixed = Self.mixBlock(system: system, microphone: block, options: options)
-                meter.append(mixed)
                 for channel in mixed { for sample in channel { samplePeak = max(samplePeak, abs(sample)) } }
-                try scratch.write(contentsOf: Self.interleavedData(mixed))
+                try write(mixed, format: outputFormat, into: encoder)
                 writtenFrames += Int64(mixed[0].count)
             }
         }
 
-        while let system = systemReader.next(), let microphone = microphoneReader.next() {
-            if pendingSystem.count < system.count { pendingSystem = Array(repeating: [], count: system.count) }
-            for channel in 0..<system.count { pendingSystem[channel].append(contentsOf: system[channel]) }
-            try emit(try canceller.process(reference: system, microphone: Self.mono(microphone)))
-        }
-        try emit(try canceller.finish(expectedFrameCount: totalFrames))
-        try scratch.close()
-        meter.finish()
-
-        guard writtenFrames == totalFrames else {
-            throw MixdownError.durationMismatch(expectedFrames: totalFrames, actualFrames: writtenFrames)
-        }
-
-        // Pass 3 — one static gain, then encode.
-        let ceiling = options.truePeakCeilingLinear
-        let truePeak = meter.truePeak
-        let peakGain = truePeak > ceiling ? Float(ceiling / truePeak) : 1
-        let encoder = try FLACEncoder(
-            outputURL: sessionDirectory.appendingPathComponent(Self.outputFileName),
-            configuration: FLACEncoderConfiguration(sampleRate: timelineSampleRate, channelCount: 2, bitDepth: .bits24)
-        )
         do {
-            try encode(scratchURL: scratchURL, gain: peakGain, blockFrames: blockFrames, into: encoder)
+            while let system = systemReader.next(), let microphone = microphoneReader.next() {
+                if pendingSystem.count < system.count { pendingSystem = Array(repeating: [], count: system.count) }
+                for channel in 0..<system.count { pendingSystem[channel].append(contentsOf: system[channel]) }
+                try emit(try canceller.process(reference: system, microphone: Self.mono(microphone)))
+            }
+            try emit(try canceller.finish(expectedFrameCount: totalFrames))
         } catch {
             encoder.cancel()
             throw error
         }
+
+        guard writtenFrames == totalFrames else {
+            encoder.cancel()
+            throw MixdownError.durationMismatch(expectedFrames: totalFrames, actualFrames: writtenFrames)
+        }
+
         let encoded = try encoder.finish()
         guard encoded.frameCount == totalFrames else {
             throw MixdownError.durationMismatch(expectedFrames: totalFrames, actualFrames: encoded.frameCount)
         }
+        let peakGain: Float = 1
+        let truePeak = Double(samplePeak)
 
         let summary = MixdownSummary(
             decision: plan.decision,
@@ -229,52 +215,30 @@ public struct MixdownService: Sendable {
         )
     }
 
-    private func encode(scratchURL: URL, gain: Float, blockFrames: Int, into encoder: FLACEncoder) throws {
-        guard let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: Double(timelineSampleRate), channels: 2, interleaved: false) else {
-            throw MixdownError.invalidOutputFormat
+    private func write(_ channels: [[Float]], format: AVAudioFormat, into encoder: FLACEncoder) throws {
+        guard let samples = channels.first, !samples.isEmpty else { return }
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count)) else {
+            throw MixdownError.bufferAllocationFailed
         }
-        let handle = try FileHandle(forReadingFrom: scratchURL)
-        defer { try? handle.close() }
-        let bytesPerFrame = MemoryLayout<Float>.size * 2
-
-        while true {
-            guard let data = try handle.read(upToCount: blockFrames * bytesPerFrame), !data.isEmpty else { break }
-            let frames = data.count / bytesPerFrame
-            guard frames > 0 else { break }
-            guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frames)) else {
-                throw MixdownError.bufferAllocationFailed
-            }
-            buffer.frameLength = AVAudioFrameCount(frames)
-            data.withUnsafeBytes { raw in
-                let source = raw.bindMemory(to: Float.self)
-                for frame in 0..<frames {
-                    // The gain is at most 1, so this can only ever move a sample
-                    // towards zero; the clamp is a floor under arithmetic, not a
-                    // limiter doing shaping of its own.
-                    buffer.floatChannelData![0][frame] = min(1, max(-1, source[frame * 2] * gain))
-                    buffer.floatChannelData![1][frame] = min(1, max(-1, source[frame * 2 + 1] * gain))
-                }
-            }
-            try encoder.write(buffer)
+        buffer.frameLength = AVAudioFrameCount(samples.count)
+        samples.withUnsafeBufferPointer { source in
+            buffer.floatChannelData![0].initialize(from: source.baseAddress!, count: samples.count)
         }
+        try encoder.write(buffer)
     }
 
     // MARK: - Mixing
 
     /// Mixes one block: the *original* system signal, untouched by the canceller,
-    /// with the cleaned microphone placed at the centre of the stereo image.
+    /// with the cleaned microphone into a mono transcription stream.
     static func mixBlock(system: [[Float]], microphone: [Float], options: Options) -> [[Float]] {
         let frames = min(system.first?.count ?? 0, microphone.count)
-        let left = system.first ?? []
-        let right = system.count > 1 ? system[1] : left
-        var outputLeft = [Float](repeating: 0, count: frames)
-        var outputRight = [Float](repeating: 0, count: frames)
+        let systemMono = mono(system)
+        var output = [Float](repeating: 0, count: frames)
         for frame in 0..<frames {
-            let centred = microphone[frame] * options.microphoneGain
-            outputLeft[frame] = left[frame] * options.systemGain + centred
-            outputRight[frame] = right[frame] * options.systemGain + centred
+            output[frame] = systemMono[frame] * options.systemGain + microphone[frame] * options.microphoneGain
         }
-        return [outputLeft, outputRight]
+        return [output]
     }
 
     /// Pops `frames` from the front of a per-channel sample queue, zero-filling if
@@ -299,15 +263,6 @@ public struct MixdownService: Sendable {
         let scale = 1 / Float(channels.count)
         for index in 0..<output.count { output[index] *= scale }
         return output
-    }
-
-    static func interleavedData(_ channels: [[Float]]) -> Data {
-        let frames = channels.first?.count ?? 0
-        var samples = [Float](repeating: 0, count: frames * channels.count)
-        for (index, channel) in channels.enumerated() {
-            for frame in 0..<frames { samples[frame * channels.count + index] = channel[frame] }
-        }
-        return samples.withUnsafeBufferPointer { Data(buffer: $0) }
     }
 
     // MARK: - Inputs
@@ -419,7 +374,6 @@ public enum MixdownError: Error, Equatable, CustomStringConvertible {
     case missingTrack(RecorderTrackKind)
     case emptyTimeline
     case uncertainDelay(reason: String)
-    case scratchUnavailable(String)
     case invalidOutputFormat
     case bufferAllocationFailed
     case durationMismatch(expectedFrames: Int64, actualFrames: Int64)
@@ -429,7 +383,6 @@ public enum MixdownError: Error, Equatable, CustomStringConvertible {
         case .missingTrack: return "mixdown.missing-track"
         case .emptyTimeline: return "mixdown.empty-timeline"
         case .uncertainDelay: return "mixdown.uncertain-delay"
-        case .scratchUnavailable: return "mixdown.scratch-unavailable"
         case .invalidOutputFormat: return "mixdown.invalid-output-format"
         case .bufferAllocationFailed: return "mixdown.buffer-allocation-failed"
         case .durationMismatch: return "mixdown.duration-mismatch"
@@ -441,7 +394,6 @@ public enum MixdownError: Error, Equatable, CustomStringConvertible {
         case .missingTrack(let track): return "the session has no \(track.rawValue) track to mix"
         case .emptyTimeline: return "the reconstructed timeline is empty"
         case .uncertainDelay(let reason): return "echo cancellation was not attempted: \(reason)"
-        case .scratchUnavailable(let path): return "could not open the mix scratch file at \(path)"
         case .invalidOutputFormat: return "cannot create the 48 kHz stereo mix format"
         case .bufferAllocationFailed: return "could not allocate the mix output buffer"
         case let .durationMismatch(expected, actual): return "the mix has \(actual) frames; the reconstructed timeline is \(expected)"

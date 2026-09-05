@@ -83,6 +83,20 @@ public struct UnprocessedFLACExporter: Sendable {
         let nativeRates = Set(track.runs.map { $0.format.sampleRate })
         let nativeChannels = Set(track.runs.map { $0.format.channelCount })
         let changedFormat = nativeRates.count != 1 || nativeChannels.count != 1
+        // Built-in microphone arrays can surface as an unlabeled three-channel
+        // stream. AudioToolbox cannot construct the PCM format its FLAC encoder
+        // requires for that layout, and the recorder does not know enough about
+        // the unlabeled channels to assign a meaningful surround layout. Preserve
+        // the native channels in the authoritative CAF archive and publish the
+        // unprocessed convenience export as mono, which is also the exact signal
+        // shape consumed by delay estimation and echo cancellation.
+        if track.track == .microphone, track.channelCount != 1 {
+            return UnprocessedExportFormat(
+                sampleRate: changedFormat ? Self.canonicalSampleRate : track.nativeFormat.sampleRate,
+                channelCount: 1,
+                canonicalBecause: "multi-channel microphone downmixed to mono; native channels retained in capture archive"
+            )
+        }
         if changedFormat {
             return UnprocessedExportFormat(
                 sampleRate: Self.canonicalSampleRate,
@@ -108,6 +122,22 @@ public struct UnprocessedFLACExporter: Sendable {
     }
 
     private func normalizedChannels(_ channels: [[Float]], channelCount: Int) -> [[Float]] {
+        guard channelCount > 0 else { return [] }
+        if channelCount == 1, channels.count > 1 {
+            guard let first = channels.first else { return [[]] }
+            var mono = first
+            for channel in channels.dropFirst() {
+                for frame in 0..<min(mono.count, channel.count) {
+                    mono[frame] += channel[frame]
+                }
+            }
+            let scale = 1 / Float(channels.count)
+            for frame in mono.indices { mono[frame] *= scale }
+            return [mono]
+        }
+        if channels.count > channelCount {
+            return Array(channels.prefix(channelCount))
+        }
         guard channels.count < channelCount, let last = channels.last else { return channels }
         return channels + Array(repeating: last, count: channelCount - channels.count)
     }

@@ -163,7 +163,7 @@ public struct RenderDelayEstimator: Sendable {
         public init(
             windowFrames: Int = timelineSampleRate,
             minimumStrideFrames: Int = timelineSampleRate / 2,
-            maximumWindows: Int = 240,
+            maximumWindows: Int = 60,
             maximumDelaySamples: Int = 5_760,
             activityFloorDbFS: Double = -55,
             minimumCorrelation: Double = 0.65,
@@ -529,7 +529,14 @@ public struct RenderDelayEstimator: Sendable {
                 microphoneEnergy += c * c
             }
             guard referenceEnergy > 1e-12, microphoneEnergy > 1e-12 else { continue }
-            candidates.append(Candidate(lag: lag, correlation: cross / (referenceEnergy * microphoneEnergy).squareRoot()))
+            // An acoustic/electrical path may invert polarity. Its sign is not
+            // evidence against an echo path, and AEC3's adaptive filter can learn
+            // either sign. Rank the normalized correlation magnitude so a valid
+            // inverted copy is not misclassified as unrelated microphone audio.
+            candidates.append(Candidate(
+                lag: lag,
+                correlation: abs(cross / (referenceEnergy * microphoneEnergy).squareRoot())
+            ))
         }
         guard let best = candidates.max(by: { $0.correlation < $1.correlation }) else { return nil }
         let runnerUp = candidates.filter { abs($0.lag - best.lag) >= separation }.max(by: { $0.correlation < $1.correlation })

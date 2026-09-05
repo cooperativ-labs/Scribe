@@ -106,10 +106,10 @@ import Testing
         #expect(segments.contains("system-0001.caf"))
         #expect(segments.contains("microphone-0001.caf"))
 
-        // Every archived sample is present: 500 x 960 stereo float frames.
+        // Every archived sample is present as transcription-grade mono int16.
         let systemSize = try FileManager.default
             .attributesOfItem(atPath: store.captureDirectory.appendingPathComponent("system-0001.caf").path)[.size] as? Int
-        #expect(systemSize == 68 + systemBuffers * 960 * 8)
+        #expect(systemSize == 68 + systemBuffers * 960 * 2)
 
         // And the CAF the store wrote is readable by AVFoundation, not just by us.
         let file = try AVAudioFile(forReading: store.captureDirectory.appendingPathComponent("microphone-0001.caf"))
@@ -209,8 +209,8 @@ import Testing
         defer { try? FileManager.default.removeItem(at: directory) }
         let store = try makeStore(in: directory)
         let events = Locked<[String]>([])
-        // Room for exactly two 960-frame stereo float buffers.
-        let service = makeService(store: store, maximumQueuedBytes: 2 * 960 * 8, events: events)
+        // Room for exactly two 960-frame mono int16 buffers.
+        let service = makeService(store: store, maximumQueuedBytes: 2 * 960 * 2, events: events)
 
         // Fill the queue without letting the writer drain it.
         let blocked = DispatchSemaphore(value: 0)
@@ -224,7 +224,7 @@ import Testing
         try store.finish()
 
         #expect(statistics.system.enqueuedBuffers + statistics.system.droppedBuffers == 6)
-        #expect(statistics.system.peakQueuedBytes <= 2 * 960 * 8)
+        #expect(statistics.system.peakQueuedBytes <= 2 * 960 * 2)
         if statistics.droppedBuffers > 0 {
             #expect(events.value.contains { $0.contains("buffersDropped") })
         }
@@ -254,7 +254,7 @@ import Testing
         #expect(statistics.droppedBuffers == 0)
         let size = try FileManager.default
             .attributesOfItem(atPath: store.captureDirectory.appendingPathComponent("system-0001.caf").path)[.size] as? Int
-        #expect(size == 68 + 50 * 960 * 8)
+        #expect(size == 68 + 50 * 960 * 2)
     }
 }
 

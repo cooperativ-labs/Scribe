@@ -26,8 +26,8 @@ extension MixdownService {
         let finalTrack = RecorderTrackManifest(
             sourceFormat: AudioSourceFormat(
                 sampleRate: Double(timelineSampleRate),
-                channelCount: 2,
-                formatDescription: "48000 Hz stereo 24-bit FLAC; original system signal mixed with the echo-cancelled microphone centred"
+                channelCount: 1,
+                formatDescription: "48000 Hz mono 16-bit FLAC; original system signal mixed with the echo-cancelled microphone for transcription"
             ),
             firstMediaTimestampSeconds: timeline.origin.seconds,
             frameCount: encoded.frameCount,
@@ -49,7 +49,9 @@ extension MixdownService {
                     "microphoneCentre": Double(summary.microphoneGain),
                     "peakControl": summary.appliedPeakGain,
                 ],
-                errors: manifest.processing.errors.filter { !$0.code.hasPrefix("mixdown.") }
+                errors: manifest.processing.errors.filter {
+                    !$0.code.hasPrefix("mixdown.") && $0.code != "processing.pipeline"
+                }
             )
         )
     }
@@ -125,12 +127,11 @@ extension MixdownService {
             "systemGain": .number(Double(summary.systemGain)),
             "microphoneCentreGain": .number(Double(summary.microphoneGain)),
             "truePeakCeilingDbTP": .number(summary.truePeakCeilingDbTP),
-            "truePeakBeforeGainDbTP": summary.truePeakBeforeGain > 0 ? .number(20 * log10(summary.truePeakBeforeGain)) : .null,
+            "truePeakMeasurementEnabled": .boolean(false),
+            "truePeakBeforeGainDbTP": .null,
             "samplePeakBeforeGainDbFS": summary.samplePeakBeforeGain > 0 ? .number(20 * log10(summary.samplePeakBeforeGain)) : .null,
             "appliedPeakGain": .number(summary.appliedPeakGain),
-            "peakControl": .string(summary.appliedPeakGain < 1
-                ? "one static gain applied to the whole mix; no dynamics processing"
-                : "the mix was already under the ceiling; no gain applied"),
+            "peakControl": .string("fixed 0.44 source gains reserve about 1.1 dB of sample headroom; no scratch-file normalization pass"),
             "delaySegments": .array(delaySegments(summary)),
             "reconvergencePoints": .array(summary.reconvergences.map { point in
                 .object([

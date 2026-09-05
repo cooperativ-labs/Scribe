@@ -120,7 +120,7 @@ public struct CaptureConfiguration: Sendable {
         applicationBundleIdentifier: String?,
         microphoneUniqueID: String? = nil,
         sampleRate: Int = 48_000,
-        channelCount: Int = 2,
+        channelCount: Int = 1,
         maximumQueuedBytes: Int = 4 * 1_024 * 1_024,
         registersMinimalScreenOutput: Bool = false
     ) {

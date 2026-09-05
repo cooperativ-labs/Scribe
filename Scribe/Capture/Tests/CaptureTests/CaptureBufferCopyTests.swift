@@ -98,10 +98,9 @@ enum SyntheticSampleBuffer {
 }
 
 @Suite struct CaptureBufferCopyTests {
-    /// Non-interleaved stereo is what the `.audio` track actually delivers, and
-    /// `SessionStore` archives packed interleaved CAF, so the plane-to-frame
-    /// transposition has to be right or every recording is channel-scrambled.
-    @Test func planarStereoIsCopiedOutInterleavedInFrameOrder() throws {
+    /// Non-interleaved stereo is what the `.audio` track commonly delivers. The
+    /// archive keeps only the mono 16-bit speech signal used downstream.
+    @Test func planarStereoIsDownmixedAndQuantizedForTranscription() throws {
         let frames = 960
         let sampleBuffer = try SyntheticSampleBuffer.make(
             sampleRate: 48_000,
@@ -109,24 +108,23 @@ enum SyntheticSampleBuffer {
             interleaved: false,
             frameCount: frames,
             presentation: CMTime(value: 207_492_667_875, timescale: 1_000_000)
-        ) { channel, frame in Float(channel) * 1_000 + Float(frame) }
+        ) { channel, frame in
+            let value = Float(frame) / Float(frames)
+            return channel == 0 ? value * 0.5 : value * -0.25
+        }
 
         let owned = try #require(CaptureBufferCopy.ownedBuffer(from: sampleBuffer, track: .system))
         #expect(owned.track == .system)
         #expect(owned.frameCount == frames)
-        #expect(owned.format == PCMFormat(sampleRate: 48_000, channelCount: 2, bitsPerChannel: 32, isFloat: true))
-        #expect(owned.samples.count == frames * 2 * 4)
+        #expect(owned.format == PCMFormat(sampleRate: 48_000, channelCount: 1, bitsPerChannel: 16, isFloat: false))
+        #expect(owned.samples.count == frames * 2)
 
-        let values: [Float] = owned.samples.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
-        #expect(values[0] == 0)          // frame 0, left
-        #expect(values[1] == 1_000)      // frame 0, right
-        #expect(values[2] == 1)          // frame 1, left
-        #expect(values[3] == 1_001)      // frame 1, right
-        #expect(values[2 * (frames - 1)] == Float(frames - 1))
-        #expect(values[2 * (frames - 1) + 1] == Float(frames - 1) + 1_000)
+        let values: [Int16] = owned.samples.withUnsafeBytes { Array($0.bindMemory(to: Int16.self)) }
+        #expect(values[0] == 0)
+        #expect(values[frames - 1] == Int16((Float(frames - 1) / Float(frames) * 0.125 * Float(Int16.max)).rounded()))
     }
 
-    @Test func interleavedMonoIsCopiedOutUnchanged() throws {
+    @Test func interleavedMonoIsQuantizedToSixteenBit() throws {
         let frames = 512
         let sampleBuffer = try SyntheticSampleBuffer.make(
             sampleRate: 48_000,
@@ -137,13 +135,13 @@ enum SyntheticSampleBuffer {
         ) { _, frame in Float(frame) / 512 }
 
         let owned = try #require(CaptureBufferCopy.ownedBuffer(from: sampleBuffer, track: .microphone))
-        #expect(owned.format == PCMFormat(sampleRate: 48_000, channelCount: 1, bitsPerChannel: 32, isFloat: true))
+        #expect(owned.format == PCMFormat(sampleRate: 48_000, channelCount: 1, bitsPerChannel: 16, isFloat: false))
         #expect(owned.frameCount == frames)
 
-        let values: [Float] = owned.samples.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
+        let values: [Int16] = owned.samples.withUnsafeBytes { Array($0.bindMemory(to: Int16.self)) }
         #expect(values.count == frames)
         #expect(values[0] == 0)
-        #expect(values[511] == Float(511) / 512)
+        #expect(values[511] == Int16((Float(511) / 512 * Float(Int16.max)).rounded()))
     }
 
     /// The timestamp is the whole timeline. Reading it as a rational value keeps
@@ -241,14 +239,15 @@ enum SyntheticSampleBuffer {
             let sampleBuffer = try SyntheticSampleBuffer.make(
                 sampleRate: 48_000, channelCount: 2, interleaved: false, frameCount: 64,
                 presentation: CMTime(value: 5, timescale: 48_000)
-            ) { channel, frame in Float(channel * 64 + frame) }
+            ) { channel, frame in
+                (Float(channel * 64 + frame) / 127) * 0.5
+            }
             owned = CaptureBufferCopy.ownedBuffer(from: sampleBuffer, track: .system)
         }
         let buffer = try #require(owned)
-        let values: [Float] = buffer.samples.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
-        #expect(values[0] == 0)
-        #expect(values[1] == 64)
-        #expect(values[126] == 63)
-        #expect(values[127] == 127)
+        let values: [Int16] = buffer.samples.withUnsafeBytes { Array($0.bindMemory(to: Int16.self)) }
+        #expect(values.count == 64)
+        #expect(values[0] == Int16((Float(32) / 127 * 0.5 * Float(Int16.max)).rounded()))
+        #expect(values[63] == Int16((Float(95) / 127 * 0.5 * Float(Int16.max)).rounded()))
     }
 }

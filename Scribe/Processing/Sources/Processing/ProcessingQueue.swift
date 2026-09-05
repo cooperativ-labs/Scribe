@@ -213,7 +213,11 @@ public struct SessionProcessor: Sendable {
     public func run(sessionDirectory: URL) throws -> MixdownResult {
         try markRunning(sessionDirectory: sessionDirectory)
         do {
-            _ = try UnprocessedFLACExporter().export(sessionDirectory: sessionDirectory)
+            // The CAF capture is already the recoverable source archive. Normal
+            // processing publishes only the transcription-ready final stream;
+            // producing two additional source FLACs costs time and disk without
+            // improving recognition. The standalone exporter remains available
+            // for explicit diagnostics and recovery work.
             return try MixdownService().run(sessionDirectory: sessionDirectory)
         } catch {
             try? markFailed(sessionDirectory: sessionDirectory, error: error)

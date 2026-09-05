@@ -4,7 +4,7 @@ import Foundation
 import ScribeAppCore
 import Storage
 
-/// Copies a `CMSampleBuffer`'s audio into owned, interleaved storage.
+/// Copies a `CMSampleBuffer`'s audio into owned, transcription-oriented storage.
 ///
 /// Everything here runs on a sample-handler queue, so it does only three things:
 /// validate the buffer, copy its samples out, and describe its format. The
@@ -13,11 +13,11 @@ import Storage
 /// IMPLEMENTATION_PLAN.md section 2 states, and the reason nothing downstream is
 /// handed a `CMSampleBuffer`.
 ///
-/// Interleaving happens here rather than later because the two tracks do not agree:
-/// system audio was measured arriving as 48 kHz stereo float32 **non-interleaved**
-/// at 960 frames, while the microphone on the same stream arrived as 48 kHz mono
-/// **interleaved** at 512 frames. `SessionStore` archives packed interleaved CAF, so
-/// byte counts recover unambiguously after a crash.
+/// ScreenCaptureKit normally supplies float32 with anywhere from one to three
+/// channels. Speech recognition consumes mono 16-bit audio, so float32 input is
+/// downmixed and quantized while it is copied. This cuts the durable capture from
+/// 4 bytes per source channel to 2 bytes per frame without changing timestamps or
+/// sample rate. Unknown integer layouts are still retained losslessly.
 public enum CaptureBufferCopy {
     /// Reads the buffer's own format description. Every buffer is inspected; the
     /// stream's requested configuration is never assumed to be what arrived.
@@ -76,6 +76,7 @@ public enum CaptureBufferCopy {
         guard status == noErr, blockBuffer != nil, list.count == bufferCount else { return nil }
 
         guard let samples = interleavedSamples(from: list, format: format, frameCount: frameCount, sourceIsInterleaved: isInterleaved) else { return nil }
+        let archived = transcriptionArchive(samples: samples, format: format, frameCount: frameCount)
 
         let presentation = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
         guard presentation.isValid, presentation.timescale != 0 else { return nil }
@@ -86,10 +87,28 @@ public enum CaptureBufferCopy {
         return try? OwnedPCMBuffer(
             track: track,
             presentationTimestampSeconds: seconds,
-            format: format,
+            format: archived.format,
             frameCount: frameCount,
-            samples: samples
+            samples: archived.samples
         )
+    }
+
+    private static func transcriptionArchive(samples: Data, format: PCMFormat, frameCount: Int) -> (format: PCMFormat, samples: Data) {
+        guard format.isFloat, format.bitsPerChannel == 32 else { return (format, samples) }
+        let outputFormat = PCMFormat(sampleRate: format.sampleRate, channelCount: 1, bitsPerChannel: 16, isFloat: false)
+        var output = [Int16](repeating: 0, count: frameCount)
+        samples.withUnsafeBytes { raw in
+            let input = raw.bindMemory(to: Float.self)
+            for frame in 0..<frameCount {
+                var sum: Float = 0
+                for channel in 0..<format.channelCount {
+                    sum += input[frame * format.channelCount + channel]
+                }
+                let mono = min(1, max(-1, sum / Float(format.channelCount)))
+                output[frame] = Int16((mono * Float(Int16.max)).rounded())
+            }
+        }
+        return (outputFormat, output.withUnsafeBufferPointer { Data(buffer: $0) })
     }
 
     private static func interleavedSamples(

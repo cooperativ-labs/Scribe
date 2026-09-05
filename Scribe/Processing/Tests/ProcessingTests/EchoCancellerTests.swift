@@ -59,7 +59,7 @@ private struct EchoScene {
     let reference: [Float]
     let microphone: [Float]
 
-    init(seconds: Double = 8, delay: Int, nearEndGain: Float = 0, echoGain: Float = 0.6, referenceSeed: UInt64 = 0x51ED_270B, nearEndSeed: UInt64 = 0x2545_F491) {
+    init(seconds: Double = 8, delay: Int, nearEndGain: Float = 0, echoGain: Float = 0.6, echoPolarity: Float = 1, referenceSeed: UInt64 = 0x51ED_270B, nearEndSeed: UInt64 = 0x2545_F491) {
         let frames = Int(seconds * Double(timelineSampleRate))
         let reference = EchoScene.speech(frames: frames, seed: referenceSeed)
         let nearEnd = EchoScene.speech(frames: frames, seed: nearEndSeed)
@@ -71,7 +71,7 @@ private struct EchoScene {
                 let source = index - delay - offset
                 if source >= 0 { value += gain * reference[source] }
             }
-            microphone[index] = value * echoGain + nearEnd[index] * nearEndGain
+            microphone[index] = value * echoGain * echoPolarity + nearEnd[index] * nearEndGain
         }
         self.reference = reference
         self.microphone = microphone
@@ -118,6 +118,16 @@ private func plan(_ scene: EchoScene, options: RenderDelayEstimator.Options = Re
     #expect(segments.count == 1)
     #expect(abs(segments[0].delaySamples - 1_440) <= 480, "found \(segments[0].delaySamples)")
     #expect(segments[0].startFrame == 0, "the first segment must cover the session from its origin")
+}
+
+@Test func anInvertedEchoPathIsFoundAtItsTrueDelay() {
+    let result = plan(EchoScene(delay: 1_440, echoPolarity: -1))
+    guard case .cancel(let segments) = result.decision else {
+        Issue.record("expected cancellation, got \(result.decision)")
+        return
+    }
+    #expect(segments.count == 1)
+    #expect(abs(segments[0].delaySamples - 1_440) <= 480, "found \(segments[0].delaySamples)")
 }
 
 @Test func doubleTalkStillFindsTheDelayFromAgreementAcrossWindows() {

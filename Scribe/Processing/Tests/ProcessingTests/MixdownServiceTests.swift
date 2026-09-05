@@ -7,7 +7,7 @@ import Testing
 
 private let mixOrigin = 207_492.667875
 
-@Test func theMixIsPublishedAsFortyEightKilohertzStereoTwentyFourBitAndRecordedInTheManifest() throws {
+@Test func theMixIsPublishedAsFortyEightKilohertzMonoSixteenBitAndRecordedInTheManifest() throws {
     let root = try temporaryRoot()
     defer { try? FileManager.default.removeItem(at: root) }
     let session = try makeEchoSession(root: root, seconds: 2.5, delay: 1_440, nearEndGain: 0.4)
@@ -16,15 +16,15 @@ private let mixOrigin = 207_492.667875
     let result = try MixdownService().run(sessionDirectory: session)
 
     #expect(result.result.sampleRate == 48_000)
-    #expect(result.result.channelCount == 2)
-    #expect(result.result.bitDepth == .bits24)
+    #expect(result.result.channelCount == 1)
+    #expect(result.result.bitDepth == .bits16)
     #expect(result.result.frameCount == result.timeline.outputFrameCount)
 
     let decoded = try AVAudioFile(forReading: session.appendingPathComponent("final.flac"))
     #expect(decoded.fileFormat.sampleRate == 48_000)
-    #expect(decoded.fileFormat.channelCount == 2)
+    #expect(decoded.fileFormat.channelCount == 1)
     #expect(decoded.length == result.timeline.outputFrameCount)
-    #expect(try FLACStreamInfo.read(from: result.result.url).bitsPerSample == 24)
+    #expect(try FLACStreamInfo.read(from: result.result.url).bitsPerSample == 16)
 
     // The capture archive is the session's one irreplaceable thing.
     #expect(try directoryDigest(session.appendingPathComponent("capture")) == captureBefore)
@@ -69,20 +69,18 @@ private let mixOrigin = 207_492.667875
     #expect(try directoryDigest(session.appendingPathComponent("capture")) == captureAfterFirst)
 }
 
-@Test func theMixIsHeldUnderTheTruePeakCeiling() throws {
+@Test func conservativeFixedGainsKeepTheDirectlyEncodedMixUnderTheCeiling() throws {
     let root = try temporaryRoot()
     defer { try? FileManager.default.removeItem(at: root) }
-    // Loud on both sides and with no echo path, so the summed mix overshoots and
-    // peak control is the only thing between it and clipping. Cancellation is
-    // deliberately not involved: the ceiling applies to every mix that is
-    // published, whatever the echo decision was.
+    // Loud on both sides and with no echo path. Fixed gains leave enough headroom
+    // to encode directly without a session-length scratch and normalization pass.
     let session = try makeEchoSession(root: root, seconds: 2.5, delay: 1_440, nearEndGain: 1.0, echoGain: 0, level: 0.95)
 
     let result = try MixdownService().run(sessionDirectory: session)
-    #expect(result.summary.appliedPeakGain < 1, "this mix overshoots, so a gain must have been applied")
-    #expect(result.summary.truePeakBeforeGain > result.summary.appliedPeakGain, "peak control may only attenuate")
+    #expect(result.summary.appliedPeakGain == 1)
+    #expect(result.summary.samplePeakBeforeGain <= 0.88 + 0.000_1)
 
-    var meter = TruePeakMeter(channelCount: 2)
+    var meter = TruePeakMeter(channelCount: 1)
     meter.append(try decode(session.appendingPathComponent("final.flac")))
     meter.finish()
     let dbTP = try #require(meter.truePeakDbTP)

@@ -69,16 +69,69 @@ private let exportOrigin = 207_492.667875
     #expect(try FLACStreamInfo.read(from: system.result.url).sampleRate == 48_000)
 }
 
-private func writeTrack(_ archive: CaptureArchiveFixture, track: String, start: Double, rate: Int, seconds: Double) throws {
+@Test func aThreeChannelMicrophoneIsExportedAsMonoAndKeepsItsNativeArchive() throws {
+    let root = try temporaryRoot()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let archive = try CaptureArchiveFixture(root: root)
+    try writeTrack(archive, track: "system", start: exportOrigin, rate: 48_000, seconds: 1.0)
+    try writeTrack(
+        archive,
+        track: "microphone",
+        start: exportOrigin,
+        rate: 48_000,
+        seconds: 1.0,
+        channelCount: 3
+    )
+    try archive.finish()
+    try writeManifest(at: archive.sessionDirectory)
+
+    let captureBefore = try directoryDigest(archive.captureDirectory)
+    let exported = try UnprocessedFLACExporter().export(sessionDirectory: archive.sessionDirectory)
+    let microphone = try #require(exported.tracks[.microphone])
+
+    #expect(microphone.format.channelCount == 1)
+    #expect(microphone.format.canonicalBecause?.contains("downmixed to mono") == true)
+    #expect(try directoryDigest(archive.captureDirectory) == captureBefore)
+
+    let decoded = try AVAudioFile(forReading: microphone.result.url)
+    #expect(decoded.fileFormat.channelCount == 1)
+    #expect(decoded.length == microphone.result.frameCount)
+
+    guard case .object(let details)? = exported.manifest.processing.configuration["unprocessedFLAC"],
+          case .object(let microphoneDetails)? = details["microphone"] else {
+        Issue.record("the manifest carries no microphone export details")
+        return
+    }
+    #expect(microphoneDetails["channelCount"] == .number(1))
+    guard case .array(let sourceFormats)? = microphoneDetails["sourceFormats"],
+          case .object(let source)? = sourceFormats.first else {
+        Issue.record("the manifest carries no native microphone source format")
+        return
+    }
+    #expect(source["channelCount"] == .number(3))
+}
+
+private func writeTrack(
+    _ archive: CaptureArchiveFixture,
+    track: String,
+    start: Double,
+    rate: Int,
+    seconds: Double,
+    channelCount: Int = 1
+) throws {
     let total = Int(Double(rate) * seconds)
     var offset = 0
     while offset < total {
         let count = min(960, total - offset)
+        let mono = testSignal(frames: count, startingAt: offset)
+        let interleaved = mono.flatMap { sample in
+            (0..<channelCount).map { channel in sample * (1 - Float(channel) * 0.1) }
+        }
         try archive.write(
             track: track,
             at: start + Double(offset) / Double(rate),
-            samples: testSignal(frames: count, startingAt: offset),
-            format: .init(sampleRate: rate)
+            samples: interleaved,
+            format: .init(sampleRate: rate, channelCount: channelCount)
         )
         offset += count
     }

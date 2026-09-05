@@ -27,6 +27,15 @@ import Testing
         #expect(request.sourceURL == session.appendingPathComponent("final.flac"))
         #expect(request.provenance?.sessionID == sessionID)
         #expect(request.provenance?.producerID == FinalRecordingHandoff.producerID)
+        #expect(!FileManager.default.fileExists(atPath: session.appendingPathComponent("system.flac").path))
+        #expect(!FileManager.default.fileExists(atPath: session.appendingPathComponent("microphone.flac").path))
+
+        let manifest = try RecorderSessionManifestCodec.decode(
+            Data(contentsOf: session.appendingPathComponent("metadata.json"))
+        )
+        #expect(manifest.tracks.system == nil)
+        #expect(manifest.tracks.microphone == nil)
+        #expect(manifest.tracks.finalTrack != nil)
 
         let outbox = TranscriptionRequestOutbox.inRecordingsDirectory(root)
         try await outbox.submit(request)

@@ -9,8 +9,13 @@ struct ScribeApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
-        MenuBarExtra(ScribeAppCore.displayName, systemImage: "waveform") {
+        MenuBarExtra {
             ScribeMenuBarContents(environment: appDelegate.environment)
+        } label: {
+            // The catalog renders the logo as a template image, so the menu bar
+            // tints the mark itself and it stays legible in both appearances.
+            Image("MenuBarIcon")
+                .accessibilityLabel(ScribeAppCore.displayName)
         }
         .menuBarExtraStyle(.menu)
 
