@@ -86,6 +86,27 @@ For a package-only release rehearsal, run
 `mise run package`. The release task refuses a dirty worktree; after the version
 bump, review and commit the version change before publishing.
 
+### Meeting detection
+
+Scribe notices when a call starts in Zoom, Microsoft Teams, Slack, FaceTime,
+WhatsApp, Signal, Discord, or an installed Chromium browser (Chrome, Arc, Edge,
+Brave, Vivaldi, Opera, Chromium). The signal is macOS's own accounting of
+microphone use, read from CoreAudio's process objects: an application that has
+the microphone open is on a call, and no window titles or extra permissions are
+involved. **Settings → Meeting detection** lists the applications with a
+checkbox each; all are on by default, and browsers appear only when installed.
+
+For a browser, a call counts only when a tab is on one of the domains under
+**Settings → Meeting websites**. The list starts with `meet.google.com`; add
+`teams.microsoft.com`, `zoom.us`, or anything else, and subdomains match. The
+tab addresses are read over Apple Events, so the first check of each browser
+produces a one-time macOS Automation prompt. If that is declined, a browser
+using the microphone is still reported, and Settings says why the domain filter
+could not be applied. Leaving the list empty treats browsers like any other
+application.
+
+Detection only reports what it sees; it never starts a recording on its own.
+
 ### Model storage and offline operation
 
 Open **Settings → Transcription model → Install Model** to install the recommended

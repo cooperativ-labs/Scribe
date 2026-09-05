@@ -44,6 +44,35 @@ final class RecorderMenuModelTests: XCTestCase {
         XCTAssertEqual(model.presentation.statusTitle, "Recording — 01:05")
     }
 
+    func testTransportCommandsTravelTheCoordinatorPath() async {
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
+        let model = RecorderMenuModel(coordinator: coordinator)
+
+        model.startRecording()
+        model.pauseRecording()
+        model.resumeRecording()
+        model.stopRecording()
+        await coordinator.waitUntilIdle()
+
+        // The transport row is a menu command like any other: it takes the same
+        // serialized route a global shortcut does.
+        XCTAssertEqual(coordinator.performedCommands, [.start, .pause, .resume, .stop])
+        XCTAssertEqual(model.presentation.transport, .idle)
+    }
+
+    func testSourceSelectionsAreSubmittedWithoutABinding() async {
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
+        coordinator.scriptedApplications = [CaptureApplicationOption(bundleIdentifier: "us.zoom.xos", name: "Zoom")]
+        let model = RecorderMenuModel(coordinator: coordinator)
+
+        model.selectApplication("us.zoom.xos")
+        model.selectMicrophone("mic-1")
+        await coordinator.waitUntilIdle()
+
+        XCTAssertEqual(model.presentation.selectedApplicationID, "us.zoom.xos")
+        XCTAssertEqual(model.presentation.selectedMicrophoneID, "mic-1")
+    }
+
     func testOpeningTheMenuReenumeratesSources() async {
         let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
         coordinator.scriptedApplications = [CaptureApplicationOption(bundleIdentifier: "us.zoom.xos", name: "Zoom")]

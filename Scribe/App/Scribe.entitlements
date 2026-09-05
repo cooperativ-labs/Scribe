@@ -14,5 +14,12 @@
     -->
     <key>com.apple.security.device.audio-input</key>
     <true/>
+    <!--
+        Meeting detection asks Chromium browsers for their tab addresses over
+        Apple Events. Under the hardened runtime that is refused outright
+        without this entitlement; with it, macOS prompts once per browser.
+    -->
+    <key>com.apple.security.automation.apple-events</key>
+    <true/>
 </dict>
 </plist>

@@ -19,13 +19,15 @@
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.2609050718.0</string>
+    <string>0.2609050750.0</string>
     <key>CFBundleVersion</key>
-    <string>0.2609050718.0</string>
+    <string>0.2609050750.0</string>
     <key>LSMinimumSystemVersion</key>
     <string>15.0</string>
     <key>LSUIElement</key>
     <true/>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Scribe reads a browser's open tab addresses to tell whether a tab is on one of your meeting websites, such as meet.google.com.</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>Scribe records your microphone so it can create a local meeting recording.</string>
 </dict>

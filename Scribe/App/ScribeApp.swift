@@ -1,6 +1,4 @@
 import AppKit
-import Platform
-import ScribeAppCore
 import ScribeUI
 import SwiftUI
 
@@ -8,37 +6,20 @@ import SwiftUI
 struct ScribeApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
+    /// The menu bar is an AppKit status item owned by the delegate, not a
+    /// `MenuBarExtra`: the recording controls sit side by side in one row, and
+    /// the source submenus have to survive the once-a-second refresh a running
+    /// recording produces. Neither is expressible in a SwiftUI menu. Settings
+    /// stays a SwiftUI scene, and the menu opens it through the same
+    /// `showSettingsWindow:` action a `SettingsLink` would have sent.
     var body: some Scene {
-        MenuBarExtra {
-            ScribeMenuBarContents(environment: appDelegate.environment)
-        } label: {
-            // The catalog renders the logo as a template image, so the menu bar
-            // tints the mark itself and it stays legible in both appearances.
-            Image("MenuBarIcon")
-                .accessibilityLabel(ScribeAppCore.displayName)
-        }
-        .menuBarExtraStyle(.menu)
-
         Settings {
-            ScribeSettingsView(settings: appDelegate.environment.settings, sources: appDelegate.environment.menuModel)
+            ScribeSettingsView(
+                settings: appDelegate.environment.settings,
+                sources: appDelegate.environment.menuModel,
+                meetingDetector: appDelegate.environment.meetingDetector
+            )
                 .onDisappear { appDelegate.environment.settingsWindowDidClose() }
         }
-    }
-}
-
-/// Observes the environment so transcription status reaches the menu.
-///
-/// The recorder's own rows already refresh through `RecorderMenuModel`; this
-/// exists because queue state belongs to a second, independent object and the
-/// menu must show both without either owning the other.
-private struct ScribeMenuBarContents: View {
-    @ObservedObject var environment: ScribeAppEnvironment
-
-    var body: some View {
-        ScribeMenuBarContent(
-            model: environment.menuModel,
-            transcription: environment.transcriptionMenuCommands,
-            updates: environment.updateMenuCommands
-        )
     }
 }

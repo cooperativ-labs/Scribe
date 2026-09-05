@@ -7,9 +7,9 @@ final class ScribeAppCoreContractTests: XCTestCase {
         let data = Data("""
         {
           "tag_name": "v1.2.3",
-          "html_url": "https://github.com/cooperativ-labs/scribe/releases/tag/v1.2.3",
+          "html_url": "https://github.com/cooperativ-labs/Scribe/releases/tag/v1.2.3",
           "assets": [
-            {"name": "Scribe-1.2.3-macos.zip", "browser_download_url": "https://github.com/cooperativ-labs/scribe/releases/download/v1.2.3/Scribe-1.2.3-macos.zip"}
+            {"name": "Scribe-1.2.3-macos.zip", "browser_download_url": "https://github.com/cooperativ-labs/Scribe/releases/download/v1.2.3/Scribe-1.2.3-macos.zip"}
           ]
         }
         """.utf8)
@@ -17,7 +17,7 @@ final class ScribeAppCoreContractTests: XCTestCase {
         let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
 
         XCTAssertEqual(release.version, "1.2.3")
-        XCTAssertEqual(release.installableArchiveURL?.absoluteString, "https://github.com/cooperativ-labs/scribe/releases/download/v1.2.3/Scribe-1.2.3-macos.zip")
+        XCTAssertEqual(release.installableArchiveURL?.absoluteString, "https://github.com/cooperativ-labs/Scribe/releases/download/v1.2.3/Scribe-1.2.3-macos.zip")
     }
 
     func testGitHubReleaseWithoutArchiveCannotBeInstalled() throws {

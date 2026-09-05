@@ -36,6 +36,23 @@ public final class ScribeSettings: ObservableObject {
         didSet { defaults.set(transcribeWhenFinalRecordingIsReady, forKey: Key.transcribeWhenFinalRecordingIsReady) }
     }
 
+    // MARK: Meeting detection
+
+    /// The master switch for noticing calls. On by default.
+    @Published public var meetingDetectionEnabled: Bool {
+        didSet { defaults.set(meetingDetectionEnabled, forKey: Key.meetingDetectionEnabled) }
+    }
+    /// Catalog applications the person has unchecked. Stored as the exceptions
+    /// so every application, including one added to the catalog by a later
+    /// update, is watched until someone says otherwise.
+    @Published public private(set) var disabledMeetingApplicationIDs: Set<String> {
+        didSet { defaults.set(disabledMeetingApplicationIDs.sorted(), forKey: Key.disabledMeetingApplicationIDs) }
+    }
+    /// Browser hosts that count as a meeting, as bare lower-case domains.
+    @Published public private(set) var meetingDomains: [String] {
+        didSet { defaults.set(meetingDomains, forKey: Key.meetingDomains) }
+    }
+
     public init(
         defaults: UserDefaults = .standard,
         defaultRecordingsFolderURL: URL = ScribeSettings.defaultRecordingsFolderURL,
@@ -59,6 +76,9 @@ public final class ScribeSettings: ObservableObject {
         startShortcut = Self.loadShortcut(from: defaults, key: Key.startShortcut) ?? .defaultStart
         stopShortcut = Self.loadShortcut(from: defaults, key: Key.stopShortcut) ?? .defaultStop
         transcribeWhenFinalRecordingIsReady = defaults.object(forKey: Key.transcribeWhenFinalRecordingIsReady) as? Bool ?? false
+        meetingDetectionEnabled = defaults.object(forKey: Key.meetingDetectionEnabled) as? Bool ?? true
+        disabledMeetingApplicationIDs = Set(defaults.stringArray(forKey: Key.disabledMeetingApplicationIDs) ?? [])
+        meetingDomains = defaults.stringArray(forKey: Key.meetingDomains) ?? MeetingDomain.defaults
 
         recordingsFolderURL = defaultRecordingsFolderURL
         modelInstaller.refresh(directory: modelsFolderURL)
@@ -119,6 +139,39 @@ public final class ScribeSettings: ObservableObject {
         modelInstaller.refresh(directory: url)
     }
 
+    // MARK: Meeting detection
+
+    public func isMeetingDetectionEnabled(for application: MeetingApplication) -> Bool {
+        !disabledMeetingApplicationIDs.contains(application.id)
+    }
+
+    public func setMeetingDetection(_ enabled: Bool, for application: MeetingApplication) {
+        if enabled {
+            disabledMeetingApplicationIDs.remove(application.id)
+        } else {
+            disabledMeetingApplicationIDs.insert(application.id)
+        }
+    }
+
+    /// Adds a domain from whatever was typed. Returns the stored form, or `nil`
+    /// when the text held no usable host. Duplicates are ignored.
+    @discardableResult
+    public func addMeetingDomain(_ input: String) -> String? {
+        guard let domain = MeetingDomain.normalize(input) else { return nil }
+        if !meetingDomains.contains(domain) { meetingDomains.append(domain) }
+        return domain
+    }
+
+    public func removeMeetingDomain(_ domain: String) {
+        meetingDomains.removeAll { $0 == domain }
+    }
+
+    /// Restores the built-in list, for a person who deleted `meet.google.com`
+    /// and wants it back without retyping.
+    public func resetMeetingDomains() {
+        meetingDomains = MeetingDomain.defaults
+    }
+
     /// Executes a short file operation while the persisted security scope is open.
     public func withRecordingsFolderAccess<Result>(_ operation: (URL) throws -> Result) rethrows -> Result {
         let didStartAccessing = recordingsFolderURL.startAccessingSecurityScopedResource()
@@ -138,6 +191,9 @@ public final class ScribeSettings: ObservableObject {
         static let startShortcut = "scribe.settings.startShortcut"
         static let stopShortcut = "scribe.settings.stopShortcut"
         static let transcribeWhenFinalRecordingIsReady = "scribe.settings.transcribeWhenFinalRecordingIsReady"
+        static let meetingDetectionEnabled = "scribe.settings.meetingDetectionEnabled"
+        static let disabledMeetingApplicationIDs = "scribe.settings.disabledMeetingApplicationIDs"
+        static let meetingDomains = "scribe.settings.meetingDomains"
     }
 
     private let defaults: UserDefaults

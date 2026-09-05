@@ -193,6 +193,18 @@ public final class SessionStore: @unchecked Sendable {
         try writer.append(buffer)
     }
 
+    /// Marks a deliberate hold on archiving. It authorizes nothing on its own:
+    /// the timestamp discontinuity the pause creates is journaled as an ordinary
+    /// gap by the segment writer, which is what the builder reconstructs from.
+    /// This exists so a gap that was intended is distinguishable, after the
+    /// fact, from one that was not.
+    public func recordCapturePause(resumed: Bool, at date: Date = Date()) throws {
+        try journal.append([
+            "event": resumed ? "capture-resumed" : "capture-paused",
+            "wallClock": ISO8601DateFormatter().string(from: date),
+        ], forceCheckpoint: true)
+    }
+
     public func recordInterruption(reason: String, at date: Date = Date()) throws {
         try journal.append([
             "event": "interruption", "reason": reason,

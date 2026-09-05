@@ -186,6 +186,8 @@ public final class LiveRecordingCoordinator: RecordingCoordinating {
             await engine.start()
             if case .recording = await engine.state() { permissionMonitor?.startMonitoring() }
         case .stop: await engine.stop()
+        case .pause: await engine.pause()
+        case .resume: await engine.resume()
         case .selectApplication(let id): snapshot.selectedApplicationID = id
         case .selectMicrophone(let id): snapshot.selectedMicrophoneID = id
         case .refreshSources:
@@ -208,7 +210,7 @@ public final class LiveRecordingCoordinator: RecordingCoordinating {
             if case .idle = state { permissionMonitor?.stopMonitoring() }
             let captureIsActive: Bool
             switch state {
-            case .starting, .recording, .stopping: captureIsActive = true
+            case .starting, .recording, .paused, .stopping: captureIsActive = true
             case .idle, .error: captureIsActive = false
             }
             if let captureActivityHandler {
@@ -243,6 +245,7 @@ public final class LiveRecordingCoordinator: RecordingCoordinating {
         case .idle: .idle
         case .starting: .starting
         case .recording(let activity): .recording(activity)
+        case .paused(let activity): .paused(activity)
         case .stopping: .stopping
         case .error(let failure): .failed(failure)
         }

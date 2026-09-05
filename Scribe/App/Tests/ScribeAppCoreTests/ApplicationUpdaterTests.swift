@@ -13,6 +13,16 @@ final class ApplicationUpdaterTests: XCTestCase {
         XCTAssertNil(release.installableArchiveURL)
     }
 
+    func testArchiveSelectionRejectsWrongRepositoryPath() throws {
+        let release = try JSONDecoder().decode(GitHubRelease.self, from: Data("""
+        {"tag_name":"v2.0","html_url":"https://github.com/cooperativ-labs/Scribe",
+         "assets":[
+          {"name":"Scribe-2.0-macos.zip","browser_download_url":"https://github.com/cooperativ-labs/Other/releases/download/v2.0/Scribe-2.0-macos.zip"}]}
+        """.utf8))
+
+        XCTAssertNil(release.installableArchiveURL)
+    }
+
     func testBundleValidationRejectsWrongIdentityVersionAndDowngrade() throws {
         let root = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }

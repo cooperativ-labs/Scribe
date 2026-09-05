@@ -71,6 +71,99 @@ final class MenuPresentationTests: XCTestCase {
         XCTAssertFalse(presentation.isStopEnabled)
     }
 
+    func testTheTransportRowOffersRecordUntilASessionExists() async {
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
+        XCTAssertEqual(presentation(for: coordinator).transport, .idle)
+
+        coordinator.submit(.start)
+        await coordinator.waitUntilIdle()
+
+        // Once a session exists the row is Pause and Stop; there is no Record
+        // button to press twice.
+        let running = presentation(for: coordinator)
+        XCTAssertEqual(running.transport, .running)
+        XCTAssertTrue(running.isPauseEnabled)
+        XCTAssertFalse(running.isResumeEnabled)
+        XCTAssertTrue(running.isStopEnabled)
+    }
+
+    func testPausingKeepsTheSessionAndOffersResumeAndStop() async {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot(), now: { start })
+        coordinator.submit(.start)
+        coordinator.submit(.pause)
+        await coordinator.waitUntilIdle()
+
+        let presentation = MenuPresentation(snapshot: coordinator.snapshot, at: start.addingTimeInterval(83))
+
+        // The elapsed figure keeps running because the recording does: the
+        // paused span is reconstructed as silence.
+        XCTAssertEqual(presentation.statusTitle, "Paused — 01:23")
+        XCTAssertEqual(presentation.transport, .running)
+        XCTAssertTrue(presentation.isResumeEnabled)
+        XCTAssertFalse(presentation.isPauseEnabled)
+        // A paused session can be stopped, and must not be startable again.
+        XCTAssertTrue(presentation.isStopEnabled)
+        XCTAssertFalse(presentation.isStartEnabled)
+    }
+
+    func testResumingReturnsToRecordingWithoutStartingASecondSession() async {
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
+        coordinator.submit(.start)
+        await coordinator.waitUntilIdle()
+        let session = coordinator.snapshot.state.activity?.sessionID
+
+        coordinator.submit(.pause)
+        coordinator.submit(.resume)
+        await coordinator.waitUntilIdle()
+
+        XCTAssertEqual(coordinator.snapshot.state.activity?.sessionID, session)
+        XCTAssertTrue(presentation(for: coordinator).isPauseEnabled)
+        XCTAssertEqual(coordinator.performedCommands, [.start, .pause, .resume])
+    }
+
+    func testStoppingKeepsTheTransportRowRatherThanOfferingRecordAgain() async {
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
+        coordinator.holdsTransitions = true
+        coordinator.submit(.start)
+        await coordinator.waitUntilIdle()
+        coordinator.finishPendingTransition()
+        coordinator.submit(.stop)
+        await coordinator.waitUntilIdle()
+
+        let presentation = presentation(for: coordinator)
+
+        // The session is still being finalized: nothing here can be pressed yet.
+        XCTAssertEqual(presentation.transport, .running)
+        XCTAssertFalse(presentation.isPauseEnabled)
+        XCTAssertFalse(presentation.isResumeEnabled)
+        XCTAssertFalse(presentation.isStopEnabled)
+    }
+
+    func testPauseAndResumeAreIgnoredWhenThereIsNoSessionToHold() async {
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
+
+        coordinator.submit(.pause)
+        coordinator.submit(.resume)
+        await coordinator.waitUntilIdle()
+
+        XCTAssertEqual(coordinator.performedCommands, [])
+        XCTAssertEqual(coordinator.snapshot.state, .idle)
+    }
+
+    func testMissingPermissionsLeaveTheRecordButtonPresentButDisabled() {
+        let snapshot = RecorderSnapshot(
+            permissions: PermissionSnapshot(screenAndSystemAudio: .denied, microphone: .granted)
+        )
+
+        let presentation = MenuPresentation(snapshot: snapshot, at: Date())
+
+        // A Record button that cannot be pressed still says what the menu is
+        // for; replacing it with Pause and Stop would not.
+        XCTAssertEqual(presentation.transport, .idle)
+        XCTAssertFalse(presentation.isStartEnabled)
+    }
+
     func testErrorStateShowsTheFailureAndAllowsAnotherAttempt() async {
         let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
         coordinator.simulateFailure(

@@ -12,6 +12,11 @@ public struct MenuPresentation: Equatable, Sendable {
     public let statusSymbol: String
     public let isStartEnabled: Bool
     public let isStopEnabled: Bool
+    public let isPauseEnabled: Bool
+    public let isResumeEnabled: Bool
+    /// Which controls the transport row offers: one Record button before a
+    /// session exists, and Pause/Resume beside Stop once one does.
+    public let transport: TransportControls
     /// Background work, reported separately from capture: the recorder is idle
     /// and ready again while these are still running.
     public let processingLines: [String]
@@ -46,6 +51,13 @@ public struct MenuPresentation: Equatable, Sendable {
             statusTitle = "Recording — \(Self.elapsedText(activity.elapsed(at: date)))"
             statusDetail = nil
             statusSymbol = "record.circle"
+        case .paused(let activity):
+            // The elapsed figure keeps advancing because the recording itself
+            // does: a paused span is reconstructed as silence, so this is the
+            // length of the file being produced, not just the audible part.
+            statusTitle = "Paused — \(Self.elapsedText(activity.elapsed(at: date)))"
+            statusDetail = nil
+            statusSymbol = "pause.circle"
         case .stopping:
             statusTitle = "Stopping…"
             statusDetail = nil
@@ -56,8 +68,13 @@ public struct MenuPresentation: Equatable, Sendable {
             statusSymbol = "exclamationmark.triangle"
         }
 
-        isStartEnabled = isReady && !snapshot.state.isRecording && !snapshot.state.isTransitioning
-        isStopEnabled = snapshot.state.isRecording
+        isStartEnabled = isReady && !snapshot.state.isCapturing && !snapshot.state.isTransitioning
+        isStopEnabled = snapshot.state.isCapturing
+        isPauseEnabled = snapshot.state.isRecording
+        isResumeEnabled = snapshot.state.isPaused
+        // Stopping keeps the transport row rather than flipping back to Record:
+        // the session is still being finalized and cannot be restarted yet.
+        transport = snapshot.state.isCapturing || snapshot.state.isTransitioning ? .running : .idle
 
         var lines = snapshot.processing.jobs.map { job -> String in
             guard let fraction = job.fractionCompleted else { return "\(job.title)…" }
@@ -117,6 +134,18 @@ public struct MenuPresentation: Equatable, Sendable {
             ? String(format: "%d:%02d:%02d", hours, minutes, seconds)
             : String(format: "%02d:%02d", minutes, seconds)
     }
+}
+
+/// Which pair of transport controls the menu's top row shows.
+///
+/// Deliberately not derived from `isStartEnabled` in the view: a Record button
+/// that is present but disabled (permissions missing, a start in flight) is a
+/// different thing from one replaced by Pause and Stop.
+public enum TransportControls: Equatable, Sendable {
+    /// One Record button, enabled only when a recording can actually start.
+    case idle
+    /// Pause or Resume, beside Stop.
+    case running
 }
 
 /// A remembered source the pickers must keep showing while it is absent.

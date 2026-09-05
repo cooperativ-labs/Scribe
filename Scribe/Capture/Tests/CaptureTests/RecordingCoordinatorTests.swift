@@ -43,6 +43,72 @@ import Testing
         }
     }
 
+    @Test func pauseHoldsOneSessionAndResumeContinuesIt() async throws {
+        let root = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let capture = FakeCapture()
+        let coordinator = makeCoordinator(root: root, capture: capture)
+
+        await coordinator.start()
+        guard case let .recording(activity) = await coordinator.state() else {
+            Issue.record("Coordinator did not enter recording")
+            return
+        }
+        await coordinator.pause()
+        #expect(await coordinator.state() == .paused(activity))
+        await coordinator.resume()
+        #expect(await coordinator.state() == .recording(activity))
+
+        // The stream is held, never restarted: restarting would rebind the
+        // microphone and re-resolve the application mid-meeting.
+        #expect(capture.pauseChanges == [true, false])
+        #expect(capture.startCount == 1)
+        #expect(capture.stopCount == 0)
+        let journal = try String(contentsOf: try onlySessionDirectory(in: root).appendingPathComponent("capture/timeline.jsonl"), encoding: .utf8)
+        #expect(journal.contains("capture-paused"))
+        #expect(journal.contains("capture-resumed"))
+    }
+
+    @Test func aPausedCaptureIsFinalizedByTheOrdinaryStop() async throws {
+        let root = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let capture = FakeCapture()
+        let coordinator = makeCoordinator(root: root, capture: capture)
+
+        await coordinator.start()
+        await coordinator.pause()
+        await coordinator.stop()
+
+        #expect(await coordinator.state() == .idle)
+        // Released before the drain, so teardown takes one path whether or not
+        // the capture was held.
+        #expect(capture.pauseChanges == [true, false])
+        #expect(capture.stopCount == 1)
+        let directory = try onlySessionDirectory(in: root)
+        let manifest = try RecorderSessionManifestCodec.decode(Data(contentsOf: directory.appendingPathComponent("metadata.json")))
+        #expect(manifest.capture.state == .complete)
+        #expect(manifest.completionStatus == .complete)
+    }
+
+    @Test func pauseAndResumeAreIgnoredOutsideTheStatesTheyBelongTo() async throws {
+        let root = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let capture = FakeCapture()
+        let coordinator = makeCoordinator(root: root, capture: capture)
+
+        await coordinator.pause()
+        #expect(await coordinator.state() == .idle)
+
+        await coordinator.start()
+        await coordinator.resume()
+        // Already recording: a resume has nothing to release.
+        #expect(capture.pauseChanges.isEmpty)
+
+        await coordinator.pause()
+        await coordinator.pause()
+        #expect(capture.pauseChanges == [true])
+    }
+
     @Test func sleepUsesTheSameDrainAndInterruptionPath() async throws {
         let root = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -136,6 +202,11 @@ private final class GrantedPermissions: RecordingPermissionProviding, @unchecked
 private final class FakeCapture: RecordingCaptureControlling, @unchecked Sendable {
     private(set) var startCount = 0
     private(set) var stopCount = 0
+    /// Every hold and release, in order, so a pause is verifiable as an effect
+    /// on capture rather than only as a published state.
+    private(set) var pauseChanges: [Bool] = []
+
+    func setPaused(_ paused: Bool) { pauseChanges.append(paused) }
 
     func start() async throws -> ResolvedCaptureSources {
         startCount += 1

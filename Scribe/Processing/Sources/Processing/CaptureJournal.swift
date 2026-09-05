@@ -44,6 +44,9 @@ public struct CaptureJournal: Sendable {
     /// their presence should not be reported as something the builder ignored.
     private static let uninterestingEvents: Set<String> = [
         "checkpoint", "session-writer-finished", "low-free-space",
+        // A deliberate hold. The gap it produces is journaled separately and is
+        // what authorizes the silence, so these two are diagnostics only.
+        "capture-paused", "capture-resumed",
     ]
 
     public static func parse(_ text: String) -> CaptureJournal {

@@ -118,6 +118,47 @@ import Testing
         #expect(file.length == Int64(microphoneBuffers * 512))
     }
 
+    /// A pause has to leave the recording aligned: nothing archived on either
+    /// track while it is held, and the span it skips journaled as a gap on both,
+    /// which is what authorizes the reconstruction to fill it with silence.
+    @Test func aPausedCaptureArchivesNothingAndLeavesOneGapPerTrack() async throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = try makeStore(in: directory)
+        let service = makeService(store: store)
+
+        // A second of both tracks, five seconds held, then a second more. The
+        // held buffers keep arriving: `SCStream` knows nothing about a pause.
+        for index in 0..<50 { service.ingest(try systemBuffer(index: index), track: .system) }
+        for index in 0..<93 { service.ingest(try microphoneBuffer(index: index), track: .microphone) }
+        service.setPaused(true)
+        for index in 50..<300 { service.ingest(try systemBuffer(index: index), track: .system) }
+        for index in 93..<562 { service.ingest(try microphoneBuffer(index: index), track: .microphone) }
+        service.setPaused(false)
+        for index in 300..<350 { service.ingest(try systemBuffer(index: index), track: .system) }
+        for index in 562..<655 { service.ingest(try microphoneBuffer(index: index), track: .microphone) }
+
+        let statistics = await service.stop()
+        try store.finish()
+
+        // The held buffers were dropped before the copy, so they are not counted
+        // as enqueued, as dropped by a full queue, or as rejected.
+        #expect(statistics.system.enqueuedBuffers == 100)
+        #expect(statistics.microphone.enqueuedBuffers == 186)
+        #expect(statistics.droppedBuffers == 0)
+        #expect(statistics.rejectedBuffers == 0)
+
+        let journal = try String(contentsOf: store.captureDirectory.appendingPathComponent("timeline.jsonl"), encoding: .utf8)
+        let gaps = journal.split(separator: "\n").filter { $0.contains("\"event\":\"gap\"") }
+        #expect(gaps.count == 2)
+        #expect(gaps.contains { $0.contains("\"track\":\"system\"") })
+        #expect(gaps.contains { $0.contains("\"track\":\"microphone\"") })
+
+        // Both tracks skip the same span, so they stay aligned across the pause.
+        let file = try AVAudioFile(forReading: store.captureDirectory.appendingPathComponent("system-0001.caf"))
+        #expect(file.length == Int64(100 * 960))
+    }
+
     /// The two tracks do not start together: the microphone was measured starting
     /// +0.123 s to +2.594 s after system audio, never simultaneously. The store's
     /// journal has to record each track's own first timestamp.

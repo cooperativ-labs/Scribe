@@ -10,12 +10,15 @@ import SwiftUI
 public struct ScribeSettingsView: View {
     @ObservedObject private var settings: ScribeSettings
     @ObservedObject private var sources: RecorderMenuModel
+    /// Absent in a build without detection; the section is then not shown.
+    private let meetingDetector: MeetingDetector?
     @State private var isChoosingRecordingsFolder = false
     @State private var folderSelectionError: String?
 
-    public init(settings: ScribeSettings, sources: RecorderMenuModel) {
+    public init(settings: ScribeSettings, sources: RecorderMenuModel, meetingDetector: MeetingDetector? = nil) {
         self.settings = settings
         self.sources = sources
+        self.meetingDetector = meetingDetector
     }
 
     public var body: some View {
@@ -76,6 +79,10 @@ public struct ScribeSettingsView: View {
                 }
             }
 
+            if let meetingDetector {
+                MeetingDetectionSettingsView(settings: settings, detector: meetingDetector)
+            }
+
             Section("Global shortcuts") {
                 Picker("Start recording", selection: $settings.startShortcut) {
                     ForEach(GlobalShortcut.commonChoices) { shortcut in
@@ -94,7 +101,7 @@ public struct ScribeSettingsView: View {
 
         }
         .formStyle(.grouped)
-        .frame(width: 560, height: 740)
+        .frame(width: 560, height: 820)
         // Enumerated on open, as the menu does, so an application launched after
         // Scribe and a microphone plugged in a moment ago both appear.
         .onAppear { sources.refreshSources() }

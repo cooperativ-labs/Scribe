@@ -67,11 +67,16 @@ public final class RecorderMenuModel: ObservableObject {
 
     public func startRecording() { coordinator.submit(.start) }
     public func stopRecording() { coordinator.submit(.stop) }
+    public func pauseRecording() { coordinator.submit(.pause) }
+    public func resumeRecording() { coordinator.submit(.resume) }
     public func openRecordingsFolder() { coordinator.submit(.openRecordingsFolder) }
     public func requestPermissions() { coordinator.submit(.requestPermissions) }
     public func openSystemSettings(_ pane: SystemSettingsPane) { coordinator.submit(.openSystemSettings(pane)) }
     public func quit() { coordinator.submit(.quit) }
     public func refreshSources() { coordinator.submit(.refreshSources) }
+
+    public func selectApplication(_ id: String?) { coordinator.submit(.selectApplication(id)) }
+    public func selectMicrophone(_ id: String?) { coordinator.submit(.selectMicrophone(id)) }
 
     public var selectedApplication: Binding<String?> {
         Binding(

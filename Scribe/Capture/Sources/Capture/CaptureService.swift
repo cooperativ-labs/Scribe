@@ -169,6 +169,7 @@ public final class CaptureService: NSObject, SCStreamOutput, SCStreamDelegate, @
     private var rejectedBuffers = 0
     private var discardedScreenFrames = 0
     private var resolvedSources: ResolvedCaptureSources?
+    private var isPaused = false
 
     /// - Parameters:
     ///   - sink: receives every archived buffer on the writer queue, in arrival
@@ -272,6 +273,19 @@ public final class CaptureService: NSObject, SCStreamOutput, SCStreamDelegate, @
         return sources
     }
 
+    /// Holds or resumes archiving without touching the stream.
+    ///
+    /// The `SCStream` keeps running: tearing it down and rebuilding it would
+    /// rebind the microphone and re-resolve the application, which is exactly
+    /// what a pause must not do. Buffers that arrive while paused are dropped in
+    /// the sample handler, before any copy, so a long pause costs nothing and
+    /// leaves no partial audio behind. The resulting timestamp discontinuity is
+    /// journaled as an ordinary gap, and the reconstruction fills it with
+    /// silence on both tracks, so the two stay aligned across the pause.
+    public func setPaused(_ paused: Bool) {
+        lock.withLock { isPaused = paused }
+    }
+
     /// Stops the stream, then drains both hand-off queues so that every buffer
     /// which already reached a callback is archived before this returns.
     public func stop() async -> CaptureStatistics {
@@ -351,6 +365,9 @@ public final class CaptureService: NSObject, SCStreamOutput, SCStreamDelegate, @
     /// `CMSampleBuffer` through to the sink, can be exercised without a Screen &
     /// System Audio Recording grant.
     func ingest(_ sampleBuffer: CMSampleBuffer, track: RecorderTrackKind) {
+        // Dropped before the copy: a paused capture must not accumulate audio,
+        // and a rejected-buffer count would be a lie about the stream's health.
+        guard !lock.withLock({ isPaused }) else { return }
         let queue = track == .system ? systemBuffers : microphoneBuffers
         guard let owned = CaptureBufferCopy.ownedBuffer(from: sampleBuffer, track: track) else {
             writerQueue.async { [weak self] in

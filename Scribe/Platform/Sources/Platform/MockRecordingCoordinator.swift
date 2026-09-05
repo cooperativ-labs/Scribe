@@ -130,6 +130,8 @@ public final class MockRecordingCoordinator: RecordingCoordinating {
         switch command {
         case .start: startRecording()
         case .stop: stopRecording()
+        case .pause: pauseRecording()
+        case .resume: resumeRecording()
         case .selectApplication(let id):
             snapshot.selectedApplicationID = id
             performedCommands.append(command)
@@ -156,7 +158,7 @@ public final class MockRecordingCoordinator: RecordingCoordinating {
     private func startRecording() {
         switch snapshot.state {
         case .idle, .failed: break
-        case .starting, .recording, .stopping: return
+        case .starting, .recording, .paused, .stopping: return
         }
         performedCommands.append(.start)
 
@@ -178,11 +180,11 @@ public final class MockRecordingCoordinator: RecordingCoordinating {
         }
     }
 
-    /// Stop is only meaningful while recording. Raw capture closing hands the
-    /// session to background processing and returns the recorder to idle, so a
-    /// new recording can start immediately.
+    /// Stop is only meaningful while a session exists, running or paused. Raw
+    /// capture closing hands the session to background processing and returns
+    /// the recorder to idle, so a new recording can start immediately.
     private func stopRecording() {
-        guard case .recording(let activity) = snapshot.state else { return }
+        guard let activity = snapshot.state.activity else { return }
         performedCommands.append(.stop)
         snapshot.state = .stopping
 
@@ -203,6 +205,21 @@ public final class MockRecordingCoordinator: RecordingCoordinating {
         } else {
             complete()
         }
+    }
+
+    /// Pause and resume are only meaningful against a live session, and neither
+    /// is a transition: the session stays open, so no `holdsTransitions` step
+    /// applies to either one.
+    private func pauseRecording() {
+        guard case .recording(let activity) = snapshot.state else { return }
+        performedCommands.append(.pause)
+        snapshot.state = .paused(activity)
+    }
+
+    private func resumeRecording() {
+        guard case .paused(let activity) = snapshot.state else { return }
+        performedCommands.append(.resume)
+        snapshot.state = .recording(activity)
     }
 
     private func refreshSources() async {
@@ -233,7 +250,7 @@ public final class MockRecordingCoordinator: RecordingCoordinating {
     private func quit() {
         quitCount += 1
         performedCommands.append(.quit)
-        if snapshot.state.isRecording {
+        if snapshot.state.isCapturing {
             stopRecording()
             finishPendingTransition()
         }

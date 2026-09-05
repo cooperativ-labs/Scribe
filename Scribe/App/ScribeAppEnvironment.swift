@@ -19,6 +19,10 @@ final class ScribeAppEnvironment: ObservableObject {
     let coordinator: LiveRecordingCoordinator
     let menuModel: RecorderMenuModel
     let permissions: PermissionService
+    /// Watches the chosen applications for a call in progress. Runs for the life
+    /// of the app; what it finds is offered to the person, never acted on alone.
+    let meetingDetector: MeetingDetector
+    @Published private(set) var detectedMeeting: DetectedMeeting?
     private let processingQueue: ProcessingQueue?
     private let outbox: TranscriptionRequestOutbox
     private let handoff = FinalRecordingHandoff()
@@ -77,6 +81,7 @@ final class ScribeAppEnvironment: ObservableObject {
         self.coordinator = coordinator
         menuModel = RecorderMenuModel(coordinator: coordinator)
         hotkeys = HotkeyService(coordinator: coordinator)
+        meetingDetector = MeetingDetector(settings: settings)
 
         transcription = try? TranscriptionHostService(settings: settings, scheduler: processingQueue)
 
@@ -99,6 +104,13 @@ final class ScribeAppEnvironment: ObservableObject {
             self.settings.rememberedApplicationBundleIdentifier = snapshot.selectedApplicationID
             self.settings.rememberedMicrophoneID = snapshot.selectedMicrophoneID
         }
+
+        // Detection only reports. Offering to record what it found, and
+        // stopping when the call ends, are separate steps built on this value.
+        meetingDetector.onChange = { [weak self] meeting in
+            self?.detectedMeeting = meeting
+        }
+        meetingDetector.start()
     }
 
     deinit {

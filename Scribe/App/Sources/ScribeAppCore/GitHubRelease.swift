@@ -30,7 +30,11 @@ public struct GitHubRelease: Decodable, Sendable, Equatable {
             $0.name == "Scribe-\(version)-macos.zip" &&
             $0.browserDownloadURL.scheme == "https" &&
             $0.browserDownloadURL.host == "github.com" &&
-            $0.browserDownloadURL.path.hasPrefix("/cooperativ-labs/scribe/releases/download/")
+            // GitHub preserves a repository's display casing in browser
+            // download URLs, but repository slugs themselves are
+            // case-insensitive. Normalize the fixed, ASCII path prefix so a
+            // valid published asset is not rejected for its display casing.
+            $0.browserDownloadURL.path.lowercased().hasPrefix("/cooperativ-labs/scribe/releases/download/")
         }?.browserDownloadURL
     }
 

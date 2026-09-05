@@ -11,6 +11,10 @@ public enum RecorderState: Equatable, Sendable {
     case idle
     case starting
     case recording(RecordingActivity)
+    /// Capture is held open but no audio is being archived. The session, its
+    /// directory, and its journal all stay alive, so resuming continues the same
+    /// recording rather than starting a second one.
+    case paused(RecordingActivity)
     case stopping
     case failed(RecorderFailure)
 
@@ -19,11 +23,27 @@ public enum RecorderState: Equatable, Sendable {
         return false
     }
 
+    public var isPaused: Bool {
+        if case .paused = self { return true }
+        return false
+    }
+
+    /// A session exists, running or held. Stop applies to both; start to neither.
+    public var isCapturing: Bool { isRecording || isPaused }
+
     /// Capture is mid-transition; a second command would race the first.
     public var isTransitioning: Bool {
         switch self {
         case .starting, .stopping: true
-        case .idle, .recording, .failed: false
+        case .idle, .recording, .paused, .failed: false
+        }
+    }
+
+    /// The session being recorded, while there is one.
+    public var activity: RecordingActivity? {
+        switch self {
+        case .recording(let activity), .paused(let activity): activity
+        case .idle, .starting, .stopping, .failed: nil
         }
     }
 }
@@ -223,6 +243,10 @@ public struct RecorderSnapshot: Equatable, Sendable {
 public enum RecordingCommand: Equatable, Sendable {
     case start
     case stop
+    /// Holds an active capture without finalizing it. The paused span becomes
+    /// silence in the reconstructed recording, so both tracks stay aligned.
+    case pause
+    case resume
     case selectApplication(String?)
     case selectMicrophone(String?)
     case refreshSources

@@ -9,6 +9,8 @@ import Storage
 public protocol RecordingCaptureControlling: Sendable {
     func start() async throws -> ResolvedCaptureSources
     func stop() async -> CaptureStatistics
+    /// Holds or resumes archiving while the stream itself keeps running.
+    func setPaused(_ paused: Bool)
 }
 
 extension CaptureService: RecordingCaptureControlling {}
@@ -17,8 +19,19 @@ public enum RecordingCoordinatorState: Equatable, Sendable {
     case idle
     case starting
     case recording(RecordingActivity)
+    /// The stream is alive and the session directory is still reserved, but no
+    /// audio is being archived.
+    case paused(RecordingActivity)
     case stopping
     case error(RecorderFailure)
+
+    /// The session, while capture owns one.
+    var activity: RecordingActivity? {
+        switch self {
+        case .recording(let activity), .paused(let activity): activity
+        case .idle, .starting, .stopping, .error: nil
+        }
+    }
 }
 
 public enum RecordingStopReason: Equatable, Sendable {
@@ -229,11 +242,31 @@ public actor RecordingCoordinator {
         }
     }
 
+    /// Holds capture without finalizing it. The stream, the session directory,
+    /// and the journal all stay open, so resuming continues the same recording.
+    /// The paused span is reconstructed as silence on both tracks.
+    public func pause() async {
+        guard case .recording(let activity) = currentState else { return }
+        activeCapture?.setPaused(true)
+        try? activeStore?.recordCapturePause(resumed: false, at: now())
+        transition(to: .paused(activity))
+    }
+
+    public func resume() async {
+        guard case .paused(let activity) = currentState else { return }
+        activeCapture?.setPaused(false)
+        try? activeStore?.recordCapturePause(resumed: true, at: now())
+        transition(to: .recording(activity))
+    }
+
     public func stop() async { await stop(reason: .user) }
 
     public func stop(reason: RecordingStopReason) async {
-        guard case .recording(let activity) = currentState else { return }
+        guard let activity = currentState.activity else { return }
         transition(to: .stopping)
+        // A paused capture is finalized like any other: unheld first, so the
+        // stream's own teardown and drain take exactly one path.
+        activeCapture?.setPaused(false)
         let store = activeStore
         let statistics = await activeCapture?.stop() ?? CaptureStatistics(
             system: .init(enqueuedBuffers: 0, droppedBuffers: 0, droppedFrames: 0, queuedBytes: 0, peakQueuedBytes: 0),
@@ -277,7 +310,7 @@ public actor RecordingCoordinator {
     }
 
     public func recordOutputRouteChange(_ change: OutputDeviceChange) async {
-        guard case .recording = currentState, let activeStore else { return }
+        guard currentState.activity != nil, let activeStore else { return }
         do { try activeStore.recordOutputDeviceChange(change) }
         catch { transition(to: .error(Self.failure(from: error))) }
     }
