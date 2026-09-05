@@ -174,6 +174,7 @@ public actor TranscriptionCoordinator {
     }
 
     private let configuration: Configuration
+    private let canStartJob: @Sendable () async -> Bool
     private let scheduler: (any ProcessingScheduler)?
     private let stageRunner: any TranscriptionStageRunning
     private let snapshotService: SourceSnapshotService
@@ -194,9 +195,11 @@ public actor TranscriptionCoordinator {
         stageRunner: any TranscriptionStageRunning,
         writer: AtomicReplaceFileWriter = AtomicReplaceFileWriter(),
         fileManager: FileManager = .default,
-        now: @escaping @Sendable () -> Date = Date.init
+        now: @escaping @Sendable () -> Date = Date.init,
+        canStartJob: @escaping @Sendable () async -> Bool = { true }
     ) throws {
         self.configuration = configuration
+        self.canStartJob = canStartJob
         self.scheduler = scheduler
         self.stageRunner = stageRunner
         self.snapshotService = SourceSnapshotService(storeDirectory: configuration.transcriptStoreURL, fileManager: fileManager, writer: writer)
@@ -362,9 +365,11 @@ public actor TranscriptionCoordinator {
     public func runPending() async {
         guard activeJobID == nil else { return }
         while activeJobID == nil, let jobID = queue.first, var job = jobs[jobID] {
+            guard await canStartJob(), activeJobID == nil else { return }
             if let scheduler, await scheduler.requestDeferral(for: ProcessingJobDescriptor(id: job.id, kind: "transcription")) == .deferUntilCaptureEnds {
                 return
             }
+            guard activeJobID == nil, queue.first == jobID else { return }
             queue.removeFirst()
             activeJobID = jobID
             let monitor = await beginMonitoringControlSignals(for: job)

@@ -45,9 +45,11 @@ public actor WorkerStageRunner: TranscriptionStageRunning {
         let runDirectoryURL: URL
         var results: [String: WorkerStageResult] = [:]
         var finished = false
+        var accessedModelsDirectory: URL?
     }
 
     private let configuration: Configuration
+    private let installationProvider: (@Sendable () async throws -> WorkerInstallation)?
     private let hostStageRunner: (any TranscriptionStageRunning)?
     private let eventHandler: (@Sendable (TranscriptionEvent) -> Void)?
     /// Extra `run` payload values; the integration test uses the helper's
@@ -58,10 +60,12 @@ public actor WorkerStageRunner: TranscriptionStageRunning {
     public init(
         configuration: Configuration,
         hostStageRunner: (any TranscriptionStageRunning)? = nil,
+        installationProvider: (@Sendable () async throws -> WorkerInstallation)? = nil,
         additionalRunOptions: [String: WorkerJSONValue] = [:],
         eventHandler: (@Sendable (TranscriptionEvent) -> Void)? = nil
     ) {
         self.configuration = configuration
+        self.installationProvider = installationProvider
         self.hostStageRunner = hostStageRunner
         self.eventHandler = eventHandler
         self.additionalRunOptions = additionalRunOptions
@@ -133,8 +137,10 @@ public actor WorkerStageRunner: TranscriptionStageRunning {
     private func startSessionIfNeeded(for job: TranscriptionJob) async throws {
         guard sessions[job.id] == nil else { return }
         try FileManager.default.createDirectory(at: job.runDirectoryURL, withIntermediateDirectories: true)
+        let installation = try await installationProvider?() ?? configuration.installation
+        let accessedDirectory = installation.modelsDirectoryURL.flatMap { $0.startAccessingSecurityScopedResource() ? $0 : nil }
         let client = WorkerClient(configuration: .init(
-            installation: configuration.installation,
+            installation: installation,
             workingDirectoryURL: configuration.workingDirectoryURL,
             environment: configuration.environment,
             responseTimeout: configuration.responseTimeout
@@ -151,9 +157,10 @@ public actor WorkerStageRunner: TranscriptionStageRunning {
             ))
         } catch {
             await client.shutdown()
+            accessedDirectory?.stopAccessingSecurityScopedResource()
             throw error
         }
-        sessions[job.id] = Session(client: client, requestID: requestID, runDirectoryURL: job.runDirectoryURL)
+        sessions[job.id] = Session(client: client, requestID: requestID, runDirectoryURL: job.runDirectoryURL, accessedModelsDirectory: accessedDirectory)
     }
 
     /// Consumes the helper's final `complete` record, then releases it. Holding
@@ -176,6 +183,7 @@ public actor WorkerStageRunner: TranscriptionStageRunning {
     private func closeSession(for jobID: UUID) async {
         guard let session = sessions.removeValue(forKey: jobID) else { return }
         await session.client.shutdown()
+        session.accessedModelsDirectory?.stopAccessingSecurityScopedResource()
     }
 
     private func emit(

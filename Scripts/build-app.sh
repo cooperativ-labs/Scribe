@@ -116,7 +116,7 @@ Re-signing changed the bundle's cdhash, so any Screen & System Audio Recording
 grant made for an earlier build no longer applies. Re-approve it in System
 Settings before recording; see docs/feasibility/capture-permissions.md.
 
-Model files are user data and are not bundled. Transcription stages that need
-them still require SCRIBE_TRANSCRIPTION_MODELS_DIRECTORY, or an installed model
-set, exactly as a release does.
+Model files are user data and are not bundled. Open Settings → Transcription
+model → Install Model to download Parakeet v3, or choose a folder containing
+an existing installation.
 EOF

@@ -25,6 +25,7 @@
 		100000000000000000000115 /* ScribeAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000004 /* ScribeAppTests.swift */; };
 		100000000000000000000116 /* ScribeAppCore in Frameworks */ = {isa = PBXBuildFile; productRef = 100000000000000000000201 /* ScribeAppCore */; };
 		100000000000000000000119 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000009 /* Assets.xcassets */; };
+		100000000000000000000120 /* model_manifest.json in Resources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000010 /* model_manifest.json */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -37,6 +38,7 @@
 		100000000000000000000005 /* Scribe.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Scribe.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		100000000000000000000006 /* ScribeAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ScribeAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		100000000000000000000009 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Resources/Assets.xcassets; sourceTree = "<group>"; };
+		100000000000000000000010 /* model_manifest.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = Workers/TranscriptionWorker/model_manifest.json; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -45,7 +47,7 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		100000000000000000000401 = {isa = PBXGroup; children = (100000000000000000000402 /* Scribe */, 100000000000000000000403 /* Tests */, 100000000000000000000404 /* Products */); sourceTree = "<group>"; };
+		100000000000000000000401 = {isa = PBXGroup; children = (100000000000000000000010 /* model_manifest.json */, 100000000000000000000402 /* Scribe */, 100000000000000000000403 /* Tests */, 100000000000000000000404 /* Products */); sourceTree = "<group>"; };
 		100000000000000000000402 /* Scribe */ = {isa = PBXGroup; children = (100000000000000000000405 /* App */); path = Scribe; sourceTree = "<group>"; };
 		100000000000000000000403 /* Tests */ = {isa = PBXGroup; children = (100000000000000000000406 /* ScribeAppTests */); path = Tests; sourceTree = "<group>"; };
 		100000000000000000000404 /* Products */ = {isa = PBXGroup; children = (100000000000000000000005 /* Scribe.app */, 100000000000000000000006 /* ScribeAppTests.xctest */); name = Products; sourceTree = "<group>"; };
@@ -63,7 +65,7 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		100000000000000000000303 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (100000000000000000000119 /* Assets.xcassets in Resources */); runOnlyForDeploymentPostprocessing = 0; };
+		100000000000000000000303 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (100000000000000000000119 /* Assets.xcassets in Resources */, 100000000000000000000120 /* model_manifest.json in Resources */); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */

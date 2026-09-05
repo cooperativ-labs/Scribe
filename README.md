@@ -88,16 +88,27 @@ bump, review and commit the version change before publishing.
 
 ### Model storage and offline operation
 
-Models are user data, not executable bundle contents. The product default is
-`~/Library/Application Support/Scribe/Models`; settings may select a different
-folder. A future model installer must verify the signed catalog's checksums and
-terms before use, make downloads an explicit user action, and never fetch a
-model while transcription is running. Once installed, the model loader uses
-only the selected local directory and works without networking.
+Open **Settings → Transcription model → Install Model** to install the recommended
+Parakeet v3 model directly from Hugging Face. The roughly 505 MB download includes
+the speaker detection assets required by the transcription pipeline. No API key,
+Python environment, or Git LFS installation is needed.
 
-For development, retain source models under `~/Development/Models/Scribe` and
-pass that path explicitly through release-input configuration. Never ship a
-symlink to a developer directory.
+Models default to `~/Library/Application Support/Scribe/Models`. **Choose Models
+Folder…** saves a different location across launches; **Use Default** restores
+the default. Changing folders leaves previous downloads in place. A complete
+installation in the selected folder is recognized automatically.
+
+The installer uses the exact revisions in the bundled `model_manifest.json`,
+checks file sizes and declared SHA-256 hashes, and publishes each verified file
+atomically. Progress, cancellation, and retry are available in Settings; retries
+reuse verified files, while an interrupted file downloads again. Queued recordings
+wait for model setup and start automatically when installation completes. New
+jobs use the selected folder without an app restart; active workers retain their
+original model directory. Once installed, transcription works offline.
+
+Cloud models and API-key configuration are deferred. The shell installer in
+`Scripts/package-transcription-models.sh` remains available for development;
+select its output folder in Settings to reuse those files.
 
 Clean-machine release test:
 

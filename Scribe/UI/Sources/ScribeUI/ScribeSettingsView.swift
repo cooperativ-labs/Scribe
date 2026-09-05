@@ -39,6 +39,12 @@ public struct ScribeSettingsView: View {
                 }
             }
 
+            TranscriptionModelSettingsView(settings: settings, installer: settings.modelInstaller)
+
+            Section("Processing") {
+                Toggle("Transcribe when the final recording is ready", isOn: $settings.transcribeWhenFinalRecordingIsReady)
+            }
+
             Section {
                 Picker("Application", selection: sources.selectedApplication) {
                     Text("None").tag(String?.none)
@@ -86,12 +92,9 @@ public struct ScribeSettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Section("Processing") {
-                Toggle("Transcribe when the final recording is ready", isOn: $settings.transcribeWhenFinalRecordingIsReady)
-            }
         }
         .formStyle(.grouped)
-        .frame(width: 500)
+        .frame(width: 560, height: 740)
         // Enumerated on open, as the menu does, so an application launched after
         // Scribe and a microphone plugged in a moment ago both appear.
         .onAppear { sources.refreshSources() }

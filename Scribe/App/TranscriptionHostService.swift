@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import Foundation
 import Platform
 import Processing
@@ -54,6 +55,7 @@ final class TranscriptionHostService {
     /// were produced before it went missing.
     private let workerUnavailableReason: String?
 
+    private var modelObservation: AnyCancellable?
     private var eventTask: Task<Void, Never>?
     private var statusDidChange: (@MainActor (Status) -> Void)?
 
@@ -76,7 +78,15 @@ final class TranscriptionHostService {
         do {
             stageRunner = WorkerStageRunner(
                 configuration: .init(installation: try WorkerLocator.locate()),
-                hostStageRunner: assembly
+                hostStageRunner: assembly,
+                installationProvider: { @MainActor [settings] in
+                    let located = try WorkerLocator.locate()
+                    return WorkerInstallation(
+                        executableURL: located.executableURL,
+                        manifestURL: located.manifestURL,
+                        modelsDirectoryURL: settings.modelsFolderURL
+                    )
+                }
             )
             workerUnavailableReason = nil
         } catch {
@@ -89,7 +99,8 @@ final class TranscriptionHostService {
         coordinator = try TranscriptionCoordinator(
             configuration: .init(transcriptStoreURL: storeDirectoryURL),
             scheduler: scheduler,
-            stageRunner: stageRunner
+            stageRunner: stageRunner,
+            canStartJob: { @MainActor [settings] in settings.modelInstaller.state == .installed }
         )
         importer = (try? MediaToolLocator.ffprobe()).map { FolderImportService(prober: MediaProber(ffprobeURL: $0)) }
     }
@@ -103,6 +114,16 @@ final class TranscriptionHostService {
         if let workerUnavailableReason {
             status.failure = "Transcription is unavailable: \(workerUnavailableReason)"
             publishStatus()
+        }
+        modelObservation = settings.modelInstaller.$state.sink { [weak self] state in
+            guard state == .installed else { return }
+            Task { @MainActor [weak self] in
+                if self?.workerUnavailableReason == nil {
+                    self?.status.failure = nil
+                    self?.publishStatus()
+                }
+                await self?.runPending()
+            }
         }
         observeJobEvents()
         Task { [weak self] in
@@ -283,6 +304,10 @@ final class TranscriptionHostService {
     func runPending() async {
         guard hasScheduler else {
             report(failure: "Transcription is paused: the processing scheduler is unavailable, and recording must keep priority.")
+            return
+        }
+        guard settings.modelInstaller.state == .installed else {
+            report(failure: "Transcription is waiting for model setup. Open Settings and install Parakeet v3 in the Models folder.")
             return
         }
         await coordinator.runPending()

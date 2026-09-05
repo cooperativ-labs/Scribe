@@ -10,6 +10,14 @@ public final class ScribeSettings: ObservableObject {
     public nonisolated static let defaultRecordingsFolderURL: URL = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Meeting Recordings", isDirectory: true)
 
+    public nonisolated static let defaultModelsFolderURL = FileManager.default
+        .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("Scribe/Models", isDirectory: true)
+
+    @Published public private(set) var modelsFolderURL: URL
+    @Published public private(set) var modelsFolderError: String?
+    public let modelInstaller: TranscriptionModelInstaller
+
     @Published public private(set) var recordingsFolderURL: URL
     @Published public private(set) var recordingsFolderError: ScribeSettingsError?
     @Published public var rememberedApplicationBundleIdentifier: String? {
@@ -31,17 +39,29 @@ public final class ScribeSettings: ObservableObject {
     public init(
         defaults: UserDefaults = .standard,
         defaultRecordingsFolderURL: URL = ScribeSettings.defaultRecordingsFolderURL,
-        fileManager: FileManager = .default
+        fileManager: FileManager = .default,
+        modelManifestURL: URL? = Bundle.main.url(forResource: "model_manifest", withExtension: "json")
     ) {
         self.defaults = defaults
         self.defaultRecordingsFolderURL = defaultRecordingsFolderURL
         self.fileManager = fileManager
+        modelInstaller = TranscriptionModelInstaller(manifestURL: modelManifestURL)
+        do {
+            modelsFolderURL = try Self.resolveBookmark(from: defaults, fileManager: fileManager, key: Key.modelsFolderBookmark)
+                ?? Self.defaultModelsFolderURL
+        } catch {
+            modelsFolderURL = Self.defaultModelsFolderURL
+            modelsFolderError = "The saved models folder could not be opened. Choose it again: \(error.localizedDescription)"
+        }
 
         rememberedApplicationBundleIdentifier = defaults.string(forKey: Key.applicationBundleIdentifier)
         rememberedMicrophoneID = defaults.string(forKey: Key.microphoneID)
         startShortcut = Self.loadShortcut(from: defaults, key: Key.startShortcut) ?? .defaultStart
         stopShortcut = Self.loadShortcut(from: defaults, key: Key.stopShortcut) ?? .defaultStop
         transcribeWhenFinalRecordingIsReady = defaults.object(forKey: Key.transcribeWhenFinalRecordingIsReady) as? Bool ?? false
+
+        recordingsFolderURL = defaultRecordingsFolderURL
+        modelInstaller.refresh(directory: modelsFolderURL)
 
         do {
             recordingsFolderURL = try Self.resolveBookmark(from: defaults, fileManager: fileManager)
@@ -84,6 +104,21 @@ public final class ScribeSettings: ObservableObject {
         }
     }
 
+    /// Selecting a new root leaves existing models in place. The installer
+    /// recognizes a complete installation there or offers to download it.
+    public func setModelsFolder(_ url: URL) throws {
+        guard !modelInstaller.isBusy else { throw ModelInstallationError("Wait for model setup to finish or cancel the download first.") }
+        let url = url.standardizedFileURL
+        let accessing = url.startAccessingSecurityScopedResource()
+        defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+        try fileManager.createDirectory(at: url, withIntermediateDirectories: true)
+        let bookmark = try url.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil)
+        defaults.set(bookmark, forKey: Key.modelsFolderBookmark)
+        modelsFolderURL = url
+        modelsFolderError = nil
+        modelInstaller.refresh(directory: url)
+    }
+
     /// Executes a short file operation while the persisted security scope is open.
     public func withRecordingsFolderAccess<Result>(_ operation: (URL) throws -> Result) rethrows -> Result {
         let didStartAccessing = recordingsFolderURL.startAccessingSecurityScopedResource()
@@ -96,6 +131,7 @@ public final class ScribeSettings: ObservableObject {
     }
 
     private enum Key {
+        static let modelsFolderBookmark = "scribe.settings.modelsFolderBookmark"
         static let recordingsFolderBookmark = "scribe.settings.recordingsFolderBookmark"
         static let applicationBundleIdentifier = "scribe.settings.rememberedApplicationBundleIdentifier"
         static let microphoneID = "scribe.settings.rememberedMicrophoneID"
@@ -126,8 +162,8 @@ public final class ScribeSettings: ObservableObject {
         return try? JSONDecoder().decode(GlobalShortcut.self, from: data)
     }
 
-    private static func resolveBookmark(from defaults: UserDefaults, fileManager: FileManager) throws -> URL? {
-        guard let bookmark = defaults.data(forKey: Key.recordingsFolderBookmark) else { return nil }
+    private static func resolveBookmark(from defaults: UserDefaults, fileManager: FileManager, key: String = Key.recordingsFolderBookmark) throws -> URL? {
+        guard let bookmark = defaults.data(forKey: key) else { return nil }
         var isStale = false
         let url = try URL(
             resolvingBookmarkData: bookmark,
@@ -141,7 +177,7 @@ public final class ScribeSettings: ObservableObject {
                 includingResourceValuesForKeys: nil,
                 relativeTo: nil
             )
-            defaults.set(refreshedBookmark, forKey: Key.recordingsFolderBookmark)
+            defaults.set(refreshedBookmark, forKey: key)
         }
         return url
     }

@@ -92,6 +92,44 @@ final class WorkerStageRunnerTests: XCTestCase {
         await runner.shutdown()
     }
 
+    func testNewJobsResolveTheCurrentInstallationWithoutRecreatingRunner() async throws {
+        let installation = try FakeTranscriptionWorker.healthyRun().install(in: root.appending(path: "helper"))
+        let provider = InstallationRequests(installation: installation)
+        let runner = WorkerStageRunner(
+            configuration: .init(installation: WorkerInstallation(executableURL: root.appending(path: "missing-helper"))),
+            installationProvider: { await provider.resolve() }
+        )
+        let coordinator = try TranscriptionCoordinator(configuration: .init(transcriptStoreURL: root.appending(path: "store")), stageRunner: runner)
+        for _ in 0..<2 {
+            let job = try await coordinator.enqueue(.init(sourceURL: try makeSource(), modelProfileID: "parakeet-v3"))
+            await coordinator.runPending()
+            let completed = await coordinator.job(id: job.id)
+            XCTAssertEqual(completed?.state, .complete)
+        }
+        let count = await provider.count
+        XCTAssertEqual(count, 2, "resolve once per job, not once per app launch or stage")
+        await runner.shutdown()
+    }
+
+    func testJobsStayQueuedUntilModelsAreReady() async throws {
+        let readiness = ModelReadiness()
+        let runner = try makeRunner(.healthyRun())
+        let coordinator = try TranscriptionCoordinator(
+            configuration: .init(transcriptStoreURL: root.appending(path: "store")),
+            stageRunner: runner,
+            canStartJob: { await readiness.ready }
+        )
+        let job = try await coordinator.enqueue(.init(sourceURL: try makeSource(), modelProfileID: "parakeet-v3"))
+        await coordinator.runPending()
+        let waiting = await coordinator.job(id: job.id)
+        XCTAssertEqual(waiting?.state, .queued)
+        await readiness.enable()
+        await coordinator.runPending()
+        let completed = await coordinator.job(id: job.id)
+        XCTAssertEqual(completed?.state, .complete)
+        await runner.shutdown()
+    }
+
     private func makeRunner(_ worker: FakeTranscriptionWorker, events: EventLog? = nil) throws -> WorkerStageRunner {
         let installation = try worker.install(in: root.appending(path: "helper-\(UUID().uuidString)", directoryHint: .isDirectory))
         return WorkerStageRunner(
@@ -122,4 +160,16 @@ private final class EventLog: @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         return events.map(\.stage)
     }
+}
+
+private actor InstallationRequests {
+    let installation: WorkerInstallation
+    var count = 0
+    init(installation: WorkerInstallation) { self.installation = installation }
+    func resolve() -> WorkerInstallation { count += 1; return installation }
+}
+
+private actor ModelReadiness {
+    var ready = false
+    func enable() { ready = true }
 }
