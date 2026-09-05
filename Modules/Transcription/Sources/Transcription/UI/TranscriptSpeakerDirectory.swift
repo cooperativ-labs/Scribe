@@ -48,7 +48,7 @@ public struct SpeakerLibraryTranscriptDirectory: TranscriptSpeakerDirectory {
 ///
 /// The transcript keeps its generic label while a suggestion is pending; only
 /// confirmation writes a person into the speaker table.
-public struct TranscriptSpeakerSuggestion: Identifiable, Equatable, Sendable {
+public struct TranscriptSpeakerSuggestion: Identifiable, Codable, Equatable, Sendable {
     public let speakerID: String
     public let person: SpeakerPersonRef
     public let score: Float

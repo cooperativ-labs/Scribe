@@ -73,7 +73,7 @@ final class TranscriptionHostService {
         outbox = .inRecordingsDirectory(settings.recordingsFolderURL)
         speakerStore = try? SpeakerProfileStore.openApplicationSupportLibrary()
 
-        let assembly = TranscriptAssemblyStageRunner()
+        let assembly = TranscriptAssemblyStageRunner(speakerLibrary: speakerStore)
         let stageRunner: any TranscriptionStageRunning
         do {
             stageRunner = WorkerStageRunner(
@@ -289,7 +289,23 @@ final class TranscriptionHostService {
 
     private func speakerDirectory() -> (any TranscriptSpeakerDirectory)? {
         guard let speakerStore else { return nil }
-        return SpeakerLibraryTranscriptDirectory(store: speakerStore, extractor: UnavailableEmbeddingExtractor())
+        do {
+            let located = try WorkerLocator.locate()
+            let installation = WorkerInstallation(
+                executableURL: located.executableURL,
+                manifestURL: located.manifestURL,
+                modelsDirectoryURL: settings.modelsFolderURL
+            )
+            return SpeakerLibraryTranscriptDirectory(
+                store: speakerStore,
+                extractor: WorkerSpeakerEmbeddingExtractor(installation: installation)
+            )
+        } catch {
+            return SpeakerLibraryTranscriptDirectory(
+                store: speakerStore,
+                extractor: UnavailableEmbeddingExtractor(reason: error.localizedDescription)
+            )
+        }
     }
 
     // MARK: - Running
@@ -385,22 +401,63 @@ private struct UnavailableWorkerStageRunner: TranscriptionStageRunning {
 /// Enrolling a voice needs an embedding from the pinned model, which the helper
 /// only produces as part of a full run today. Naming people still works; this
 /// refuses clearly instead of writing a signature from something else.
-private struct UnavailableEmbeddingExtractor: SpeakerEmbeddingExtracting {
+private struct WorkerSpeakerEmbeddingExtractor: SpeakerEmbeddingExtracting {
+    let installation: WorkerInstallation
+
     func extract(_ request: SpeakerEmbeddingExtractionRequest) async throws -> [ExtractedSpeakerEmbedding] {
-        throw TranscriptionHostError.embeddingUnavailable
+        let modelsDirectory = installation.modelsDirectoryURL
+        let accessing = modelsDirectory?.startAccessingSecurityScopedResource() == true
+        defer { if accessing { modelsDirectory?.stopAccessingSecurityScopedResource() } }
+        let client = WorkerClient(configuration: .init(installation: installation))
+        do {
+            _ = try await client.handshake()
+            let result = try await client.extractEmbedding(
+                sourceURL: request.audioFileURL,
+                ranges: request.ranges.map {
+                    WorkerEmbeddingRange(
+                        startSeconds: Double($0.startMs) / 1_000,
+                        endSeconds: Double($0.endMs) / 1_000
+                    )
+                },
+                clipOutputURL: request.clipOutputURL
+            )
+            await client.shutdown()
+            return [ExtractedSpeakerEmbedding(
+                vector: result.vector,
+                format: SpeakerEmbeddingFormat(
+                    model: SpeakerEmbeddingModelIdentity(modelID: result.modelID, revision: result.modelRevision),
+                    preprocessingVersion: result.preprocessingVersion,
+                    normalizationVersion: result.normalizationVersion,
+                    transformVersion: SpeakerPinnedEmbeddingFormat.transformVersion
+                ),
+                usableSpeechDuration: result.usableSpeechDuration,
+                clipURL: request.clipOutputURL
+            )]
+        } catch {
+            await client.shutdown()
+            throw error
+        }
+    }
+}
+
+private struct UnavailableEmbeddingExtractor: SpeakerEmbeddingExtracting {
+    let reason: String
+
+    func extract(_ request: SpeakerEmbeddingExtractionRequest) async throws -> [ExtractedSpeakerEmbedding] {
+        throw TranscriptionHostError.embeddingUnavailable(reason)
     }
 }
 
 enum TranscriptionHostError: LocalizedError {
     case workerUnavailable(String)
-    case embeddingUnavailable
+    case embeddingUnavailable(String)
 
     var errorDescription: String? {
         switch self {
         case let .workerUnavailable(reason):
             "The transcription helper is not available: \(reason)"
-        case .embeddingUnavailable:
-            "Remembering a voice needs the transcription helper's embedding stage, which this build does not expose yet. Names assigned by hand still work."
+        case let .embeddingUnavailable(reason):
+            "Remembering a voice needs the transcription helper: \(reason)"
         }
     }
 }

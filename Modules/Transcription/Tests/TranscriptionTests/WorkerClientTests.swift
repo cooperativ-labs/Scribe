@@ -47,6 +47,27 @@ final class WorkerClientTests: XCTestCase {
         XCTAssertEqual(results.map(\.resultFileName), ["prepare.json", "transcript.json", "diarization.json", "embeddings.json"])
     }
 
+    func testEnrollmentEmbeddingIsDecodedFromTheDedicatedWorkerOperation() async throws {
+        let worker = FakeTranscriptionWorker(steps: [
+            .emit(
+                kind: "stage_result",
+                payload: #"{"stage":"extract_embedding","vector":[0.6,0.8],"modelID":"wespeaker-embedding-coreml","modelRevision":"revision","preprocessingVersion":"fbank-v1","normalizationVersion":"l2-unit-v1","usableSpeechDuration":2.5}"#
+            ),
+        ])
+        let client = try makeClient(worker)
+        _ = try await client.handshake()
+
+        let result = try await client.extractEmbedding(
+            sourceURL: root.appending(path: "source.wav"),
+            ranges: [WorkerEmbeddingRange(startSeconds: 1, endSeconds: 3.5)]
+        )
+        await client.shutdown()
+
+        XCTAssertEqual(result.vector, [0.6, 0.8])
+        XCTAssertEqual(result.modelID, "wespeaker-embedding-coreml")
+        XCTAssertEqual(result.usableSpeechDuration, 2.5)
+    }
+
     func testAnEnvelopeVersionTheHostDoesNotSupportIsRefused() async throws {
         let unsupported = #"{"version":2,"kind":"stage_result","requestID":"%s","payload":{"stage":"handshake"}}"#
         let client = try makeClient(FakeTranscriptionWorker(handshakeRecord: unsupported, steps: []))

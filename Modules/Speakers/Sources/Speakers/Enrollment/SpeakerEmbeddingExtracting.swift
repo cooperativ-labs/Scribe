@@ -24,11 +24,15 @@ public struct SpeakerEmbeddingExtractionRequest: Sendable, Equatable {
     public let excerptID: String
     public let audioFileURL: URL
     public let ranges: [SpeakerTimeRange]
+    /// A caller-owned temporary destination when the confirmed clip should be
+    /// retained. The enrollment pipeline removes it after the store copies it.
+    public let clipOutputURL: URL?
 
-    public init(excerptID: String, audioFileURL: URL, ranges: [SpeakerTimeRange]) {
+    public init(excerptID: String, audioFileURL: URL, ranges: [SpeakerTimeRange], clipOutputURL: URL? = nil) {
         self.excerptID = excerptID
         self.audioFileURL = audioFileURL
         self.ranges = ranges
+        self.clipOutputURL = clipOutputURL
     }
 }
 

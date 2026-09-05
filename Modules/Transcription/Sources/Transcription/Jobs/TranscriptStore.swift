@@ -71,6 +71,12 @@ public struct TranscriptStore: Sendable {
         return try? CanonicalTranscriptCodec.decode(data)
     }
 
+    public func recognition(forRunAt runDirectoryURL: URL) -> SpeakerRecognitionRecord? {
+        let url = runDirectoryURL.appending(path: TranscriptRunArtifact.speakerRecognition)
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(SpeakerRecognitionRecord.self, from: data)
+    }
+
     /// Commits a new revision produced by review — a relabelling, never a
     /// reprocessing — beside the revision it supersedes.
     @discardableResult
@@ -149,12 +155,17 @@ public extension TranscriptReviewFile {
     /// committed transcript from an earlier revision still shows its transcript,
     /// with the failure reported above it.
     init(_ run: StoredTranscriptRun) {
+        let recognitionURL = run.runDirectoryURL.appending(path: TranscriptRunArtifact.speakerRecognition)
+        let suggestions = (try? Data(contentsOf: recognitionURL))
+            .flatMap { try? JSONDecoder().decode(SpeakerRecognitionRecord.self, from: $0) }?
+            .suggestions ?? []
         self.init(
             id: run.job.runID.uuidString,
             sourceSnapshotURL: run.job.sourceSnapshotURL,
             transcript: run.transcript,
             jobState: TranscriptJobState(run.job.state, transcript: run.transcript),
-            processingError: run.job.failure?.message
+            processingError: run.job.failure?.message,
+            suggestions: suggestions
         )
     }
 }

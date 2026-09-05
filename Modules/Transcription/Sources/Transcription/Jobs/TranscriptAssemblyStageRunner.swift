@@ -1,5 +1,6 @@
 import Foundation
 import ScribeAppCore
+import Speakers
 
 /// Host-side artifacts the worker does not produce, read back from a run directory.
 ///
@@ -14,6 +15,9 @@ public enum TranscriptRunArtifact {
     public static let workerTranscript = "transcript.json"
     public static let diarization = "diarization.json"
     public static let embeddings = "embeddings.json"
+    /// Export-safe recognition decisions and review suggestions. Voice vectors
+    /// stay in embeddings.json and the private speaker library.
+    public static let speakerRecognition = "speaker-recognition.json"
     /// The host's reconciled word list.
     public static let words = "words.json"
     /// The canonical transcript.
@@ -45,6 +49,25 @@ struct DiarizationRecord: Codable, Sendable {
 
     let intervals: [Interval]
     let sourceDurationSeconds: TimeInterval
+}
+
+struct WorkerSpeakerEmbeddingRecord: Codable, Sendable {
+    let speakerID: String
+    let vector: [Float]
+    let modelID: String
+    let modelRevision: String
+    let preprocessingVersion: String
+    let normalizationVersion: String
+}
+
+public struct SpeakerRecognitionRecord: Codable, Sendable, Equatable {
+    public let libraryRevision: SpeakerLibraryRevision?
+    public let suggestions: [TranscriptSpeakerSuggestion]
+
+    public init(libraryRevision: SpeakerLibraryRevision?, suggestions: [TranscriptSpeakerSuggestion]) {
+        self.libraryRevision = libraryRevision
+        self.suggestions = suggestions
+    }
 }
 
 /// The host's committed `words.json`: reconciled words plus the warnings that
@@ -91,12 +114,18 @@ public struct TranscriptAssemblyStageRunner: TranscriptionStageRunning {
     private let turnBuilder: SpeakerTurnBuilder
     private let writer: AtomicReplaceFileWriter
     private let engineRevisions: [String: String]
+    private let speakerLibrary: (any SpeakerLibrary)?
+    private let identityMatcher: Speakers.SpeakerIdentityMatcher
     private let now: @Sendable () -> Date
     nonisolated(unsafe) private let fileManager: FileManager
 
     public init(
         reconciler: TokenTimingReconciler = TokenTimingReconciler(),
         turnBuilder: SpeakerTurnBuilder = SpeakerTurnBuilder(),
+        speakerLibrary: (any SpeakerLibrary)? = nil,
+        identityMatcher: Speakers.SpeakerIdentityMatcher = Speakers.SpeakerIdentityMatcher(
+            configuration: SpeakerIdentityMatcherConfiguration(minimumConsistentExcerpts: 1)
+        ),
         engineRevisions: [String: String] = [:],
         writer: AtomicReplaceFileWriter = AtomicReplaceFileWriter(),
         fileManager: FileManager = .default,
@@ -104,6 +133,8 @@ public struct TranscriptAssemblyStageRunner: TranscriptionStageRunning {
     ) {
         self.reconciler = reconciler
         self.turnBuilder = turnBuilder
+        self.speakerLibrary = speakerLibrary
+        self.identityMatcher = identityMatcher
         self.engineRevisions = engineRevisions
         self.writer = writer
         self.fileManager = fileManager
@@ -114,6 +145,7 @@ public struct TranscriptAssemblyStageRunner: TranscriptionStageRunning {
         switch stage {
         case .reconcilingTimings: try reconcileTimings(for: job)
         case .assembling: try assemble(for: job)
+        case .matchingSpeakers: try await matchSpeakers(for: job)
         default: TranscriptionStageOutput()
         }
     }
@@ -216,6 +248,100 @@ public struct TranscriptAssemblyStageRunner: TranscriptionStageRunning {
             warnings: warnings
         )
         return TranscriptionStageOutput(artifactURL: try write(transcript, named: TranscriptRunArtifact.canonicalTranscript, in: job))
+    }
+
+    private func matchSpeakers(for job: TranscriptionJob) async throws -> TranscriptionStageOutput {
+        let transcriptURL = job.runDirectoryURL.appending(path: TranscriptRunArtifact.canonicalTranscript)
+        guard job.request.speakerMatching == .enabled, let speakerLibrary else {
+            let record = SpeakerRecognitionRecord(libraryRevision: nil, suggestions: [])
+            return TranscriptionStageOutput(artifactURL: try write(record, named: TranscriptRunArtifact.speakerRecognition, in: job))
+        }
+
+        let transcript: CanonicalTranscript = try read(TranscriptRunArtifact.canonicalTranscript, in: job)
+        let embeddings: [WorkerSpeakerEmbeddingRecord] = try read(TranscriptRunArtifact.embeddings, in: job)
+        let library = try await speakerLibrary.snapshot()
+        let formatTransform = SpeakerPinnedEmbeddingFormat.transformVersion
+        let assignments = embeddings.map { embedding in
+            identityMatcher.match(
+                RecordingLocalSpeaker(
+                    speakerID: embedding.speakerID,
+                    excerpts: [SpeakerEmbeddingExcerpt(
+                        excerptID: "\(embedding.speakerID)-centroid",
+                        vector: embedding.vector,
+                        format: SpeakerEmbeddingFormat(
+                            model: SpeakerEmbeddingModelIdentity(modelID: embedding.modelID, revision: embedding.modelRevision),
+                            preprocessingVersion: embedding.preprocessingVersion,
+                            normalizationVersion: embedding.normalizationVersion,
+                            transformVersion: formatTransform
+                        )
+                    )]
+                ),
+                against: library
+            )
+        }
+        let automatic: [String: SpeakerPersonRef] = Dictionary(uniqueKeysWithValues: assignments.compactMap { assignment -> (String, SpeakerPersonRef)? in
+            guard assignment.outcome == .matched, let person = assignment.person else { return nil }
+            return (assignment.recordingSpeakerID, person)
+        })
+        let suggestions = assignments.compactMap(TranscriptSpeakerSuggestion.init)
+
+        if !automatic.isEmpty {
+            let speakers = transcript.speakers.map { speaker -> TranscriptSpeaker in
+                guard let person = automatic[speaker.id] else { return speaker }
+                return TranscriptSpeaker(
+                    id: speaker.id,
+                    profileID: person.profileID.uuidString,
+                    identityAssignment: .automatic,
+                    labelSnapshot: person.displayName
+                )
+            }
+            let labels: [String: String] = Dictionary(
+                speakers.map { ($0.id, $0.labelSnapshot) },
+                uniquingKeysWith: { first, _ in first }
+            )
+            let segments = transcript.segments.map { segment -> TranscriptSegment in
+                guard let speakerID = segment.speakerID,
+                      let label = labels[speakerID],
+                      label != segment.speakerLabel else { return segment }
+                return TranscriptSegment(
+                    id: segment.id,
+                    speakerID: segment.speakerID,
+                    speakerLabel: label,
+                    startMs: segment.startMs,
+                    endMs: segment.endMs,
+                    text: segment.text,
+                    overlap: segment.overlap,
+                    timingQuality: segment.timingQuality,
+                    speakerConfidence: segment.speakerConfidence,
+                    words: segment.words
+                )
+            }
+            let recognized = CanonicalTranscript(
+                schemaVersion: transcript.schemaVersion,
+                transcriptID: transcript.transcriptID,
+                revision: transcript.revision,
+                status: transcript.status,
+                createdAt: transcript.createdAt,
+                source: transcript.source,
+                language: transcript.language,
+                languageSource: transcript.languageSource,
+                timestampUnit: transcript.timestampUnit,
+                timestampOrigin: transcript.timestampOrigin,
+                speakers: speakers,
+                segments: segments,
+                subtitleCueMappings: transcript.subtitleCueMappings,
+                processingOptions: transcript.processingOptions.merging([
+                    "speaker_library_revision": .string(library.revision.snapshotValue),
+                    "speaker_matcher_version": .string(identityMatcher.configuration.matcherVersion),
+                ]) { _, new in new },
+                engineRevisions: transcript.engineRevisions,
+                warnings: transcript.warnings
+            )
+            try writer.write(try CanonicalTranscriptCodec.encode(recognized), to: transcriptURL)
+        }
+
+        let record = SpeakerRecognitionRecord(libraryRevision: library.revision, suggestions: suggestions)
+        return TranscriptionStageOutput(artifactURL: try write(record, named: TranscriptRunArtifact.speakerRecognition, in: job))
     }
 
     // MARK: - Artifacts

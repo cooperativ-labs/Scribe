@@ -126,6 +126,11 @@ public extension JSONValue {
         return value
     }
 
+    var arrayValue: [JSONValue]? {
+        guard case let .array(value) = self else { return nil }
+        return value
+    }
+
     var stringValue: String? {
         guard case let .string(value) = self else { return nil }
         return value

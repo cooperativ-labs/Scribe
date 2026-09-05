@@ -77,6 +77,8 @@ public final class WorkerRequestLoop: @unchecked Sendable {
             ])))
         case "validate_assets":
             validateAssets(requestID: envelope.requestID)
+        case "extract_embedding":
+            extractEmbedding(requestID: envelope.requestID, payload: payload)
         case "run":
             if state.isCancelled(envelope.requestID) {
                 writer.write(WorkerProtocol.error(requestID: envelope.requestID, code: "cancelled", message: "The request was cancelled before its first stage boundary."))
@@ -109,6 +111,72 @@ public final class WorkerRequestLoop: @unchecked Sendable {
                 "stage": .string("asset_validation"), "status": .string("ready"), "modelsDirectory": .string(configuration.modelsDirectory.path), "declaredOnDiskBytes": .number(Double(manifest.totalDeclaredOnDiskBytes)),
             ])))
         } catch { writer.write(WorkerProtocol.error(requestID: requestID, code: "model_setup_incomplete", message: error.localizedDescription)) }
+    }
+
+    /// Enrollment is deliberately a small worker operation rather than a full
+    /// transcription run. It reuses the exact diarization embedding stack and
+    /// its pinned assets, but never spends time loading Parakeet or writing ASR
+    /// checkpoints for excerpts the person has already confirmed.
+    private func extractEmbedding(requestID: String, payload: [String: JSONValue]) {
+        let semaphore = DispatchSemaphore(value: 0)
+        Task {
+            defer { semaphore.signal() }
+            do {
+                guard let sourcePath = payload["sourcePath"]?.stringValue,
+                      sourcePath.hasPrefix("/"),
+                      FileManager.default.fileExists(atPath: sourcePath) else {
+                    throw WorkerJobRunner.Error.invalidPath("extract_embedding requires an existing absolute sourcePath.")
+                }
+                guard let values = payload["ranges"]?.arrayValue, !values.isEmpty else {
+                    throw EnrollmentAudioClipper.Error.emptySelection
+                }
+                let ranges = try values.map { value -> AudioTimeRange in
+                    guard let object = value.objectValue,
+                          let start = object["startSeconds"]?.numberValue,
+                          let end = object["endSeconds"]?.numberValue,
+                          start.isFinite, end.isFinite, start >= 0, end > start else {
+                        throw EnrollmentAudioClipper.Error.invalidRange(start: 0, end: 0)
+                    }
+                    return AudioTimeRange(startSeconds: start, endSeconds: end)
+                }
+                let manifest = try ModelManifest.load(from: configuration.manifestURL)
+                guard !manifest.telemetry.enabled, !manifest.telemetry.runtimeDownloadsAllowed else {
+                    throw ModelSetupError.unsafeManifest
+                }
+                let report = manifest.validate(modelsDirectory: configuration.modelsDirectory)
+                guard report.isValid else { throw ModelSetupError.report(report) }
+                let clipOutputURL: URL? = try payload["clipOutputPath"]?.stringValue.map { path in
+                    guard path.hasPrefix("/") else {
+                        throw WorkerJobRunner.Error.invalidPath("clipOutputPath must be absolute.")
+                    }
+                    return URL(fileURLWithPath: path)
+                }
+                let embedding = try await EnrollmentEmbeddingExtractor(
+                    manifest: manifest,
+                    modelsDirectory: configuration.modelsDirectory
+                ).extract(
+                    from: URL(fileURLWithPath: sourcePath),
+                    ranges: ranges,
+                    retainingClipAt: clipOutputURL
+                )
+                writer.write(WorkerEnvelope(kind: .stageResult, requestID: requestID, payload: .object([
+                    "stage": .string("extract_embedding"),
+                    "vector": .array(embedding.vector.map { .number(Double($0)) }),
+                    "modelID": .string(embedding.modelID),
+                    "modelRevision": .string(embedding.modelRevision),
+                    "preprocessingVersion": .string(embedding.preprocessingVersion),
+                    "normalizationVersion": .string(embedding.normalizationVersion),
+                    "usableSpeechDuration": .number(ranges.reduce(0) { $0 + $1.duration }),
+                ])))
+            } catch {
+                writer.write(WorkerProtocol.error(
+                    requestID: requestID,
+                    code: "embedding_extraction_failed",
+                    message: error.localizedDescription
+                ))
+            }
+        }
+        semaphore.wait()
     }
 }
 

@@ -25,13 +25,20 @@ public struct SpeakerEnrollmentPipeline: Sendable {
 
         let selected = try SpeakerExcerptSelector(configuration: configuration).select(from: request.excerpts)
         var extracted: [(SpeakerEnrollmentExcerpt, ExtractedSpeakerEmbedding)] = []
+        var temporaryClips: [URL] = []
+        defer { temporaryClips.forEach { try? FileManager.default.removeItem(at: $0) } }
         extracted.reserveCapacity(selected.count)
         for excerpt in selected {
+            let clipOutputURL: URL? = request.retainClips
+                ? FileManager.default.temporaryDirectory.appending(path: "scribe-enrollment-\(UUID().uuidString).wav")
+                : nil
+            if let clipOutputURL { temporaryClips.append(clipOutputURL) }
             let embeddings = try await extractor.extract(
                 SpeakerEmbeddingExtractionRequest(
                     excerptID: excerpt.excerptID,
                     audioFileURL: request.audioFileURL,
-                    ranges: excerpt.timeRanges
+                    ranges: excerpt.timeRanges,
+                    clipOutputURL: clipOutputURL
                 )
             )
             guard embeddings.count < 2 else {

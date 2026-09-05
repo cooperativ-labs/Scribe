@@ -1,6 +1,7 @@
 import AVFoundation
 import Foundation
 import ScribeAppCore
+import Speakers
 import XCTest
 @testable import Transcription
 
@@ -98,6 +99,58 @@ final class ModuleIntegrationTests: XCTestCase {
         XCTAssertTrue(srt.contains("-->"), "SRT export was:\n\(srt)")
         let json = try CanonicalTranscriptCodec.decode(Data(contentsOf: exports.appending(path: "team sync.json")))
         XCTAssertEqual(json.segments.count, transcript.segments.count)
+    }
+
+    func testCompletedRunRecognizesAnEnrolledSpeaker() async throws {
+        let source = try writeAudio(named: "known voice.wav", in: root, seconds: 6)
+        let speakerStore = try SpeakerProfileStore(directoryURL: root.appending(path: "Speakers"))
+        let profile = try await speakerStore.createProfile(SpeakerProfileDraft(displayName: "Alice"))
+        _ = try await speakerStore.setCurrentEmbeddingModel(SpeakerPinnedEmbeddingFormat.model)
+        _ = try await speakerStore.addSignature(
+            profileID: profile.profileID,
+            draft: SpeakerSignatureDraft(
+                embeddingVector: [1, 0],
+                embeddingModel: SpeakerPinnedEmbeddingFormat.model,
+                preprocessingVersion: SpeakerPinnedEmbeddingFormat.preprocessingVersion,
+                normalizationVersion: SpeakerPinnedEmbeddingFormat.normalizationVersion,
+                transformVersion: SpeakerPinnedEmbeddingFormat.transformVersion,
+                usableSpeechDuration: 20,
+                enrollmentSourceID: "earlier-recording",
+                selectedTimeRanges: [SpeakerTimeRange(startMs: 0, endMs: 20_000)]
+            )
+        )
+        let format = SpeakerPinnedEmbeddingFormat.self
+        let embeddings = [
+            WorkerSpeakerEmbeddingRecord(
+                speakerID: "speaker_1", vector: [1, 0],
+                modelID: format.modelID, modelRevision: format.modelRevision,
+                preprocessingVersion: format.preprocessingVersion,
+                normalizationVersion: format.normalizationVersion
+            ),
+            WorkerSpeakerEmbeddingRecord(
+                speakerID: "speaker_2", vector: [0, 1],
+                modelID: format.modelID, modelRevision: format.modelRevision,
+                preprocessingVersion: format.preprocessingVersion,
+                normalizationVersion: format.normalizationVersion
+            ),
+        ]
+        let assembly = TranscriptAssemblyStageRunner(speakerLibrary: speakerStore)
+        let coordinator = try TranscriptionCoordinator(
+            configuration: .init(transcriptStoreURL: storeURL),
+            stageRunner: ScriptedWorkerStageRunner(hostStageRunner: assembly, embeddings: embeddings)
+        )
+
+        _ = try await coordinator.enqueue(TranscriptionRequest(sourceURL: source, modelProfileID: "parakeet-v3"))
+        await coordinator.runPending()
+
+        let run = try XCTUnwrap(TranscriptStore(storeDirectoryURL: storeURL).latestRunPerSource().first)
+        let transcript = try XCTUnwrap(run.transcript)
+        XCTAssertEqual(transcript.speakers[0].labelSnapshot, "Alice")
+        XCTAssertEqual(transcript.speakers[0].identityAssignment, .automatic)
+        XCTAssertEqual(transcript.speakers[0].profileID, profile.profileID.uuidString)
+        XCTAssertEqual(transcript.segments.first?.speakerLabel, "Alice")
+        XCTAssertEqual(transcript.speakers[1].identityAssignment, .unmatched)
+        XCTAssertEqual(TranscriptReviewFile(run).suggestions, [])
     }
 
     /// Selecting a segment seeks the retained snapshot, which is what makes a
@@ -213,6 +266,7 @@ final class ModuleIntegrationTests: XCTestCase {
 struct ScriptedWorkerStageRunner: TranscriptionStageRunning {
     let hostStageRunner: any TranscriptionStageRunning
     var writesDiarization = true
+    var embeddings: [WorkerSpeakerEmbeddingRecord] = []
 
     func run(stage: TranscriptionJobState, job: TranscriptionJob) async throws -> TranscriptionStageOutput {
         switch stage {
@@ -244,9 +298,9 @@ struct ScriptedWorkerStageRunner: TranscriptionStageRunning {
                 ]),
             ], named: TranscriptRunArtifact.diarization, in: job))
         case .matchingSpeakers:
-            return TranscriptionStageOutput(artifactURL: try write(
-                ["embeddings": .array([])], named: TranscriptRunArtifact.embeddings, in: job
-            ))
+            let url = job.runDirectoryURL.appending(path: TranscriptRunArtifact.embeddings)
+            try AtomicReplaceFileWriter().write(try JSONEncoder().encode(embeddings), to: url)
+            return try await hostStageRunner.run(stage: stage, job: job)
         default:
             return try await hostStageRunner.run(stage: stage, job: job)
         }

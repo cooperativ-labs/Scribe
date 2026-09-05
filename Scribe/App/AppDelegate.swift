@@ -1,6 +1,7 @@
 import AppKit
 import ScribeAppCore
 import ScribeUI
+import SwiftUI
 
 /// Owns AppKit lifecycle hooks that do not belong in SwiftUI scenes.
 @MainActor
@@ -14,6 +15,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// window, so it can reach a person who is looking at their meeting rather
     /// than at Scribe's menu.
     private var meetingChip: MeetingChipController?
+    /// Retained while visible because the status item is otherwise Scribe's
+    /// only AppKit-owned surface.
+    private var settingsWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         menuBar = ScribeMenuBarController(
@@ -22,7 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             accessibilityLabel: ScribeAppCore.displayName,
             transcription: { [environment] in environment.transcriptionMenuCommands },
             updates: { [environment] in environment.updateMenuCommands },
-            openSettings: { Self.openSettings() }
+            openSettings: { [weak self] in self?.openSettings() }
         )
         // The anchor is read at each appearance rather than captured: the menu
         // bar rearranges itself as other items come and go.
@@ -55,10 +59,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return .terminateLater
     }
 
-    /// Opens the SwiftUI `Settings` scene. Scribe has no Dock icon, so the app
-    /// is activated first, or the window opens behind whatever is in front.
-    private static func openSettings() {
+    /// Opens Settings from the status-item menu. Sending `showSettingsWindow:`
+    /// through the responder chain is unreliable while that menu is tracking:
+    /// it activates this LSUIElement app but can have no target to display the
+    /// SwiftUI scene. Host the same view in an owned AppKit window instead.
+    private func openSettings() {
+        if let settingsWindow {
+            NSApp.activate(ignoringOtherApps: true)
+            settingsWindow.makeKeyAndOrderFront(nil)
+            return
+        }
+
+        let window = NSWindow(contentViewController: NSHostingController(
+            rootView: ScribeSettingsView(
+                settings: environment.settings,
+                sources: environment.menuModel,
+                meetingDetector: environment.meetingDetector
+            )
+        ))
+        window.title = "Settings"
+        window.styleMask = [.titled, .closable, .miniaturizable]
+        window.setContentSize(NSSize(width: 700, height: 650))
+        window.minSize = NSSize(width: 500, height: 400)
+        window.isReleasedWhenClosed = false
+        window.delegate = self
+        window.center()
+        settingsWindow = window
         NSApp.activate(ignoringOtherApps: true)
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        window.makeKeyAndOrderFront(nil)
+    }
+}
+
+extension AppDelegate: NSWindowDelegate {
+    func windowWillClose(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow, window === settingsWindow else { return }
+        settingsWindow = nil
+        environment.settingsWindowDidClose()
     }
 }

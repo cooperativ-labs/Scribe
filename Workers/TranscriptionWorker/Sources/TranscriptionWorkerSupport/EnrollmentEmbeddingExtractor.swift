@@ -35,15 +35,15 @@ public struct EnrollmentEmbeddingExtractor: Sendable {
 
     public func extract(
         from fileURL: URL,
-        ranges: [AudioTimeRange]
+        ranges: [AudioTimeRange],
+        retainingClipAt retainedClipURL: URL? = nil
     ) async throws -> OfflineDiarizationAdapter.SpeakerEmbedding {
-        let directory = FileManager.default.temporaryDirectory.appending(
-            path: "scribe-enrollment-\(UUID().uuidString)",
-            directoryHint: .isDirectory
-        )
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let clipURL = directory.appending(path: "excerpt.wav")
+        let temporaryDirectory = retainedClipURL == nil ? FileManager.default.temporaryDirectory.appending(
+            path: "scribe-enrollment-\(UUID().uuidString)", directoryHint: .isDirectory
+        ) : nil
+        let clipURL = retainedClipURL ?? temporaryDirectory!.appending(path: "excerpt.wav")
+        try FileManager.default.createDirectory(at: clipURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        defer { if let temporaryDirectory { try? FileManager.default.removeItem(at: temporaryDirectory) } }
         _ = try EnrollmentAudioClipper.writeClip(from: fileURL, ranges: ranges, to: clipURL)
         let result = try await adapter.diarize(fileURL: clipURL)
         guard result.embeddings.count <= 1 else {

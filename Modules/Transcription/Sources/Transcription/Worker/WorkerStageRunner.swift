@@ -79,7 +79,15 @@ public actor WorkerStageRunner: TranscriptionStageRunning {
         }
         do {
             let result = try await stageResult(named: workerStage, for: job)
-            if workerStage == Self.workerStageNames[.matchingSpeakers] { try await finish(job) }
+            if workerStage == Self.workerStageNames[.matchingSpeakers] {
+                try await finish(job)
+                if let hostStageRunner {
+                    // The worker owns vector extraction; identity comparison is
+                    // host-only because the private speaker library must never
+                    // be exposed to the helper process.
+                    return try await hostStageRunner.run(stage: stage, job: job)
+                }
+            }
             let artifact = result.resultFileName.map { job.runDirectoryURL.appending(path: $0) }
             return TranscriptionStageOutput(artifactURL: artifact)
         } catch let failure as WorkerFailure {

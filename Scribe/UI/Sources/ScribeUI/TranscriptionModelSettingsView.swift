@@ -10,7 +10,7 @@ struct TranscriptionModelSettingsView: View {
     var body: some View {
         Section("Transcription model") {
             LabeledContent("Model", value: "Parakeet v3 · Recommended")
-            Text("Runs locally on your Mac. Downloads about 505 MB from Hugging Face, including the speaker detection models needed for transcription.")
+            Text("Runs locally on your Mac. The 505 MB download includes the compact WeSpeaker voice-embedding model used to recognize people you have chosen to remember.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             LabeledContent("Models folder") {
@@ -36,7 +36,7 @@ struct TranscriptionModelSettingsView: View {
             case .checking:
                 HStack { ProgressView().controlSize(.small); Text("Checking installed models…") }
             case .installed:
-                Label("Installed · Ready to transcribe", systemImage: "checkmark.circle.fill")
+                Label("Installed · Ready to transcribe and recognize voices", systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.green)
             case .installing:
                 VStack(alignment: .leading, spacing: 6) {
@@ -62,6 +62,8 @@ struct TranscriptionModelSettingsView: View {
                 Text(error).font(.footnote).foregroundStyle(.red)
             }
             Link("Parakeet v3 on Hugging Face · CC BY 4.0", destination: URL(string: "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml")!)
+                .font(.footnote)
+            Link("WeSpeaker Core ML on Hugging Face · CC BY 4.0", destination: URL(string: "https://huggingface.co/FluidInference/speaker-diarization-coreml")!)
                 .font(.footnote)
         }
         .fileImporter(isPresented: $choosingFolder, allowedContentTypes: [.folder]) { result in

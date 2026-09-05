@@ -107,6 +107,25 @@ public struct WorkerRunRequest: Sendable, Equatable {
     }
 }
 
+public struct WorkerEmbeddingRange: Sendable, Equatable {
+    public let startSeconds: TimeInterval
+    public let endSeconds: TimeInterval
+
+    public init(startSeconds: TimeInterval, endSeconds: TimeInterval) {
+        self.startSeconds = startSeconds
+        self.endSeconds = endSeconds
+    }
+}
+
+public struct WorkerExtractedEmbedding: Sendable, Equatable {
+    public let vector: [Float]
+    public let modelID: String
+    public let modelRevision: String
+    public let preprocessingVersion: String
+    public let normalizationVersion: String
+    public let usableSpeechDuration: TimeInterval
+}
+
 /// Launches the bundled helper and exchanges versioned JSON records with it.
 ///
 /// The client owns exactly one child process and one in-flight request. It does
@@ -230,6 +249,72 @@ public actor WorkerClient {
         lastStartedStage = nil
         cancellationSent = false
         try send(WorkerEnvelope(kind: .request, requestID: request.requestID, payload: .object(payload)))
+    }
+
+    /// Extracts one enrollment embedding without running ASR. The caller must
+    /// handshake first, matching the lifecycle used by normal worker runs.
+    public func extractEmbedding(
+        sourceURL: URL,
+        ranges: [WorkerEmbeddingRange],
+        clipOutputURL: URL? = nil,
+        requestID: String = UUID().uuidString
+    ) async throws -> WorkerExtractedEmbedding {
+        try start()
+        let encodedRanges: [WorkerJSONValue] = ranges.map { range in
+            .object([
+                "startSeconds": .number(range.startSeconds),
+                "endSeconds": .number(range.endSeconds),
+            ])
+        }
+        var payload: [String: WorkerJSONValue] = [
+            "operation": .string("extract_embedding"),
+            "sourcePath": .string(sourceURL.path),
+            "ranges": .array(encodedRanges),
+        ]
+        if let clipOutputURL { payload["clipOutputPath"] = .string(clipOutputURL.path) }
+        try send(WorkerEnvelope(kind: .request, requestID: requestID, payload: .object(payload)))
+        while true {
+            let envelope = try await receive(stage: "extract_embedding")
+            guard envelope.requestID == requestID else { continue }
+            switch envelope.kind {
+            case .stageResult:
+                let payload = envelope.payload.objectValue ?? [:]
+                guard payload["stage"]?.stringValue == "extract_embedding",
+                      let values = payload["vector"]?.arrayValue,
+                      !values.isEmpty,
+                      let modelID = payload["modelID"]?.stringValue,
+                      let modelRevision = payload["modelRevision"]?.stringValue,
+                      let preprocessingVersion = payload["preprocessingVersion"]?.stringValue,
+                      let normalizationVersion = payload["normalizationVersion"]?.stringValue,
+                      let usableSpeechDuration = payload["usableSpeechDuration"]?.numberValue else {
+                    throw WorkerFailure(
+                        code: WorkerFailure.protocolErrorCode,
+                        message: "The transcription helper returned an invalid speaker embedding.",
+                        stage: "extract_embedding"
+                    )
+                }
+                let vector = values.compactMap { $0.numberValue.map(Float.init) }
+                guard vector.count == values.count, vector.allSatisfy(\.isFinite) else {
+                    throw WorkerFailure(
+                        code: WorkerFailure.protocolErrorCode,
+                        message: "The transcription helper returned a malformed speaker vector.",
+                        stage: "extract_embedding"
+                    )
+                }
+                return WorkerExtractedEmbedding(
+                    vector: vector,
+                    modelID: modelID,
+                    modelRevision: modelRevision,
+                    preprocessingVersion: preprocessingVersion,
+                    normalizationVersion: normalizationVersion,
+                    usableSpeechDuration: usableSpeechDuration
+                )
+            case .error:
+                throw failure(from: envelope, stage: "extract_embedding")
+            case .progress, .request, .cancel:
+                continue
+            }
+        }
     }
 
     /// The next event of the in-flight run. Throws a `WorkerFailure` for a
