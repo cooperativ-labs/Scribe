@@ -402,12 +402,21 @@ extension ScribeAppEnvironment {
             NSApp.activate(ignoringOtherApps: true)
             return
         }
-        let window = NSWindow(contentViewController: NSHostingController(rootView: TranscriptWindow(viewModel: model)))
+        // The hosting controller must not publish a preferred content size:
+        // with it, AppKit resizes the window to the SwiftUI ideal height, so a
+        // long transcript opens near full screen and a resize the user made is
+        // undone the next time a transcript is selected.
+        let host = NSHostingController(rootView: TranscriptWindow(viewModel: model))
+        host.sizingOptions = []
+        let window = NSWindow(contentViewController: host)
         window.title = "Transcripts"
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
-        window.setContentSize(NSSize(width: 1_040, height: 680))
+        window.contentMinSize = NSSize(width: 820, height: 500)
         window.isReleasedWhenClosed = false
+        // A remembered frame wins; the fixed default applies only the first time.
+        window.setContentSize(NSSize(width: 1_040, height: 680))
         window.center()
+        window.setFrameAutosaveName("ScribeTranscriptWindow")
         transcriptWindow = window
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)

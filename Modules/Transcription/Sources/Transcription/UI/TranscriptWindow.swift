@@ -55,6 +55,8 @@ public struct TranscriptWindow: View {
                 await viewModel.exportRefreshingLabels(formats, to: directory)
             }
         }
+        // A floor only: the window, not the transcript's length, decides the size.
+        .frame(minWidth: 820, minHeight: 500)
         .task { await viewModel.loadPeople() }
         .onChange(of: viewModel.selectedFileID) {
             isRenaming = false
