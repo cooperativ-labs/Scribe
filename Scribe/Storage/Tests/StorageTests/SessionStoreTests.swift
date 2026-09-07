@@ -22,6 +22,32 @@ import ScribeAppCore
     #expect(FileManager.default.fileExists(atPath: first.timelineURL.path))
 }
 
+@Test func aTitledSessionIsNamedAfterItsMeetingAndKeepsTheTitleInTheManifest() throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let configuration = makeConfiguration(root: root, timeZone: .gmt, title: "  Weekly Sync: Q3 / Planning?  ")
+    let date = Date(timeIntervalSince1970: 1_725_381_012)
+    let store = try SessionStore.create(configuration: configuration, now: date)
+    defer { try? store.finish() }
+
+    // The timestamp still leads, so the folder sorts by date; the title is
+    // cleaned of what a filesystem refuses.
+    #expect(store.sessionDirectory.lastPathComponent == "2024-09-03 16-30-12 Z Weekly Sync- Q3 - Planning")
+    let manifest = try RecorderSessionManifestCodec.decode(Data(contentsOf: store.manifestURL))
+    #expect(manifest.title == "Weekly Sync- Q3 - Planning")
+}
+
+@Test func sessionDirectoryTitlesAreBoundedAndMayBeAbsent() {
+    let date = Date(timeIntervalSince1970: 1_725_381_012)
+    #expect(SessionDirectoryName.make(for: date, timeZone: .gmt) == "2024-09-03 16-30-12 Z")
+    #expect(SessionDirectoryName.make(for: date, timeZone: .gmt, title: " ... ") == "2024-09-03 16-30-12 Z")
+    #expect(SessionDirectoryName.normalizedTitle("Line one\nLine two") == "Line one Line two")
+    #expect(SessionDirectoryName.normalizedTitle("a\\b|c<d>e\"f*g") == "a-b c d e f g")
+    let long = String(repeating: "x", count: 200)
+    #expect(SessionDirectoryName.normalizedTitle(long)?.count == SessionDirectoryName.maximumTitleLength)
+    #expect(SessionDirectoryName.normalizedTitle(nil) == nil)
+}
+
 @Test func journalDescribesGapsOverlapsAndFormatChanges() throws {
     let root = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: root) }
@@ -132,7 +158,8 @@ private func makeConfiguration(
     segmentDuration: TimeInterval = 60,
     minimumFreeBytes: Int64 = 0,
     freeSpace: @escaping @Sendable (URL) throws -> Int64 = { _ in .max },
-    cleanStop: @escaping @Sendable () -> Void = {}
+    cleanStop: @escaping @Sendable () -> Void = {},
+    title: String? = nil
 ) -> SessionStoreConfiguration {
     SessionStoreConfiguration(
         recordingsDirectory: root,
@@ -144,7 +171,8 @@ private func makeConfiguration(
         segmentDuration: segmentDuration,
         minimumFreeBytes: minimumFreeBytes,
         freeSpaceProvider: freeSpace,
-        cleanStopRequester: cleanStop
+        cleanStopRequester: cleanStop,
+        title: title
     )
 }
 

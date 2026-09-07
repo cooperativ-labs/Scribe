@@ -47,6 +47,10 @@ public struct TranscriptionRequest: Codable, Sendable, Equatable, Identifiable {
     /// Redirects TXT/JSON/SRT exports only; canonical data stays in the transcript store.
     public let exportDirectory: URL?
     public let provenance: TranscriptionProvenance?
+    /// The name the transcript should open under, typically the calendar
+    /// meeting the recording was made during. `nil` leaves the transcript named
+    /// after its source file until a person renames it.
+    public let title: String?
 
     public var id: UUID { requestID }
 
@@ -60,7 +64,8 @@ public struct TranscriptionRequest: Codable, Sendable, Equatable, Identifiable {
         speakerLibraryRevision: String? = nil,
         modelProfileID: String,
         exportDirectory: URL? = nil,
-        provenance: TranscriptionProvenance? = nil
+        provenance: TranscriptionProvenance? = nil,
+        title: String? = nil
     ) {
         self.requestID = requestID
         self.sourceURL = sourceURL
@@ -72,6 +77,7 @@ public struct TranscriptionRequest: Codable, Sendable, Equatable, Identifiable {
         self.modelProfileID = modelProfileID
         self.exportDirectory = exportDirectory
         self.provenance = provenance
+        self.title = title
     }
 }
 
@@ -212,8 +218,12 @@ public struct RecorderSessionManifest: Codable, Sendable, Equatable {
     public let gaps: [CaptureGap]
     public let interruptions: [CaptureInterruption]
     public let processing: ProcessingMetadata
+    /// The meeting this session recorded, when one was known at start: the
+    /// calendar event's title. Additive and optional, so older manifests decode
+    /// unchanged and older readers ignore it.
+    public let title: String?
 
-    public init(schemaVersion: Int = Self.currentSchemaVersion, sessionID: UUID, appBuild: String, macOSVersion: String, startedAt: Date, endedAt: Date? = nil, durationSeconds: TimeInterval? = nil, completionStatus: RecorderSessionCompletionStatus, capture: CaptureMetadata, tracks: RecorderTrackCollection, gaps: [CaptureGap] = [], interruptions: [CaptureInterruption] = [], processing: ProcessingMetadata) {
+    public init(schemaVersion: Int = Self.currentSchemaVersion, sessionID: UUID, appBuild: String, macOSVersion: String, startedAt: Date, endedAt: Date? = nil, durationSeconds: TimeInterval? = nil, completionStatus: RecorderSessionCompletionStatus, capture: CaptureMetadata, tracks: RecorderTrackCollection, gaps: [CaptureGap] = [], interruptions: [CaptureInterruption] = [], processing: ProcessingMetadata, title: String? = nil) {
         self.schemaVersion = schemaVersion
         self.sessionID = sessionID
         self.appBuild = appBuild
@@ -227,6 +237,7 @@ public struct RecorderSessionManifest: Codable, Sendable, Equatable {
         self.gaps = gaps
         self.interruptions = interruptions
         self.processing = processing
+        self.title = title
     }
 }
 

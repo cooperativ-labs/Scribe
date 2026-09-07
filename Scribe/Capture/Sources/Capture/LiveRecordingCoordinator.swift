@@ -35,6 +35,9 @@ public final class LiveRecordingCoordinator: RecordingCoordinating {
     private let openFolder: @MainActor (URL) -> Void
     private let processingSubmission: ProcessingSubmission?
     private let captureActivityHandler: CaptureActivityHandler?
+    /// Asked once per start for the meeting's name. Absent when calendar naming
+    /// is not composed into the build.
+    private let recordingTitleProvider: (any RecordingTitleProviding)?
     private var eventTask: Task<Void, Never>?
     private var interruptionObservers: [NSObjectProtocol] = []
     private let permissionMonitor: PermissionService?
@@ -48,6 +51,7 @@ public final class LiveRecordingCoordinator: RecordingCoordinating {
         scheduler: (any ProcessingScheduler)? = nil,
         processingSubmission: ProcessingSubmission? = nil,
         captureActivityHandler: CaptureActivityHandler? = nil,
+        recordingTitleProvider: (any RecordingTitleProviding)? = nil,
         appBuild: String = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "development",
         macOSVersion: String = ProcessInfo.processInfo.operatingSystemVersionString
     ) {
@@ -57,6 +61,7 @@ public final class LiveRecordingCoordinator: RecordingCoordinating {
         self.openFolder = openFolder
         self.processingSubmission = processingSubmission
         self.captureActivityHandler = captureActivityHandler
+        self.recordingTitleProvider = recordingTitleProvider
         permissionMonitor = permissions as? PermissionService
         let initialConfiguration = Self.configuration(from: snapshot, appBuild: appBuild, macOSVersion: macOSVersion)
         let engine = RecordingCoordinator(
@@ -191,7 +196,10 @@ public final class LiveRecordingCoordinator: RecordingCoordinating {
         switch command {
         case .start:
             await engine.updateConfiguration(Self.configuration(from: snapshot))
-            await engine.start()
+            // The name is looked up at the moment of starting, so a recording
+            // begun from the menu, a shortcut, or the chip is named the same way.
+            let title = await recordingTitleProvider?.suggestedRecordingTitle(at: Date())
+            await engine.start(title: title)
             if case .recording = await engine.state() { permissionMonitor?.startMonitoring() }
         case .stop: await engine.stop()
         case .pause: await engine.pause()

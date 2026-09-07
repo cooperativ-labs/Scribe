@@ -73,6 +73,9 @@ public final class MeetingDetector: ObservableObject {
     private let settings: ScribeSettings
     private let microphoneProbe: any MicrophoneActivityProbing
     private let browserProbe: any BrowserTabURLProbing
+    /// Names a noticed call after the calendar meeting in progress, so the
+    /// offer can say which meeting it means. Absent in a build without one.
+    private let titleProvider: (any RecordingTitleProviding)?
     private let now: @MainActor () -> Date
     private let logger = Logger(subsystem: "com.scribe.app", category: "MeetingDetector")
     /// Only ever touched on the main actor; marked so `deinit` may invalidate it.
@@ -85,6 +88,7 @@ public final class MeetingDetector: ObservableObject {
         settings: ScribeSettings,
         microphoneProbe: any MicrophoneActivityProbing = CoreAudioMicrophoneActivityProbe(),
         browserProbe: any BrowserTabURLProbing = AppleEventBrowserTabURLProbe(),
+        titleProvider: (any RecordingTitleProviding)? = nil,
         pollInterval: TimeInterval = 2,
         endGracePeriod: TimeInterval = 5,
         browserRefreshInterval: TimeInterval = 10,
@@ -93,6 +97,7 @@ public final class MeetingDetector: ObservableObject {
         self.settings = settings
         self.microphoneProbe = microphoneProbe
         self.browserProbe = browserProbe
+        self.titleProvider = titleProvider
         self.pollInterval = pollInterval
         self.endGracePeriod = endGracePeriod
         self.browserRefreshInterval = browserRefreshInterval
@@ -156,7 +161,7 @@ public final class MeetingDetector: ObservableObject {
             // A browser is re-asked about its tabs only now and then: the answer
             // costs a process launch, and a tab does not change domain often.
             lastBrowserRefresh = time
-            if let refreshed = await resolve(stillLive, at: current.detectedAt) {
+            if let refreshed = await resolve(stillLive, at: current.detectedAt, calendarTitle: current.calendarTitle) {
                 if refreshed.domain != current.domain { publish(refreshed) }
                 lastSeenActive = time
             } else {
@@ -170,7 +175,10 @@ public final class MeetingDetector: ObservableObject {
 
         for candidate in candidates {
             if candidate.application.isBrowser { lastBrowserRefresh = time }
-            if let meeting = await resolve(candidate, at: time) {
+            // Looked up once per noticed call, not on every poll: the calendar
+            // is read only when there is something to name.
+            let calendarTitle = await titleProvider?.suggestedRecordingTitle(at: time)
+            if let meeting = await resolve(candidate, at: time, calendarTitle: calendarTitle) {
                 lastSeenActive = time
                 publish(meeting)
                 return
@@ -203,14 +211,15 @@ public final class MeetingDetector: ObservableObject {
     }
 
     /// Confirms a candidate, asking a browser about its tabs when domains are configured.
-    private func resolve(_ candidate: Candidate, at time: Date) async -> DetectedMeeting? {
+    private func resolve(_ candidate: Candidate, at time: Date, calendarTitle: String?) async -> DetectedMeeting? {
         func meeting(domain: String?) -> DetectedMeeting {
             DetectedMeeting(
                 application: candidate.application,
                 bundleIdentifier: candidate.bundleIdentifier,
                 processIdentifier: candidate.process.processIdentifier,
                 domain: domain,
-                detectedAt: time
+                detectedAt: time,
+                calendarTitle: calendarTitle
             )
         }
 
@@ -243,7 +252,7 @@ public final class MeetingDetector: ObservableObject {
         detectedMeeting = meeting
         if meeting == nil { lastSeenActive = nil }
         if let meeting {
-            logger.info("Detected a call: \(meeting.displayName, privacy: .public) (pid \(meeting.processIdentifier))")
+            logger.info("Detected a call: \(meeting.preferredName, privacy: .public) (pid \(meeting.processIdentifier))")
         } else {
             logger.info("Call ended")
         }

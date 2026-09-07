@@ -29,6 +29,11 @@ private final class FakeBrowserProbe: BrowserTabURLProbing, @unchecked Sendable 
     }
 }
 
+private struct FakeTitleProvider: RecordingTitleProviding {
+    let title: String?
+    func suggestedRecordingTitle(at date: Date) async -> String? { title }
+}
+
 @MainActor
 private func makeSettings() throws -> (ScribeSettings, cleanup: () -> Void) {
     let suiteName = "MeetingDetectionTests-\(UUID().uuidString)"
@@ -149,7 +154,7 @@ private struct Harness {
     let browser = FakeBrowserProbe()
     let detector: MeetingDetector
 
-    init() throws {
+    init(calendarTitle: String? = nil) throws {
         let (settings, cleanup) = try makeSettings()
         self.settings = settings
         self.cleanup = cleanup
@@ -159,6 +164,7 @@ private struct Harness {
             settings: settings,
             microphoneProbe: microphone,
             browserProbe: browser,
+            titleProvider: FakeTitleProvider(title: calendarTitle),
             pollInterval: 60,
             endGracePeriod: 5,
             browserRefreshInterval: 10,
@@ -190,6 +196,19 @@ private struct Harness {
         #expect(meeting.displayName == "Zoom")
         #expect(seen.count == 1)
         #expect(harness.browser.askedBundleIdentifiers.isEmpty, "native applications are never asked about tabs")
+    }
+
+    @MainActor @Test func aCallIsNamedAfterTheCalendarMeetingInProgress() async throws {
+        let harness = try Harness(calendarTitle: "Weekly Sync")
+        defer { harness.cleanup() }
+
+        harness.microphone.set([AudioInputProcess(processIdentifier: 42, bundleIdentifier: "us.zoom.xos")])
+        await harness.detector.poll()
+
+        let meeting = try #require(harness.detector.detectedMeeting)
+        #expect(meeting.calendarTitle == "Weekly Sync")
+        #expect(meeting.preferredName == "Weekly Sync")
+        #expect(meeting.displayName == "Zoom")
     }
 
     @MainActor @Test func unrelatedMicrophoneUsersAreIgnored() async throws {

@@ -67,6 +67,15 @@ public final class ScribeSettings: ObservableObject {
         didSet { defaults.set(meetingDomains, forKey: Key.meetingDomains) }
     }
 
+    // MARK: Calendar
+
+    /// Names recordings and transcripts after the Apple Calendar meeting in
+    /// progress when they start. Off by default: it needs calendar access, and
+    /// that is a question to ask only once the person has chosen the feature.
+    @Published public var useCalendarMeetingNames: Bool {
+        didSet { defaults.set(useCalendarMeetingNames, forKey: Key.useCalendarMeetingNames) }
+    }
+
     public init(
         defaults: UserDefaults = .standard,
         defaultRecordingsFolderURL: URL = ScribeSettings.defaultRecordingsFolderURL,
@@ -100,6 +109,7 @@ public final class ScribeSettings: ObservableObject {
         stopRecordingWhenMeetingEnds = defaults.object(forKey: Key.stopRecordingWhenMeetingEnds) as? Bool ?? false
         disabledMeetingApplicationIDs = Set(defaults.stringArray(forKey: Key.disabledMeetingApplicationIDs) ?? [])
         meetingDomains = defaults.stringArray(forKey: Key.meetingDomains) ?? MeetingDomain.defaults
+        useCalendarMeetingNames = defaults.object(forKey: Key.useCalendarMeetingNames) as? Bool ?? false
 
         recordingsFolderURL = defaultRecordingsFolderURL
         modelInstaller.refresh(directory: modelsFolderURL)
@@ -256,6 +266,7 @@ public final class ScribeSettings: ObservableObject {
         static let stopRecordingWhenMeetingEnds = "scribe.settings.stopRecordingWhenMeetingEnds"
         static let disabledMeetingApplicationIDs = "scribe.settings.disabledMeetingApplicationIDs"
         static let meetingDomains = "scribe.settings.meetingDomains"
+        static let useCalendarMeetingNames = "scribe.settings.useCalendarMeetingNames"
     }
 
     private let defaults: UserDefaults

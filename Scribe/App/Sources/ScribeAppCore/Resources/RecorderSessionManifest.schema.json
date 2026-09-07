@@ -13,6 +13,7 @@
     "endedAt": { "type": ["string", "null"], "format": "date-time" },
     "durationSeconds": { "type": ["number", "null"] },
     "completionStatus": { "enum": ["complete", "interrupted", "failed"] },
+    "title": { "type": ["string", "null"], "description": "The calendar meeting the session recorded, when known at start." },
     "capture": {
       "type": "object",
       "required": ["state", "scope", "microphone", "outputDeviceChanges"],

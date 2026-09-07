@@ -226,6 +226,9 @@ public struct TranscriptAssemblyStageRunner: TranscriptionStageRunning {
         let transcript = CanonicalTranscript(
             transcriptID: job.runID.uuidString,
             revision: 1,
+            // The recorder names a request after the calendar meeting it was
+            // made during; the transcript opens under that name.
+            title: job.request.title,
             status: build.segments.isEmpty ? .noSpeech : (warnings.isEmpty ? .complete : .completeWithWarnings),
             createdAt: ISO8601DateFormatter().string(from: now()),
             source: TranscriptSource(

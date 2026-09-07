@@ -191,7 +191,8 @@ extension MixdownService {
             tracks: tracks,
             gaps: manifest.gaps,
             interruptions: manifest.interruptions,
-            processing: processing
+            processing: processing,
+            title: manifest.title
         )
     }
 }

@@ -26,6 +26,9 @@ final class ScribeAppEnvironment: ObservableObject {
     /// once one is running. Owns no detection of its own: it is told what was
     /// found and decides only what to show.
     let meetingChipModel: MeetingChipModel
+    /// The person's Apple Calendar, once they connect it. Names recordings,
+    /// transcripts, and the chip's offer after the meeting in progress.
+    let calendar: CalendarMeetingService
     @Published private(set) var detectedMeeting: DetectedMeeting?
     private let processingQueue: ProcessingQueue?
     private let outbox: TranscriptionRequestOutbox
@@ -61,6 +64,8 @@ final class ScribeAppEnvironment: ObservableObject {
         self.permissions = permissions
         processingQueue = try? ProcessingQueue(configuration: .inRecordingsDirectory(settings.recordingsFolderURL))
         outbox = .inRecordingsDirectory(settings.recordingsFolderURL)
+        let calendar = CalendarMeetingService(settings: settings)
+        self.calendar = calendar
 
         let coordinator = LiveRecordingCoordinator(
             snapshot: RecorderSnapshot(
@@ -81,7 +86,8 @@ final class ScribeAppEnvironment: ObservableObject {
             },
             captureActivityHandler: { [processingQueue] active in
                 await processingQueue?.setCaptureActive(active)
-            }
+            },
+            recordingTitleProvider: calendar
         )
         self.coordinator = coordinator
         menuModel = RecorderMenuModel(
@@ -95,7 +101,7 @@ final class ScribeAppEnvironment: ObservableObject {
             }
         )
         hotkeys = HotkeyService(coordinator: coordinator)
-        meetingDetector = MeetingDetector(settings: settings)
+        meetingDetector = MeetingDetector(settings: settings, titleProvider: calendar)
 
         transcription = try? TranscriptionHostService(settings: settings, scheduler: processingQueue)
 

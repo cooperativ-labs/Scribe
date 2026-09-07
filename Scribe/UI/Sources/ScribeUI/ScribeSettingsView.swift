@@ -12,13 +12,16 @@ public struct ScribeSettingsView: View {
     @ObservedObject private var sources: RecorderMenuModel
     /// Absent in a build without detection; the section is then not shown.
     private let meetingDetector: MeetingDetector?
+    /// Absent in a build without calendar naming; the section is then not shown.
+    private let calendar: CalendarMeetingService?
     @State private var isChoosingRecordingsFolder = false
     @State private var folderSelectionError: String?
 
-    public init(settings: ScribeSettings, sources: RecorderMenuModel, meetingDetector: MeetingDetector? = nil) {
+    public init(settings: ScribeSettings, sources: RecorderMenuModel, meetingDetector: MeetingDetector? = nil, calendar: CalendarMeetingService? = nil) {
         self.settings = settings
         self.sources = sources
         self.meetingDetector = meetingDetector
+        self.calendar = calendar
     }
 
     public var body: some View {
@@ -100,6 +103,10 @@ public struct ScribeSettingsView: View {
 
             if let meetingDetector {
                 MeetingDetectionSettingsView(settings: settings, detector: meetingDetector)
+            }
+
+            if let calendar {
+                CalendarSettingsView(settings: settings, calendar: calendar)
             }
 
             Section("Global shortcuts") {

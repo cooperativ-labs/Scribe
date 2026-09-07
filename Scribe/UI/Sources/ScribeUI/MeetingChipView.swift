@@ -59,12 +59,16 @@ struct MeetingChipView: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(offer.question)
                     .font(.system(size: 13, weight: .medium))
+                    .lineLimit(1)
+                    .frame(maxWidth: 320, alignment: .leading)
                 // The website is the useful half of a browser call: it says
-                // which of the open tabs Scribe means.
-                if let domain = offer.domain {
-                    Text(domain)
+                // which of the open tabs Scribe means. With a calendar name on
+                // the first line, the application is named here instead.
+                if let detail = offer.detail {
+                    Text(detail)
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
             }
             .fixedSize(horizontal: true, vertical: false)
@@ -101,6 +105,13 @@ struct MeetingChipView: View {
                     .foregroundStyle(session.isPaused ? AnyShapeStyle(.secondary) : AnyShapeStyle(Color.red))
                     .accessibilityLabel(session.isPaused ? "Paused" : "Recording")
                 ElapsedTimestampButton(elapsedText: session.elapsedText, copy: actions.copyTimestamp)
+                if let title = session.title {
+                    Text(title)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .frame(maxWidth: 200, alignment: .leading)
+                }
             }
 
             Spacer(minLength: 16)

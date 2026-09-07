@@ -21,6 +21,14 @@ import Testing
         #expect(request.speakerMatching == .enabled)
     }
 
+    @Test func theMeetingTitleTravelsWithTheRequest() throws {
+        let session = try handoffSession(finalContents: "verified-final-mix", title: "Weekly Sync")
+        let request = try FinalRecordingHandoff(checksumOfFile: fakeChecksum)
+            .request(forSessionAt: session.directory)
+
+        #expect(request.title == "Weekly Sync")
+    }
+
     @Test func failedCleanupIsSurfacedRatherThanHandingOffARawTrack() throws {
         let session = try handoffSession(
             processing: ProcessingMetadata(
@@ -125,7 +133,8 @@ private func handoffSession(
     processing: ProcessingMetadata = ProcessingMetadata(state: .complete),
     tracks: RecorderTrackCollection? = nil,
     finalContents: String?,
-    checksum: String? = nil
+    checksum: String? = nil,
+    title: String? = nil
 ) throws -> HandoffSession {
     let root = try handoffTemporaryRoot()
     let directory = root.appendingPathComponent("2026-09-04 10-00-00", isDirectory: true)
@@ -159,7 +168,8 @@ private func handoffSession(
             microphone: AudioDeviceIdentity(uniqueID: "mic", name: "Microphone")
         ),
         tracks: resolvedTracks,
-        processing: processing
+        processing: processing,
+        title: title
     )
     try AtomicReplaceFileWriter().write(manifest, to: directory.appendingPathComponent("metadata.json"))
     return HandoffSession(directory: directory, sessionID: sessionID)

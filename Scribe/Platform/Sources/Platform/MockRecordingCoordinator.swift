@@ -24,6 +24,9 @@ public final class MockRecordingCoordinator: RecordingCoordinating {
     public var holdsTransitions = false
     /// Failure returned by the next start instead of entering `.recording`.
     public var startFailure: RecorderFailure?
+    /// The name the next started recording carries, standing in for what the
+    /// calendar would have supplied.
+    public var nextRecordingTitle: String?
     /// Failure returned by the next stop instead of returning to `.idle`.
     public var stopFailure: RecorderFailure?
     /// Status applied when a permission request runs without a live service.
@@ -173,7 +176,7 @@ public final class MockRecordingCoordinator: RecordingCoordinating {
         snapshot.state = .starting
         let complete: @MainActor () -> Void = { [weak self] in
             guard let self, case .starting = snapshot.state else { return }
-            snapshot.state = .recording(RecordingActivity(sessionID: UUID(), startedAt: now()))
+            snapshot.state = .recording(RecordingActivity(sessionID: UUID(), startedAt: now(), title: nextRecordingTitle))
         }
         if holdsTransitions {
             pendingTransition = complete

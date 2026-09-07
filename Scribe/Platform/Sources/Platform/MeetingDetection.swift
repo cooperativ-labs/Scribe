@@ -142,13 +142,18 @@ public struct DetectedMeeting: Equatable, Sendable {
     /// applications, and for a browser whose tabs could not be read.
     public let domain: String?
     public let detectedAt: Date
+    /// The calendar meeting on at the time, when the person connected their
+    /// calendar and one matched. This is what the offer and the recording are
+    /// named after.
+    public let calendarTitle: String?
 
-    public init(application: MeetingApplication, bundleIdentifier: String, processIdentifier: pid_t, domain: String?, detectedAt: Date) {
+    public init(application: MeetingApplication, bundleIdentifier: String, processIdentifier: pid_t, domain: String?, detectedAt: Date, calendarTitle: String? = nil) {
         self.application = application
         self.bundleIdentifier = bundleIdentifier
         self.processIdentifier = processIdentifier
         self.domain = domain
         self.detectedAt = detectedAt
+        self.calendarTitle = calendarTitle
     }
 
     /// "Zoom", or "meet.google.com in Arc".
@@ -156,4 +161,7 @@ public struct DetectedMeeting: Equatable, Sendable {
         guard let domain else { return application.name }
         return "\(domain) in \(application.name)"
     }
+
+    /// The calendar name when there is one, otherwise the application form.
+    public var preferredName: String { calendarTitle ?? displayName }
 }

@@ -21,14 +21,34 @@ public enum MeetingChipPresentation: Equatable, Sendable {
         /// The website the call was matched on, when it was noticed in a
         /// browser. `nil` for a dedicated calling application.
         public let domain: String?
+        /// The calendar meeting on at the time, when the person connected
+        /// their calendar and one matched.
+        public let meetingTitle: String?
 
-        public init(applicationName: String, domain: String?) {
+        public init(applicationName: String, domain: String?, meetingTitle: String? = nil) {
             self.applicationName = applicationName
             self.domain = domain
+            self.meetingTitle = meetingTitle
         }
 
-        /// "Record this Zoom meeting?"
-        public var question: String { "Record this \(applicationName) meeting?" }
+        /// "Record “Weekly Sync”?" when the calendar names the meeting, and
+        /// "Record this Zoom meeting?" otherwise.
+        public var question: String {
+            if let meetingTitle { return "Record \u{201C}\(meetingTitle)\u{201D}?" }
+            return "Record this \(applicationName) meeting?"
+        }
+
+        /// The second line: where the call is. With a calendar name on the
+        /// first line the application is worth saying too; without one, only
+        /// the website adds anything.
+        public var detail: String? {
+            switch (meetingTitle, domain) {
+            case (nil, nil): nil
+            case (nil, let domain?): domain
+            case (_, nil): applicationName
+            case (_, let domain?): "\(domain) in \(applicationName)"
+            }
+        }
     }
 
     /// The transport the chip offers while it owns a recording.
@@ -39,12 +59,15 @@ public enum MeetingChipPresentation: Equatable, Sendable {
         public let isPaused: Bool
         public let isHoldEnabled: Bool
         public let isStopEnabled: Bool
+        /// The meeting's name, when the recording has one.
+        public let title: String?
 
-        public init(elapsedText: String, isPaused: Bool, isHoldEnabled: Bool, isStopEnabled: Bool) {
+        public init(elapsedText: String, isPaused: Bool, isHoldEnabled: Bool, isStopEnabled: Bool, title: String? = nil) {
             self.elapsedText = elapsedText
             self.isPaused = isPaused
             self.isHoldEnabled = isHoldEnabled
             self.isStopEnabled = isStopEnabled
+            self.title = title
         }
     }
 
@@ -88,7 +111,8 @@ public enum MeetingChipPresentation: Equatable, Sendable {
                 elapsedText: MenuPresentation.elapsedText(elapsed),
                 isPaused: snapshot.state.isPaused,
                 isHoldEnabled: snapshot.state.isCapturing,
-                isStopEnabled: snapshot.state.isCapturing
+                isStopEnabled: snapshot.state.isCapturing,
+                title: snapshot.state.activity?.title
             ))
             return
         }
@@ -97,6 +121,6 @@ public enum MeetingChipPresentation: Equatable, Sendable {
             self = .hidden
             return
         }
-        self = .offer(Offer(applicationName: meeting.application.name, domain: meeting.domain))
+        self = .offer(Offer(applicationName: meeting.application.name, domain: meeting.domain, meetingTitle: meeting.calendarTitle))
     }
 }

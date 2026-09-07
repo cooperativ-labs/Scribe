@@ -21,5 +21,12 @@
     -->
     <key>com.apple.security.automation.apple-events</key>
     <true/>
+    <!--
+        Calendar naming reads event titles through EventKit. The hardened
+        runtime refuses calendar access without this entitlement, and System
+        Settings never offers a switch for Scribe.
+    -->
+    <key>com.apple.security.personal-information.calendars</key>
+    <true/>
 </dict>
 </plist>

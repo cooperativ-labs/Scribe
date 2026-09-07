@@ -44,6 +44,19 @@ final class MenuPresentationTests: XCTestCase {
         XCTAssertTrue(presentation.isStopEnabled)
     }
 
+    func testRecordingNamesTheMeetingWhenTheCalendarSuppliedOne() async {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot(), now: { start })
+        coordinator.nextRecordingTitle = "Weekly Sync"
+        coordinator.submit(.start)
+        await coordinator.waitUntilIdle()
+
+        let presentation = MenuPresentation(snapshot: coordinator.snapshot, at: start.addingTimeInterval(83))
+
+        XCTAssertEqual(presentation.statusTitle, "Recording — 01:23")
+        XCTAssertEqual(presentation.statusDetail, "Weekly Sync")
+    }
+
     func testRecordingPastAnHourShowsHours() async {
         let start = Date(timeIntervalSince1970: 1_000)
         let coordinator = MockRecordingCoordinator(snapshot: readySnapshot(), now: { start })

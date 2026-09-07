@@ -52,10 +52,14 @@ public enum RecorderState: Equatable, Sendable {
 public struct RecordingActivity: Equatable, Sendable {
     public let sessionID: UUID
     public let startedAt: Date
+    /// The meeting being recorded, when a calendar event named it. Shown in the
+    /// menu and the chip so a person can see which meeting the recording is for.
+    public let title: String?
 
-    public init(sessionID: UUID, startedAt: Date) {
+    public init(sessionID: UUID, startedAt: Date, title: String? = nil) {
         self.sessionID = sessionID
         self.startedAt = startedAt
+        self.title = title
     }
 
     public func elapsed(at date: Date) -> TimeInterval {

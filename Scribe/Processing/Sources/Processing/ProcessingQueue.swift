@@ -261,7 +261,8 @@ public struct SessionProcessor: Sendable {
             startedAt: current.startedAt, endedAt: current.endedAt,
             durationSeconds: current.durationSeconds, completionStatus: current.completionStatus,
             capture: current.capture, tracks: current.tracks, gaps: current.gaps,
-            interruptions: current.interruptions, processing: processing
+            interruptions: current.interruptions, processing: processing,
+            title: current.title
         )
         try AtomicReplaceFileWriter().write(updated, to: manifestURL)
     }

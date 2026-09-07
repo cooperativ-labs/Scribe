@@ -56,14 +56,16 @@ public struct MenuPresentation: Equatable, Sendable {
             statusSymbol = "waveform.badge.plus"
         case .recording(let activity):
             statusTitle = "Recording — \(Self.elapsedText(activity.elapsed(at: date)))"
-            statusDetail = nil
+            // The meeting's name, when the calendar supplied one, so the menu
+            // says which meeting is being recorded.
+            statusDetail = activity.title
             statusSymbol = "record.circle"
         case .paused(let activity):
             // The elapsed figure keeps advancing because the recording itself
             // does: a paused span is reconstructed as silence, so this is the
             // length of the file being produced, not just the audible part.
             statusTitle = "Paused — \(Self.elapsedText(activity.elapsed(at: date)))"
-            statusDetail = nil
+            statusDetail = activity.title
             statusSymbol = "pause.circle"
         case .stopping:
             statusTitle = "Stopping…"

@@ -193,7 +193,10 @@ public actor RecordingCoordinator {
 
     /// Performs permission, destination, reserve-space, source-selection, and
     /// stream-start preflight in one serialized transition.
-    public func start() async {
+    ///
+    /// - Parameter title: the meeting being recorded, when known. It names the
+    ///   session directory and is carried in the manifest to the transcript.
+    public func start(title: String? = nil) async {
         guard currentState == .idle || isErrorState else { return }
         transition(to: .starting)
         do {
@@ -215,7 +218,8 @@ public actor RecordingCoordinator {
                 freeSpaceProvider: freeSpace,
                 cleanStopRequester: { [weak self] in
                     Task { await self?.stop(reason: .lowFreeSpace) }
-                }
+                },
+                title: title
             ))
             activeStore = store
             let capture = captureFactory(configuration, store) { [weak self] event in
@@ -224,7 +228,7 @@ public actor RecordingCoordinator {
             activeCapture = capture
             let sources = try await capture.start()
             try store.updateCaptureSources(CaptureSourceUpdate(scope: sources.scope, microphone: sources.microphone))
-            transition(to: .recording(RecordingActivity(sessionID: sessionID, startedAt: now())))
+            transition(to: .recording(RecordingActivity(sessionID: sessionID, startedAt: now(), title: store.manifest.title)))
             if let pendingInterruption {
                 self.pendingInterruption = nil
                 await stop(reason: pendingInterruption)

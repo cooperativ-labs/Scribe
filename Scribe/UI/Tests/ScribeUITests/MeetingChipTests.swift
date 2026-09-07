@@ -23,6 +23,35 @@ final class MeetingChipTests: XCTestCase {
         XCTAssertEqual(offer.question, "Record this Zoom meeting?")
     }
 
+    func testACallWithACalendarMeetingIsOfferedByThatMeetingsName() {
+        let model = makeModel(MockRecordingCoordinator(snapshot: readySnapshot()))
+
+        model.meetingWasDetected(zoomCall(calendarTitle: "Weekly Sync"))
+
+        guard case .offer(let offer) = model.presentation else { return XCTFail("expected an offer") }
+        // The calendar says which meeting; the application says where it is.
+        XCTAssertEqual(offer.question, "Record \u{201C}Weekly Sync\u{201D}?")
+        XCTAssertEqual(offer.detail, "Zoom")
+        XCTAssertEqual(
+            MeetingChipPresentation.Offer(applicationName: "Arc", domain: "meet.google.com", meetingTitle: "Weekly Sync").detail,
+            "meet.google.com in Arc"
+        )
+        XCTAssertNil(MeetingChipPresentation.Offer(applicationName: "Zoom", domain: nil).detail)
+    }
+
+    func testTheTransportNamesTheMeetingBeingRecorded() async {
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
+        coordinator.nextRecordingTitle = "Weekly Sync"
+        let model = makeModel(coordinator)
+        model.meetingWasDetected(zoomCall(calendarTitle: "Weekly Sync"))
+
+        model.record()
+        await coordinator.waitUntilIdle()
+
+        guard case .session(let session) = model.presentation else { return XCTFail("expected a session") }
+        XCTAssertEqual(session.title, "Weekly Sync")
+    }
+
     func testACallNoticedInABrowserNamesTheWebsiteAsWellAsTheBrowser() {
         let model = makeModel(MockRecordingCoordinator(snapshot: readySnapshot()))
 
@@ -372,13 +401,14 @@ final class MeetingChipTests: XCTestCase {
         RecorderSnapshot(permissions: .allGranted, recordingsFolderURL: URL(fileURLWithPath: "/tmp/scribe", isDirectory: true))
     }
 
-    private func zoomCall(at date: Date = Date(timeIntervalSince1970: 1_000)) -> DetectedMeeting {
+    private func zoomCall(at date: Date = Date(timeIntervalSince1970: 1_000), calendarTitle: String? = nil) -> DetectedMeeting {
         DetectedMeeting(
             application: MeetingApplication.catalog.first { $0.id == "zoom" }!,
             bundleIdentifier: "us.zoom.xos",
             processIdentifier: 501,
             domain: nil,
-            detectedAt: date
+            detectedAt: date,
+            calendarTitle: calendarTitle
         )
     }
 

@@ -74,7 +74,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             rootView: ScribeSettingsView(
                 settings: environment.settings,
                 sources: environment.menuModel,
-                meetingDetector: environment.meetingDetector
+                meetingDetector: environment.meetingDetector,
+                calendar: environment.calendar
             )
         ))
         window.title = "Settings"

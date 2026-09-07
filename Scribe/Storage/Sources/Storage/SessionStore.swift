@@ -76,6 +76,9 @@ public struct SessionStoreConfiguration: Sendable {
     public let journalCheckpointEveryBuffers: Int
     public let freeSpaceProvider: @Sendable (URL) throws -> Int64
     public let cleanStopRequester: @Sendable () -> Void
+    /// The meeting being recorded, when known: names the session directory
+    /// after it and is kept in the manifest for the transcript.
+    public let title: String?
 
     public init(
         recordingsDirectory: URL,
@@ -89,7 +92,8 @@ public struct SessionStoreConfiguration: Sendable {
         minimumFreeBytes: Int64 = 512 * 1_024 * 1_024,
         journalCheckpointEveryBuffers: Int = 1,
         freeSpaceProvider: @escaping @Sendable (URL) throws -> Int64 = SessionStore.availableCapacity,
-        cleanStopRequester: @escaping @Sendable () -> Void = {}
+        cleanStopRequester: @escaping @Sendable () -> Void = {},
+        title: String? = nil
     ) {
         self.recordingsDirectory = recordingsDirectory
         self.sessionID = sessionID
@@ -103,6 +107,7 @@ public struct SessionStoreConfiguration: Sendable {
         self.journalCheckpointEveryBuffers = max(1, journalCheckpointEveryBuffers)
         self.freeSpaceProvider = freeSpaceProvider
         self.cleanStopRequester = cleanStopRequester
+        self.title = SessionDirectoryName.normalizedTitle(title)
     }
 }
 
@@ -155,7 +160,7 @@ public final class SessionStore: @unchecked Sendable {
     public static func create(configuration: SessionStoreConfiguration, now: Date = Date(), sessionID: UUID = UUID()) throws -> SessionStore {
         let manager = FileManager.default
         try manager.createDirectory(at: configuration.recordingsDirectory, withIntermediateDirectories: true)
-        let baseName = sessionDirectoryName(for: now, timeZone: configuration.timeZone)
+        let baseName = SessionDirectoryName.make(for: now, timeZone: configuration.timeZone, title: configuration.title)
         let directory = try reserveSessionDirectory(in: configuration.recordingsDirectory, baseName: baseName)
         let capture = directory.appendingPathComponent("capture", isDirectory: true)
         try manager.createDirectory(at: capture, withIntermediateDirectories: false)
@@ -169,7 +174,8 @@ public final class SessionStore: @unchecked Sendable {
             completionStatus: .interrupted,
             capture: CaptureMetadata(state: .capturing, scope: configuration.captureScope, microphone: configuration.microphone),
             tracks: RecorderTrackCollection(),
-            processing: ProcessingMetadata(state: .pending)
+            processing: ProcessingMetadata(state: .pending),
+            title: configuration.title
         )
         let manifestURL = directory.appendingPathComponent("metadata.json")
         try AtomicReplaceFileWriter().write(manifest, to: manifestURL)
@@ -229,7 +235,8 @@ public final class SessionStore: @unchecked Sendable {
             tracks: current.tracks,
             gaps: current.gaps,
             interruptions: current.interruptions,
-            processing: current.processing
+            processing: current.processing,
+            title: current.title
         )
         try AtomicReplaceFileWriter().write(updated, to: manifestURL)
         manifest = updated
@@ -253,7 +260,7 @@ public final class SessionStore: @unchecked Sendable {
             durationSeconds: current.durationSeconds, completionStatus: current.completionStatus,
             capture: CaptureMetadata(state: current.capture.state, scope: current.capture.scope, microphone: current.capture.microphone, outputDeviceChanges: current.capture.outputDeviceChanges + [change]),
             tracks: current.tracks, gaps: current.gaps, interruptions: current.interruptions,
-            processing: current.processing
+            processing: current.processing, title: current.title
         )
         try AtomicReplaceFileWriter().write(updated, to: manifestURL)
         manifest = updated
@@ -313,7 +320,8 @@ public final class SessionStore: @unchecked Sendable {
             tracks: manifest.tracks,
             gaps: manifest.gaps,
             interruptions: manifest.interruptions + [CaptureInterruption(occurredAt: recoveredAt, reason: "recovered after unclean shutdown")],
-            processing: manifest.processing
+            processing: manifest.processing,
+            title: manifest.title
         )
         try AtomicReplaceFileWriter().write(recoveredManifest, to: metadata)
         return RecoveredSession(sessionDirectory: sessionDirectory, sessionID: manifest.sessionID, recoveredActiveSegments: recovered.sorted())
@@ -365,7 +373,7 @@ public final class SessionStore: @unchecked Sendable {
             completionStatus: completionStatus,
             capture: CaptureMetadata(state: state, scope: current.capture.scope, microphone: current.capture.microphone, outputDeviceChanges: current.capture.outputDeviceChanges),
             tracks: current.tracks, gaps: current.gaps, interruptions: interruptions,
-            processing: current.processing
+            processing: current.processing, title: current.title
         )
         try AtomicReplaceFileWriter().write(updated, to: manifestURL)
         manifest = updated
@@ -602,13 +610,55 @@ private func reserveSessionDirectory(in root: URL, baseName: String) throws -> U
     throw CocoaError(.fileWriteFileExists)
 }
 
-private func sessionDirectoryName(for date: Date, timeZone: TimeZone) -> String {
-    let formatter = DateFormatter()
-    formatter.locale = Locale(identifier: "en_US_POSIX")
-    formatter.calendar = Calendar(identifier: .gregorian)
-    formatter.timeZone = timeZone
-    formatter.dateFormat = "yyyy-MM-dd HH-mm-ss ZZZZZ"
-    return formatter.string(from: date)
+/// How a session directory is named: the timestamp that has always led the
+/// name, followed by the meeting's title when one was known.
+///
+/// The timestamp stays first so the recordings folder keeps sorting by date
+/// and launch recovery keeps recognising sessions the same way. The title is
+/// cleaned for the filesystem and bounded, since a calendar event's name can
+/// contain anything.
+public enum SessionDirectoryName {
+    /// The most a title may add to the directory name, in characters. Long
+    /// enough for a real meeting name; short enough that the whole path stays
+    /// well within what every filesystem and sync client accepts.
+    public static let maximumTitleLength = 80
+
+    public static func make(for date: Date, timeZone: TimeZone, title: String? = nil) -> String {
+        let stamp = timestamp(for: date, timeZone: timeZone)
+        guard let title = normalizedTitle(title) else { return stamp }
+        return stamp + " " + title
+    }
+
+    public static func timestamp(for date: Date, timeZone: TimeZone) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = timeZone
+        formatter.dateFormat = "yyyy-MM-dd HH-mm-ss ZZZZZ"
+        return formatter.string(from: date)
+    }
+
+    /// The form of a title that is safe as part of a directory name, or `nil`
+    /// when nothing usable remains. Path separators and characters Finder or
+    /// Windows refuse are replaced, control characters and surrounding
+    /// whitespace are dropped, and runs of whitespace collapse to one space.
+    public static func normalizedTitle(_ title: String?) -> String? {
+        guard let title else { return nil }
+        let replaced = title.map { character -> Character in
+            if character == "/" || character == ":" || character == "\\" { return "-" }
+            if character == "\"" || character == "*" || character == "?" || character == "<" || character == ">" || character == "|" { return " " }
+            if character.isNewline || character.unicodeScalars.allSatisfy({ CharacterSet.controlCharacters.contains($0) }) { return " " }
+            return character
+        }
+        let collapsed = String(replaced)
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+        var trimmed = collapsed.trimmingCharacters(in: CharacterSet(charactersIn: ". -"))
+        if trimmed.count > maximumTitleLength {
+            trimmed = String(trimmed.prefix(maximumTitleLength)).trimmingCharacters(in: CharacterSet(charactersIn: ". -"))
+        }
+        return trimmed.isEmpty ? nil : trimmed
+    }
 }
 
 private func atomicWrite(_ data: Data, to url: URL) throws {

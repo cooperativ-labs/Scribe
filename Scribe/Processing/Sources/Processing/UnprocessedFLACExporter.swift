@@ -210,7 +210,8 @@ public struct UnprocessedFLACExporter: Sendable {
             tracks: RecorderTrackCollection(system: system, microphone: microphone, finalTrack: manifest.tracks.finalTrack),
             gaps: manifest.gaps,
             interruptions: manifest.interruptions,
-            processing: processing
+            processing: processing,
+            title: manifest.title
         )
     }
 

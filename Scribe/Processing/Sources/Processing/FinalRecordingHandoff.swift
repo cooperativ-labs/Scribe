@@ -155,7 +155,8 @@ public struct FinalRecordingHandoff: Sendable {
             sourceURL: finalURL,
             modelProfileID: modelProfileID,
             exportDirectory: exportDirectory,
-            provenance: TranscriptionProvenance(producerID: Self.producerID, sessionID: manifest.sessionID)
+            provenance: TranscriptionProvenance(producerID: Self.producerID, sessionID: manifest.sessionID),
+            title: manifest.title
         )
     }
 
