@@ -59,7 +59,7 @@ public struct TranscriptWindow: View {
             }
         }
         // A floor only: the window, not the transcript's length, decides the size.
-        .frame(minWidth: 820, minHeight: 500)
+        .frame(minWidth: 820, minHeight: 600)
         .task { await viewModel.loadPeople() }
         .onChange(of: viewModel.selectedFileID) {
             isRenaming = false
@@ -238,12 +238,7 @@ public struct TranscriptWindow: View {
                 titleHeader(file: file)
                 TranscriptSuggestionBanner(viewModel: viewModel)
                 if !viewModel.speakerRows.isEmpty {
-                    DisclosureGroup(isExpanded: $isSpeakersExpanded) {
-                        TranscriptSpeakersInspector(viewModel: viewModel)
-                            .padding(.top, 4)
-                    } label: {
-                        Text("Speakers in this recording").font(.headline)
-                    }
+                    speakersDisclosure
                 }
                 if let message = viewModel.speakerActionMessage {
                     Label(message.text, systemImage: message.isFailure ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
@@ -281,6 +276,41 @@ public struct TranscriptWindow: View {
         }
         .background { keyboardShortcuts }
         .animation(.snappy, value: viewModel.speakerActionMessage)
+    }
+
+    /// A hand-rolled disclosure rather than `DisclosureGroup`: on macOS that
+    /// control makes the whole detail column lay out at its ideal height, so a
+    /// long transcript pushed the header and transport bar out of the window
+    /// instead of scrolling inside it. The speaker list is capped so that many
+    /// speakers cannot squeeze the transcript out either.
+    private var speakersDisclosure: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.snappy(duration: 0.2)) { isSpeakersExpanded.toggle() }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(isSpeakersExpanded ? 90 : 0))
+                    Text("Speakers in this recording").font(.headline)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityValue(isSpeakersExpanded ? "Expanded" : "Collapsed")
+            if isSpeakersExpanded {
+                ScrollView(.vertical) {
+                    TranscriptSpeakersInspector(viewModel: viewModel)
+                        .padding(.top, 4)
+                }
+                // Content height up to the cap, not the cap itself: a few
+                // speakers must not reserve blank space above the transcript.
+                .frame(maxHeight: 180)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 
     @ViewBuilder

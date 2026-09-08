@@ -439,7 +439,7 @@ extension ScribeAppEnvironment {
         let window = NSWindow(contentViewController: host)
         window.title = "Transcripts"
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
-        window.contentMinSize = NSSize(width: 820, height: 500)
+        window.contentMinSize = NSSize(width: 820, height: 600)
         window.isReleasedWhenClosed = false
         // A remembered frame wins; the fixed default applies only the first time.
         window.setContentSize(NSSize(width: 1_040, height: 680))
