@@ -8,6 +8,7 @@ import Speakers
 import Storage
 import SwiftUI
 import Transcription
+import Vocabulary
 
 /// Owns the objects the menu, the settings window, and the app delegate share.
 ///
@@ -36,6 +37,16 @@ final class ScribeAppEnvironment: ObservableObject {
     /// Absent only when the transcript store cannot be opened at all; the
     /// recorder is unaffected either way.
     let transcription: TranscriptionHostService?
+    /// The custom transcription vocabulary. Absent only when its store could
+    /// not be opened, in which case Settings hides the section.
+    let vocabulary: VocabularyViewModel?
+    /// Lets the transcript window ask Settings to open at the vocabulary.
+    let settingsFocus = SettingsFocusModel()
+    /// Turns a reviewed transcript into a Latch session running a coding agent
+    /// in a folder the person connected.
+    let agentHandoff: AgentHandoffService
+    /// Set by the app delegate, which owns the settings window.
+    var openSettingsWindow: (() -> Void)?
     /// Mirrors the transcription service's status into the menu.
     @Published private(set) var transcriptionStatus = TranscriptionHostService.Status()
     @Published private(set) var updateState: UpdateMenuState = .idle
@@ -104,6 +115,17 @@ final class ScribeAppEnvironment: ObservableObject {
         meetingDetector = MeetingDetector(settings: settings, titleProvider: calendar)
 
         transcription = try? TranscriptionHostService(settings: settings, scheduler: processingQueue)
+        vocabulary = VocabularyViewModel.applicationSupportModel()
+        agentHandoff = AgentHandoffService(settings: settings)
+        // The review window's Send to Agent action reaches Latch through this
+        // service; the window itself never launches anything.
+        transcription?.agentDispatcher = LatchTranscriptAgentDispatcher(service: agentHandoff)
+
+        // Set here rather than passed in: the review window's Vocabulary button
+        // has to reach the settings window, which the app delegate owns.
+        if vocabulary != nil {
+            transcription?.openVocabularySettings = { [weak self] in self?.openVocabularySettings() }
+        }
 
         coordinator.terminationHandler = { NSApplication.shared.terminate(nil) }
         coordinator.recoveryReporter = { [weak self] recovered in
@@ -426,6 +448,14 @@ extension ScribeAppEnvironment {
         transcriptWindow = window
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    /// Opens Settings and marks the vocabulary section, so a person who pressed
+    /// the transcript window's button lands on the thing they asked for rather
+    /// than at the top of a window of eight sections.
+    func openVocabularySettings() {
+        settingsFocus.request(.vocabulary)
+        openSettingsWindow?()
     }
 
     func openSpeakersWindow() {

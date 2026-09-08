@@ -28,6 +28,59 @@ private final class MockLoginItemManager: LoginItemManaging {
 
 @MainActor
 final class ScribeSettingsTests: XCTestCase {
+    func testConnectedAgentFoldersSurviveRelaunchMostRecentFirst() throws {
+        let suiteName = "ScribeSettingsTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ScribeAgentFolders-\(UUID().uuidString)", isDirectory: true)
+        let first = root.appendingPathComponent("scribe", isDirectory: true)
+        let second = root.appendingPathComponent("notes", isDirectory: true)
+        try FileManager.default.createDirectory(at: first, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: second, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let settings = ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: root)
+        settings.connectAgentFolder(first)
+        settings.connectAgentFolder(second)
+        XCTAssertEqual(settings.agentFolderURLs, [second.standardizedFileURL, first.standardizedFileURL])
+
+        // Connecting one again moves it to the front rather than listing it twice.
+        settings.connectAgentFolder(first)
+        XCTAssertEqual(settings.agentFolderURLs, [first.standardizedFileURL, second.standardizedFileURL])
+
+        let relaunched = ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: root)
+        XCTAssertEqual(relaunched.agentFolderURLs, [first.standardizedFileURL, second.standardizedFileURL])
+
+        relaunched.disconnectAgentFolder(first)
+        XCTAssertEqual(relaunched.agentFolderURLs, [second.standardizedFileURL])
+        // Disconnecting forgets the folder; it must not remove it from disk.
+        XCTAssertTrue(FileManager.default.fileExists(atPath: first.path))
+
+        let afterRemoval = ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: root)
+        XCTAssertEqual(afterRemoval.agentFolderURLs, [second.standardizedFileURL])
+    }
+
+    func testAnAgentFolderThatHasGoneIsDroppedAtTheNextLaunch() throws {
+        let suiteName = "ScribeSettingsTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ScribeAgentFolders-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+
+        let settings = ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: folder)
+        settings.connectAgentFolder(folder)
+        XCTAssertEqual(settings.agentFolderURLs, [folder.standardizedFileURL])
+
+        try FileManager.default.removeItem(at: folder)
+
+        let relaunched = ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: FileManager.default.temporaryDirectory)
+        XCTAssertTrue(relaunched.agentFolderURLs.isEmpty)
+    }
+
     func testRecordingsFolderBookmarkSurvivesRelaunch() throws {
         let suiteName = "ScribeSettingsTests-\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))

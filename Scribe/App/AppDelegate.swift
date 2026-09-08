@@ -20,6 +20,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // The transcript window's Vocabulary button opens Settings, which lives
+        // here rather than in the environment.
+        environment.openSettingsWindow = { [weak self] in self?.openSettings() }
         menuBar = ScribeMenuBarController(
             model: environment.menuModel,
             image: NSImage(named: "MenuBarIcon"),
@@ -75,7 +78,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 settings: environment.settings,
                 sources: environment.menuModel,
                 meetingDetector: environment.meetingDetector,
-                calendar: environment.calendar
+                calendar: environment.calendar,
+                vocabulary: environment.vocabulary,
+                focus: environment.settingsFocus
             )
         ))
         window.title = "Settings"

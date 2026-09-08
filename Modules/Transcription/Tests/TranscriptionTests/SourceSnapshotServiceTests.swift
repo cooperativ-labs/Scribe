@@ -44,13 +44,32 @@ final class ImportFingerprintTests: XCTestCase {
         otherStream.audioStreamIndex = 1
         var otherRevision = base
         otherRevision.speakerLibraryRevision = "rev-2"
+        var otherVocabulary = base
+        otherVocabulary.vocabularyRevision = "vocab-1"
 
-        let variants = try [base, withKnownSpeakers, withoutMatching, otherChannel, otherStream, otherRevision]
+        let variants = try [base, withKnownSpeakers, withoutMatching, otherChannel, otherStream, otherRevision, otherVocabulary]
             .map { try ImportFingerprint(fileAt: url, configuration: $0) }
 
         XCTAssertEqual(Set(variants.map(\.configurationHash)).count, variants.count)
         XCTAssertEqual(Set(variants.map(\.sourceID)).count, 1, "A rerun is a new run inside the same meeting, not a new meeting")
         XCTAssertEqual(Set(variants.map(\.value)).count, variants.count)
+    }
+
+    func testAnEmptyVocabularyLeavesExistingRunFingerprintsAlone() throws {
+        // A person who has never added a term must keep the fingerprints their
+        // stored runs were recorded under, so the field is absent — not empty —
+        // in the canonical rendering.
+        let before = ImportConfiguration(modelProfileID: "parakeet-v3")
+        var withEmptyVocabulary = before
+        withEmptyVocabulary.vocabularyRevision = ""
+        var withNilVocabulary = before
+        withNilVocabulary.vocabularyRevision = nil
+        var withVocabulary = before
+        withVocabulary.vocabularyRevision = "abc123"
+
+        XCTAssertEqual(before.fingerprint, withEmptyVocabulary.fingerprint)
+        XCTAssertEqual(before.fingerprint, withNilVocabulary.fingerprint)
+        XCTAssertNotEqual(before.fingerprint, withVocabulary.fingerprint)
     }
 
     func testConfigurationFingerprintIsStableAcrossEncodings() throws {

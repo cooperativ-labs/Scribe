@@ -274,3 +274,46 @@ public protocol TranscriptRevisionStoring: Sendable {
 public protocol TranscriptFileDeleting: Sendable {
     func delete(fileID: TranscriptReviewFile.ID) throws
 }
+
+/// The result of handing dropped files to the host for transcription.
+public struct TranscriptImportOutcome: Equatable, Sendable {
+    /// One dropped item the host would not queue, with the reason it gave.
+    public struct Refusal: Equatable, Sendable {
+        public let url: URL
+        public let message: String
+
+        public init(url: URL, message: String) {
+            self.url = url
+            self.message = message
+        }
+    }
+
+    public let queuedCount: Int
+    public let refusals: [Refusal]
+
+    public init(queuedCount: Int, refusals: [Refusal] = []) {
+        self.queuedCount = queuedCount
+        self.refusals = refusals
+    }
+
+    /// One line for the window: how many were queued, and how many were not.
+    public var summary: String {
+        let queued = "Queued \(queuedCount) file\(queuedCount == 1 ? "" : "s") for transcription"
+        guard !refusals.isEmpty else { return queued + "." }
+        if queuedCount == 0, refusals.count == 1 { return refusals[0].message }
+        return "\(queued); \(refusals.count) could not be queued."
+    }
+
+    public var isFailure: Bool { queuedCount == 0 && !refusals.isEmpty }
+}
+
+/// Queues files a person dropped on the window for transcription.
+///
+/// The window only knows file URLs. Probing, snapshotting, and running are the
+/// host's business, so the contract returns what happened rather than a job:
+/// the list refreshes from the store as the jobs move, the way it does for
+/// every other source. A fixture-backed window with no importer attached
+/// simply does not accept drops.
+public protocol TranscriptFileImporting: Sendable {
+    func importFiles(at urls: [URL]) async -> TranscriptImportOutcome
+}

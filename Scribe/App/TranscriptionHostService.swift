@@ -6,6 +6,7 @@ import Processing
 import ScribeAppCore
 import Speakers
 import Transcription
+import Vocabulary
 
 /// The host's side of the transcription module contract.
 ///
@@ -45,6 +46,9 @@ final class TranscriptionHostService {
     private let outbox: TranscriptionRequestOutbox
     private let settings: ScribeSettings
     private let importer: FolderImportService?
+    /// The same content-based prober the folder importer uses, held on its
+    /// own so a single dropped file is checked the way a folder's files are.
+    private let prober: MediaProber?
     private let speakerStore: SpeakerProfileStore?
     private let modelProfileID: String
     /// Recording priority is enforced through this contract, so its absence
@@ -55,6 +59,16 @@ final class TranscriptionHostService {
     /// were produced before it went missing.
     private let workerUnavailableReason: String?
 
+    /// Set by the environment so the review window's Vocabulary button can send
+    /// someone to Settings. A property rather than an initializer argument
+    /// because the environment is not fully formed when this service is built.
+    var openVocabularySettings: (@MainActor () -> Void)?
+
+    /// Hands a reviewed transcript to a coding agent through Latch. Set by the
+    /// environment for the same reason, and absent in a build with no agent
+    /// host, which hides the action rather than offering a dead end.
+    var agentDispatcher: (any TranscriptAgentDispatching)?
+
     private var modelObservation: AnyCancellable?
     private var eventTask: Task<Void, Never>?
     private var statusDidChange: (@MainActor (Status) -> Void)?
@@ -63,7 +77,8 @@ final class TranscriptionHostService {
         settings: ScribeSettings,
         scheduler: (any ProcessingScheduler)?,
         storeDirectoryURL: URL = TranscriptStore.defaultStoreDirectoryURL(),
-        modelProfileID: String = "parakeet-v3"
+        modelProfileID: String = "parakeet-v3",
+        vocabularyStore: VocabularyStore? = try? VocabularyStore.openApplicationSupportLibrary()
     ) throws {
         self.settings = settings
         self.storeDirectoryURL = storeDirectoryURL
@@ -100,9 +115,17 @@ final class TranscriptionHostService {
             configuration: .init(transcriptStoreURL: storeDirectoryURL),
             scheduler: scheduler,
             stageRunner: stageRunner,
-            canStartJob: { @MainActor [settings] in settings.modelInstaller.state == .installed }
+            canStartJob: { @MainActor [settings] in settings.modelInstaller.state == .installed },
+            // Read at enqueue time, not held: the list a job runs with is the
+            // one in force when it was queued, including edits an agent made
+            // through `scribe-vocab` a moment earlier.
+            vocabularyRevision: { [vocabularyStore] in
+                guard let vocabularyStore else { return nil }
+                return (try? vocabularyStore.load())?.revision
+            }
         )
-        importer = (try? MediaToolLocator.ffprobe()).map { FolderImportService(prober: MediaProber(ffprobeURL: $0)) }
+        prober = (try? MediaToolLocator.ffprobe()).map { MediaProber(ffprobeURL: $0) }
+        importer = prober.map { FolderImportService(prober: $0) }
     }
 
     deinit { eventTask?.cancel() }
@@ -230,6 +253,74 @@ final class TranscriptionHostService {
         return result
     }
 
+    // MARK: - Dropped files
+
+    /// Queues files a person dropped on the transcript window.
+    ///
+    /// A dropped folder goes through the folder importer, so a recorder session
+    /// dropped whole is recognized and its tracks are not transcribed three
+    /// times. A dropped file is probed by content, the way the folder importer
+    /// probes its files, and refused with the prober's reason when it is not
+    /// media: a text file dropped by mistake must say so rather than fail
+    /// later inside the helper. Every item is reported on its own, so one bad
+    /// drop does not stop the good ones beside it.
+    func importDroppedFiles(at urls: [URL]) async -> TranscriptImportOutcome {
+        var queued = 0
+        var refusals: [TranscriptImportOutcome.Refusal] = []
+        let store = storeDirectoryURL.resolvingSymlinksInPath().standardizedFileURL
+
+        for url in urls {
+            let resolved = url.resolvingSymlinksInPath().standardizedFileURL
+            var isDirectory: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: resolved.path, isDirectory: &isDirectory) else {
+                refusals.append(.init(url: url, message: "\(url.lastPathComponent) no longer exists."))
+                continue
+            }
+            if resolved.pathComponents.starts(with: store.pathComponents) {
+                refusals.append(.init(url: url, message: "\(url.lastPathComponent) is inside the transcript store, which holds Scribe's own output."))
+                continue
+            }
+            if isDirectory.boolValue {
+                guard let result = await importFolder(at: url) else {
+                    refusals.append(.init(url: url, message: status.failure ?? "\(url.lastPathComponent) could not be read."))
+                    continue
+                }
+                queued += result.preselectedFiles.filter(\.isImportable).count
+                for file in result.failedFiles {
+                    refusals.append(.init(url: file.url, message: "\(file.relativePath): \(file.failure?.message ?? "could not be read")"))
+                }
+                continue
+            }
+
+            guard let prober else {
+                refusals.append(.init(url: url, message: "The bundled media prober is unavailable, so \(url.lastPathComponent) cannot be checked."))
+                continue
+            }
+            do {
+                _ = try prober.probe(url)
+            } catch let error as MediaProbeError {
+                refusals.append(.init(url: url, message: "\(url.lastPathComponent): \(ImportFileFailure(error).message)"))
+                continue
+            } catch {
+                refusals.append(.init(url: url, message: "\(url.lastPathComponent) could not be inspected: \(error.localizedDescription)"))
+                continue
+            }
+            do {
+                _ = try await coordinator.enqueue(TranscriptionRequest(sourceURL: url, modelProfileID: modelProfileID))
+                queued += 1
+            } catch {
+                refusals.append(.init(url: url, message: "\(url.lastPathComponent) could not be queued: \(error.localizedDescription)"))
+            }
+        }
+
+        let outcome = TranscriptImportOutcome(queuedCount: queued, refusals: refusals)
+        status.lastImportSummary = outcome.summary
+        publishStatus()
+        await refreshReview()
+        if queued > 0 { Task { [weak self] in await self?.runPending() } }
+        return outcome
+    }
+
     /// The folder chooser the menu opens. Security-scoped access is held for the
     /// scan and the snapshot copies, which is all the module needs the original
     /// folder for.
@@ -261,7 +352,10 @@ final class TranscriptionHostService {
             playback: AVFoundationTranscriptPlayback(),
             directory: speakerDirectory(),
             revisionStore: TranscriptStoreRevisionWriter(store: store),
-            fileDeleter: TranscriptStoreFileDeleter(store: store)
+            fileDeleter: TranscriptStoreFileDeleter(store: store),
+            fileImporter: DroppedFileImporter(host: self),
+            agentDispatcher: agentDispatcher,
+            openVocabularySettings: openVocabularySettings
         )
         reviewModel = model
         return model
@@ -379,6 +473,32 @@ final class TranscriptionHostService {
 
     private func publishStatus() {
         statusDidChange?(status)
+    }
+}
+
+/// The window's side of dropping files: a thin hop onto the main actor, where
+/// the host service lives. Held weakly so the view model never keeps the host
+/// alive on its own.
+private struct DroppedFileImporter: TranscriptFileImporting {
+    private let host: WeakHost
+
+    init(host: TranscriptionHostService) {
+        self.host = WeakHost(host)
+    }
+
+    func importFiles(at urls: [URL]) async -> TranscriptImportOutcome {
+        guard let host = await MainActor.run(body: { host.value }) else {
+            return TranscriptImportOutcome(queuedCount: 0, refusals: urls.map {
+                .init(url: $0, message: "Transcription is not available right now.")
+            })
+        }
+        return await host.importDroppedFiles(at: urls)
+    }
+
+    /// The host is main-actor bound; the reference is only ever read there.
+    private final class WeakHost: @unchecked Sendable {
+        weak var value: TranscriptionHostService?
+        init(_ value: TranscriptionHostService) { self.value = value }
     }
 }
 

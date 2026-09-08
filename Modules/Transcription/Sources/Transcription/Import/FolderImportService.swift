@@ -43,7 +43,7 @@ public struct ImportFileFailure: Equatable, Sendable, Codable {
         self.message = message
     }
 
-    init(_ error: MediaProbeError) {
+    public init(_ error: MediaProbeError) {
         switch error {
         case .corrupt(let details): self.init(code: "import.file.corrupt", message: "This file is not valid media data: \(details)")
         case .encrypted(let details): self.init(code: "import.file.encrypted", message: "This file is encrypted and cannot be transcribed: \(details)")

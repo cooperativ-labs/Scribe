@@ -165,6 +165,30 @@ public final class TranscriptViewModel {
     @ObservationIgnored private let directory: (any TranscriptSpeakerDirectory)?
     @ObservationIgnored private let revisionStore: (any TranscriptRevisionStoring)?
     @ObservationIgnored private let fileDeleter: (any TranscriptFileDeleting)?
+    @ObservationIgnored private let fileImporter: (any TranscriptFileImporting)?
+    /// Hands a finished transcript to a coding agent. Absent in a build with no
+    /// agent host, which hides the action rather than offering a dead end.
+    @ObservationIgnored private let agentDispatcher: (any TranscriptAgentDispatching)?
+    /// Opens the vocabulary editor in the host's Settings window. Absent in a
+    /// build with no settings surface — the toolbar then hides the button
+    /// rather than offering a route that goes nowhere.
+    @ObservationIgnored private let openVocabularySettings: (@MainActor () -> Void)?
+
+    /// The outcome of the last drop, shown in the sidebar until the next one.
+    public private(set) var importMessage: TranscriptSpeakerActionMessage?
+    /// True while dropped files are being probed and queued.
+    public private(set) var isImporting = false
+
+    /// What the host found for the send sheet, or nil until it has been asked.
+    public private(set) var agentEnvironment: TranscriptAgentEnvironment?
+    public var selectedAgentID: TranscriptAgent.ID?
+    public var selectedAgentFolderID: TranscriptAgentFolder.ID?
+    /// What the person wants done with the transcript. Empty means the default.
+    public var agentInstruction = ""
+    /// True while the agent's session is being created.
+    public private(set) var isSendingToAgent = false
+    /// The outcome of the last send, shown until the next one.
+    public private(set) var agentMessage: TranscriptSpeakerActionMessage?
 
     public init(
         files: [TranscriptReviewFile],
@@ -173,7 +197,10 @@ public final class TranscriptViewModel {
         exportWriter: any TranscriptExportWriting = FileTranscriptExportWriter(),
         directory: (any TranscriptSpeakerDirectory)? = nil,
         revisionStore: (any TranscriptRevisionStoring)? = nil,
-        fileDeleter: (any TranscriptFileDeleting)? = nil
+        fileDeleter: (any TranscriptFileDeleting)? = nil,
+        fileImporter: (any TranscriptFileImporting)? = nil,
+        agentDispatcher: (any TranscriptAgentDispatching)? = nil,
+        openVocabularySettings: (@MainActor () -> Void)? = nil
     ) {
         self.files = files
         self.selectedFileID = selectedFileID ?? files.first?.id
@@ -182,8 +209,21 @@ public final class TranscriptViewModel {
         self.directory = directory
         self.revisionStore = revisionStore
         self.fileDeleter = fileDeleter
+        self.fileImporter = fileImporter
+        self.agentDispatcher = agentDispatcher
+        self.openVocabularySettings = openVocabularySettings
         selectFileIfNeeded()
         playback.setPlaybackObserver { [weak self] event in self?.handle(event) }
+    }
+
+    /// Whether the review window can send someone to the vocabulary editor.
+    public var canOpenVocabularySettings: Bool { openVocabularySettings != nil }
+
+    /// Sends the person to Settings, at the vocabulary. Editing the list here
+    /// would be the wrong place: the list is not a property of this transcript,
+    /// and a change to it applies to transcriptions made afterwards.
+    public func openVocabulary() {
+        openVocabularySettings?()
     }
 
     /// Replaces the list as the job pipeline reports new state.
@@ -465,6 +505,31 @@ public final class TranscriptViewModel {
         }
     }
 
+    // MARK: - Importing
+
+    /// Whether the sidebar accepts dropped files at all. Without a host
+    /// importer there is nowhere to queue them, so the drop is refused up
+    /// front rather than accepted and silently lost.
+    public var canImportFiles: Bool { fileImporter != nil }
+
+    /// Hands files dropped on the window to the host for transcription.
+    ///
+    /// The list is not touched here: the host refreshes it from the store once
+    /// the jobs exist, which keeps a dropped file on the same path as one from a
+    /// folder import or a finished recording. Only the outcome is kept, so the
+    /// person sees what happened to what they dropped.
+    public func importFiles(at urls: [URL]) async {
+        guard let fileImporter, !urls.isEmpty else { return }
+        isImporting = true
+        defer { isImporting = false }
+        let outcome = await fileImporter.importFiles(at: urls)
+        importMessage = TranscriptSpeakerActionMessage(text: outcome.summary, isFailure: outcome.isFailure)
+    }
+
+    public func dismissImportMessage() {
+        importMessage = nil
+    }
+
     /// Exports each requested format separately so an SRT failure does not lose valid TXT/JSON.
     public func export(_ formats: Set<TranscriptExportFormat>, to directoryURL: URL) {
         guard let transcript = selectedTranscript else {
@@ -480,6 +545,108 @@ public final class TranscriptViewModel {
     public func exportRefreshingLabels(_ formats: Set<TranscriptExportFormat>, to directoryURL: URL) async {
         await refreshLabelsFromLibrary(announceUnchanged: false)
         export(formats, to: directoryURL)
+    }
+
+    // MARK: - Sending to an agent
+
+    /// Whether the window offers the send action at all. Without a host
+    /// dispatcher there is nothing to send to, so the toolbar leaves it out
+    /// rather than opening a sheet that can do nothing.
+    public var canSendToAgent: Bool { agentDispatcher != nil }
+
+    public var agents: [TranscriptAgent] { agentEnvironment?.agents ?? [] }
+    public var agentFolders: [TranscriptAgentFolder] { agentEnvironment?.folders ?? [] }
+
+    public var selectedAgent: TranscriptAgent? {
+        agents.first { $0.id == selectedAgentID }
+    }
+
+    public var selectedAgentFolder: TranscriptAgentFolder? {
+        agentFolders.first { $0.id == selectedAgentFolderID }
+    }
+
+    /// Why the send button is not available yet, in the person's terms, or nil
+    /// when everything it needs is chosen. The sheet shows this rather than
+    /// leaving a disabled button unexplained.
+    public var agentHandoffProblem: String? {
+        if let reason = agentEnvironment?.unavailableReason { return reason }
+        if selectedTranscript == nil { return "This file has no completed transcript to send." }
+        if agents.isEmpty { return "No coding agent was found on this Mac." }
+        if agentFolders.isEmpty { return "Connect the folder the agent should work in." }
+        if selectedAgent == nil { return "Choose an agent." }
+        guard let folder = selectedAgentFolder else { return "Choose a folder." }
+        if !folder.isReachable { return "\(folder.displayName) is no longer where it was. Connect it again." }
+        return nil
+    }
+
+    public var canSubmitAgentHandoff: Bool { agentHandoffProblem == nil && !isSendingToAgent }
+
+    /// Asks the host what is available and keeps the two choices valid.
+    ///
+    /// Called each time the sheet opens: an agent can be installed and a folder
+    /// moved between one sending and the next, and a selection that no longer
+    /// names anything must not survive as an invisible choice.
+    public func loadAgentEnvironment() async {
+        guard let agentDispatcher else { return }
+        apply(await agentDispatcher.environment())
+    }
+
+    /// Sends the person to the host's folder chooser, then selects whatever
+    /// came back so the folder they just connected is the one that is used.
+    public func connectAgentFolder() async {
+        guard let agentDispatcher else { return }
+        let known = Set(agentFolders.map(\.id))
+        let environment = await agentDispatcher.connectFolder()
+        apply(environment)
+        if let connected = environment.folders.first(where: { !known.contains($0.id) }) {
+            selectedAgentFolderID = connected.id
+        }
+    }
+
+    public func disconnectAgentFolder(id: TranscriptAgentFolder.ID) async {
+        guard let agentDispatcher else { return }
+        apply(await agentDispatcher.disconnectFolder(id: id))
+    }
+
+    /// Brings saved labels up to date with the library, then starts the agent on
+    /// that revision. Labels are refreshed first for the same reason exporting
+    /// refreshes them: the agent should read the names the library holds now,
+    /// not the ones diarization guessed.
+    ///
+    /// Returns whether the session was created, so the sheet can close on
+    /// success and stay open with the reason on failure.
+    @discardableResult
+    public func sendToAgent() async -> Bool {
+        guard let agentDispatcher, canSubmitAgentHandoff else { return false }
+        await refreshLabelsFromLibrary(announceUnchanged: false)
+        guard let transcript = selectedTranscript, let agent = selectedAgent, let folder = selectedAgentFolder else { return false }
+        isSendingToAgent = true
+        defer { isSendingToAgent = false }
+        let outcome = await agentDispatcher.send(TranscriptAgentRequest(
+            transcript: transcript,
+            agent: agent,
+            folder: folder,
+            instruction: agentInstruction
+        ))
+        agentMessage = TranscriptSpeakerActionMessage(text: outcome.summary, isFailure: !outcome.succeeded)
+        return outcome.succeeded
+    }
+
+    public func dismissAgentMessage() {
+        agentMessage = nil
+    }
+
+    /// Adopts a refreshed environment, moving each selection onto something
+    /// that still exists rather than leaving it naming an agent or folder that
+    /// has gone.
+    private func apply(_ environment: TranscriptAgentEnvironment) {
+        agentEnvironment = environment
+        if selectedAgentID == nil || !environment.agents.contains(where: { $0.id == selectedAgentID }) {
+            selectedAgentID = environment.agents.first?.id
+        }
+        if selectedAgentFolderID == nil || !environment.folders.contains(where: { $0.id == selectedAgentFolderID }) {
+            selectedAgentFolderID = environment.folders.first(where: \.isReachable)?.id ?? environment.folders.first?.id
+        }
     }
 
     // MARK: - Naming

@@ -46,6 +46,7 @@ mise run build
 mise run test
 mise run test-platform
 mise run test-ui
+mise run test-vocabulary
 ```
 
 Scribe is an Xcode macOS application, so Xcode remains the source of truth for
@@ -85,6 +86,38 @@ mise run release
 For a package-only release rehearsal, run
 `mise run package`. The release task refuses a dirty worktree; after the version
 bump, review and commit the version change before publishing.
+
+### Custom transcription vocabulary
+
+Names, companies, product spellings, and jargon transcription should get right
+live in one always-on list, edited in **Settings → Vocabulary** or from the
+transcript window's **Vocabulary** toolbar button. There is no per-recording
+picker: the list is merged into every job.
+
+The same list is editable from a shell, so an agent can maintain it without
+going through the app:
+
+```sh
+Scripts/vocab.sh list
+Scripts/vocab.sh add "Livmarli" --alias "Liv Mali, Liv-Marli"
+Scripts/vocab.sh import glossary.txt      # one term per line, `Canonical: mishearing, other`
+Scripts/vocab.sh list --json              # for scripts
+Scripts/vocab.sh --help
+```
+
+Both surfaces open
+`~/Library/Application Support/Scribe/Vocabulary/library.json` under a lock and
+write it atomically, so an edit made in one shows up in the other. Adding a term
+that is already present merges its mishearings rather than duplicating the row,
+which makes `add` safe to repeat. Terms shorter than three characters are kept
+and marked but not applied.
+
+Each run records the vocabulary it was queued with, as
+`ImportConfiguration.vocabularyRevision`, so editing the list makes a rerun a
+genuinely new run. The recognizer-side work that makes the list change what
+Parakeet actually produces — the CTC model pin, worker boosting, and applying
+replacements to the word stream — is steps 2 to 4 in
+`docs/decisions/custom-transcription-vocabulary.md` and is **not built yet**.
 
 ### Meeting detection
 
@@ -191,8 +224,10 @@ package products, so parallel workstreams do not need to edit
 | Native AEC and FLAC boundaries | `Native/WebRTCBridge/`, `Native/FLACBridge/` |
 | Speaker module | `Modules/Speakers/` (with `Profiles/`, `Enrollment/`, `Matching/`, `UI/`, `Tests/`) |
 | Transcription module | `Modules/Transcription/` (with `Contracts/`, `Import/`, `Jobs/`, `Worker/`, `Transcript/`, `Export/`, `UI/`, `Tests/`) |
+| Custom transcription vocabulary | `Modules/Vocabulary/` (with `Model/`, `Store/`, `Text/`, `UI/`, `Tests/`) |
 | Bundled transcription helper | `Workers/TranscriptionWorker/` |
 | Standalone processing utility | `Tools/ScribeProcess/` |
+| Vocabulary command line | `Tools/ScribeVocabulary/` (`scribe-vocab`) |
 | Capture feasibility harness | `Tools/CaptureHarness/` |
 | Audio-quality metrics tool | `Tools/AudioMetrics/` |
 | Host-app tests and synthetic fixtures | `Tests/`, `Tests/Fixtures/` |

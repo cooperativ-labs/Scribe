@@ -1,5 +1,6 @@
 import Speakers
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// A macOS review window. The host supplies files as jobs complete; this view does not own jobs.
 public struct TranscriptWindow: View {
@@ -16,7 +17,9 @@ public struct TranscriptWindow: View {
     @State private var splitSegment: TranscriptSegment?
     @State private var newPersonScope: TranscriptSpeakerScope?
     @State private var isShowingShortcuts = false
+    @State private var isShowingAgentSheet = false
     @State private var isSpeakersExpanded = true
+    @State private var isDropTargeted = false
     @FocusState private var isSearchFocused: Bool
     @FocusState private var isTitleFocused: Bool
 
@@ -79,6 +82,100 @@ public struct TranscriptWindow: View {
     }
 
     private var sidebar: some View {
+        fileList
+            .safeAreaInset(edge: .bottom, spacing: 0) { sidebarFooter }
+            .overlay { if isDropTargeted { dropHighlight } }
+            .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
+                guard viewModel.canImportFiles else { return false }
+                Task { await viewModel.importFiles(at: await Self.fileURLs(from: providers)) }
+                return true
+            }
+            .animation(.snappy(duration: 0.15), value: isDropTargeted)
+            .animation(.snappy, value: viewModel.importMessage)
+    }
+
+    /// The drop shows what is about to happen: a file becomes a transcript in
+    /// this list, not somewhere else.
+    private var dropHighlight: some View {
+        RoundedRectangle(cornerRadius: 8)
+            .strokeBorder(Color.accentColor, lineWidth: 2)
+            .background(RoundedRectangle(cornerRadius: 8).fill(Color.accentColor.opacity(0.08)))
+            .overlay {
+                Label("Drop to transcribe", systemImage: "waveform.badge.plus")
+                    .font(.headline)
+                    .padding(10)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+            }
+            .padding(6)
+            .allowsHitTesting(false)
+    }
+
+    @ViewBuilder
+    private var sidebarFooter: some View {
+        VStack(spacing: 0) {
+            if viewModel.isImporting {
+                Divider()
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text("Queuing dropped files…").font(.caption).foregroundStyle(.secondary)
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+            } else if let message = viewModel.importMessage {
+                Divider()
+                HStack(alignment: .top, spacing: 8) {
+                    Label(message.text, systemImage: message.isFailure ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(message.isFailure ? .red : .green)
+                        .multilineTextAlignment(.leading)
+                    Spacer(minLength: 0)
+                    Button {
+                        viewModel.dismissImportMessage()
+                    } label: {
+                        Image(systemName: "xmark").font(.caption2)
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel("Dismiss")
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            } else if viewModel.canImportFiles {
+                Divider()
+                Label("Drop audio files here to transcribe them", systemImage: "waveform.badge.plus")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+            }
+        }
+        .background(.bar)
+    }
+
+    /// Resolves every dropped item that is a file URL. Anything else on the
+    /// pasteboard is left out rather than failing the whole drop.
+    private static func fileURLs(from providers: [NSItemProvider]) async -> [URL] {
+        var urls: [URL] = []
+        for provider in providers where provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+            let url: URL? = await withCheckedContinuation { continuation in
+                provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier) { item, _ in
+                    if let data = item as? Data {
+                        continuation.resume(returning: URL(dataRepresentation: data, relativeTo: nil))
+                    } else if let url = item as? URL {
+                        continuation.resume(returning: url)
+                    } else {
+                        continuation.resume(returning: nil)
+                    }
+                }
+            }
+            if let url { urls.append(url) }
+        }
+        return urls
+    }
+
+    private var fileList: some View {
         List(selection: $viewModel.selectedFileID) {
             ForEach(filteredFiles) { file in
                 TranscriptFileRow(file: file, canDelete: viewModel.canDelete(file)) {
@@ -176,6 +273,11 @@ public struct TranscriptWindow: View {
         }
         .sheet(item: $splitSegment) { segment in
             TranscriptSplitSheet(viewModel: viewModel, segment: segment)
+        }
+        .sheet(isPresented: $isShowingAgentSheet) {
+            TranscriptAgentSheet(viewModel: viewModel, transcriptName: file.displayName) {
+                isShowingAgentSheet = false
+            }
         }
         .background { keyboardShortcuts }
         .animation(.snappy, value: viewModel.speakerActionMessage)
@@ -346,6 +448,15 @@ public struct TranscriptWindow: View {
                 Task { await viewModel.refreshLabelsFromLibrary() }
             }
             .help("Applies current speaker-library names to this transcript as a new revision.")
+            if viewModel.canOpenVocabularySettings {
+                Button("Vocabulary", systemImage: "character.book.closed") { viewModel.openVocabulary() }
+                    .help("Names and spellings Scribe should get right. Opens Settings; new terms apply to transcriptions made afterwards.")
+            }
+            if viewModel.canSendToAgent {
+                Button("Send to Agent", systemImage: "paperplane") { isShowingAgentSheet = true }
+                    .disabled(viewModel.selectedTranscript == nil)
+                    .help("Hand this transcript to a coding agent working in a folder you have connected. The session opens in Latch.")
+            }
             Menu("Export", systemImage: "square.and.arrow.up") {
                 Button("Export TXT") { chooseDestination(for: [.plainText]) }
                 Button("Export JSON") { chooseDestination(for: [.json]) }

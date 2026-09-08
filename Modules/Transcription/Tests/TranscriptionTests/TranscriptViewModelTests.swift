@@ -23,6 +23,31 @@ final class TranscriptViewModelTests: XCTestCase {
         XCTAssertEqual(playback.soughtMilliseconds, [2_800])
     }
 
+    func testTheVocabularyRouteIsOfferedOnlyWhenTheHostSuppliesOne() throws {
+        let transcript = try fixture(named: "overlap")
+        let file = TranscriptReviewFile(
+            sourceSnapshotURL: URL(fileURLWithPath: "/tmp/scribe-vocabulary-snapshot.flac"),
+            transcript: transcript,
+            jobState: .complete
+        )
+
+        let withoutRoute = TranscriptViewModel(files: [file], playback: PlaybackSpy())
+        XCTAssertFalse(withoutRoute.canOpenVocabularySettings)
+        // Calling it anyway must be inert rather than a crash: the toolbar hides
+        // the button, but a keyboard route could still reach the model.
+        withoutRoute.openVocabulary()
+
+        var opened = 0
+        let withRoute = TranscriptViewModel(
+            files: [file],
+            playback: PlaybackSpy(),
+            openVocabularySettings: { opened += 1 }
+        )
+        XCTAssertTrue(withRoute.canOpenVocabularySettings)
+        withRoute.openVocabulary()
+        XCTAssertEqual(opened, 1)
+    }
+
     func testReviewMetadataKeepsLanguageProvenanceTimingLimitationsAndErrorsVisible() throws {
         let transcript = try fixture(named: "unknown-speaker")
         let playback = PlaybackSpy()
@@ -199,6 +224,54 @@ final class TranscriptViewModelTests: XCTestCase {
 }
 
 @MainActor
+final class TranscriptViewModelImportTests: XCTestCase {
+    func testDroppedFilesGoToTheHostImporterAndTheOutcomeIsShown() async {
+        let importer = ImporterSpy()
+        importer.outcome = TranscriptImportOutcome(queuedCount: 2)
+        let viewModel = TranscriptViewModel(files: [], playback: PlaybackSpy(), fileImporter: importer)
+        let urls = [URL(fileURLWithPath: "/tmp/a.wav"), URL(fileURLWithPath: "/tmp/b.m4a")]
+
+        XCTAssertTrue(viewModel.canImportFiles)
+        await viewModel.importFiles(at: urls)
+
+        XCTAssertEqual(importer.imported, [urls])
+        XCTAssertEqual(viewModel.importMessage?.text, "Queued 2 files for transcription.")
+        XCTAssertEqual(viewModel.importMessage?.isFailure, false)
+        XCTAssertFalse(viewModel.isImporting)
+
+        viewModel.dismissImportMessage()
+        XCTAssertNil(viewModel.importMessage)
+    }
+
+    func testARefusedDropShowsTheHostsReasonAsAFailure() async {
+        let importer = ImporterSpy()
+        let url = URL(fileURLWithPath: "/tmp/notes.txt")
+        importer.outcome = TranscriptImportOutcome(queuedCount: 0, refusals: [.init(url: url, message: "notes.txt is not media.")])
+        let viewModel = TranscriptViewModel(files: [], playback: PlaybackSpy(), fileImporter: importer)
+
+        await viewModel.importFiles(at: [url])
+
+        XCTAssertEqual(viewModel.importMessage?.text, "notes.txt is not media.")
+        XCTAssertEqual(viewModel.importMessage?.isFailure, true)
+    }
+
+    func testAMixedDropCountsBothQueuedAndRefused() {
+        let outcome = TranscriptImportOutcome(
+            queuedCount: 1,
+            refusals: [.init(url: URL(fileURLWithPath: "/tmp/x"), message: "x"), .init(url: URL(fileURLWithPath: "/tmp/y"), message: "y")]
+        )
+        XCTAssertEqual(outcome.summary, "Queued 1 file for transcription; 2 could not be queued.")
+        XCTAssertFalse(outcome.isFailure)
+    }
+
+    func testWithoutAHostImporterDropsAreRefusedUpFront() async {
+        let viewModel = TranscriptViewModel(files: [], playback: PlaybackSpy())
+        XCTAssertFalse(viewModel.canImportFiles)
+        await viewModel.importFiles(at: [URL(fileURLWithPath: "/tmp/a.wav")])
+        XCTAssertNil(viewModel.importMessage)
+    }
+}
+
 private final class PlaybackSpy: TranscriptPlaybackSeeking {
     enum Transport: Equatable { case play, pause }
 
@@ -214,6 +287,16 @@ private final class PlaybackSpy: TranscriptPlaybackSeeking {
     func setPlaybackObserver(_ observer: (@MainActor (TranscriptPlaybackEvent) -> Void)?) { self.observer = observer }
 
     func emit(_ event: TranscriptPlaybackEvent) { observer?(event) }
+}
+
+private final class ImporterSpy: TranscriptFileImporting, @unchecked Sendable {
+    var outcome = TranscriptImportOutcome(queuedCount: 0)
+    private(set) var imported: [[URL]] = []
+
+    func importFiles(at urls: [URL]) async -> TranscriptImportOutcome {
+        imported.append(urls)
+        return outcome
+    }
 }
 
 private final class DeleterSpy: TranscriptFileDeleting, @unchecked Sendable {

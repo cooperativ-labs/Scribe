@@ -47,6 +47,11 @@ public struct ImportConfiguration: Codable, Equatable, Sendable {
     public var speakerCount: TranscriptionSpeakerCount
     public var speakerMatching: TranscriptionSpeakerMatching
     public var speakerLibraryRevision: String?
+    /// The content hash of the custom vocabulary a run was given, or nil when
+    /// the vocabulary was empty. Changing a spelling changes the transcript, so
+    /// it belongs here; keeping it separate from `speakerLibraryRevision` keeps
+    /// "who is remembered" and "how words are spelled" independently invalidated.
+    public var vocabularyRevision: String?
     public var channelSelection: AudioChannelSelection
     /// The ffprobe stream index chosen for a multitrack container, when one was chosen.
     public var audioStreamIndex: Int?
@@ -58,6 +63,7 @@ public struct ImportConfiguration: Codable, Equatable, Sendable {
         speakerCount: TranscriptionSpeakerCount = .automatic,
         speakerMatching: TranscriptionSpeakerMatching = .enabled,
         speakerLibraryRevision: String? = nil,
+        vocabularyRevision: String? = nil,
         channelSelection: AudioChannelSelection = .downmix,
         audioStreamIndex: Int? = nil
     ) {
@@ -67,6 +73,7 @@ public struct ImportConfiguration: Codable, Equatable, Sendable {
         self.speakerCount = speakerCount
         self.speakerMatching = speakerMatching
         self.speakerLibraryRevision = speakerLibraryRevision
+        self.vocabularyRevision = vocabularyRevision
         self.channelSelection = channelSelection
         self.audioStreamIndex = audioStreamIndex
     }
@@ -77,7 +84,7 @@ public struct ImportConfiguration: Codable, Equatable, Sendable {
     /// adding an unrelated field, or a change in encoder behavior, cannot
     /// silently invalidate every checkpoint recorded by an earlier build.
     var canonicalDescription: String {
-        let fields: [String: String] = [
+        var fields: [String: String] = [
             "audioStreamIndex": audioStreamIndex.map(String.init) ?? "automatic",
             "channelSelection": channelSelection.rawValue,
             "expectedLanguage": expectedLanguage ?? "",
@@ -92,6 +99,11 @@ public struct ImportConfiguration: Codable, Equatable, Sendable {
             "speakerLibraryRevision": speakerLibraryRevision ?? "",
             "speakerMatching": speakerMatching.rawValue,
         ]
+        // Present only when there is a vocabulary, so every run recorded before
+        // the feature existed keeps the fingerprint it was stored under.
+        if let vocabularyRevision, !vocabularyRevision.isEmpty {
+            fields["vocabularyRevision"] = vocabularyRevision
+        }
         let body = fields.keys.sorted().map { "\($0)=\(fields[$0]!)" }.joined(separator: "\n")
         return "scribe.import.configuration.v1\n" + body
     }

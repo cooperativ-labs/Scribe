@@ -76,6 +76,17 @@ public final class ScribeSettings: ObservableObject {
         didSet { defaults.set(useCalendarMeetingNames, forKey: Key.useCalendarMeetingNames) }
     }
 
+    // MARK: Agent folders
+
+    /// Folders a person has connected for handing transcripts to a coding
+    /// agent, most recently connected first. Held as security-scoped bookmarks
+    /// for the same reason the recordings folder is: a chosen folder has to
+    /// keep working across launches, and in a sandboxed build a path alone
+    /// would not.
+    @Published public private(set) var agentFolderURLs: [URL]
+    /// Why the last connect attempt did not take, or nil.
+    @Published public private(set) var agentFolderError: String?
+
     public init(
         defaults: UserDefaults = .standard,
         defaultRecordingsFolderURL: URL = ScribeSettings.defaultRecordingsFolderURL,
@@ -110,6 +121,11 @@ public final class ScribeSettings: ObservableObject {
         disabledMeetingApplicationIDs = Set(defaults.stringArray(forKey: Key.disabledMeetingApplicationIDs) ?? [])
         meetingDomains = defaults.stringArray(forKey: Key.meetingDomains) ?? MeetingDomain.defaults
         useCalendarMeetingNames = defaults.object(forKey: Key.useCalendarMeetingNames) as? Bool ?? false
+        // A folder that has been moved or deleted is dropped from the list
+        // rather than resolved to something else: the send sheet offers what is
+        // still there, and connecting it again is one button away.
+        agentFolderURLs = Self.resolveBookmarks(from: defaults, key: Key.agentFolderBookmarks)
+        agentFolderError = nil
 
         recordingsFolderURL = defaultRecordingsFolderURL
         modelInstaller.refresh(directory: modelsFolderURL)
@@ -241,6 +257,48 @@ public final class ScribeSettings: ObservableObject {
         meetingDomains = MeetingDomain.defaults
     }
 
+    // MARK: Agent folders
+
+    /// Remembers a folder an agent may be started in. An already-connected
+    /// folder moves to the front rather than appearing twice, so the list stays
+    /// in the order the person last reached for.
+    @discardableResult
+    public func connectAgentFolder(_ url: URL) -> URL? {
+        let standardizedURL = url.standardizedFileURL
+        do {
+            let bookmark = try standardizedURL.bookmarkData(
+                options: [.withSecurityScope],
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            )
+            var bookmarks = defaults.array(forKey: Key.agentFolderBookmarks) as? [Data] ?? []
+            var urls = agentFolderURLs
+            if let existing = urls.firstIndex(of: standardizedURL) {
+                urls.remove(at: existing)
+                if bookmarks.indices.contains(existing) { bookmarks.remove(at: existing) }
+            }
+            urls.insert(standardizedURL, at: 0)
+            bookmarks.insert(bookmark, at: 0)
+            defaults.set(bookmarks, forKey: Key.agentFolderBookmarks)
+            agentFolderURLs = urls
+            agentFolderError = nil
+            return standardizedURL
+        } catch {
+            agentFolderError = ScribeSettingsError.cannotCreateBookmark(error.localizedDescription).localizedDescription
+            return nil
+        }
+    }
+
+    /// Forgets a connected folder. The folder itself is left alone.
+    public func disconnectAgentFolder(_ url: URL) {
+        guard let index = agentFolderURLs.firstIndex(of: url.standardizedFileURL) else { return }
+        var bookmarks = defaults.array(forKey: Key.agentFolderBookmarks) as? [Data] ?? []
+        if bookmarks.indices.contains(index) { bookmarks.remove(at: index) }
+        defaults.set(bookmarks, forKey: Key.agentFolderBookmarks)
+        agentFolderURLs.remove(at: index)
+        agentFolderError = nil
+    }
+
     /// Executes a short file operation while the persisted security scope is open.
     public func withRecordingsFolderAccess<Result>(_ operation: (URL) throws -> Result) rethrows -> Result {
         let didStartAccessing = recordingsFolderURL.startAccessingSecurityScopedResource()
@@ -267,6 +325,7 @@ public final class ScribeSettings: ObservableObject {
         static let disabledMeetingApplicationIDs = "scribe.settings.disabledMeetingApplicationIDs"
         static let meetingDomains = "scribe.settings.meetingDomains"
         static let useCalendarMeetingNames = "scribe.settings.useCalendarMeetingNames"
+        static let agentFolderBookmarks = "scribe.settings.agentFolderBookmarks"
     }
 
     private let defaults: UserDefaults
@@ -290,6 +349,32 @@ public final class ScribeSettings: ObservableObject {
     private static func loadShortcut(from defaults: UserDefaults, key: String) -> GlobalShortcut? {
         guard let data = defaults.data(forKey: key) else { return nil }
         return try? JSONDecoder().decode(GlobalShortcut.self, from: data)
+    }
+
+    /// Resolves a stored list of folder bookmarks, keeping order and dropping
+    /// the ones that no longer resolve. Refreshed bookmarks are written back so
+    /// a folder that merely moved keeps working.
+    private static func resolveBookmarks(from defaults: UserDefaults, key: String) -> [URL] {
+        guard let bookmarks = defaults.array(forKey: key) as? [Data] else { return [] }
+        var resolved: [URL] = []
+        var kept: [Data] = []
+        for bookmark in bookmarks {
+            var isStale = false
+            guard let url = try? URL(
+                resolvingBookmarkData: bookmark,
+                options: [.withSecurityScope, .withoutUI],
+                relativeTo: nil,
+                bookmarkDataIsStale: &isStale
+            ).standardizedFileURL, !resolved.contains(url) else { continue }
+            resolved.append(url)
+            if isStale, let refreshed = try? url.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil) {
+                kept.append(refreshed)
+            } else {
+                kept.append(bookmark)
+            }
+        }
+        if kept.count != bookmarks.count { defaults.set(kept, forKey: key) }
+        return resolved
     }
 
     private static func resolveBookmark(from defaults: UserDefaults, fileManager: FileManager, key: String = Key.recordingsFolderBookmark) throws -> URL? {

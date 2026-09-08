@@ -1,5 +1,6 @@
 import Platform
 import SwiftUI
+import Vocabulary
 
 /// The compact settings pane used by the menu-bar app.
 ///
@@ -14,20 +15,43 @@ public struct ScribeSettingsView: View {
     private let meetingDetector: MeetingDetector?
     /// Absent in a build without calendar naming; the section is then not shown.
     private let calendar: CalendarMeetingService?
+    /// Absent only when the vocabulary store could not be opened; Settings then
+    /// hides the section rather than showing an editor that can save nothing.
+    private let vocabulary: VocabularyViewModel?
+    /// Requests from elsewhere in the app to open Settings at one section.
+    @ObservedObject private var focus: SettingsFocusModel
     @State private var isChoosingRecordingsFolder = false
     @State private var folderSelectionError: String?
+    @State private var highlightedSection: SettingsSection?
 
-    public init(settings: ScribeSettings, sources: RecorderMenuModel, meetingDetector: MeetingDetector? = nil, calendar: CalendarMeetingService? = nil) {
+    public init(
+        settings: ScribeSettings,
+        sources: RecorderMenuModel,
+        meetingDetector: MeetingDetector? = nil,
+        calendar: CalendarMeetingService? = nil,
+        vocabulary: VocabularyViewModel? = nil,
+        focus: SettingsFocusModel = SettingsFocusModel()
+    ) {
         self.settings = settings
         self.sources = sources
         self.meetingDetector = meetingDetector
         self.calendar = calendar
+        self.vocabulary = vocabulary
+        self.focus = focus
     }
 
     public var body: some View {
+        ScrollViewReader { proxy in
+            settingsForm
+                .onChange(of: focus.requestCount) { showRequestedSection(with: proxy) }
+                .onAppear { showRequestedSection(with: proxy) }
+        }
+    }
+
+    private var settingsForm: some View {
         let presentation = sources.presentation
 
-        Form {
+        return Form {
             Section("General") {
                 Toggle(
                     "Launch Scribe at login",
@@ -65,6 +89,14 @@ public struct ScribeSettingsView: View {
             }
 
             TranscriptionModelSettingsView(settings: settings, installer: settings.modelInstaller)
+
+            if let vocabulary {
+                VocabularySettingsSection(
+                    model: vocabulary,
+                    isHighlighted: highlightedSection == .vocabulary
+                )
+                .id(SettingsSection.vocabulary)
+            }
 
             Section("Processing") {
                 Toggle("Transcribe when the final recording is ready", isOn: $settings.transcribeWhenFinalRecordingIsReady)
@@ -133,6 +165,7 @@ public struct ScribeSettingsView: View {
         }
         .formStyle(.grouped)
         .frame(width: 560, height: 820)
+        .animation(.snappy, value: highlightedSection)
         // Enumerated on open, as the menu does, so an application launched after
         // Scribe and a microphone plugged in a moment ago both appear.
         .onAppear { sources.refreshSources() }
@@ -154,6 +187,22 @@ public struct ScribeSettingsView: View {
             case .failure(let error):
                 folderSelectionError = error.localizedDescription
             }
+        }
+    }
+
+    /// Scrolls to whatever asked to be shown and marks it briefly.
+    ///
+    /// The mark matters more than the scroll: a person who pressed "Vocabulary"
+    /// in the transcript window arrives in a window of eight sections and needs
+    /// to be told which one answered them.
+    private func showRequestedSection(with proxy: ScrollViewProxy) {
+        guard let section = focus.section else { return }
+        focus.clear()
+        withAnimation(.snappy) { proxy.scrollTo(section, anchor: .top) }
+        highlightedSection = section
+        Task {
+            try? await Task.sleep(for: .seconds(3))
+            if highlightedSection == section { highlightedSection = nil }
         }
     }
 

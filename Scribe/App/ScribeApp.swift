@@ -18,7 +18,9 @@ struct ScribeApp: App {
             ScribeSettingsView(
                 settings: appDelegate.environment.settings,
                 sources: appDelegate.environment.menuModel,
-                meetingDetector: appDelegate.environment.meetingDetector
+                meetingDetector: appDelegate.environment.meetingDetector,
+                vocabulary: appDelegate.environment.vocabulary,
+                focus: appDelegate.environment.settingsFocus
             )
                 .onDisappear { appDelegate.environment.settingsWindowDidClose() }
         }

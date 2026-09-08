@@ -43,6 +43,10 @@ public struct TranscriptionRequest: Codable, Sendable, Equatable, Identifiable {
     public let speakerCount: TranscriptionSpeakerCount
     public let speakerMatching: TranscriptionSpeakerMatching
     public let speakerLibraryRevision: String?
+    /// The content hash of the custom vocabulary in force when the request was
+    /// made. Part of the run's configuration, so editing a glossary makes a
+    /// rerun a genuinely new run rather than a repeat of the stored one.
+    public let vocabularyRevision: String?
     public let modelProfileID: String
     /// Redirects TXT/JSON/SRT exports only; canonical data stays in the transcript store.
     public let exportDirectory: URL?
@@ -62,6 +66,7 @@ public struct TranscriptionRequest: Codable, Sendable, Equatable, Identifiable {
         speakerCount: TranscriptionSpeakerCount = .automatic,
         speakerMatching: TranscriptionSpeakerMatching = .enabled,
         speakerLibraryRevision: String? = nil,
+        vocabularyRevision: String? = nil,
         modelProfileID: String,
         exportDirectory: URL? = nil,
         provenance: TranscriptionProvenance? = nil,
@@ -74,6 +79,7 @@ public struct TranscriptionRequest: Codable, Sendable, Equatable, Identifiable {
         self.speakerCount = speakerCount
         self.speakerMatching = speakerMatching
         self.speakerLibraryRevision = speakerLibraryRevision
+        self.vocabularyRevision = vocabularyRevision
         self.modelProfileID = modelProfileID
         self.exportDirectory = exportDirectory
         self.provenance = provenance

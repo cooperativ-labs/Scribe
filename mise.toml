@@ -19,6 +19,17 @@ run = "cd Scribe/Platform && swift test"
 description = "Run the UI Swift package tests"
 run = "cd Scribe/UI && swift test"
 
+[tasks.vocab]
+description = "Read and edit the custom transcription vocabulary (scribe-vocab)"
+run = "Scripts/vocab.sh"
+
+[tasks.test-vocabulary]
+description = "Run the Vocabulary module and scribe-vocab tests"
+run = """
+cd Modules/Vocabulary && swift test
+cd Tools/ScribeVocabulary && swift test
+"""
+
 [tasks.version]
 description = "Set the next UTC timestamp-based marketing and build version"
 run = "Scripts/bump-minor-version.sh"

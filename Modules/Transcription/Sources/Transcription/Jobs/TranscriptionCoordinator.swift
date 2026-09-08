@@ -180,6 +180,13 @@ public actor TranscriptionCoordinator {
     private let snapshotService: SourceSnapshotService
     private let writer: AtomicReplaceFileWriter
     private let now: @Sendable () -> Date
+    /// The custom vocabulary in force when a job is queued, as a content hash.
+    ///
+    /// Read here rather than carried on every `TranscriptionRequest` so the
+    /// three ways a job arrives — the recorder handoff, a folder import, and a
+    /// dropped file — cannot disagree about which glossary a run was made with.
+    /// A request that names its own revision keeps it.
+    private let vocabularyRevision: @Sendable () -> String?
     nonisolated(unsafe) private let fileManager: FileManager
 
     private var jobs: [UUID: TranscriptionJob] = [:]
@@ -196,7 +203,8 @@ public actor TranscriptionCoordinator {
         writer: AtomicReplaceFileWriter = AtomicReplaceFileWriter(),
         fileManager: FileManager = .default,
         now: @escaping @Sendable () -> Date = Date.init,
-        canStartJob: @escaping @Sendable () async -> Bool = { true }
+        canStartJob: @escaping @Sendable () async -> Bool = { true },
+        vocabularyRevision: @escaping @Sendable () -> String? = { nil }
     ) throws {
         self.configuration = configuration
         self.canStartJob = canStartJob
@@ -206,6 +214,7 @@ public actor TranscriptionCoordinator {
         self.writer = writer
         self.fileManager = fileManager
         self.now = now
+        self.vocabularyRevision = vocabularyRevision
         try fileManager.createDirectory(at: configuration.transcriptStoreURL, withIntermediateDirectories: true)
         let indexed = try Self.readQueueIndex(at: configuration.queueFileURL, fileManager: fileManager)
         let discovered = Self.discoverRecoverableJobs(in: configuration.transcriptStoreURL, fileManager: fileManager)
@@ -247,7 +256,8 @@ public actor TranscriptionCoordinator {
             expectedLanguage: request.expectedLanguage,
             speakerCount: request.speakerCount,
             speakerMatching: request.speakerMatching,
-            speakerLibraryRevision: request.speakerLibraryRevision
+            speakerLibraryRevision: request.speakerLibraryRevision,
+            vocabularyRevision: request.vocabularyRevision ?? vocabularyRevision()
         )
         let fingerprint: ImportFingerprint
         let snapshot: SourceSnapshot
