@@ -196,7 +196,10 @@ public enum TranscriptSpeakerLabelEditor {
             overlap: segment.overlap,
             timingQuality: segment.timingQuality,
             speakerConfidence: segment.speakerConfidence,
-            words: segment.words
+            words: segment.words,
+            attributionSource: .manual,
+            speakerInference: nil,
+            unresolvedSpeakerEvidence: nil
         )
         return transcript.nextRevision(speakers: speakers, segments: relabeledSegments(segments, from: speakers))
     }
@@ -227,7 +230,10 @@ public enum TranscriptSpeakerLabelEditor {
                 overlap: segment.overlap,
                 timingQuality: segment.timingQuality,
                 speakerConfidence: segment.speakerConfidence,
-                words: segment.words
+                words: segment.words,
+                attributionSource: segment.attributionSource,
+                speakerInference: segment.speakerInference,
+                unresolvedSpeakerEvidence: segment.unresolvedSpeakerEvidence
             )
         }
     }
@@ -246,7 +252,10 @@ extension TranscriptSegment {
             overlap: overlap,
             timingQuality: timingQuality,
             speakerConfidence: speakerConfidence,
-            words: words
+            words: words,
+            attributionSource: .manual,
+            speakerInference: nil,
+            unresolvedSpeakerEvidence: nil
         )
     }
 }

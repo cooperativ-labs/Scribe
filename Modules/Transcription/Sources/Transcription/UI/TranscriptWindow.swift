@@ -1001,7 +1001,11 @@ private struct TranscriptSegmentRow: View {
                     .foregroundStyle(.secondary)
 
                 TranscriptSpeakerMenu(viewModel: viewModel, scope: .turn(segmentID: segment.id), onNewPerson: onNewPerson) {
-                    if segment.speakerID == nil {
+                    if segment.hasInferredSpeaker, let inference = segment.speakerInference {
+                        Label("\(inference.speakerLabel) (inferred)", systemImage: "person.crop.circle.badge.questionmark")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.orange)
+                    } else if segment.speakerID == nil {
                         Label("Unknown speaker", systemImage: "person.crop.circle.badge.questionmark")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.orange)
@@ -1011,7 +1015,9 @@ private struct TranscriptSegmentRow: View {
                     }
                 }
                 .menuStyle(.borderlessButton)
-                .help("Change who is speaking in this turn")
+                .help(segment.hasInferredSpeaker
+                    ? "Inferred from diarization timing. Original speaker is still unknown; a manual label takes precedence."
+                    : "Change who is speaking in this turn")
 
                 if segment.hasLowSpeakerConfidence, let confidence = segment.speakerConfidence {
                     Label("Uncertain speaker (\(Int((confidence * 100).rounded()))%)", systemImage: "questionmark.circle")
@@ -1157,6 +1163,12 @@ private struct TranscriptParagraphRow: View {
                     Label("Uncertain speaker (\(Int((confidence * 100).rounded()))%)", systemImage: "questionmark.circle")
                         .font(.caption)
                         .foregroundStyle(.orange)
+                }
+                if paragraph.containsInferredAttribution {
+                    Label("Inferred attribution", systemImage: "questionmark.circle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .help("This reading paragraph includes a short unknown fragment inferred from diarization timing. Original speaker IDs are unchanged.")
                 }
                 if paragraph.overlap {
                     Label("Overlapping speech", systemImage: "person.2.badge.gearshape")

@@ -57,7 +57,22 @@
         "overlap": { "type": "boolean" },
         "timing_quality": { "enum": ["asr_word", "segment_only", "forced_aligned"] },
         "speaker_confidence": { "type": ["number", "null"] },
-        "words": { "type": "array", "items": { "$ref": "#/$defs/timedWord" } }
+        "words": { "type": "array", "items": { "$ref": "#/$defs/timedWord" } },
+        "attribution_source": { "enum": ["inferred", "manual"] },
+        "speaker_inference": { "$ref": "#/$defs/speakerInference" },
+        "unresolved_speaker_evidence": { "enum": ["no_coverage", "insufficient_overlap", "competing_speakers"] }
+      }
+    },
+    "speakerInference": {
+      "type": "object",
+      "required": ["speaker_id", "speaker_label", "evidence", "provenance"],
+      "properties": {
+        "speaker_id": { "type": "string", "minLength": 1 },
+        "speaker_label": { "type": "string", "minLength": 1 },
+        "evidence": { "enum": ["diarization_coverage", "diarization_boundary_gap"] },
+        "provenance": { "type": "string", "minLength": 1 },
+        "diarization_hole_ms": { "type": "integer", "minimum": 0 },
+        "overlap_ms": { "type": "integer", "minimum": 0 }
       }
     },
     "timedWord": {

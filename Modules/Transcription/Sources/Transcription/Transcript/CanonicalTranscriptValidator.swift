@@ -29,6 +29,9 @@ public enum CanonicalTranscriptValidator {
             if let speakerID = segment.speakerID, !speakerIDs.contains(speakerID) {
                 throw Error.unknownSpeakerReference(segmentID: segment.id, speakerID: speakerID)
             }
+            if let inferredID = segment.speakerInference?.speakerID, !speakerIDs.contains(inferredID) {
+                throw Error.unknownSpeakerReference(segmentID: segment.id, speakerID: inferredID)
+            }
             if let previous, !isSorted(previous, before: segment) {
                 throw Error.unsortedSegments(previousID: previous.id, nextID: segment.id)
             }

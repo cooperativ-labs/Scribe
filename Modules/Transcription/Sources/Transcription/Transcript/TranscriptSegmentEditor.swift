@@ -77,7 +77,10 @@ public enum TranscriptSegmentEditor {
             overlap: segment.overlap,
             timingQuality: segment.timingQuality,
             speakerConfidence: segment.speakerConfidence,
-            words: nil
+            words: nil,
+            attributionSource: segment.attributionSource,
+            speakerInference: segment.speakerInference,
+            unresolvedSpeakerEvidence: segment.unresolvedSpeakerEvidence
         )
         return transcript.nextRevision(segments: segments, subtitleCueMappings: .some(nil))
     }
@@ -159,7 +162,10 @@ public enum TranscriptSegmentEditor {
                 overlap: segment.overlap,
                 timingQuality: quality,
                 speakerConfidence: segment.speakerConfidence,
-                words: words
+                words: words,
+                attributionSource: segment.attributionSource,
+                speakerInference: segment.speakerInference,
+                unresolvedSpeakerEvidence: segment.unresolvedSpeakerEvidence
             )
         }
 
@@ -209,7 +215,12 @@ public enum TranscriptSegmentEditor {
             overlap: earlier.overlap || later.overlap,
             timingQuality: quality,
             speakerConfidence: earlier.speakerConfidence,
-            words: words
+            words: words,
+            attributionSource: earlier.attributionSource == .manual || later.attributionSource == .manual
+                ? .manual
+                : earlier.attributionSource,
+            speakerInference: earlier.speakerInference ?? later.speakerInference,
+            unresolvedSpeakerEvidence: earlier.unresolvedSpeakerEvidence ?? later.unresolvedSpeakerEvidence
         )
         var segments = ordered
         segments.removeAll { $0.id == earlier.id || $0.id == later.id }

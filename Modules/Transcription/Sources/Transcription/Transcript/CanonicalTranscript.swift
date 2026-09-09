@@ -157,6 +157,13 @@ public struct TranscriptSegment: Codable, Sendable, Equatable, Identifiable {
     public let timingQuality: TranscriptTimingQuality
     public let speakerConfidence: Double?
     public let words: [TimedWord]?
+    /// How the current speaker field was decided. Omitted for original
+    /// turn-builder output so older files stay unchanged.
+    public let attributionSource: TranscriptSpeakerAttributionSource?
+    /// Conservative identity recorded without replacing `speakerID`.
+    public let speakerInference: TranscriptSpeakerInference?
+    /// Why an unknown span was left unresolved, when the pass evaluated it.
+    public let unresolvedSpeakerEvidence: TranscriptUnresolvedSpeakerEvidence?
 
     private enum CodingKeys: String, CodingKey {
         case id
@@ -168,6 +175,9 @@ public struct TranscriptSegment: Codable, Sendable, Equatable, Identifiable {
         case timingQuality = "timing_quality"
         case speakerConfidence = "speaker_confidence"
         case words
+        case attributionSource = "attribution_source"
+        case speakerInference = "speaker_inference"
+        case unresolvedSpeakerEvidence = "unresolved_speaker_evidence"
     }
 
     public init(
@@ -180,7 +190,10 @@ public struct TranscriptSegment: Codable, Sendable, Equatable, Identifiable {
         overlap: Bool,
         timingQuality: TranscriptTimingQuality,
         speakerConfidence: Double? = nil,
-        words: [TimedWord]? = nil
+        words: [TimedWord]? = nil,
+        attributionSource: TranscriptSpeakerAttributionSource? = nil,
+        speakerInference: TranscriptSpeakerInference? = nil,
+        unresolvedSpeakerEvidence: TranscriptUnresolvedSpeakerEvidence? = nil
     ) {
         self.id = id
         self.speakerID = speakerID
@@ -192,7 +205,72 @@ public struct TranscriptSegment: Codable, Sendable, Equatable, Identifiable {
         self.timingQuality = timingQuality
         self.speakerConfidence = speakerConfidence
         self.words = words
+        self.attributionSource = attributionSource
+        self.speakerInference = speakerInference
+        self.unresolvedSpeakerEvidence = unresolvedSpeakerEvidence
     }
+
+    /// Confirmed identity, or a conservative inference when the original
+    /// assignment is still unknown. Manual labels always win.
+    public var effectiveSpeakerID: String? {
+        if attributionSource == .manual { return speakerID }
+        return speakerID ?? speakerInference?.speakerID
+    }
+
+    public var hasInferredSpeaker: Bool {
+        speakerID == nil && speakerInference != nil && attributionSource != .manual
+    }
+}
+
+/// Who wrote the canonical `speaker_id`. Omitted means the turn builder.
+public enum TranscriptSpeakerAttributionSource: String, Codable, Sendable, Equatable {
+    case inferred
+    case manual
+}
+
+/// A presentation-only identity that does not replace the original unknown assignment.
+public struct TranscriptSpeakerInference: Codable, Sendable, Equatable {
+    public let speakerID: String
+    public let speakerLabel: String
+    public let evidence: TranscriptSpeakerInferenceEvidence
+    public let provenance: String
+    public let diarizationHoleMs: Int?
+    public let overlapMs: Int?
+
+    private enum CodingKeys: String, CodingKey {
+        case speakerID = "speaker_id"
+        case speakerLabel = "speaker_label"
+        case evidence, provenance
+        case diarizationHoleMs = "diarization_hole_ms"
+        case overlapMs = "overlap_ms"
+    }
+
+    public init(
+        speakerID: String,
+        speakerLabel: String,
+        evidence: TranscriptSpeakerInferenceEvidence,
+        provenance: String,
+        diarizationHoleMs: Int? = nil,
+        overlapMs: Int? = nil
+    ) {
+        self.speakerID = speakerID
+        self.speakerLabel = speakerLabel
+        self.evidence = evidence
+        self.provenance = provenance
+        self.diarizationHoleMs = diarizationHoleMs
+        self.overlapMs = overlapMs
+    }
+}
+
+public enum TranscriptSpeakerInferenceEvidence: String, Codable, Sendable, Equatable {
+    case diarizationCoverage = "diarization_coverage"
+    case diarizationBoundaryGap = "diarization_boundary_gap"
+}
+
+public enum TranscriptUnresolvedSpeakerEvidence: String, Codable, Sendable, Equatable {
+    case noCoverage = "no_coverage"
+    case insufficientOverlap = "insufficient_overlap"
+    case competingSpeakers = "competing_speakers"
 }
 
 public enum TranscriptTimingQuality: String, Codable, Sendable, Equatable {

@@ -18,6 +18,7 @@ public struct TranscriptParagraph: Identifiable, Equatable, Sendable {
     public let speakerConfidence: Double?
     public let words: [TimedWord]?
     public let sourceSegmentIDs: [TranscriptSegment.ID]
+    public let containsInferredAttribution: Bool
 
     public var sourceSegmentCount: Int { sourceSegmentIDs.count }
 
@@ -27,7 +28,7 @@ public struct TranscriptParagraph: Identifiable, Equatable, Sendable {
     }
 
     public var needsReview: Bool {
-        speakerID == nil || hasLowSpeakerConfidence || overlap || timingQuality == .segmentOnly
+        speakerID == nil || containsInferredAttribution || hasLowSpeakerConfidence || overlap || timingQuality == .segmentOnly
     }
 
     public init(
@@ -41,7 +42,8 @@ public struct TranscriptParagraph: Identifiable, Equatable, Sendable {
         timingQuality: TranscriptTimingQuality,
         speakerConfidence: Double?,
         words: [TimedWord]?,
-        sourceSegmentIDs: [TranscriptSegment.ID]
+        sourceSegmentIDs: [TranscriptSegment.ID],
+        containsInferredAttribution: Bool = false
     ) {
         self.id = id
         self.speakerID = speakerID
@@ -54,6 +56,7 @@ public struct TranscriptParagraph: Identifiable, Equatable, Sendable {
         self.speakerConfidence = speakerConfidence
         self.words = words
         self.sourceSegmentIDs = sourceSegmentIDs
+        self.containsInferredAttribution = containsInferredAttribution
     }
 }
 
@@ -94,20 +97,19 @@ public struct TranscriptParagraphGrouper: Sendable {
         let nextWordCount = next.storedWordCount
         guard current.wordCount + nextWordCount <= configuration.maximumWordCount else { return false }
         return displayGrouper.shouldContinue(
-            currentSpeakerID: current.speakerID,
+            currentSpeakerID: current.groupingSpeakerID,
             currentStartMs: current.startMs,
             currentEndMs: current.endMs,
             currentWordCount: current.wordCount,
             lastText: current.lastText,
-            nextSpeakerID: next.speakerID,
+            nextSpeakerID: next.effectiveSpeakerID,
             nextStartMs: next.startMs,
             nextEndMs: next.endMs
         )
     }
 
     private struct Draft {
-        var speakerID: String?
-        var speakerLabel: String
+        var groupingSpeakerID: String?
         var startMs: Int
         var endMs: Int
         var wordCount: Int
@@ -116,8 +118,7 @@ public struct TranscriptParagraphGrouper: Sendable {
         var sources: [TranscriptSegment]
 
         init(segment: TranscriptSegment) {
-            speakerID = segment.speakerID
-            speakerLabel = segment.speakerLabel
+            groupingSpeakerID = segment.effectiveSpeakerID
             startMs = segment.startMs
             endMs = segment.endMs
             wordCount = segment.storedWordCount
@@ -137,10 +138,13 @@ public struct TranscriptParagraphGrouper: Sendable {
         func paragraph() -> TranscriptParagraph {
             let sourceIDs = sources.map(\.id)
             let confidences = sources.compactMap(\.speakerConfidence)
+            let confirmed = sources.first { $0.speakerID != nil }
+            let inferred = sources.first { $0.hasInferredSpeaker }?.speakerInference
+            let containsInferred = sources.contains { $0.hasInferredSpeaker }
             return TranscriptParagraph(
                 id: "paragraph:" + sourceIDs.joined(separator: "+"),
-                speakerID: speakerID,
-                speakerLabel: speakerLabel,
+                speakerID: confirmed?.speakerID ?? inferred?.speakerID,
+                speakerLabel: confirmed?.speakerLabel ?? inferred?.speakerLabel ?? sources[0].speakerLabel,
                 startMs: startMs,
                 endMs: endMs,
                 text: sources.map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -150,7 +154,8 @@ public struct TranscriptParagraphGrouper: Sendable {
                 timingQuality: Self.timingQuality(of: sources),
                 speakerConfidence: confidences.min(),
                 words: Self.joinedWords(from: sources),
-                sourceSegmentIDs: sourceIDs
+                sourceSegmentIDs: sourceIDs,
+                containsInferredAttribution: containsInferred
             )
         }
 

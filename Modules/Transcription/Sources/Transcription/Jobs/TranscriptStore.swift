@@ -167,7 +167,7 @@ public extension TranscriptReviewFile {
         self.init(
             id: run.job.runID.uuidString,
             sourceSnapshotURL: run.job.sourceSnapshotURL,
-            transcript: run.transcript,
+            transcript: UnknownFragmentReconciler.applied(to: run.transcript, in: run.runDirectoryURL),
             jobState: TranscriptJobState(run.job.state, transcript: run.transcript),
             processingError: run.job.failure?.message,
             suggestions: suggestions

@@ -179,7 +179,7 @@ public final class TranscriptViewModel {
     public var visibleSegments: [TranscriptSegment] {
         let query = Self.normalizedSearch(searchText)
         return chronologicalSegments.filter { segment in
-            if let speakerFilterID, segment.speakerID != speakerFilterID { return false }
+            if let speakerFilterID, segment.effectiveSpeakerID != speakerFilterID { return false }
             guard reviewFilter.matches(segment) else { return false }
             guard !query.isEmpty else { return true }
             return Self.normalizedSearch(segment.text).contains(query)

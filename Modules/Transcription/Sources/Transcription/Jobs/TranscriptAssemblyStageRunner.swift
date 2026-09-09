@@ -266,6 +266,12 @@ public struct TranscriptAssemblyStageRunner: TranscriptionStageRunning {
         } else {
             build = try turnBuilder.build(words: words, diarizedTurns: turns)
         }
+        let acousticIntervals = diarization.acousticIntervals(sourceDurationMs: sourceDurationMs)
+        let reconciledSegments = UnknownFragmentReconciler().reconcile(
+            segments: build.segments,
+            speakers: build.speakers,
+            intervals: acousticIntervals
+        )
         for diagnostic in build.diagnostics {
             guard case let .untranscribedSpeech(startMs, endMs) = diagnostic else { continue }
             warnings.append(TranscriptWarning(
@@ -290,6 +296,16 @@ public struct TranscriptAssemblyStageRunner: TranscriptionStageRunning {
                 "maximum_duration_ms": .number(Double(turnBuilder.configuration.grouping.maximumSegmentDurationMs)),
                 "maximum_word_count": .number(Double(turnBuilder.configuration.grouping.maximumWordCount)),
             ]),
+            "unknown_fragment_reconciliation": .object({
+                let configuration = UnknownFragmentReconciler.Configuration()
+                return [
+                    "provenance": .string(UnknownFragmentReconciler.provenance),
+                    "maximum_unknown_duration_ms": .number(Double(configuration.maximumUnknownDurationMs)),
+                    "maximum_neighbor_gap_ms": .number(Double(configuration.maximumNeighborGapMs)),
+                    "maximum_diarization_hole_ms": .number(Double(configuration.maximumDiarizationHoleMs)),
+                    "maximum_word_count": .number(Double(configuration.maximumWordCount)),
+                ]
+            }()),
         ]
         if let configuration = diarization.configuration {
             processingOptions["diarization_configuration"] = .object([
@@ -345,7 +361,7 @@ public struct TranscriptAssemblyStageRunner: TranscriptionStageRunning {
             language: job.request.expectedLanguage ?? "und",
             languageSource: job.request.expectedLanguage == nil ? .unknown : .userProvided,
             speakers: build.speakers,
-            segments: build.segments,
+            segments: reconciledSegments,
             processingOptions: processingOptions,
             engineRevisions: resolvedEngineRevisions,
             warnings: warnings
@@ -416,7 +432,10 @@ public struct TranscriptAssemblyStageRunner: TranscriptionStageRunning {
                     overlap: segment.overlap,
                     timingQuality: segment.timingQuality,
                     speakerConfidence: segment.speakerConfidence,
-                    words: segment.words
+                    words: segment.words,
+                    attributionSource: segment.attributionSource,
+                    speakerInference: segment.speakerInference,
+                    unresolvedSpeakerEvidence: segment.unresolvedSpeakerEvidence
                 )
             }
             let recognized = CanonicalTranscript(
