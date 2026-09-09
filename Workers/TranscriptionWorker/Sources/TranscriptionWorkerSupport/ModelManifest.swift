@@ -44,6 +44,19 @@ public struct ModelManifest: Codable, Sendable {
         try JSONDecoder().decode(ModelManifest.self, from: Data(contentsOf: url))
     }
 
+    /// Loads the manifest and enforces the worker's offline-only runtime policy.
+    /// Runtime entry points share this path so validation cannot drift between
+    /// full transcription, asset checks, and enrollment extraction.
+    public static func loadValidated(from url: URL, modelsDirectory: URL) throws -> ModelManifest {
+        let manifest = try load(from: url)
+        guard !manifest.telemetry.enabled, !manifest.telemetry.runtimeDownloadsAllowed else {
+            throw ModelSetupError.unsafeManifest
+        }
+        let report = manifest.validate(modelsDirectory: modelsDirectory)
+        guard report.isValid else { throw ModelSetupError.report(report) }
+        return manifest
+    }
+
     /// Validates exactly the staged files. It never asks FluidAudio, Core ML, or
     /// a model host to fill a gap; callers get one structured setup error with
     /// all missing or mismatched paths.

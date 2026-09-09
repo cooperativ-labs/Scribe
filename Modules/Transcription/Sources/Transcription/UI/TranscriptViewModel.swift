@@ -3,123 +3,6 @@ import Observation
 import ScribeAppCore
 import Speakers
 
-/// One recording-local speaker as the review window presents it.
-public struct TranscriptSpeakerRow: Identifiable, Equatable, Sendable {
-    public let speakerID: String
-    public let label: String
-    public let assignment: SpeakerIdentityAssignment
-    public let profileID: String?
-    public let segmentCount: Int
-    public let suggestion: TranscriptSpeakerSuggestion?
-
-    public var id: String { speakerID }
-
-    public var statusDescription: String {
-        if let suggestion {
-            return "Suggested: \(suggestion.person.displayName) (\(suggestion.scoreDescription)) — confirm to apply"
-        }
-        return switch assignment {
-        case .manual: "Assigned by you"
-        case .automatic: "Matched from your speaker library"
-        case .unmatched: "Not matched to a saved person"
-        }
-    }
-
-    public init(
-        speakerID: String,
-        label: String,
-        assignment: SpeakerIdentityAssignment,
-        profileID: String?,
-        segmentCount: Int,
-        suggestion: TranscriptSpeakerSuggestion?
-    ) {
-        self.speakerID = speakerID
-        self.label = label
-        self.assignment = assignment
-        self.profileID = profileID
-        self.segmentCount = segmentCount
-        self.suggestion = suggestion
-    }
-}
-
-/// Result of an assignment, enrollment, or label-refresh action.
-public struct TranscriptSpeakerActionMessage: Equatable, Sendable {
-    public let text: String
-    public let isFailure: Bool
-
-    public init(text: String, isFailure: Bool) {
-        self.text = text
-        self.isFailure = isFailure
-    }
-}
-
-/// What the transport bar shows while the selected source is playing.
-public struct TranscriptPlaybackStatus: Equatable, Sendable {
-    /// The turn whose words are being spoken, or the last one that started
-    /// when the play head is in a pause between turns.
-    public let segment: TranscriptSegment
-    public let isPlaying: Bool
-
-    public init(segment: TranscriptSegment, isPlaying: Bool) {
-        self.segment = segment
-        self.isPlaying = isPlaying
-    }
-
-    public var speakerLabel: String { segment.speakerLabel }
-
-    /// The turn's own bounds, which is what a listener is placing the words against.
-    public var timestamp: String {
-        "\(TranscriptTimecode.string(fromMilliseconds: segment.startMs)) – \(TranscriptTimecode.string(fromMilliseconds: segment.endMs))"
-    }
-}
-
-/// Which turns the transcript list shows.
-public enum TranscriptReviewFilter: String, CaseIterable, Identifiable, Sendable {
-    case all
-    case needsReview
-    case unknownSpeaker
-    case overlap
-    case estimatedTiming
-
-    public var id: String { rawValue }
-
-    public var displayName: String {
-        switch self {
-        case .all: "All turns"
-        case .needsReview: "Needs review"
-        case .unknownSpeaker: "Unknown speaker"
-        case .overlap: "Overlapping speech"
-        case .estimatedTiming: "Estimated timing"
-        }
-    }
-
-    public func matches(_ segment: TranscriptSegment) -> Bool {
-        switch self {
-        case .all: true
-        case .needsReview: segment.needsReview
-        case .unknownSpeaker: segment.speakerID == nil
-        case .overlap: segment.overlap
-        case .estimatedTiming: segment.timingQuality == .segmentOnly
-        }
-    }
-}
-
-public extension TranscriptSegment {
-    /// Below this the diarizer was guessing, which is worth a second listen.
-    static let lowSpeakerConfidence = 0.5
-
-    var hasLowSpeakerConfidence: Bool {
-        guard let speakerConfidence else { return false }
-        return speakerConfidence < Self.lowSpeakerConfidence
-    }
-
-    /// A turn a reviewer should look at: no speaker, an uncertain one,
-    /// overlapping speech, or timing that was estimated rather than measured.
-    var needsReview: Bool {
-        speakerID == nil || hasLowSpeakerConfidence || overlap || timingQuality == .segmentOnly
-    }
-}
-
 /// Fixture-first state and actions for the transcript review window.
 @MainActor
 @Observable
@@ -156,6 +39,8 @@ public final class TranscriptViewModel {
     /// Show only this recording-local speaker's turns, or nil for everyone.
     public var speakerFilterID: String?
     public var reviewFilter: TranscriptReviewFilter = .all
+    /// Segments for precise review, or paragraphs derived for reading.
+    public var reviewLayout: TranscriptReviewLayout = .segments
 
     /// Earlier revisions of each file, most recent last, for undo; and the
     /// ones undone, for redo. Kept in memory only: every step is also a saved
@@ -280,6 +165,11 @@ public final class TranscriptViewModel {
         }
     }
 
+    /// Reading paragraphs derived from the current canonical segments.
+    public var chronologicalParagraphs: [TranscriptParagraph] {
+        TranscriptParagraphGrouper().paragraphs(from: chronologicalSegments)
+    }
+
     /// The speakers this recording has, in table order.
     public var recordingSpeakers: [TranscriptSpeaker] { selectedTranscript?.speakers ?? [] }
 
@@ -297,6 +187,42 @@ public final class TranscriptViewModel {
         }
     }
 
+    /// The reading paragraphs the list shows after search and filters.
+    public var visibleParagraphs: [TranscriptParagraph] {
+        let query = Self.normalizedSearch(searchText)
+        return chronologicalParagraphs.filter { paragraph in
+            if let speakerFilterID, paragraph.speakerID != speakerFilterID { return false }
+            guard reviewFilter.matches(paragraph) else { return false }
+            guard !query.isEmpty else { return true }
+            return Self.normalizedSearch(paragraph.text).contains(query)
+                || Self.normalizedSearch(paragraph.speakerLabel).contains(query)
+        }
+    }
+
+    /// The list row that currently owns the play head, in the active layout.
+    public var playingRowID: String? {
+        switch reviewLayout {
+        case .segments: playingSegmentID
+        case .paragraphs: playingParagraphID
+        }
+    }
+
+    /// The list row that is selected, in the active layout.
+    public var selectedRowID: String? {
+        switch reviewLayout {
+        case .segments: selectedSegmentID
+        case .paragraphs: selectedParagraphID
+        }
+    }
+
+    public var selectedParagraphID: TranscriptParagraph.ID? {
+        paragraph(containingSegmentID: selectedSegmentID)?.id
+    }
+
+    public var playingParagraphID: TranscriptParagraph.ID? {
+        paragraph(containingSegmentID: playingSegmentID)?.id
+    }
+
     public var isFiltering: Bool {
         !Self.normalizedSearch(searchText).isEmpty || speakerFilterID != nil || reviewFilter != .all
     }
@@ -305,13 +231,15 @@ public final class TranscriptViewModel {
         chronologicalSegments.filter(\.needsReview).count
     }
 
-    /// A one-line account of the recording: turns, speakers, and length.
+    /// A one-line account of the recording: turns, paragraphs, speakers, and length.
     public var reviewSummary: String? {
         guard let transcript = selectedTranscript else { return nil }
         let turns = transcript.segments.count
+        let paragraphs = chronologicalParagraphs.count
         let speakers = transcript.speakers.count
         var parts = [
             "\(turns) turn\(turns == 1 ? "" : "s")",
+            "\(paragraphs) paragraph\(paragraphs == 1 ? "" : "s")",
             "\(speakers) speaker\(speakers == 1 ? "" : "s")",
             TranscriptTimecode.string(fromMilliseconds: transcript.source.durationMs).replacingOccurrences(of: #"\.\d{3}$"#, with: "", options: .regularExpression),
         ]
@@ -348,13 +276,50 @@ public final class TranscriptViewModel {
         return Array(NSOrderedSet(array: messages)) as? [String] ?? messages
     }
 
-    public func select(segment: TranscriptSegment) {
+    public func select(segment: TranscriptSegment, seekToStart: Bool = true) {
         selectedSegmentID = segment.id
-        playheadMilliseconds = segment.startMs
-        playback.seek(toMilliseconds: segment.startMs)
+        if seekToStart {
+            playheadMilliseconds = segment.startMs
+            playback.seek(toMilliseconds: segment.startMs)
+        }
         // A seek while playing moves the readout with the audio; a seek while
         // paused or stopped is only a selection and must not start sound.
         if isPlaying { playingSegmentID = segment.id }
+    }
+
+    /// Selects the paragraph without rewriting canonical segments. The play head
+    /// stays put when it already sits inside the paragraph.
+    public func select(paragraph: TranscriptParagraph) {
+        guard let segment = primarySegment(for: paragraph) else { return }
+        let playheadInside = playheadMilliseconds >= paragraph.startMs && playheadMilliseconds <= paragraph.endMs
+        select(segment: segment, seekToStart: !playheadInside)
+    }
+
+    public func play(paragraph: TranscriptParagraph) {
+        guard let segment = chronologicalSegments.first(where: { $0.id == paragraph.sourceSegmentIDs.first }) else {
+            return
+        }
+        play(segment: segment)
+    }
+
+    public func paragraph(containingSegmentID segmentID: TranscriptSegment.ID?) -> TranscriptParagraph? {
+        guard let segmentID else { return nil }
+        return chronologicalParagraphs.first { $0.sourceSegmentIDs.contains(segmentID) }
+    }
+
+    /// The canonical segment a paragraph row should act on: the selected source
+    /// when it belongs to the paragraph, otherwise the source covering the play
+    /// head, otherwise the first source.
+    public func primarySegment(for paragraph: TranscriptParagraph) -> TranscriptSegment? {
+        let sources = chronologicalSegments.filter { paragraph.sourceSegmentIDs.contains($0.id) }
+        guard !sources.isEmpty else { return nil }
+        if let selectedSegmentID, let selected = sources.first(where: { $0.id == selectedSegmentID }) {
+            return selected
+        }
+        if playheadMilliseconds >= paragraph.startMs, playheadMilliseconds <= paragraph.endMs {
+            return sources.last { $0.startMs <= playheadMilliseconds } ?? sources.first
+        }
+        return sources.first
     }
 
     // MARK: - Playback
@@ -443,6 +408,10 @@ public final class TranscriptViewModel {
     /// Moves the selection through the visible turns; the play head follows
     /// only while playback is running, so browsing stays silent.
     public func selectNeighbouringSegment(offset: Int) {
+        if reviewLayout == .paragraphs {
+            selectNeighbouringParagraph(offset: offset)
+            return
+        }
         let segments = visibleSegments
         guard !segments.isEmpty else { return }
         guard let selectedSegmentID, let index = segments.firstIndex(where: { $0.id == selectedSegmentID }) else {
@@ -458,6 +427,9 @@ public final class TranscriptViewModel {
     /// to the top; returns false when nothing does.
     @discardableResult
     public func selectNextSegmentNeedingReview() -> Bool {
+        if reviewLayout == .paragraphs {
+            return selectNextParagraphNeedingReview()
+        }
         let segments = chronologicalSegments
         let candidates = segments.filter(\.needsReview)
         guard !candidates.isEmpty else { return false }
@@ -465,6 +437,30 @@ public final class TranscriptViewModel {
         let next = segments.enumerated().first { $0.offset > start && $0.element.needsReview }?.element
             ?? candidates[0]
         select(segment: next)
+        return true
+    }
+
+    private func selectNeighbouringParagraph(offset: Int) {
+        let paragraphs = visibleParagraphs
+        guard !paragraphs.isEmpty else { return }
+        guard let selectedParagraphID, let index = paragraphs.firstIndex(where: { $0.id == selectedParagraphID }) else {
+            select(paragraph: offset < 0 ? paragraphs[paragraphs.count - 1] : paragraphs[0])
+            return
+        }
+        let target = max(0, min(paragraphs.count - 1, index + offset))
+        guard target != index else { return }
+        if isPlaying { play(paragraph: paragraphs[target]) } else { select(paragraph: paragraphs[target]) }
+    }
+
+    @discardableResult
+    private func selectNextParagraphNeedingReview() -> Bool {
+        let paragraphs = chronologicalParagraphs
+        let candidates = paragraphs.filter(\.needsReview)
+        guard !candidates.isEmpty else { return false }
+        let start = paragraphs.firstIndex { $0.id == selectedParagraphID } ?? -1
+        let next = paragraphs.enumerated().first { $0.offset > start && $0.element.needsReview }?.element
+            ?? candidates[0]
+        select(paragraph: next)
         return true
     }
 
@@ -620,16 +616,6 @@ public final class TranscriptViewModel {
             speakerActionMessage = TranscriptSpeakerActionMessage(text: failure, isFailure: true)
         }
         reprocessSession = session
-    }
-
-    /// Re-diarizes from the preserved source as a new run. The selected file
-    /// stays in place until the new run is completed and becomes the latest
-    /// run for that source. Prefer `presentReprocessConfirmation` from UI so
-    /// the person sees progress; this remains for direct host-path tests.
-    public func reprocess(speakerCount: TranscriptionSpeakerCount) async {
-        guard let reprocessor, let fileID = selectedFileID else { return }
-        let outcome = await reprocessor.reprocess(fileID: fileID, speakerCount: speakerCount)
-        speakerActionMessage = TranscriptSpeakerActionMessage(text: outcome.message, isFailure: outcome.isFailure)
     }
 
     /// Re-runs recognition and diarization with the host's current models and

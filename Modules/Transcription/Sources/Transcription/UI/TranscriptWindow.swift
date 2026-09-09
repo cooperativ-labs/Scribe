@@ -53,6 +53,11 @@ public struct TranscriptWindow: View {
             newPersonScope = nil
             Task { await viewModel.loadPeople() }
         }
+        .onChange(of: viewModel.reviewLayout) {
+            editingSegmentID = nil
+            splitSegment = nil
+            newPersonScope = nil
+        }
         .sheet(
             isPresented: Binding(
                 get: { viewModel.reprocessSession != nil },
@@ -277,7 +282,7 @@ public struct TranscriptWindow: View {
             Divider()
             TranscriptFilterBar(viewModel: viewModel, isSearchFocused: $isSearchFocused)
             Divider()
-            segmentList(transcript: transcript)
+            transcriptList(transcript: transcript)
         }
         .navigationTitle(file.displayName)
         .navigationSubtitle(file.transcript?.title == nil ? "" : file.filename)
@@ -393,31 +398,85 @@ public struct TranscriptWindow: View {
     }
 
     @ViewBuilder
-    private func segmentList(transcript: CanonicalTranscript) -> some View {
+    private func transcriptList(transcript: CanonicalTranscript) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 8) {
+                LazyVStack(alignment: .leading, spacing: viewModel.reviewLayout == .paragraphs ? 12 : 8) {
                     if transcript.segments.isEmpty {
                         ContentUnavailableView("No speech detected", systemImage: "waveform.slash", description: Text("This source completed without recognized speech."))
                             .frame(maxWidth: .infinity, minHeight: 240)
+                    } else if viewModel.reviewLayout == .paragraphs {
+                        if viewModel.visibleParagraphs.isEmpty {
+                            ContentUnavailableView.search(text: viewModel.searchText)
+                                .frame(maxWidth: .infinity, minHeight: 240)
+                        }
+                        ForEach(viewModel.visibleParagraphs) { paragraph in
+                            paragraphRow(paragraph)
+                                .id(paragraph.id)
+                        }
                     } else if viewModel.visibleSegments.isEmpty {
                         ContentUnavailableView.search(text: viewModel.searchText)
                             .frame(maxWidth: .infinity, minHeight: 240)
-                    }
-                    ForEach(viewModel.visibleSegments) { segment in
-                        segmentRow(segment, in: transcript)
-                            .id(segment.id)
+                    } else {
+                        ForEach(viewModel.visibleSegments) { segment in
+                            segmentRow(segment, in: transcript)
+                                .id(segment.id)
+                        }
                     }
                 }
                 .padding()
             }
-            .onChange(of: viewModel.playingSegmentID) { _, playing in
+            .onChange(of: viewModel.playingRowID) { _, playing in
                 guard viewModel.followsPlayback, let playing else { return }
                 withAnimation(.easeInOut(duration: 0.25)) { proxy.scrollTo(playing, anchor: .center) }
             }
-            .onChange(of: viewModel.selectedSegmentID) { _, selected in
+            .onChange(of: viewModel.selectedRowID) { _, selected in
                 guard let selected, !viewModel.isPlaying else { return }
                 proxy.scrollTo(selected)
+            }
+            .onChange(of: viewModel.reviewLayout) {
+                if viewModel.followsPlayback, let playing = viewModel.playingRowID {
+                    proxy.scrollTo(playing, anchor: .center)
+                } else if let selected = viewModel.selectedRowID {
+                    proxy.scrollTo(selected)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func paragraphRow(_ paragraph: TranscriptParagraph) -> some View {
+        let primary = viewModel.primarySegment(for: paragraph)
+        TranscriptParagraphRow(
+            viewModel: viewModel,
+            paragraph: paragraph,
+            isSelected: paragraph.id == viewModel.selectedParagraphID,
+            isPlaying: viewModel.isPlaying && paragraph.id == viewModel.playingParagraphID,
+            onSelect: { viewModel.select(paragraph: paragraph) },
+            onPlay: { viewModel.play(paragraph: paragraph) },
+            onNewPerson: {
+                if let primary { newPersonScope = .turn(segmentID: primary.id) }
+            }
+        )
+        .popover(
+            isPresented: Binding(
+                get: { primary.map { newPersonScope == .turn(segmentID: $0.id) } ?? false },
+                set: { if !$0, let primary, newPersonScope == .turn(segmentID: primary.id) { newPersonScope = nil } }
+            ),
+            arrowEdge: .bottom
+        ) {
+            if let primary {
+                TranscriptNewPersonPopover(viewModel: viewModel, scope: .turn(segmentID: primary.id))
+            }
+        }
+        .contextMenu {
+            Button("Play from Here", systemImage: "play.fill") { viewModel.play(paragraph: paragraph) }
+            if let primary {
+                Menu("Speaker") {
+                    TranscriptSpeakerMenuItems(viewModel: viewModel, scope: .turn(segmentID: primary.id)) {
+                        newPersonScope = .turn(segmentID: primary.id)
+                    }
+                }
             }
         }
     }
@@ -565,26 +624,32 @@ public struct TranscriptWindow: View {
                 .keyboardShortcut("f", modifiers: .command)
             Button("Next Turn Needing Review") { viewModel.selectNextSegmentNeedingReview() }
                 .keyboardShortcut("j", modifiers: .command)
+            Button("Segments View") { viewModel.reviewLayout = .segments }
+                .keyboardShortcut("1", modifiers: .command)
+                .disabled(isTyping)
+            Button("Paragraphs View") { viewModel.reviewLayout = .paragraphs }
+                .keyboardShortcut("2", modifiers: .command)
+                .disabled(isTyping)
             Button("Edit Words") {
                 if let segment = selectedSegment { beginEditing(segment) }
             }
             .keyboardShortcut("e", modifiers: .command)
-            .disabled(isTyping || selectedSegment == nil)
+            .disabled(isTyping || selectedSegment == nil || viewModel.reviewLayout != .segments)
             Button("Split") {
                 if let segment = selectedSegment, viewModel.splitTokens(for: segment).count > 1 { splitSegment = segment }
             }
             .keyboardShortcut("s", modifiers: [.command, .shift])
-            .disabled(isTyping || selectedSegment == nil)
+            .disabled(isTyping || selectedSegment == nil || viewModel.reviewLayout != .segments)
             Button("Combine with Previous") {
                 if let segment = selectedSegment { viewModel.merge(segmentID: segment.id, withNext: false) }
             }
             .keyboardShortcut(.upArrow, modifiers: [.command, .option])
-            .disabled(isTyping || selectedSegment == nil)
+            .disabled(isTyping || selectedSegment == nil || viewModel.reviewLayout != .segments)
             Button("Combine with Next") {
                 if let segment = selectedSegment { viewModel.merge(segmentID: segment.id, withNext: true) }
             }
             .keyboardShortcut(.downArrow, modifiers: [.command, .option])
-            .disabled(isTyping || selectedSegment == nil)
+            .disabled(isTyping || selectedSegment == nil || viewModel.reviewLayout != .segments)
         }
         .frame(width: 0, height: 0)
         .opacity(0)
@@ -702,6 +767,16 @@ private struct TranscriptFilterBar: View {
             .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 7))
             .frame(maxWidth: 360)
 
+            Picker("View", selection: $viewModel.reviewLayout) {
+                ForEach(TranscriptReviewLayout.allCases) { layout in
+                    Text(layout.displayName).tag(layout)
+                }
+            }
+            .pickerStyle(.segmented)
+            .fixedSize()
+            .help("Segments shows each canonical turn. Paragraphs groups consecutive same-speaker turns for reading without changing the saved transcript.")
+            .accessibilityLabel("Transcript view")
+
             Picker("Show", selection: $viewModel.reviewFilter) {
                 ForEach(TranscriptReviewFilter.allCases) { filter in
                     Text(filter.displayName).tag(filter)
@@ -742,9 +817,16 @@ private struct TranscriptFilterBar: View {
     }
 
     private var countDescription: String {
-        let total = viewModel.chronologicalSegments.count
-        let visible = viewModel.visibleSegments.count
-        return viewModel.isFiltering ? "\(visible) of \(total) turns" : "\(total) turns"
+        switch viewModel.reviewLayout {
+        case .segments:
+            let total = viewModel.chronologicalSegments.count
+            let visible = viewModel.visibleSegments.count
+            return viewModel.isFiltering ? "\(visible) of \(total) turns" : "\(total) turns"
+        case .paragraphs:
+            let total = viewModel.chronologicalParagraphs.count
+            let visible = viewModel.visibleParagraphs.count
+            return viewModel.isFiltering ? "\(visible) of \(total) paragraphs" : "\(total) paragraphs"
+        }
     }
 }
 
@@ -786,7 +868,7 @@ private struct TranscriptTransportBar: View {
                 Text(status?.speakerLabel ?? "Ready")
                     .font(.callout.weight(.semibold))
                     .lineLimit(1)
-                Text(status?.timestamp ?? "Select a turn, or drag the play head")
+                Text(status?.timestamp ?? (viewModel.reviewLayout == .paragraphs ? "Select a paragraph, or drag the play head" : "Select a turn, or drag the play head"))
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -1020,6 +1102,106 @@ private struct TranscriptSegmentRow: View {
     }
 }
 
+/// One reading paragraph: consecutive same-speaker canonical turns grouped
+/// without rewriting the saved transcript. Precise split, merge, and word
+/// edits stay in Segments view.
+private struct TranscriptParagraphRow: View {
+    let viewModel: TranscriptViewModel
+    let paragraph: TranscriptParagraph
+    let isSelected: Bool
+    let isPlaying: Bool
+    let onSelect: () -> Void
+    let onPlay: () -> Void
+    let onNewPerson: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 7) {
+                Button(action: onPlay) {
+                    Image(systemName: isPlaying ? "speaker.wave.2.fill" : "play.circle")
+                        .font(.callout)
+                        .foregroundStyle(isPlaying ? Color.accentColor : .secondary)
+                        .contentTransition(.symbolEffect(.replace))
+                }
+                .buttonStyle(.plain)
+                .help("Play from this paragraph")
+                .accessibilityLabel("Play from \(TranscriptTimecode.string(fromMilliseconds: paragraph.startMs))")
+
+                Text("\(TranscriptTimecode.string(fromMilliseconds: paragraph.startMs)) – \(TranscriptTimecode.string(fromMilliseconds: paragraph.endMs))")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+
+                if let primary = viewModel.primarySegment(for: paragraph) {
+                    TranscriptSpeakerMenu(viewModel: viewModel, scope: .turn(segmentID: primary.id), onNewPerson: onNewPerson) {
+                        if paragraph.speakerID == nil {
+                            Label("Unknown speaker", systemImage: "person.crop.circle.badge.questionmark")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.orange)
+                        } else {
+                            Label(paragraph.speakerLabel, systemImage: "person.crop.circle")
+                                .font(.caption.weight(.semibold))
+                        }
+                    }
+                    .menuStyle(.borderlessButton)
+                    .help("Change who is speaking in the selected source turn")
+                } else if paragraph.speakerID == nil {
+                    Label("Unknown speaker", systemImage: "person.crop.circle.badge.questionmark")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.orange)
+                } else {
+                    Label(paragraph.speakerLabel, systemImage: "person.crop.circle")
+                        .font(.caption.weight(.semibold))
+                }
+
+                if paragraph.hasLowSpeakerConfidence, let confidence = paragraph.speakerConfidence {
+                    Label("Uncertain speaker (\(Int((confidence * 100).rounded()))%)", systemImage: "questionmark.circle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+                if paragraph.overlap {
+                    Label("Overlapping speech", systemImage: "person.2.badge.gearshape")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.red)
+                }
+                if paragraph.timingQuality == .segmentOnly {
+                    Label("Estimated timing", systemImage: "clock.badge.exclamationmark")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+                if paragraph.sourceSegmentCount > 1 {
+                    Text("\(paragraph.sourceSegmentCount) segments")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .help("This reading paragraph maps to \(paragraph.sourceSegmentCount) saved turns. Switch to Segments for precise review.")
+                }
+                Spacer(minLength: 0)
+            }
+            Text(TranscriptSearchHighlighter.highlight(paragraph.text, query: viewModel.searchText))
+                .font(.body)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .textSelection(.enabled)
+        }
+        .padding(12)
+        .background(background, in: RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(isSelected ? Color.accentColor.opacity(0.5) : .clear, lineWidth: 1)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture(count: 2, perform: onPlay)
+        .onTapGesture(perform: onSelect)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("\(paragraph.speakerLabel), \(paragraph.text)")
+        .accessibilityHint("Double-click to play from \(TranscriptTimecode.string(fromMilliseconds: paragraph.startMs)). Grouped from \(paragraph.sourceSegmentCount) saved turn\(paragraph.sourceSegmentCount == 1 ? "" : "s").")
+    }
+
+    private var background: Color {
+        if isPlaying { return Color.accentColor.opacity(0.18) }
+        if isSelected { return Color.accentColor.opacity(0.12) }
+        return Color.secondary.opacity(0.06)
+    }
+}
+
 /// Marks every occurrence of the search words in a turn's text.
 enum TranscriptSearchHighlighter {
     static func highlight(_ text: String, query: String) -> AttributedString {
@@ -1047,6 +1229,7 @@ private struct TranscriptShortcutsHelp: View {
         ("Space", "Play the selected turn, or pause"),
         ("⌥↑ / ⌥↓", "Select the previous or next turn"),
         ("⌥← / ⌥→", "Back or forward five seconds"),
+        ("⌘1 / ⌘2", "Segments or Paragraphs view"),
         ("⌘F", "Find words or a speaker"),
         ("⌘J", "Select the next turn needing review"),
         ("⌘E", "Edit the words of the selected turn"),

@@ -1,179 +1,6 @@
 import Foundation
 import ScribeAppCore
 
-/// The durable state of a transcription run.  The non-terminal cases are the
-/// safe boundaries at which a run may be paused, cancelled, or recovered.
-public enum TranscriptionJobState: String, Codable, Sendable, CaseIterable {
-    case queued
-    case preparing
-    case transcribing
-    case reconcilingTimings
-    case diarizing
-    case assembling
-    case matchingSpeakers
-    case complete
-    case cancelled
-    case failed
-
-    public var isTerminal: Bool {
-        self == .complete || self == .cancelled || self == .failed
-    }
-
-    public static let processingStages: [Self] = [
-        .preparing, .transcribing, .reconcilingTimings, .diarizing,
-        .assembling, .matchingSpeakers,
-    ]
-
-    /// Short label for progress UI while a run is in flight.
-    public var progressLabel: String {
-        switch self {
-        case .queued: "Queued"
-        case .preparing: "Preparing audio"
-        case .transcribing: "Transcribing"
-        case .reconcilingTimings: "Aligning timings"
-        case .diarizing: "Separating speakers"
-        case .assembling: "Assembling transcript"
-        case .matchingSpeakers: "Matching speakers"
-        case .complete: "Complete"
-        case .cancelled: "Cancelled"
-        case .failed: "Failed"
-        }
-    }
-
-    /// Fraction of the fixed processing pipeline completed when this stage starts.
-    public var progressFractionOnStart: Double {
-        guard let index = Self.processingStages.firstIndex(of: self) else {
-            return self == .complete ? 1 : 0
-        }
-        return Double(index) / Double(Self.processingStages.count)
-    }
-
-    /// Fraction completed once this stage's checkpoint is written.
-    public var progressFractionOnCheckpoint: Double {
-        guard let index = Self.processingStages.firstIndex(of: self) else {
-            return self == .complete ? 1 : 0
-        }
-        return Double(index + 1) / Double(Self.processingStages.count)
-    }
-}
-
-/// Export failures are deliberately independent from the canonical transcript.
-public enum TranscriptionExportState: String, Codable, Sendable, Equatable {
-    case notRequested
-    case queued
-    case exporting
-    case complete
-    case failed
-}
-
-/// A completed stage's durable, fingerprinted recovery point.
-public struct TranscriptionStageCheckpoint: Codable, Sendable, Equatable {
-    public let stage: TranscriptionJobState
-    public let sourceFingerprint: String
-    public let modelFingerprint: String
-    public let configurationFingerprint: String
-    public let artifactURL: URL?
-    public let completedAt: Date
-
-    public init(
-        stage: TranscriptionJobState,
-        sourceFingerprint: String,
-        modelFingerprint: String,
-        configurationFingerprint: String,
-        artifactURL: URL? = nil,
-        completedAt: Date = Date()
-    ) {
-        self.stage = stage
-        self.sourceFingerprint = sourceFingerprint
-        self.modelFingerprint = modelFingerprint
-        self.configurationFingerprint = configurationFingerprint
-        self.artifactURL = artifactURL
-        self.completedAt = completedAt
-    }
-}
-
-/// The result a stage runner writes after it has atomically committed its own
-/// intermediate artifact.  The coordinator owns the matching job checkpoint.
-public struct TranscriptionStageOutput: Sendable, Equatable {
-    public let artifactURL: URL?
-
-    public init(artifactURL: URL? = nil) {
-        self.artifactURL = artifactURL
-    }
-}
-
-/// The worker-facing seam.  Keeping it small lets the next WorkerClient
-/// objective plug in without giving the worker responsibility for queue state.
-public protocol TranscriptionStageRunning: Sendable {
-    func run(stage: TranscriptionJobState, job: TranscriptionJob) async throws -> TranscriptionStageOutput
-}
-
-/// The persisted contents of `<run>/job.json`.
-public struct TranscriptionJob: Codable, Sendable, Equatable, Identifiable {
-    public static let schemaVersion = 1
-
-    public let schemaVersion: Int
-    public let id: UUID
-    public let runID: UUID
-    public let request: TranscriptionRequest
-    public let sourceSnapshotURL: URL
-    public let runDirectoryURL: URL
-    public let sourceFingerprint: String
-    public let modelFingerprint: String
-    public let configurationFingerprint: String
-    public var state: TranscriptionJobState
-    public var checkpoints: [TranscriptionJobState: TranscriptionStageCheckpoint]
-    /// Keys are exporter names (for example `txt`, `json`, and `srt`).
-    public var exportStates: [String: TranscriptionExportState]
-    public var failure: TranscriptionDiagnostic?
-    public let createdAt: Date
-    public var updatedAt: Date
-    public var retryOfRunID: UUID?
-
-    public init(
-        id: UUID = UUID(),
-        runID: UUID = UUID(),
-        request: TranscriptionRequest,
-        sourceSnapshotURL: URL,
-        runDirectoryURL: URL,
-        sourceFingerprint: String,
-        modelFingerprint: String,
-        configurationFingerprint: String,
-        state: TranscriptionJobState = .queued,
-        checkpoints: [TranscriptionJobState: TranscriptionStageCheckpoint] = [:],
-        exportStates: [String: TranscriptionExportState] = [:],
-        failure: TranscriptionDiagnostic? = nil,
-        createdAt: Date = Date(),
-        updatedAt: Date = Date(),
-        retryOfRunID: UUID? = nil
-    ) {
-        self.schemaVersion = Self.schemaVersion
-        self.id = id
-        self.runID = runID
-        self.request = request
-        self.sourceSnapshotURL = sourceSnapshotURL
-        self.runDirectoryURL = runDirectoryURL
-        self.sourceFingerprint = sourceFingerprint
-        self.modelFingerprint = modelFingerprint
-        self.configurationFingerprint = configurationFingerprint
-        self.state = state
-        self.checkpoints = checkpoints
-        self.exportStates = exportStates
-        self.failure = failure
-        self.createdAt = createdAt
-        self.updatedAt = updatedAt
-        self.retryOfRunID = retryOfRunID
-    }
-
-    public var jobFileURL: URL { runDirectoryURL.appendingPathComponent("job.json") }
-}
-
-public enum TranscriptionCoordinatorError: Error, Sendable, Equatable {
-    case unknownJob(UUID)
-    case sourceSnapshotFailed(String)
-    case persistenceFailed(String)
-}
-
 /// Owns the persistent, capture-aware transcription queue.
 ///
 /// Job records are authoritative and live in their transcript-store run
@@ -388,7 +215,6 @@ public actor TranscriptionCoordinator {
             modelFingerprint: previous.modelFingerprint,
             configurationFingerprint: previous.configurationFingerprint,
             checkpoints: compatible,
-            exportStates: previous.exportStates.mapValues { $0 == .complete ? .complete : .notRequested },
             createdAt: now(),
             updatedAt: now(),
             retryOfRunID: previous.runID
@@ -408,24 +234,14 @@ public actor TranscriptionCoordinator {
     /// directory, including any review revisions, is never touched.
     @discardableResult
     public func reprocess(_ previous: TranscriptionJob, speakerCount: TranscriptionSpeakerCount) throws -> TranscriptionJob {
-        let request = TranscriptionRequest(
-            sourceURL: previous.sourceSnapshotURL,
-            languageMode: previous.request.languageMode,
-            expectedLanguage: previous.request.expectedLanguage,
+        let request = retainedSourceRequest(
+            from: previous,
             speakerCount: speakerCount,
-            speakerMatching: previous.request.speakerMatching,
             speakerLibraryRevision: previous.request.speakerLibraryRevision,
             vocabularyRevision: previous.request.vocabularyRevision,
-            modelProfileID: previous.request.modelProfileID,
-            exportDirectory: previous.request.exportDirectory,
-            provenance: previous.request.provenance,
-            title: previous.request.title
+            modelProfileID: previous.request.modelProfileID
         )
-        var job = try enqueue(request)
-        job.retryOfRunID = previous.runID
-        try write(job)
-        jobs[job.id] = job
-        return job
+        return try enqueueDerivedRun(from: previous, request: request)
     }
 
     /// Queues a fresh run over a retained source with the host's current model
@@ -439,19 +255,42 @@ public actor TranscriptionCoordinator {
         modelProfileID: String,
         speakerCount: TranscriptionSpeakerCount
     ) throws -> TranscriptionJob {
-        let request = TranscriptionRequest(
+        let request = retainedSourceRequest(
+            from: previous,
+            speakerCount: speakerCount,
+            speakerLibraryRevision: nil,
+            vocabularyRevision: nil,
+            modelProfileID: modelProfileID
+        )
+        return try enqueueDerivedRun(from: previous, request: request)
+    }
+
+    private func retainedSourceRequest(
+        from previous: TranscriptionJob,
+        speakerCount: TranscriptionSpeakerCount,
+        speakerLibraryRevision: String?,
+        vocabularyRevision: String?,
+        modelProfileID: String
+    ) -> TranscriptionRequest {
+        TranscriptionRequest(
             sourceURL: previous.sourceSnapshotURL,
             languageMode: previous.request.languageMode,
             expectedLanguage: previous.request.expectedLanguage,
             speakerCount: speakerCount,
             speakerMatching: previous.request.speakerMatching,
-            speakerLibraryRevision: nil,
-            vocabularyRevision: nil,
+            speakerLibraryRevision: speakerLibraryRevision,
+            vocabularyRevision: vocabularyRevision,
             modelProfileID: modelProfileID,
             exportDirectory: previous.request.exportDirectory,
             provenance: previous.request.provenance,
             title: previous.request.title
         )
+    }
+
+    private func enqueueDerivedRun(
+        from previous: TranscriptionJob,
+        request: TranscriptionRequest
+    ) throws -> TranscriptionJob {
         var job = try enqueue(request)
         job.retryOfRunID = previous.runID
         try write(job)
@@ -481,14 +320,6 @@ public actor TranscriptionCoordinator {
             }
             try? persistQueueIndex()
         }
-    }
-
-    public func setExportState(_ state: TranscriptionExportState, named name: String, for jobID: UUID) throws {
-        guard var job = jobs[jobID] else { throw TranscriptionCoordinatorError.unknownJob(jobID) }
-        job.exportStates[name] = state
-        job.updatedAt = now()
-        jobs[jobID] = job
-        try write(job)
     }
 
     private func execute(_ job: inout TranscriptionJob) async {

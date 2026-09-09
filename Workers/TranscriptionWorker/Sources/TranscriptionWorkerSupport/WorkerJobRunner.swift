@@ -55,12 +55,10 @@ public struct WorkerJobRunner: Sendable {
     ) async {
         do {
             let job = try Job(payload: payload)
-            let manifest = try ModelManifest.load(from: configuration.manifestURL)
-            guard !manifest.telemetry.enabled, !manifest.telemetry.runtimeDownloadsAllowed else {
-                throw ModelSetupError.unsafeManifest
-            }
-            let report = manifest.validate(modelsDirectory: configuration.modelsDirectory)
-            guard report.isValid else { throw ModelSetupError.report(report) }
+            let manifest = try ModelManifest.loadValidated(
+                from: configuration.manifestURL,
+                modelsDirectory: configuration.modelsDirectory
+            )
 
             try FileManager.default.createDirectory(at: job.runDirectory, withIntermediateDirectories: true)
             let prepare = try await runPrepare(job: job, requestID: requestID, isCancelled: isCancelled, emit: emit)
@@ -204,17 +202,7 @@ public struct WorkerJobRunner: Sendable {
 
     private func commit<T: Encodable>(_ value: T, to destination: URL) throws {
         let data = try JSONEncoder.workerCheckpoint.encode(value)
-        let temporary = destination.deletingLastPathComponent().appending(path: ".\(destination.lastPathComponent).\(UUID().uuidString).tmp")
-        // `temporary` already has a unique name in the destination directory;
-        // the following move/replace is the atomic publication step. Avoid
-        // Foundation's second hidden staging file, which is not permitted by
-        // every sandboxed host directory.
-        try data.write(to: temporary)
-        if FileManager.default.fileExists(atPath: destination.path) {
-            _ = try FileManager.default.replaceItemAt(destination, withItemAt: temporary)
-        } else {
-            try FileManager.default.moveItem(at: temporary, to: destination)
-        }
+        try AtomicFilePublisher.write(data, to: destination)
     }
 
     private func sha256(of url: URL) -> String {
@@ -317,20 +305,14 @@ private enum PreparedAudio {
             guard status != .error else { throw conversionError ?? WorkerJobRunner.Error.invalidPath("Audio conversion failed.") }
             if converted.frameLength > 0 { try output.write(from: converted) }
         }
-        try replace(temporary: temporary, destination: destination)
+        try AtomicFilePublisher.publish(temporary, to: destination)
         return duration
     }
 
     private static func replaceWithCopy(source: URL, destination: URL) throws {
         let temporary = destination.deletingLastPathComponent().appending(path: ".prepared-\(UUID().uuidString).wav")
         try FileManager.default.copyItem(at: source, to: temporary)
-        try replace(temporary: temporary, destination: destination)
-    }
-
-    private static func replace(temporary: URL, destination: URL) throws {
-        if FileManager.default.fileExists(atPath: destination.path) {
-            _ = try FileManager.default.replaceItemAt(destination, withItemAt: temporary)
-        } else { try FileManager.default.moveItem(at: temporary, to: destination) }
+        try AtomicFilePublisher.publish(temporary, to: destination)
     }
 }
 

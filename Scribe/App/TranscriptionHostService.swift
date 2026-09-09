@@ -398,13 +398,12 @@ final class TranscriptionHostService {
     }
 
     func reprocessTranscript(fileID: TranscriptReviewFile.ID, speakerCount: TranscriptionSpeakerCount) async -> TranscriptReprocessingOutcome {
-        guard let runID = UUID(uuidString: fileID), let previous = store.run(withRunID: runID) else {
+        guard let previous = reviewedRun(fileID: fileID) else {
             return TranscriptReprocessingOutcome(message: "The original transcription run could not be found.", isFailure: true)
         }
         do {
             let job = try await coordinator.reprocess(previous.job, speakerCount: speakerCount)
-            await refreshReview()
-            Task { [weak self] in await self?.runPending() }
+            await refreshAndRunPending()
             let description = switch speakerCount {
             case .automatic: "automatic speaker count"
             case .known(let count): "exactly \(count) speaker\(count == 1 ? "" : "s")"
@@ -422,7 +421,7 @@ final class TranscriptionHostService {
     /// Re-runs recognition and diarization from the retained source using the
     /// models and speaker-count setting currently configured for new imports.
     func retranscribeTranscript(fileID: TranscriptReviewFile.ID) async -> TranscriptReprocessingOutcome {
-        guard let runID = UUID(uuidString: fileID), let previous = store.run(withRunID: runID) else {
+        guard let previous = reviewedRun(fileID: fileID) else {
             return TranscriptReprocessingOutcome(message: "The original transcription run could not be found.", isFailure: true)
         }
         do {
@@ -431,8 +430,7 @@ final class TranscriptionHostService {
                 modelProfileID: modelProfileID,
                 speakerCount: speakerCount
             )
-            await refreshReview()
-            Task { [weak self] in await self?.runPending() }
+            await refreshAndRunPending()
             return TranscriptReprocessingOutcome(
                 message: "Queued a new transcription with the current models and settings. This transcript and its edits were kept.",
                 isFailure: false
@@ -440,6 +438,15 @@ final class TranscriptionHostService {
         } catch {
             return TranscriptReprocessingOutcome(message: "Could not queue retranscription: \(error.localizedDescription)", isFailure: true)
         }
+    }
+
+    private func reviewedRun(fileID: TranscriptReviewFile.ID) -> StoredTranscriptRun? {
+        UUID(uuidString: fileID).flatMap { store.run(withRunID: $0) }
+    }
+
+    private func refreshAndRunPending() async {
+        await refreshReview()
+        Task { [weak self] in await self?.runPending() }
     }
 
     private func speakerDirectory() -> (any TranscriptSpeakerDirectory)? {

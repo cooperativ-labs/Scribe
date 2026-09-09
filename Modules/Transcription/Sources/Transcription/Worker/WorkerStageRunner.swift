@@ -128,17 +128,7 @@ public actor WorkerStageRunner: TranscriptionStageRunning {
                     completedStages: Array(session.results.keys)
                 )
             }
-            let event = try await session.client.nextRunEvent()
-            guard var updated = sessions[job.id] else { continue }
-            switch event {
-            case let .progress(progress):
-                emit(job, stage: progress.stage, progress: progress.progress)
-            case let .stageResult(result):
-                updated.results[result.stage] = result
-            case .finished:
-                updated.finished = true
-            }
-            sessions[job.id] = updated
+            try await receiveNextEvent(for: job)
         }
     }
 
@@ -175,17 +165,27 @@ public actor WorkerStageRunner: TranscriptionStageRunning {
     /// the model-loading process open past the last stage would compete with a
     /// recording for memory.
     private func finish(_ job: TranscriptionJob) async throws {
-        while let session = sessions[job.id], !session.finished {
-            let event = try await session.client.nextRunEvent()
-            guard var updated = sessions[job.id] else { return }
-            switch event {
-            case let .progress(progress): emit(job, stage: progress.stage, progress: progress.progress)
-            case let .stageResult(result): updated.results[result.stage] = result
-            case .finished: updated.finished = true
-            }
-            sessions[job.id] = updated
+        while sessions[job.id]?.finished == false {
+            try await receiveNextEvent(for: job)
         }
         await closeSession(for: job.id)
+    }
+
+    /// Applies one worker event to its session. Both stage waits and final
+    /// draining use this path so buffering and progress reporting cannot drift.
+    private func receiveNextEvent(for job: TranscriptionJob) async throws {
+        guard let session = sessions[job.id] else { return }
+        let event = try await session.client.nextRunEvent()
+        guard var updated = sessions[job.id] else { return }
+        switch event {
+        case let .progress(progress):
+            emit(job, stage: progress.stage, progress: progress.progress)
+        case let .stageResult(result):
+            updated.results[result.stage] = result
+        case .finished:
+            updated.finished = true
+        }
+        sessions[job.id] = updated
     }
 
     private func closeSession(for jobID: UUID) async {

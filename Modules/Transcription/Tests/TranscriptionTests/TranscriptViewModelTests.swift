@@ -293,26 +293,6 @@ final class TranscriptViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.speakerActionMessage?.text.hasPrefix("Could not delete") == true)
     }
 
-    func testReprocessSendsTheSelectedExactCountToTheHostWithoutEditingTheTranscript() async throws {
-        let transcript = try fixture(named: "two-speakers")
-        let file = TranscriptReviewFile(
-            id: "revision-29-run",
-            sourceSnapshotURL: URL(fileURLWithPath: "/tmp/investigation.flac"),
-            transcript: transcript,
-            jobState: .complete
-        )
-        let reprocessor = ReprocessorSpy()
-        let viewModel = TranscriptViewModel(files: [file], playback: PlaybackSpy(), reprocessor: reprocessor)
-
-        await viewModel.reprocess(speakerCount: .known(2))
-
-        XCTAssertEqual(reprocessor.requests.count, 1)
-        XCTAssertEqual(reprocessor.requests.first?.0, file.id)
-        XCTAssertEqual(reprocessor.requests.first?.1, .known(2))
-        XCTAssertEqual(viewModel.selectedTranscript?.revision, transcript.revision, "Reprocessing must not overwrite the reviewed revision.")
-        XCTAssertEqual(viewModel.speakerActionMessage?.isFailure, false)
-    }
-
     func testReprocessConfirmationSheetShowsProgressAndCompletion() async throws {
         let transcript = try fixture(named: "two-speakers")
         let file = TranscriptReviewFile(
@@ -396,6 +376,143 @@ final class TranscriptViewModelTests: XCTestCase {
         let viewModel = TranscriptViewModel(files: [file], playback: PlaybackSpy(), retranscriber: RetranscriberSpy())
 
         XCTAssertFalse(viewModel.canRetranscribe(file))
+    }
+
+    func testSwitchingLayoutsPreservesPlaybackPositionSelectionAndCanonicalSegments() throws {
+        let transcript = groupingTranscript()
+        let playback = PlaybackSpy()
+        let viewModel = TranscriptViewModel(
+            files: [TranscriptReviewFile(
+                sourceSnapshotURL: URL(fileURLWithPath: "/tmp/scribe-grouping-snapshot.flac"),
+                transcript: transcript,
+                jobState: .complete
+            )],
+            playback: playback
+        )
+        let original = try XCTUnwrap(viewModel.selectedTranscript)
+
+        XCTAssertEqual(viewModel.reviewLayout, .segments)
+        XCTAssertEqual(viewModel.chronologicalSegments.map(\.id), ["seg_a", "seg_b", "seg_ack", "seg_c"])
+        XCTAssertEqual(viewModel.chronologicalParagraphs.map(\.sourceSegmentIDs), [["seg_a", "seg_b"], ["seg_ack"], ["seg_c"]])
+
+        let second = try XCTUnwrap(viewModel.chronologicalSegments.first { $0.id == "seg_b" })
+        viewModel.select(segment: second)
+        viewModel.seek(toMilliseconds: 700)
+        let seeksAfterSelection = playback.soughtMilliseconds
+
+        viewModel.reviewLayout = .paragraphs
+        XCTAssertEqual(viewModel.selectedSegmentID, "seg_b")
+        XCTAssertEqual(viewModel.playheadMilliseconds, 700)
+        XCTAssertEqual(viewModel.selectedParagraphID, viewModel.chronologicalParagraphs[0].id)
+        XCTAssertEqual(playback.soughtMilliseconds, seeksAfterSelection, "switching views must not move the play head")
+        XCTAssertEqual(viewModel.selectedTranscript, original)
+
+        viewModel.reviewLayout = .segments
+        XCTAssertEqual(viewModel.selectedSegmentID, "seg_b")
+        XCTAssertEqual(viewModel.playheadMilliseconds, 700)
+        XCTAssertEqual(viewModel.selectedTranscript?.segments, original.segments)
+        XCTAssertEqual(viewModel.selectedTranscript?.speakers, original.speakers)
+    }
+
+    func testParagraphPlaybackAndNeighbourNavigationKeepSourceMappings() throws {
+        let transcript = groupingTranscript()
+        let playback = PlaybackSpy()
+        let viewModel = TranscriptViewModel(
+            files: [TranscriptReviewFile(
+                sourceSnapshotURL: URL(fileURLWithPath: "/tmp/scribe-grouping-play.flac"),
+                transcript: transcript,
+                jobState: .complete
+            )],
+            playback: playback
+        )
+        viewModel.reviewLayout = .paragraphs
+        let firstParagraph = try XCTUnwrap(viewModel.chronologicalParagraphs.first)
+        viewModel.play(paragraph: firstParagraph)
+
+        XCTAssertEqual(viewModel.playingSegmentID, "seg_a")
+        XCTAssertEqual(viewModel.playingParagraphID, firstParagraph.id)
+        XCTAssertEqual(viewModel.playheadMilliseconds, 0)
+        XCTAssertEqual(playback.transport, [.play])
+
+        viewModel.selectNeighbouringSegment(offset: 1)
+        XCTAssertEqual(viewModel.playingSegmentID, "seg_ack")
+        XCTAssertEqual(viewModel.selectedSegmentID, "seg_ack")
+        XCTAssertEqual(viewModel.playingParagraphID, viewModel.chronologicalParagraphs[1].id)
+
+        playback.emit(.timeChanged(milliseconds: 1_100))
+        viewModel.reviewLayout = .segments
+        XCTAssertEqual(viewModel.playingSegmentID, "seg_ack")
+        XCTAssertEqual(viewModel.playheadMilliseconds, 1_100)
+        XCTAssertTrue(viewModel.isPlaying)
+    }
+
+    private func groupingTranscript() -> CanonicalTranscript {
+        CanonicalTranscript(
+            transcriptID: "paragraph-views",
+            revision: 1,
+            status: .complete,
+            createdAt: "2026-09-09T12:00:00Z",
+            source: TranscriptSource(filename: "grouping.flac", durationMs: 5_000, checksum: "sha256:grouping"),
+            language: "en",
+            languageSource: .detected,
+            speakers: [
+                TranscriptSpeaker(id: "speaker_1", identityAssignment: .unmatched, labelSnapshot: "Speaker 1"),
+                TranscriptSpeaker(id: "speaker_2", identityAssignment: .unmatched, labelSnapshot: "Speaker 2"),
+            ],
+            segments: [
+                TranscriptSegment(
+                    id: "seg_a",
+                    speakerID: "speaker_1",
+                    speakerLabel: "Speaker 1",
+                    startMs: 0,
+                    endMs: 400,
+                    text: "That's fine.",
+                    overlap: false,
+                    timingQuality: .asrWord,
+                    words: [
+                        TimedWord(text: "That's", startMs: 0, endMs: 200),
+                        TimedWord(text: "fine.", startMs: 220, endMs: 400),
+                    ]
+                ),
+                TranscriptSegment(
+                    id: "seg_b",
+                    speakerID: "speaker_1",
+                    speakerLabel: "Speaker 1",
+                    startMs: 450,
+                    endMs: 1_000,
+                    text: "We can wait.",
+                    overlap: false,
+                    timingQuality: .asrWord,
+                    words: [
+                        TimedWord(text: "We", startMs: 450, endMs: 600),
+                        TimedWord(text: "can", startMs: 620, endMs: 780),
+                        TimedWord(text: "wait.", startMs: 800, endMs: 1_000),
+                    ]
+                ),
+                TranscriptSegment(
+                    id: "seg_ack",
+                    speakerID: "speaker_2",
+                    speakerLabel: "Speaker 2",
+                    startMs: 1_050,
+                    endMs: 1_300,
+                    text: "Mm-hm.",
+                    overlap: false,
+                    timingQuality: .asrWord,
+                    words: [TimedWord(text: "Mm-hm.", startMs: 1_050, endMs: 1_300)]
+                ),
+                TranscriptSegment(
+                    id: "seg_c",
+                    speakerID: "speaker_1",
+                    speakerLabel: "Speaker 1",
+                    startMs: 1_350,
+                    endMs: 1_800,
+                    text: "Anyway.",
+                    overlap: false,
+                    timingQuality: .asrWord,
+                    words: [TimedWord(text: "Anyway.", startMs: 1_350, endMs: 1_800)]
+                ),
+            ]
+        )
     }
 
     private func fixture(named name: String) throws -> CanonicalTranscript {

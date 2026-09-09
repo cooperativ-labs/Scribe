@@ -6,8 +6,8 @@ import Foundation
 /// already an atomically committed file.
 public final class WorkerRequestLoop: @unchecked Sendable {
     private let configuration: WorkerJobRunner.Configuration
-    private let state = State()
-    private let writer = EnvelopeWriter()
+    private let state = WorkerRequestState()
+    private let writer = WorkerEnvelopeWriter()
 
     public init(configuration: WorkerJobRunner.Configuration) {
         self.configuration = configuration
@@ -98,19 +98,30 @@ public final class WorkerRequestLoop: @unchecked Sendable {
 
     private func validateAssets(requestID: String) {
         do {
-            let manifest = try ModelManifest.load(from: configuration.manifestURL)
-            guard !manifest.telemetry.enabled, !manifest.telemetry.runtimeDownloadsAllowed else {
-                writer.write(WorkerProtocol.error(requestID: requestID, code: "unsafe_manifest", message: "The manifest must disable telemetry and runtime downloads.")); return
-            }
-            let report = manifest.validate(modelsDirectory: configuration.modelsDirectory)
-            guard report.isValid else {
-                let data = try JSONEncoder().encode(report)
-                writer.write(WorkerProtocol.error(requestID: requestID, code: "model_setup_incomplete", message: "Required offline model assets are missing, corrupt, or unreadable.", details: try JSONDecoder().decode(JSONValue.self, from: data))); return
-            }
+            let manifest = try ModelManifest.loadValidated(
+                from: configuration.manifestURL,
+                modelsDirectory: configuration.modelsDirectory
+            )
             writer.write(WorkerEnvelope(kind: .stageResult, requestID: requestID, payload: .object([
                 "stage": .string("asset_validation"), "status": .string("ready"), "modelsDirectory": .string(configuration.modelsDirectory.path), "declaredOnDiskBytes": .number(Double(manifest.totalDeclaredOnDiskBytes)),
             ])))
-        } catch { writer.write(WorkerProtocol.error(requestID: requestID, code: "model_setup_incomplete", message: error.localizedDescription)) }
+        } catch ModelSetupError.unsafeManifest {
+            writer.write(WorkerProtocol.error(
+                requestID: requestID,
+                code: "unsafe_manifest",
+                message: "The manifest must disable telemetry and runtime downloads."
+            ))
+        } catch let ModelSetupError.report(report) {
+            let details = (try? JSONValue.encoding(report)) ?? .object([:])
+            writer.write(WorkerProtocol.error(
+                requestID: requestID,
+                code: "model_setup_incomplete",
+                message: "Required offline model assets are missing, corrupt, or unreadable.",
+                details: details
+            ))
+        } catch {
+            writer.write(WorkerProtocol.error(requestID: requestID, code: "model_setup_incomplete", message: error.localizedDescription))
+        }
     }
 
     /// Enrollment is deliberately a small worker operation rather than a full
@@ -139,12 +150,10 @@ public final class WorkerRequestLoop: @unchecked Sendable {
                     }
                     return AudioTimeRange(startSeconds: start, endSeconds: end)
                 }
-                let manifest = try ModelManifest.load(from: configuration.manifestURL)
-                guard !manifest.telemetry.enabled, !manifest.telemetry.runtimeDownloadsAllowed else {
-                    throw ModelSetupError.unsafeManifest
-                }
-                let report = manifest.validate(modelsDirectory: configuration.modelsDirectory)
-                guard report.isValid else { throw ModelSetupError.report(report) }
+                let manifest = try ModelManifest.loadValidated(
+                    from: configuration.manifestURL,
+                    modelsDirectory: configuration.modelsDirectory
+                )
                 let clipOutputURL: URL? = try payload["clipOutputPath"]?.stringValue.map { path in
                     guard path.hasPrefix("/") else {
                         throw WorkerJobRunner.Error.invalidPath("clipOutputPath must be absolute.")
@@ -177,23 +186,5 @@ public final class WorkerRequestLoop: @unchecked Sendable {
             }
         }
         semaphore.wait()
-    }
-}
-
-private final class State: @unchecked Sendable {
-    private let condition = NSCondition(); private var queue: [WorkerEnvelope] = []; private var cancelled = Set<String>(); private var closed = false
-    func enqueue(_ envelope: WorkerEnvelope) { condition.lock(); defer { condition.unlock() }; queue.append(envelope); condition.signal() }
-    func cancel(_ requestID: String) { condition.lock(); defer { condition.unlock() }; cancelled.insert(requestID) }
-    func isCancelled(_ requestID: String) -> Bool { condition.lock(); defer { condition.unlock() }; return cancelled.contains(requestID) }
-    func finish() { condition.lock(); defer { condition.unlock() }; closed = true; condition.broadcast() }
-    func next() -> WorkerEnvelope? { condition.lock(); defer { condition.unlock() }; while queue.isEmpty && !closed { condition.wait() }; return queue.isEmpty ? nil : queue.removeFirst() }
-}
-
-private final class EnvelopeWriter: @unchecked Sendable {
-    private let lock = NSLock()
-    func write(_ envelope: WorkerEnvelope) {
-        lock.lock(); defer { lock.unlock() }
-        do { var data = try WorkerProtocol.encode(envelope); data.append(0x0A); FileHandle.standardOutput.write(data) }
-        catch { FileHandle.standardError.write(Data("Failed to write worker response: \(error.localizedDescription)\n".utf8)) }
     }
 }
