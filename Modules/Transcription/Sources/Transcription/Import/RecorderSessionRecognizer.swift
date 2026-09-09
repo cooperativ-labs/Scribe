@@ -84,7 +84,7 @@ public struct RecorderSession: Equatable, Sendable {
 /// version, `processing.state`, and `tracks.final.checksum` — and re-hashes the
 /// published file instead of trusting the manifest's claim about it. A filename
 /// is never sufficient on its own: without a `metadata.json` beside them, files
-/// called `final.flac` or `system.flac` are ordinary importable audio.
+/// called `final.m4a`, `final.flac`, or `system.flac` are ordinary importable audio.
 public struct RecorderSessionRecognizer: Sendable {
     public static let manifestFileName = "metadata.json"
     public static let supportedSchemaVersions: Set<Int> = [RecorderSessionManifest.currentSchemaVersion]
@@ -94,6 +94,7 @@ public struct RecorderSessionRecognizer: Sendable {
     /// preselection from the tracks it conventionally contains is the safe
     /// reading; the user can still select any of them explicitly.
     static let conventionalTrackRoles: [String: RecorderSessionTrackRole] = [
+        "final.m4a": .finalMix,
         "final.flac": .finalMix,
         "system.flac": .system,
         "microphone.flac": .microphone,

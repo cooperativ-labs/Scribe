@@ -31,7 +31,7 @@ final class MediaProberTests: XCTestCase {
             for (name, formatArguments, container, codec) in formats {
                 let output = temporaryDirectory.appendingPathComponent("\(name) \(suffix)")
                 // Opus is specified at 48 kHz; its encoder resamples other input rates to that timeline.
-                let expectedRate = container == .ogg ? 48_000.0 : rate
+                let expectedRate = codec == "opus" ? 48_000.0 : rate
                 try transcode(source, to: output, arguments: ["-ac", "\(channels)", "-ar", "\(Int(expectedRate))"] + formatArguments)
                 let result = try MediaProber(ffprobeURL: ffprobeURL).probe(output)
                 XCTAssertEqual(result.container, container, "\(output.lastPathComponent)")
@@ -51,6 +51,70 @@ final class MediaProberTests: XCTestCase {
         XCTAssertThrowsError(try MediaProber(ffprobeURL: ffprobeURL).probe(corrupt)) { error in
             guard case MediaProbeError.corrupt = error else { return XCTFail("Expected a structured corrupt error, got \(error)") }
         }
+    }
+
+    func testProbesFinderFileReferenceURLsForFlacAndM4A() throws {
+        let source = try writePCM(name: "reference source.wav", rate: 48_000, channels: 1)
+        let samples: [(String, [String], MediaContainer, String)] = [
+            ("scribe flac.flac", ["-c:a", "flac", "-f", "flac"], .flac, "flac"),
+            ("quicktime.m4a", ["-c:a", "aac", "-f", "ipod"], .m4a, "aac"),
+        ]
+        for (name, arguments, container, codec) in samples {
+            let output = temporaryDirectory.appendingPathComponent(name)
+            try transcode(source, to: output, arguments: arguments)
+            guard let fileReference = (output as NSURL).fileReferenceURL() as URL? else {
+                throw XCTSkip("This host does not produce Finder file-reference URLs.")
+            }
+            XCTAssertTrue(
+                fileReference.path.contains("/.file/id=") || fileReference.path != output.path,
+                "expected a file-reference URL, got \(fileReference.path)"
+            )
+            let result = try MediaProber(ffprobeURL: ffprobeURL).probe(fileReference)
+            XCTAssertEqual(result.container, container, name)
+            XCTAssertEqual(result.audioStreams[0].codec, codec, name)
+        }
+    }
+
+    func testProbesPopularVideoContainers() throws {
+        let source = try writePCM(name: "container source.wav", rate: 48_000, channels: 1)
+        let formats: [(String, [String], MediaContainer, String)] = [
+            ("meeting.mkv", ["-c:a", "libopus", "-f", "matroska"], .mkv, "opus"),
+            ("clip.webm", ["-c:a", "libopus", "-f", "webm"], .mkv, "opus"),
+            ("clip.mp4", ["-c:a", "aac", "-f", "mp4"], .m4a, "aac"),
+        ]
+        for (name, arguments, container, codec) in formats {
+            let output = temporaryDirectory.appendingPathComponent(name)
+            try transcode(source, to: output, arguments: arguments)
+            let result = try MediaProber(ffprobeURL: ffprobeURL).probe(output)
+            XCTAssertEqual(result.container, container, name)
+            XCTAssertEqual(result.audioStreams[0].codec, codec, name)
+            XCTAssertGreaterThan(result.duration, 0, name)
+        }
+    }
+
+    func testMapsPopularFormatNamesIncludingVideo() {
+        XCTAssertEqual(MediaContainer(formatNames: "flac"), .flac)
+        XCTAssertEqual(MediaContainer(formatNames: "mov,mp4,m4a,3gp,3g2,mj2"), .m4a)
+        XCTAssertEqual(MediaContainer(formatNames: "matroska,webm"), .mkv)
+        XCTAssertEqual(MediaContainer(formatNames: "matroska"), .mkv)
+        XCTAssertEqual(MediaContainer(formatNames: "avi"), .avi)
+        XCTAssertEqual(MediaContainer(formatNames: "mpegts"), .mpegts)
+        XCTAssertEqual(MediaContainer(formatNames: "ogg"), .ogg)
+        XCTAssertEqual(MediaContainer(formatNames: "asf"), .asf)
+        XCTAssertEqual(MediaContainer(formatNames: "aac"), .aac)
+        XCTAssertEqual(MediaContainer(formatNames: "nut"), .generic)
+    }
+
+    func testResolvesFileReferenceURLsToAnFFmpegFileInput() throws {
+        let file = temporaryDirectory.appendingPathComponent("path test.flac")
+        try Data("flac".utf8).write(to: file)
+        guard let fileReference = (file as NSURL).fileReferenceURL() as URL? else {
+            throw XCTSkip("This host does not produce Finder file-reference URLs.")
+        }
+        let resolved = MediaSourceURL.resolvedFileURL(for: fileReference)
+        XCTAssertEqual(resolved.standardizedFileURL.path, file.resolvingSymlinksInPath().standardizedFileURL.path)
+        XCTAssertTrue(MediaSourceURL.ffmpegInput(for: fileReference).hasPrefix("file:"))
+        XCTAssertFalse(MediaSourceURL.ffmpegInput(for: fileReference).contains("/.file/id="))
     }
 
     private func writePCM(name: String, rate: Double, channels: AVAudioChannelCount) throws -> URL {

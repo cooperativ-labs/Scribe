@@ -49,7 +49,7 @@ final class ScribeAppCoreContractTests: XCTestCase {
         XCTAssertEqual(decoded, manifest)
         XCTAssertEqual(decoded.schemaVersion, RecorderSessionManifest.currentSchemaVersion)
         XCTAssertEqual(decoded.processing.state, .complete)
-        XCTAssertEqual(decoded.tracks.finalTrack?.fileName, "final.flac")
+        XCTAssertEqual(decoded.tracks.finalTrack?.fileName, "final.m4a")
         XCTAssertEqual(decoded.tracks.finalTrack?.checksum, "final-sha256")
     }
 

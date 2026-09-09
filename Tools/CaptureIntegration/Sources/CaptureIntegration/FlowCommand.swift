@@ -130,7 +130,7 @@ func runFlow(_ options: Options) async -> Int32 {
     }
 
     // The handoff, verified rather than assumed: a request exists only if
-    // final.flac was published and its checksum matches the manifest.
+    // final.m4a was published and its checksum matches the manifest.
     do {
         let request = try FinalRecordingHandoff().request(forSessionAt: sessionDirectory)
         try await outbox.submit(request)
@@ -148,7 +148,7 @@ func runFlow(_ options: Options) async -> Int32 {
         print("""
 
         Session:            \(sessionDirectory.path)
-        final.flac:         \(request.sourceURL.lastPathComponent)
+        final.m4a:          \(request.sourceURL.lastPathComponent)
         Transcription:      \(request.requestID)
         Provenance:         \(provenance.producerID) / \(provenance.sessionID)
         Outbox entries:     \(pending.count)

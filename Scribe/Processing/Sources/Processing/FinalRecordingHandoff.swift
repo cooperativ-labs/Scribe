@@ -82,7 +82,7 @@ public enum FinalRecordingHandoffRefusal: Error, Equatable, Sendable {
 /// The gate between a finished recording and the transcription module.
 ///
 /// It reads only the three fields the transcription importer treats as stable —
-/// schema version, processing state, and the `final.flac` checksum — and it
+/// schema version, processing state, and the declared final-track checksum — and it
 /// re-hashes the published file rather than trusting the manifest's claim that
 /// it exists. A `TranscriptionRequest` comes out only when all of that holds.
 public struct FinalRecordingHandoff: Sendable {
@@ -107,7 +107,7 @@ public struct FinalRecordingHandoff: Sendable {
         exportDirectory: URL? = nil,
         // Injected so a test can force a mismatch, and so the hash that verifies
         // the file is the same routine that produced the manifest's value.
-        checksumOfFile: @escaping @Sendable (URL) throws -> String = { try FLACEncoder.sha256(ofFileAt: $0) }
+        checksumOfFile: @escaping @Sendable (URL) throws -> String = { try AACM4AEncoder.sha256(ofFileAt: $0) }
     ) {
         self.modelProfileID = modelProfileID
         self.speakerCount = speakerCount

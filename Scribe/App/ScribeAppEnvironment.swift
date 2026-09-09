@@ -324,8 +324,7 @@ final class ScribeAppEnvironment: ObservableObject {
         }
     }
 
-    /// Submits a `TranscriptionRequest` for `final.flac`, and only for a
-    /// `final.flac` that has been published and verified.
+    /// Submits a `TranscriptionRequest` for verified `final.m4a` recorder output.
     ///
     /// A refusal is surfaced instead of being worked around: handing over a raw
     /// track when cleanup failed would look like a successful transcription of
@@ -421,7 +420,8 @@ extension ScribeAppEnvironment {
             failure: transcriptionStatus.failure,
             openTranscripts: { [weak self] in self?.openTranscriptWindow() },
             openSpeakers: transcription.speakersAreAvailable ? { [weak self] in self?.openSpeakersWindow() } : nil,
-            transcribeFolder: { transcription.chooseFolderToTranscribe() }
+            transcribeFolder: { transcription.chooseFolderToTranscribe() },
+            openTranscriptionsFolder: { NSWorkspace.shared.open(transcription.storeDirectoryURL) }
         )
     }
 

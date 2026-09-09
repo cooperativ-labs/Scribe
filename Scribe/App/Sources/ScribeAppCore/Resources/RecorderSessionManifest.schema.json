@@ -30,7 +30,7 @@
       "properties": {
         "system": { "$ref": "#/$defs/trackOrNull" },
         "microphone": { "$ref": "#/$defs/trackOrNull" },
-        "final": { "$ref": "#/$defs/trackOrNull", "description": "Stable path: tracks.final.checksum for final.flac." }
+        "final": { "$ref": "#/$defs/trackOrNull", "description": "Stable path: tracks.final.checksum for the declared final file (new recordings use final.m4a AAC-LC; older final.flac sessions remain supported)." }
       }
     },
     "gaps": { "type": "array" },

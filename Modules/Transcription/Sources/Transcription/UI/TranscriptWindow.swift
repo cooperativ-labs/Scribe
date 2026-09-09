@@ -126,7 +126,7 @@ public struct TranscriptWindow: View {
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             } else if viewModel.canImportFiles {
                 Divider()
-                Label("Drop audio files here to transcribe them", systemImage: "waveform.badge.plus")
+                Label("Drop audio or video files here to transcribe them", systemImage: "waveform.badge.plus")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -148,12 +148,14 @@ public struct TranscriptWindow: View {
                         continuation.resume(returning: URL(dataRepresentation: data, relativeTo: nil))
                     } else if let url = item as? URL {
                         continuation.resume(returning: url)
+                    } else if let path = item as? String {
+                        continuation.resume(returning: URL(fileURLWithPath: path))
                     } else {
                         continuation.resume(returning: nil)
                     }
                 }
             }
-            if let url { urls.append(url) }
+            if let url { urls.append(MediaSourceURL.resolvedFileURL(for: url)) }
         }
         return urls
     }

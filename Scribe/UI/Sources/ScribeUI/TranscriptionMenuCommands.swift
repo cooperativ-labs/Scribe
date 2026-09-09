@@ -17,18 +17,21 @@ public struct TranscriptionMenuCommands {
     public var openTranscripts: () -> Void
     public var openSpeakers: (() -> Void)?
     public var transcribeFolder: () -> Void
+    public var openTranscriptionsFolder: () -> Void
 
     public init(
         statusLines: [String] = [],
         failure: String? = nil,
         openTranscripts: @escaping () -> Void,
         openSpeakers: (() -> Void)? = nil,
-        transcribeFolder: @escaping () -> Void
+        transcribeFolder: @escaping () -> Void,
+        openTranscriptionsFolder: @escaping () -> Void
     ) {
         self.statusLines = statusLines
         self.failure = failure
         self.openTranscripts = openTranscripts
         self.openSpeakers = openSpeakers
         self.transcribeFolder = transcribeFolder
+        self.openTranscriptionsFolder = openTranscriptionsFolder
     }
 }

@@ -93,7 +93,7 @@ This runs `timeline-harness mixdown` over the synthetic suite and over the
 real-room takes in `Tests/Fixtures/real`, then scores with `Tools/AudioMetrics`
 and, for the real takes, by direct measurement. It writes the cleaned microphone
 (before mix gain, which is where section 8 defines both gates) and the decoded
-`final.flac` for every case, so the double-talk listening check has artefacts to
+`final.m4a` for every case, so the double-talk listening check has artefacts to
 listen to. It exits non-zero if a case misses its gate.
 
 Two things about the archives this command synthesizes are deliberate and worth

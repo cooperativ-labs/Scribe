@@ -14,7 +14,7 @@ import Transcription
 /// `TranscriptionRequestOutbox` writes the request; the module's
 /// `TranscriptionHandoffConsumer` drains it into a real
 /// `TranscriptionCoordinator`, which produces a real canonical transcript. The
-/// only step not exercised here is the capture that wrote `final.flac`, which
+/// only step not exercised here is the capture that wrote `final.m4a`, which
 /// `Tools/CaptureIntegration` covers on real hardware.
 ///
 /// It lives in this package because this is the one target that links the
@@ -30,7 +30,7 @@ import Transcription
         let request = try FinalRecordingHandoff().request(forSessionAt: session)
         let outbox = TranscriptionRequestOutbox.inRecordingsDirectory(root)
         try await outbox.submit(request)
-        #expect(request.sourceURL.lastPathComponent == "final.flac")
+        #expect(request.sourceURL.lastPathComponent == "final.m4a")
         #expect(request.provenance?.producerID.isEmpty == false)
 
         // Transcription side: nothing here knows a recorder exists.
@@ -57,7 +57,7 @@ import Transcription
         #expect(run.job.state == .complete)
         #expect(run.job.request.provenance?.sessionID == request.provenance?.sessionID)
         let transcript = try #require(run.transcript)
-        #expect(transcript.source.filename == "final.flac")
+        #expect(transcript.source.filename == "final.m4a")
         #expect(!transcript.segments.isEmpty)
 
         // The transcript a person would then export, from the same revision.
@@ -117,20 +117,21 @@ import Transcription
             let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames)!
             buffer.frameLength = frames
             for frame in 0..<Int(frames) { buffer.floatChannelData![0][frame] = sin(Float(frame) * 0.02) * 0.4 }
-            // Real FLAC, because that is what the recorder publishes and what
+            // Real AAC M4A, because that is what the recorder publishes and what
             // the handoff checksums. The writer is released before the file is
             // hashed; hashing a file that is still open reads a partial one,
             // which is exactly the mismatch the handoff is there to catch.
             try {
                 let file = try AVAudioFile(forWriting: url, settings: [
-                    AVFormatIDKey: kAudioFormatFLAC,
+                    AVFormatIDKey: kAudioFormatMPEG4AAC,
                     AVSampleRateKey: 48_000,
                     AVNumberOfChannelsKey: 1,
+                    AVEncoderBitRateKey: 64_000,
                 ])
                 try file.write(from: buffer)
             }()
             return RecorderTrackManifest(
-                sourceFormat: AudioSourceFormat(sampleRate: 48_000, channelCount: 1, formatDescription: "flac"),
+                sourceFormat: AudioSourceFormat(sampleRate: 48_000, channelCount: 1, formatDescription: "aac-lc-m4a"),
                 firstMediaTimestampSeconds: 0,
                 frameCount: 192_000,
                 fileName: fileName,
@@ -154,7 +155,7 @@ import Transcription
             tracks: RecorderTrackCollection(
                 system: try track("system.flac"),
                 microphone: try track("microphone.flac"),
-                finalTrack: try track("final.flac")
+                finalTrack: try track("final.m4a")
             ),
             processing: ProcessingMetadata(state: state)
         )

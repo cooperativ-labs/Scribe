@@ -215,7 +215,7 @@ public struct AudioPreparationService: Sendable {
     }
 
     private func decode(source: URL, stream: AudioStreamProbe, selection: AudioChannelSelection, to destination: URL) throws {
-        var arguments = ["-y", "-v", "error", "-nostdin", "-i", source.path, "-map", "0:\(stream.index)", "-vn", "-sn", "-dn"]
+        var arguments = ["-y", "-v", "error", "-nostdin", "-i", MediaSourceURL.ffmpegInput(for: source), "-map", "0:\(stream.index)", "-vn", "-sn", "-dn"]
         if stream.channels == 2 {
             switch selection {
             case .downmix: arguments += ["-filter:a", "pan=mono|c0=0.5*c0+0.5*c1"]

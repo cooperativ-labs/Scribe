@@ -13,7 +13,7 @@ This is a greenfield plan for the currently empty Scribe repository. Decisions b
 | Capture | One ScreenCaptureKit `SCStream`, with separate `.audio` and `.microphone` outputs. |
 | Audio sources | A remembered meeting application and microphone; an explicit “All System Audio” alternative. Resolve the application’s current process when recording starts. |
 | Processing | Offline WebRTC Audio Processing Module using AEC3, wrapped behind a small C/Objective-C++ interface. |
-| Output | Unprocessed system and microphone FLAC files, cleaned stereo `final.flac`, and versioned metadata. |
+| Output | Recoverable CAF originals, cleaned mono AAC-LC `final.m4a`, and versioned metadata. |
 | Distribution | Initially a Developer ID signed, notarized app distributed directly, running without App Sandbox. App Store packaging (and the sandboxing work it implies for global shortcuts, the recordings folder, and bundled helpers) is outside the MVP. |
 | Local operation | No accounts, runtime downloads, telemetry, uploads, or meeting-service APIs. Bundle the processing dependencies. |
 
@@ -33,7 +33,7 @@ flowchart TD
     Capture --> Mic[Microphone PCM and timestamps]
     System --> Store[Native capture archive and timing journal]
     Mic --> Store
-    Store --> Raw[Unprocessed FLAC exports]
+    Store --> Raw[Recoverable CAF originals]
     Store --> Align[Timeline reconstruction and format conversion]
     Align --> Reference[System reference]
     Align --> Near[Microphone input]
@@ -42,7 +42,7 @@ flowchart TD
     AEC --> Clean[Clean microphone]
     Clean --> Mix[Stereo mix and peak control]
     Reference --> Mix
-    Mix --> Final[final.flac]
+    Mix --> Final[final.m4a AAC-LC]
 ```
 
 | Component | Responsibility |
@@ -80,7 +80,7 @@ Silence is valid input. A silent meeting must not be mistaken for a capture fail
 ```text
 ~/Meeting Recordings/
   2026-09-03 15-30-12/
-    final.flac
+    final.m4a
     metadata.json
     capture/
       system-0001.caf
@@ -92,9 +92,9 @@ Use an atomic directory-creation operation and add a short UUID suffix if the ti
 
 Write transcription-oriented 48 kHz mono 16-bit PCM to recoverable CAF segments during recording. Downmix and quantize float input during the owned-buffer copy without changing frame counts or timestamps. Rotate at a bounded interval, initially 60 seconds, and on format changes. Checkpoint the timing journal so a crash cannot invalidate the whole meeting. Verify recovery of the active segment from persisted format and byte-count information.
 
-After capture, normally generate only the mixed `final.flac`. The recoverable CAF tracks remain the source archive, while explicit diagnostic or recovery tooling may generate separate source FLACs on demand. Avoid retaining redundant automatic exports.
+After capture, normally generate only the mixed `final.m4a`. The recoverable CAF tracks remain the lossless source archive; explicit diagnostic tooling may generate other formats on demand. Avoid retaining redundant automatic exports, especially an automatic FLAC export.
 
-FLAC remains lossless relative to the transcription-grade 16-bit integer mix supplied to it. Verify the encoded stream before publication and retain the CAF archive for reprocessing.
+The final mix is AAC-LC in an MPEG-4 audio container at 48 kHz mono, 64 kbps CBR — a speech-appropriate compatibility profile. Verify container/codec, decodability, layout, rate, timing (allowing AAC priming/padding up to one 1,024-frame packet), and checksum before publication; do not apply FLAC's bit-exact sample verification to this lossy output. Retain the CAF archive for lossless reprocessing.
 
 The manifest should include:
 
@@ -104,13 +104,13 @@ The manifest should include:
 - Gap/interruption information and reasons for stopping.
 - Processing state, dependency versions, configuration, resampling and delay corrections, mix gains, and errors.
 
-Use separate capture and processing states, such as `capturing / complete / interrupted` and `pending / running / complete / failed`. Write manifests through an atomic replacement. Publish FLAC files through temporary files and rename only after successful finalization and verification.
+Use separate capture and processing states, such as `capturing / complete / interrupted` and `pending / running / complete / failed`. Write manifests through an atomic replacement. Publish M4A files through temporary files and rename only after successful finalization and verification.
 
-The manifest is also the contract consumers rely on. The transcription module’s importer (see [TRANSCRIPTION_IMPLEMENTATION_PLAN.md](TRANSCRIPTION_IMPLEMENTATION_PLAN.md), section 4) preselects `final.flac` only when it finds a recognized schema version, a processing state of `complete`, and a matching `final.flac` checksum. Treat these three fields as stable once the schema is versioned; add fields rather than renaming them.
+The manifest is also the contract consumers rely on. The transcription module’s importer (see [TRANSCRIPTION_IMPLEMENTATION_PLAN.md](TRANSCRIPTION_IMPLEMENTATION_PLAN.md), section 4) preselects the declared verified final track — new sessions use `final.m4a`, while existing `final.flac` sessions remain recognized — only when it finds a recognized schema version, a processing state of `complete`, and a matching checksum. Treat these three fields as stable once the schema is versioned; add fields rather than renaming them.
 
-On launch, scan incomplete manifests, recover available raw audio, and resume pending processing. Reprocessing writes a new temporary result and replaces `final.flac` only on success. Originals are never overwritten. Provide a small local `scribe-process <session-directory>` developer tool so recovery and reruns are testable without the UI.
+On launch, scan incomplete manifests, recover available raw audio, and resume pending processing. Reprocessing writes a new temporary result and replaces `final.m4a` only on success. Originals are never overwritten. Existing `final.flac` remains intact unless a successful new processing pass publishes its M4A replacement. Provide a small local `scribe-process <session-directory>` developer tool so recovery and reruns are testable without the UI.
 
-Budget disk space for two 48 kHz mono 16-bit CAF tracks plus one mono 16-bit FLAC. This is about 691 MB per hour before FLAC compression, versus several gigabytes for native multi-channel float capture. Stream the final encode directly without a session-length mix scratch file. Monitor actual free space and stop cleanly before exhaustion.
+Budget disk space primarily for the lossless CAF archive; the 48 kHz mono 64 kbps AAC final is about 29 MB per hour. Stream the final encode directly without a session-length mix scratch file. Monitor actual free space and stop cleanly before exhaustion.
 
 ## 5. Offline echo cancellation and mixdown
 
@@ -128,7 +128,7 @@ The offline processor should:
 6. Treat uncertain delay estimates conservatively. A failed AEC job retains originals and reports failure; it must not publish a raw doubled mix as a successfully cleaned result.
 7. Keep cleaned microphone output on its original capture timeline, compensating only for introduced DSP latency. Echo-reference alignment must not move the user’s speech earlier in the meeting.
 8. Mix the original system signal with the cleaned microphone into mono using conservative fixed gains that reserve sample headroom. Avoid a scratch-file peak-normalization pass and unrelated loudness processing.
-9. Stream `final.flac` directly at 48 kHz, mono, 16-bit PCM. Flush partial final blocks and trim padding so the output retains the session duration.
+9. Stream `final.m4a` directly at 48 kHz, mono AAC-LC, 64 kbps CBR. Verify the final M4A edit-list timing and allow no more than a 1,024-frame AAC priming/padding difference at the decoder boundary.
 
 AEC only knows about audio present in its reference. In application-specific mode, unrelated notifications or music reaching the microphone may remain. System volume, speaker processing, Bluetooth latency, and existing device microphone processing can also change the echo path. Validate these cases explicitly; do not assume captured playback is identical to the physical speaker signal.
 
@@ -144,7 +144,7 @@ Keep processing streaming and memory-bounded. Persist job state so it can restar
 - First run requests Screen & System Audio Recording and microphone access, with a clear route back to System Settings after denial. Include the microphone usage description and signing capabilities required by the chosen distribution configuration.
 - Keep macOS’s normal capture and microphone indicators. There is no meeting participant or bot, but capture is still visible through the operating system’s privacy UI.
 - Quitting during capture performs a normal stop and saves originals. Pending processing can resume on the next launch.
-- When the transcribe-on-completion toggle is on, submit a `TranscriptionRequest` for `final.flac` only after it has been published and verified. If cleanup failed, do not hand off a raw track; surface the failure instead. Capture and cleanup never wait on transcription.
+- When the transcribe-on-completion toggle is on, submit a `TranscriptionRequest` for `final.m4a` only after it has been published and verified. If cleanup failed, do not hand off a raw track; surface the failure instead. Capture and cleanup never wait on transcription.
 
 ## 7. Implementation milestones
 
@@ -152,7 +152,7 @@ Keep processing streaming and memory-bounded. Persist job state so it can restar
 | --- | --- | --- |
 | 1. Audio feasibility | Minimal signed capture harness, timestamp inspector, pinned AEC build, offline processing harness, and recorded fixtures. | Capture real system/mic pairs on macOS 15; establish clock alignment; demonstrate useful echo reduction without losing local speech on built-in speakers and a USB microphone. Resolve major AEC limitations before UI work. |
 | 2. Reliable recording core | `CaptureService`, coordinator, native archive, timing journal, permission handling, and stop/drain logic. | A two-hour recording preserves both tracks; repeated start/stop works; interrupted recordings recover without corrupting completed segments. |
-| 3. Audio processing and files | Timeline reconstruction, format conversion, AEC bridge, mixer, FLAC exporter, metadata, processing queue, and the `scribe-process` developer tool. | Fixture suite meets alignment and audio-quality gates; reruns use saved originals; failed processing never overwrites a valid final file. |
+| 3. Audio processing and files | Timeline reconstruction, format conversion, AEC bridge, mixer, AAC M4A exporter, metadata, processing queue, and the `scribe-process` developer tool. | Fixture suite meets alignment and lossy-audio-quality gates; reruns use saved originals; failed processing never overwrites a valid final file. |
 | 4. Menu-bar MVP | Menu states, shortcuts, settings, source selection, folder opening, and recovery feedback. | Complete start → stop → process → open-folder flow works while a meeting app is foregrounded. |
 | 5. Release hardening | Device/app matrix, resource profiling, fault injection, signing, notarization, and clean-machine installation. | Acceptance gates below pass on the declared support matrix; installation and recording require no developer tools or network access. |
 
@@ -171,7 +171,7 @@ Build deterministic fixtures from a known playback signal, a simulated delayed/r
 | File correctness | All exports decode, expected channel counts/rates are present, durations match the reconstructed timeline, and reruns leave original checksums unchanged. |
 | Resource use | Initial budget on the declared baseline Mac: capture below 10% of one CPU core on average and app memory below 200 MB; processing at least twice real time. Measure in a release build and revise architecture if capture misses the budget. |
 | Fully local operation | Capture, processing, folder opening, and recovery all work with networking disabled. |
-| Recovery | Forced termination during capture, FLAC encoding, and manifest replacement leaves completed originals recoverable; restarting completes or clearly reports pending work. |
+| Recovery | Forced termination during capture, AAC M4A encoding, and manifest replacement leaves completed originals recoverable; restarting completes or clearly reports pending work. |
 
 Test Zoom, Google Meet in Safari and Chrome, and Teams. Cover built-in speakers/microphone, wired headphones, a USB microphone, and Bluetooth playback/input modes. Test minimized windows, multiple displays, app relaunch, rapid shortcut presses, permission revocation, missing inputs, low disk space, screen lock, and sleep/wake.
 

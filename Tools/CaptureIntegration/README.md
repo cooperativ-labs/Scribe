@@ -81,7 +81,7 @@ It checks the whole chain in order:
 - Background processing runs *after* capture has closed and reports a terminal
   outcome, so the recorder is startable again while it works.
 - Open Recordings Folder resolves to the configured folder.
-- `final.flac` passes the handoff gate — recognized schema version, processing
+- `final.m4a` passes the handoff gate — recognized schema version, processing
   state `complete`, file present, checksum matching the manifest — and becomes a
   `TranscriptionRequest` whose provenance names the session that was just
   recorded.

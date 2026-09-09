@@ -12,7 +12,7 @@ import Testing
         let request = try FinalRecordingHandoff(checksumOfFile: fakeChecksum)
             .request(forSessionAt: session.directory)
 
-        #expect(request.sourceURL.lastPathComponent == "final.flac")
+        #expect(request.sourceURL.lastPathComponent == "final.m4a")
         #expect(request.provenance == TranscriptionProvenance(
             producerID: FinalRecordingHandoff.producerID,
             sessionID: session.sessionID
@@ -76,7 +76,7 @@ import Testing
         } catch let refusal as FinalRecordingHandoffRefusal {
             #expect(refusal == .checksumMismatch(
                 expected: "not-the-file-on-disk",
-                actual: fakeChecksum(session.directory.appendingPathComponent("final.flac"))
+                actual: fakeChecksum(session.directory.appendingPathComponent("final.m4a"))
             ))
             #expect(!refusal.isTransient)
         }
@@ -84,7 +84,7 @@ import Testing
 
     @Test func aMissingFinalFileIsRefusedEvenWhenTheManifestClaimsCompletion() throws {
         let session = try handoffSession(finalContents: nil)
-        #expect(throws: FinalRecordingHandoffRefusal.finalFileMissing("final.flac")) {
+        #expect(throws: FinalRecordingHandoffRefusal.finalFileMissing("final.m4a")) {
             try FinalRecordingHandoff(checksumOfFile: fakeChecksum).request(forSessionAt: session.directory)
         }
     }
@@ -123,7 +123,7 @@ import Testing
 
 // MARK: - Fixture
 
-/// A stand-in hash: the real one is `FLACEncoder.sha256`, which is also what
+/// A stand-in hash: the real one is `AACM4AEncoder.sha256`, which is also what
 /// wrote the manifest's value. Substituting it here keeps these tests about the
 /// gate's decisions rather than about hashing.
 private func fakeChecksum(_ url: URL) -> String {
@@ -148,7 +148,7 @@ private func handoffSession(
     let directory = root.appendingPathComponent("2026-09-04 10-00-00", isDirectory: true)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
-    let finalURL = directory.appendingPathComponent("final.flac")
+    let finalURL = directory.appendingPathComponent("final.m4a")
     if let finalContents {
         try finalContents.write(to: finalURL, atomically: true, encoding: .utf8)
     }
@@ -156,10 +156,10 @@ private func handoffSession(
     let sessionID = UUID()
     let resolvedTracks = tracks ?? RecorderTrackCollection(
         finalTrack: RecorderTrackManifest(
-            sourceFormat: AudioSourceFormat(sampleRate: 48_000, channelCount: 2, formatDescription: "flac"),
+            sourceFormat: AudioSourceFormat(sampleRate: 48_000, channelCount: 2, formatDescription: "aac-lc"),
             firstMediaTimestampSeconds: 0,
             frameCount: 48_000,
-            fileName: "final.flac",
+            fileName: "final.m4a",
             checksum: checksum ?? fakeChecksum(finalURL)
         )
     )

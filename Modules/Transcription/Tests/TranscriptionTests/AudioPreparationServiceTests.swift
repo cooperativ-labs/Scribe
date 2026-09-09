@@ -29,11 +29,12 @@ final class AudioPreparationServiceTests: XCTestCase {
             ("AIFF", ["-c:a", "pcm_s16be", "-f", "aiff"]),
             ("CAF", ["-c:a", "pcm_s16le", "-f", "caf"]),
             ("Ogg Opus", ["-c:a", "libopus", "-f", "ogg"]),
+            ("Matroska Opus", ["-c:a", "libopus", "-f", "matroska"]),
         ]
 
         for (label, formatArguments) in formats {
             let destination = temporaryDirectory.appendingPathComponent("\(label) stereo path ü.data")
-            try transcode(source, to: destination, arguments: ["-ac", "2", "-ar", label == "Ogg Opus" ? "48000" : "44100"] + formatArguments)
+            try transcode(source, to: destination, arguments: ["-ac", "2", "-ar", label.contains("Opus") ? "48000" : "44100"] + formatArguments)
             let result = try service.prepare(
                 sourceURL: destination,
                 options: .init(cacheDirectory: temporaryDirectory.appendingPathComponent("cache \(label)", isDirectory: true))

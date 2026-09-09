@@ -91,7 +91,7 @@ doubled mix labelled as cleaned.
 The run above was the feasibility harness reading two WAVs. What follows is the
 application path: `TimelineBuilder` reconstructs a capture archive, then
 `Scribe/Processing`'s `EchoCanceller` and `MixdownService` cancel, mix and publish
-`final.flac`. Reproduce with:
+AAC-LC `final.m4a`. Reproduce with:
 
 ```sh
 sh Tools/TimelineHarness/run-mixdown-gates.sh
@@ -138,7 +138,8 @@ tonal-playback fixtures do not share this defect: `double-talk` measures −0.00
 ### Synthetic suite
 
 Echo reduction is measured on the cleaned microphone before mix gain; peak and
-duration on the published `final.flac`.
+duration on the published AAC-LC `final.m4a` after decoding. AAC encoder
+priming/padding is allowed within one 1,024-frame packet at the decoder boundary.
 
 | Fixture | Decision | Delay | Echo reduction | Near-end change | Mix true peak |
 | --- | --- | --- | --- | --- | --- |
@@ -159,7 +160,7 @@ against the 20 dB gate. `sample-rate-drift` is now a genuine cancellation rather
 than the bypass recorded above, because the timeline stage removes the 500 ppm
 clock mismatch before AEC sees it. Every published mix decodes, carries no
 clipped samples, sits at or under −1 dBTP, and matches the reconstructed
-timeline's duration exactly.
+timeline's duration within AAC's one-packet priming/padding tolerance.
 
 The near-end numbers in the last four rows are **not** gated, and should not be
 read as speech damage. Section 8 places the 1 dB bound on *near-end-only*

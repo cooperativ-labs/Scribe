@@ -205,7 +205,7 @@ public enum TranscriptionResultStatus: String, Codable, Sendable, Equatable {
 /// A versioned recorder-session `metadata.json` manifest.
 ///
 /// Stable consumer fields are `schemaVersion`, `processing.state`, and
-/// `tracks.final.checksum` (the checksum for `final.flac`). New schema versions
+/// `tracks.final.checksum` (the checksum for the declared final file). New schema versions
 /// must add fields rather than renaming or changing the meaning of those paths.
 public struct RecorderSessionManifest: Codable, Sendable, Equatable {
     public static let currentSchemaVersion = 1
@@ -317,7 +317,7 @@ public struct OutputDeviceChange: Codable, Sendable, Equatable {
 public struct RecorderTrackCollection: Codable, Sendable, Equatable {
     public let system: RecorderTrackManifest?
     public let microphone: RecorderTrackManifest?
-    /// Stable consumer field: `tracks.final.checksum` is the verified `final.flac` checksum.
+    /// Stable consumer field: `tracks.final.checksum` is the verified final-file checksum.
     public let finalTrack: RecorderTrackManifest?
 
     enum CodingKeys: String, CodingKey { case system, microphone, finalTrack = "final" }

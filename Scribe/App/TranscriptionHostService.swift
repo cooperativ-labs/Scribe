@@ -271,9 +271,11 @@ final class TranscriptionHostService {
         let store = storeDirectoryURL.resolvingSymlinksInPath().standardizedFileURL
 
         for url in urls {
-            let resolved = url.resolvingSymlinksInPath().standardizedFileURL
+            let granted = url.startAccessingSecurityScopedResource()
+            defer { if granted { url.stopAccessingSecurityScopedResource() } }
+            let resolved = MediaSourceURL.resolvedFileURL(for: url)
             var isDirectory: ObjCBool = false
-            guard FileManager.default.fileExists(atPath: resolved.path, isDirectory: &isDirectory) else {
+            guard FileManager.default.fileExists(atPath: MediaSourceURL.filesystemPath(for: resolved), isDirectory: &isDirectory) else {
                 refusals.append(.init(url: url, message: "\(url.lastPathComponent) no longer exists."))
                 continue
             }
@@ -282,7 +284,7 @@ final class TranscriptionHostService {
                 continue
             }
             if isDirectory.boolValue {
-                guard let result = await importFolder(at: url) else {
+                guard let result = await importFolder(at: resolved) else {
                     refusals.append(.init(url: url, message: status.failure ?? "\(url.lastPathComponent) could not be read."))
                     continue
                 }
@@ -298,7 +300,7 @@ final class TranscriptionHostService {
                 continue
             }
             do {
-                _ = try prober.probe(url)
+                _ = try prober.probe(resolved)
             } catch let error as MediaProbeError {
                 refusals.append(.init(url: url, message: "\(url.lastPathComponent): \(ImportFileFailure(error).message)"))
                 continue
@@ -308,7 +310,7 @@ final class TranscriptionHostService {
             }
             do {
                 _ = try await coordinator.enqueue(TranscriptionRequest(
-                    sourceURL: url,
+                    sourceURL: resolved,
                     speakerCount: speakerCount,
                     modelProfileID: modelProfileID
                 ))

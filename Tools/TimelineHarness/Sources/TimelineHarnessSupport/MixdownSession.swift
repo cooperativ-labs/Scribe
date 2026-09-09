@@ -8,7 +8,7 @@ import ScribeAppCore
 ///
 /// The synthetic cases go through a synthesized capture archive so the code under
 /// test is the production path — `TimelineBuilder`, the delay estimator, AEC3, the
-/// mixer, the FLAC encoder — and not a shortcut that reads WAVs directly.
+/// mixer, the AAC M4A encoder — and not a shortcut that reads WAVs directly.
 ///
 /// One deliberate difference from ``FixtureSession``: the microphone track is
 /// written starting at the session origin rather than behind it by one of the
@@ -25,10 +25,10 @@ public enum MixdownSession {
         /// The echo-cancelled microphone, before mix gain: the signal the echo and
         /// local-speech gates are defined against.
         public let cleanedMicrophoneURL: URL
-        /// `final.flac` decoded back to WAV, for the peak and clipping gates and
+        /// `final.m4a` decoded back to WAV, for the peak and clipping gates and
         /// for listening.
         public let finalMixURL: URL
-        public let finalFLACURL: URL
+        public let finalM4AURL: URL
         public let decision: String
         public let delaySamples: Int?
         public let delayCorrelation: Double?
@@ -164,14 +164,14 @@ public enum MixdownSession {
         var cleaned: [Float] = []
         let cleanedURL = workingDirectory.appendingPathComponent("\(caseID)-cleaned-microphone.wav")
         let finalMixURL = workingDirectory.appendingPathComponent("\(caseID)-final-mix.wav")
-        let finalFLACURL = sessionDirectory.appendingPathComponent(MixdownService.outputFileName)
+        let finalM4AURL = sessionDirectory.appendingPathComponent(MixdownService.outputFileName)
 
         do {
             let result = try MixdownService().run(sessionDirectory: sessionDirectory, options: options) { block in
                 cleaned.append(contentsOf: block)
             }
             try WAVAudio(sampleRate: 48_000, channels: [cleaned]).write(to: cleanedURL)
-            try decodeFLAC(at: finalFLACURL, to: finalMixURL)
+            try decodePublishedMix(at: finalM4AURL, to: finalMixURL)
             let summary = result.summary
             let report = windowReport(summary.delayPlan)
             let firstSegment: RenderDelaySegment?
@@ -183,7 +183,7 @@ public enum MixdownSession {
                 sessionDirectory: sessionDirectory,
                 cleanedMicrophoneURL: cleanedURL,
                 finalMixURL: finalMixURL,
-                finalFLACURL: finalFLACURL,
+                finalM4AURL: finalM4AURL,
                 decision: summary.decision.summary,
                 delaySamples: firstSegment?.delaySamples,
                 delayCorrelation: firstSegment?.correlation,
@@ -211,7 +211,7 @@ public enum MixdownSession {
             let report = ((try? MixdownService().estimateEchoPath(sessionDirectory: sessionDirectory, options: options)).map(windowReport)) ?? ([], [])
             return Result(
                 caseID: caseID, sessionDirectory: sessionDirectory,
-                cleanedMicrophoneURL: cleanedURL, finalMixURL: finalMixURL, finalFLACURL: finalFLACURL,
+                cleanedMicrophoneURL: cleanedURL, finalMixURL: finalMixURL, finalM4AURL: finalM4AURL,
                 decision: "failed", delaySamples: nil, delayCorrelation: nil, delayBasis: nil,
                 delaySegments: 0, analysisWindows: 0, processingLatencyFrames: 0, reconvergenceSeconds: [],
                 truePeakBeforeGainDbTP: nil, appliedPeakGain: 1, echoReturnLossEnhancementDb: nil,
@@ -224,10 +224,10 @@ public enum MixdownSession {
         }
     }
 
-    /// Decodes the published FLAC back to float WAV so the same metrics tool can
+    /// Decodes the published M4A back to float WAV so the same metrics tool can
     /// read it. Decoding is also the cheapest possible check that it is a real,
     /// readable file rather than bytes that happen to be on disk.
-    public static func decodeFLAC(at source: URL, to destination: URL) throws {
+    public static func decodePublishedMix(at source: URL, to destination: URL) throws {
         let file = try AVAudioFile(forReading: source)
         let frames = AVAudioFrameCount(file.length)
         guard frames > 0,

@@ -7,7 +7,7 @@ import Testing
 
 private let mixOrigin = 207_492.667875
 
-@Test func theMixIsPublishedAsFortyEightKilohertzMonoSixteenBitAndRecordedInTheManifest() throws {
+@Test func theMixIsPublishedAsFortyEightKilohertzMonoAACM4AAndRecordedInTheManifest() throws {
     let root = try temporaryRoot()
     defer { try? FileManager.default.removeItem(at: root) }
     let session = try makeEchoSession(root: root, seconds: 2.5, delay: 1_440, nearEndGain: 0.4)
@@ -17,21 +17,21 @@ private let mixOrigin = 207_492.667875
 
     #expect(result.result.sampleRate == 48_000)
     #expect(result.result.channelCount == 1)
-    #expect(result.result.bitDepth == .bits16)
+    #expect(result.result.bitRate == AACM4AEncoder.defaultBitRate)
     #expect(result.result.frameCount == result.timeline.outputFrameCount)
 
-    let decoded = try AVAudioFile(forReading: session.appendingPathComponent("final.flac"))
+    let decoded = try AVAudioFile(forReading: session.appendingPathComponent("final.m4a"))
     #expect(decoded.fileFormat.sampleRate == 48_000)
     #expect(decoded.fileFormat.channelCount == 1)
-    #expect(decoded.length == result.timeline.outputFrameCount)
-    #expect(try FLACStreamInfo.read(from: result.result.url).bitsPerSample == 16)
+    #expect(abs(decoded.length - result.timeline.outputFrameCount) <= AACM4AEncoder.maximumTimingErrorFrames)
+    #expect(decoded.fileFormat.streamDescription.pointee.mFormatID == kAudioFormatMPEG4AAC)
 
     // The capture archive is the session's one irreplaceable thing.
     #expect(try directoryDigest(session.appendingPathComponent("capture")) == captureBefore)
 
     let manifest = try RecorderSessionManifestCodec.decode(Data(contentsOf: session.appendingPathComponent("metadata.json")))
     #expect(manifest.processing.state == .complete)
-    #expect(manifest.tracks.finalTrack?.fileName == "final.flac")
+    #expect(manifest.tracks.finalTrack?.fileName == "final.m4a")
     #expect(manifest.tracks.finalTrack?.checksum == result.result.sha256)
     #expect(manifest.tracks.finalTrack?.journalReference == "capture/timeline.jsonl")
     #expect(manifest.processing.dependencyVersions["webrtc-audio-processing"]?.isEmpty == false)
@@ -54,7 +54,7 @@ private let mixOrigin = 207_492.667875
     #expect(mixdown["measuredProcessingLatencyFrames"] != nil)
 }
 
-@Test func rerunningProducesTheSameMixAndLeavesTheOriginalsAlone() throws {
+@Test func rerunningRepublishesAVerifiedMixAndLeavesTheOriginalsAlone() throws {
     let root = try temporaryRoot()
     defer { try? FileManager.default.removeItem(at: root) }
     let session = try makeEchoSession(root: root, seconds: 2.5, delay: 1_440, nearEndGain: 0.4)
@@ -65,7 +65,21 @@ private let mixOrigin = 207_492.667875
     let first = try SessionProcessor().run(sessionDirectory: session)
     let captureAfterFirst = try directoryDigest(session.appendingPathComponent("capture"))
     let second = try SessionProcessor().run(sessionDirectory: session)
-    #expect(first.result.sha256 == second.result.sha256)
+
+    // AAC is intentionally lossy and its encoder is not required to emit
+    // byte-identical packets across runs. Each run must instead publish a fully
+    // decodable M4A whose checksum is the one declared by its manifest.
+    let finalURL = session.appendingPathComponent("final.m4a")
+    let decoded = try AVAudioFile(forReading: finalURL)
+    #expect(decoded.fileFormat.streamDescription.pointee.mFormatID == kAudioFormatMPEG4AAC)
+    #expect(decoded.fileFormat.sampleRate == 48_000)
+    #expect(decoded.fileFormat.channelCount == 1)
+    #expect(abs(decoded.length - second.result.frameCount) <= AACM4AEncoder.maximumTimingErrorFrames)
+    #expect(try AACM4AEncoder.sha256(ofFileAt: finalURL) == second.result.sha256)
+    let manifest = try RecorderSessionManifestCodec.decode(Data(contentsOf: session.appendingPathComponent("metadata.json")))
+    #expect(manifest.tracks.finalTrack?.fileName == "final.m4a")
+    #expect(manifest.tracks.finalTrack?.checksum == second.result.sha256)
+    #expect(first.result.frameCount == second.result.frameCount)
     #expect(try directoryDigest(session.appendingPathComponent("capture")) == captureAfterFirst)
 }
 
@@ -81,7 +95,7 @@ private let mixOrigin = 207_492.667875
     #expect(result.summary.samplePeakBeforeGain <= 0.88 + 0.000_1)
 
     var meter = TruePeakMeter(channelCount: 1)
-    meter.append(try decode(session.appendingPathComponent("final.flac")))
+    meter.append(try decode(session.appendingPathComponent("final.m4a")))
     meter.finish()
     let dbTP = try #require(meter.truePeakDbTP)
     #expect(dbTP <= -1 + 0.01, "published mix measured \(String(format: "%.3f", dbTP)) dBTP")
@@ -117,7 +131,7 @@ private let mixOrigin = 207_492.667875
     #expect(throws: MixdownError.self) {
         try MixdownService().run(sessionDirectory: session, options: options)
     }
-    #expect(!FileManager.default.fileExists(atPath: session.appendingPathComponent("final.flac").path))
+    #expect(!FileManager.default.fileExists(atPath: session.appendingPathComponent("final.m4a").path))
     #expect(try directoryDigest(session.appendingPathComponent("capture")) == captureBefore)
 
     let manifest = try RecorderSessionManifestCodec.decode(Data(contentsOf: session.appendingPathComponent("metadata.json")))
@@ -143,7 +157,7 @@ private let mixOrigin = 207_492.667875
         try MixdownService().run(sessionDirectory: session, options: options)
     }
 
-    #expect(try FLACEncoder.sha256(ofFileAt: session.appendingPathComponent("final.flac")) == good.result.sha256)
+    #expect(try AACM4AEncoder.sha256(ofFileAt: session.appendingPathComponent("final.m4a")) == good.result.sha256)
     let manifest = try RecorderSessionManifestCodec.decode(Data(contentsOf: session.appendingPathComponent("metadata.json")))
     #expect(manifest.processing.state == .failed)
     // The file is still on disk and still described, so a reader can see both the

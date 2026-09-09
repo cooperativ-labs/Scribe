@@ -249,6 +249,16 @@ final class FolderImportServiceTests: XCTestCase {
         XCTAssertTrue(result.recorderSessions[0].isEligible)
     }
 
+    func testRecognizedAACM4ASessionPreselectsTheVerifiedFinalMix() throws {
+        let session = try makeRecorderSession(named: "m4a-meeting", processing: .complete, finalFileName: "final.m4a")
+
+        let result = try FolderImportService(prober: StubProber()).scan(session, options: options())
+
+        XCTAssertEqual(result.preselectedFiles.map(\.relativePath), ["final.m4a"])
+        XCTAssertEqual(result.files.first { $0.relativePath == "final.m4a" }?.recorderTrackRole, .finalMix)
+        XCTAssertTrue(result.recorderSessions[0].isEligible)
+    }
+
     func testEveryNonCompleteProcessingStateLeavesTheFinalMixUnselectedWithAReason() throws {
         let expectations: [(ProcessingState, String)] = [
             (.pending, "Audio cleanup is pending"),
@@ -377,7 +387,8 @@ final class FolderImportServiceTests: XCTestCase {
         named name: String,
         processing state: ProcessingState,
         schemaVersion: Int = RecorderSessionManifest.currentSchemaVersion,
-        errors: [ManifestError] = []
+        errors: [ManifestError] = [],
+        finalFileName: String = "final.flac"
     ) throws -> URL {
         let directory = root.appendingPathComponent(name, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -410,7 +421,7 @@ final class FolderImportServiceTests: XCTestCase {
             tracks: RecorderTrackCollection(
                 system: try track("system.flac"),
                 microphone: try track("microphone.flac"),
-                finalTrack: try track("final.flac")
+                finalTrack: try track(finalFileName)
             ),
             processing: ProcessingMetadata(state: state, errors: errors)
         )

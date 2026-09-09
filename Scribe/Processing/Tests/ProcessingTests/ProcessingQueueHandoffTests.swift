@@ -4,7 +4,7 @@ import Testing
 @testable import Processing
 
 /// The whole tail of the recorder flow: a finished capture goes into the queue,
-/// comes out as a published `final.flac`, and only then becomes a transcription
+/// comes out as a published `final.m4a`, and only then becomes a transcription
 /// request. These run the real processor and the real checksum, because the
 /// point of the handoff is that nothing along here is taken on trust.
 @Suite("Processing queue handoff") struct ProcessingQueueHandoffTests {
@@ -24,7 +24,7 @@ import Testing
 
         // The real gate, with the real hash, over the file the pipeline published.
         let request = try FinalRecordingHandoff().request(forSessionAt: session)
-        #expect(request.sourceURL == session.appendingPathComponent("final.flac"))
+        #expect(request.sourceURL == session.appendingPathComponent("final.m4a"))
         #expect(request.provenance?.sessionID == sessionID)
         #expect(request.provenance?.producerID == FinalRecordingHandoff.producerID)
         #expect(!FileManager.default.fileExists(atPath: session.appendingPathComponent("system.flac").path))
@@ -135,7 +135,7 @@ private actor QueueEventRecorder {
 }
 
 /// A minimal but genuine capture archive: two mono 48 kHz tracks on one timeline,
-/// enough for the exporter and the mixdown to produce a real `final.flac`.
+/// enough for the exporter and the mixdown to produce a real `final.m4a`.
 private func handoffCaptureSession(root: URL, sessionID: UUID, seconds: Double) throws -> URL {
     let sampleRate = 48_000
     let frames = Int(seconds * Double(sampleRate))

@@ -265,6 +265,9 @@ public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
         }
 
         menu.addItem(.separator())
+        if let openTranscriptionsFolder = transcription()?.openTranscriptionsFolder {
+            menu.addItem(ActionMenuItem(title: "Open Transcriptions Folder", handler: openTranscriptionsFolder))
+        }
         menu.addItem(ActionMenuItem(title: "Open Recordings Folder") { [model] in model.openRecordingsFolder() })
         menu.addItem(ActionMenuItem(title: "Settings…", handler: openSettings))
 

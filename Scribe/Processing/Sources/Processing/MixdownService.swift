@@ -4,8 +4,8 @@ import Foundation
 import ScribeAppCore
 import WebRTCBridge
 
-/// Produces `final.flac`: the original system signal mixed with the echo-cancelled
-/// microphone, 48 kHz mono 16-bit for transcription.
+/// Produces `final.m4a`: the original system signal mixed with the echo-cancelled
+/// microphone, 48 kHz mono AAC-LC for transcription and interchange.
 ///
 /// Both tracks are already on one 48 kHz grid from ``TimelineBuilder``, so block
 /// *i* of each is simultaneous by construction and the only remaining unknown is
@@ -13,15 +13,15 @@ import WebRTCBridge
 /// own audio. Two streaming passes keep work bounded at any session length:
 ///
 /// 1. estimate the render-to-capture delay across the whole session;
-/// 2. cancel, mix with conservative fixed gains, and encode directly to FLAC.
+/// 2. cancel, mix with conservative fixed gains, and encode directly to AAC M4A.
 ///
 /// Failure is a first-class outcome. A job that cannot establish a delay while
 /// evidently having an echo to cancel does not publish anything: the originals
-/// stay exactly as they were, any previously valid `final.flac` is left alone, and
+/// stay exactly as they were, any previously valid `final.m4a` is left alone, and
 /// the manifest records `failed` with the reason.
 public struct MixdownService: Sendable {
     public static let journalReference = "capture/timeline.jsonl"
-    public static let outputFileName = "final.flac"
+    public static let outputFileName = "final.m4a"
 
     public struct Options: Sendable, Equatable {
         /// Conservative fixed gains. At 0.44 each, two full-scale sources sum to
@@ -145,9 +145,10 @@ public struct MixdownService: Sendable {
             channels: 1,
             interleaved: false
         ) else { throw MixdownError.invalidOutputFormat }
-        let encoder = try FLACEncoder(
+        let encoder = try AACM4AEncoder(
             outputURL: sessionDirectory.appendingPathComponent(Self.outputFileName),
-            configuration: FLACEncoderConfiguration(sampleRate: timelineSampleRate, channelCount: 1, bitDepth: .bits16)
+            sampleRate: timelineSampleRate,
+            channelCount: 1
         )
         // The system side is held as a flat sample queue rather than a queue of
         // blocks. The canceller's output blocks do not have to line up one-for-one
@@ -215,7 +216,7 @@ public struct MixdownService: Sendable {
         )
     }
 
-    private func write(_ channels: [[Float]], format: AVAudioFormat, into encoder: FLACEncoder) throws {
+    private func write(_ channels: [[Float]], format: AVAudioFormat, into encoder: AACM4AEncoder) throws {
         guard let samples = channels.first, !samples.isEmpty else { return }
         guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count)) else {
             throw MixdownError.bufferAllocationFailed
@@ -366,7 +367,7 @@ public struct MixdownSummary: Sendable, Equatable {
 public struct MixdownResult: Sendable, Equatable {
     public let timeline: SessionTimeline
     public let summary: MixdownSummary
-    public let result: FLACEncodeResult
+    public let result: AACM4AEncodeResult
     public let manifest: RecorderSessionManifest
 }
 

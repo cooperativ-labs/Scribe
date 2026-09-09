@@ -9,7 +9,7 @@ extension MixdownService {
     static var dependencyVersions: [String: String] {
         [
             "webrtc-audio-processing": WebRTCBridge.EchoCanceller.upstreamRevision,
-            "FLACBridge": "system-audiotoolbox-verified",
+            "AACM4AEncoder": "system-audiotoolbox-verified",
         ]
     }
 
@@ -17,7 +17,7 @@ extension MixdownService {
         _ manifest: RecorderSessionManifest,
         timeline: SessionTimeline,
         summary: MixdownSummary,
-        encoded: FLACEncodeResult,
+        encoded: AACM4AEncodeResult,
         options: Options
     ) -> RecorderSessionManifest {
         var configuration = timeline.manifestConfiguration
@@ -27,7 +27,7 @@ extension MixdownService {
             sourceFormat: AudioSourceFormat(
                 sampleRate: Double(timelineSampleRate),
                 channelCount: 1,
-                formatDescription: "48000 Hz mono 16-bit FLAC; original system signal mixed with the echo-cancelled microphone for transcription"
+                formatDescription: "48000 Hz mono AAC-LC in MPEG-4 audio; 64 kbps CBR, original system signal mixed with the echo-cancelled microphone for transcription"
             ),
             firstMediaTimestampSeconds: timeline.origin.seconds,
             frameCount: encoded.frameCount,
@@ -127,6 +127,9 @@ extension MixdownService {
             "systemGain": .number(Double(summary.systemGain)),
             "microphoneCentreGain": .number(Double(summary.microphoneGain)),
             "truePeakCeilingDbTP": .number(summary.truePeakCeilingDbTP),
+            "codec": .string("AAC-LC"),
+            "container": .string("MPEG-4 audio (.m4a)"),
+            "bitRate": .number(Double(AACM4AEncoder.defaultBitRate)),
             "truePeakMeasurementEnabled": .boolean(false),
             "truePeakBeforeGainDbTP": .null,
             "samplePeakBeforeGainDbFS": summary.samplePeakBeforeGain > 0 ? .number(20 * log10(summary.samplePeakBeforeGain)) : .null,

@@ -20,15 +20,20 @@ tar -xf "${CACHE}/${ARCHIVE}" -C "${BUILD}"
 pushd "${BUILD}/ffmpeg-${VERSION}" >/dev/null
 
 # No --enable-gpl, --enable-version3, --enable-nonfree, or external codec library is permitted.
+# --disable-autodetect keeps accidental host libraries (X11, x264, …) out of the LGPL build.
+# Demuxers cover popular audio and video containers; only audio decoders are enabled because
+# transcription extracts the soundtrack and never decodes video.
 export SOURCE_DATE_EPOCH=1736640000
 ./configure \
-  --prefix="${PREFIX}" --disable-doc --disable-debug --disable-network \
+  --prefix="${PREFIX}" --disable-doc --disable-debug --disable-network --disable-autodetect \
   --disable-static --enable-shared --disable-everything --disable-avdevice --disable-postproc --disable-swscale --disable-ffplay \
   --enable-avcodec --enable-avformat --enable-avutil --enable-swresample \
   --enable-ffmpeg --enable-ffprobe --enable-avfilter --enable-filter=pan,aresample \
-  --enable-protocol=file --enable-demuxer=wav,flac,mp3,mov,aiff,caf,ogg \
-  --enable-parser=aac,flac,mpegaudio,opus --enable-muxer=wav --enable-encoder=pcm_s16le \
-  --enable-decoder=aac,alac,flac,mp3,opus,pcm_s16le,pcm_s16be,pcm_s24le,pcm_s24be,pcm_s32le,pcm_s32be,pcm_f32le,pcm_f32be,pcm_f64le,pcm_f64be
+  --enable-protocol=file \
+  --enable-demuxer=wav,flac,mp3,mov,aiff,caf,ogg,matroska,avi,mpegts,mpegps,mpegvideo,flv,asf,aac,ac3,amr,dts,wavpack,ape,au,voc,w64,spdif,truehd,mlp,tta,dsf \
+  --enable-parser=aac,flac,mpegaudio,opus,vorbis,ac3,amr,dca \
+  --enable-muxer=wav --enable-encoder=pcm_s16le \
+  --enable-decoder=aac,aac_latm,alac,flac,mp3,mp2,opus,vorbis,wmav1,wmav2,wmapro,ac3,eac3,dca,truehd,mlp,amrnb,amrwb,wavpack,ape,nellymoser,gsm,adpcm_ima_qt,adpcm_ms,pcm_s16le,pcm_s16be,pcm_s24le,pcm_s24be,pcm_s32le,pcm_s32be,pcm_f32le,pcm_f32be,pcm_f64le,pcm_f64be,pcm_u8,pcm_mulaw,pcm_alaw
 make -j"$(sysctl -n hw.ncpu)"
 rm -rf "${PREFIX}"
 make install

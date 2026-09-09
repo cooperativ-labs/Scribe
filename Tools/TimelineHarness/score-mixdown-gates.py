@@ -17,7 +17,7 @@ Two gates, applied to the fixture class each one names:
                     rather than a numeric bound; their level change is printed as
                     an observation and is not gated here.
 
-Every published `final.flac` is additionally held to the true-peak ceiling and
+Every published `final.m4a` is additionally held to the true-peak ceiling and
 the clipping bound, and to matching the reconstructed timeline's duration.
 
 The real-room fixtures have no ground truth, so they are measured directly:

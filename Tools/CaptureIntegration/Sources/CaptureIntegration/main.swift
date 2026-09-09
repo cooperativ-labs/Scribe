@@ -42,7 +42,7 @@ func usage() -> Never {
 
     The `flow` gate drives the shipping menu-bar path end to end -- start, stop,
     process, open folder -- and checks that a verified transcription request is
-    emitted for final.flac with the session ID as provenance.
+    emitted for final.m4a with the session ID as provenance.
 
     The `record` gate passes only when both tracks delivered audio and no buffer
     was dropped. Run it from the signed bundle:

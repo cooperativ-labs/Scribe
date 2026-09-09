@@ -165,17 +165,50 @@ final class ScribeMenuBarControllerTests: XCTestCase {
         XCTAssertFalse(controller.showsRecordingIndicator)
     }
 
+    func testOpenTranscriptionsFolderAppearsBesideOpenRecordingsFolder() throws {
+        var openedTranscriptions = false
+        let controller = makeController(
+            MockRecordingCoordinator(snapshot: readySnapshot()),
+            transcription: TranscriptionMenuCommands(
+                openTranscripts: {},
+                transcribeFolder: {},
+                openTranscriptionsFolder: { openedTranscriptions = true }
+            )
+        )
+
+        controller.menuNeedsUpdate(controller.menu)
+
+        let titles = controller.menu.items.map(\.title)
+        let transcriptionsIndex = try XCTUnwrap(titles.firstIndex(of: "Open Transcriptions Folder"))
+        let recordingsIndex = try XCTUnwrap(titles.firstIndex(of: "Open Recordings Folder"))
+        XCTAssertEqual(transcriptionsIndex + 1, recordingsIndex)
+
+        let item = try XCTUnwrap(controller.menu.items.first { $0.title == "Open Transcriptions Folder" })
+        XCTAssertTrue(NSApp.sendAction(try XCTUnwrap(item.action), to: item.target, from: item))
+        XCTAssertTrue(openedTranscriptions)
+    }
+
+    func testOpenTranscriptionsFolderIsAbsentWithoutTranscription() {
+        let controller = makeController(MockRecordingCoordinator(snapshot: readySnapshot()))
+
+        controller.menuNeedsUpdate(controller.menu)
+
+        XCTAssertFalse(controller.menu.items.contains { $0.title == "Open Transcriptions Folder" })
+        XCTAssertTrue(controller.menu.items.contains { $0.title == "Open Recordings Folder" })
+    }
+
     // MARK: Helpers
 
     private func makeController(
         _ coordinator: MockRecordingCoordinator,
-        model: RecorderMenuModel? = nil
+        model: RecorderMenuModel? = nil,
+        transcription: TranscriptionMenuCommands? = nil
     ) -> ScribeMenuBarController {
         ScribeMenuBarController(
             model: model ?? RecorderMenuModel(coordinator: coordinator),
             image: nil,
             accessibilityLabel: "Scribe",
-            transcription: { nil },
+            transcription: { transcription },
             updates: { nil },
             openSettings: {}
         )

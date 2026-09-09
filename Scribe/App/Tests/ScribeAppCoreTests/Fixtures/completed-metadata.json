@@ -16,9 +16,9 @@
   "tracks" : {
     "system" : { "sourceFormat" : { "sampleRate" : 48000, "channelCount" : 2, "formatDescription" : "pcm-f32" }, "firstMediaTimestampSeconds" : 0, "frameCount" : 86400000, "fileName" : "system.flac", "checksum" : "system-sha256", "journalReference" : "capture/timeline.jsonl" },
     "microphone" : { "sourceFormat" : { "sampleRate" : 48000, "channelCount" : 1, "formatDescription" : "pcm-f32" }, "firstMediaTimestampSeconds" : 0, "frameCount" : 86400000, "fileName" : "microphone.flac", "checksum" : "microphone-sha256", "journalReference" : "capture/timeline.jsonl" },
-    "final" : { "sourceFormat" : { "sampleRate" : 48000, "channelCount" : 2, "formatDescription" : "flac-24" }, "firstMediaTimestampSeconds" : 0, "frameCount" : 86400000, "fileName" : "final.flac", "checksum" : "final-sha256" }
+    "final" : { "sourceFormat" : { "sampleRate" : 48000, "channelCount" : 1, "formatDescription" : "aac-lc-64k-m4a" }, "firstMediaTimestampSeconds" : 0, "frameCount" : 86400000, "fileName" : "final.m4a", "checksum" : "final-sha256" }
   },
   "gaps" : [],
   "interruptions" : [],
-  "processing" : { "state" : "complete", "dependencyVersions" : { "libFLAC" : "1.4.3" }, "configuration" : { "aecEnabled" : true }, "resamplingCorrections" : [], "delayCorrections" : [], "mixGains" : { "system" : 1, "microphone" : 1 }, "errors" : [] }
+  "processing" : { "state" : "complete", "dependencyVersions" : { "AACM4AEncoder" : "system-audiotoolbox-verified" }, "configuration" : { "aecEnabled" : true }, "resamplingCorrections" : [], "delayCorrections" : [], "mixGains" : { "system" : 1, "microphone" : 1 }, "errors" : [] }
 }

@@ -154,7 +154,7 @@ enum Harness {
                     "sessionDirectory": result.sessionDirectory.path,
                     "cleanedMicrophone": result.cleanedMicrophoneURL.path,
                     "finalMix": result.finalMixURL.path,
-                    "finalFLAC": result.finalFLACURL.path,
+                    "finalM4A": result.finalM4AURL.path,
                     "decision": result.decision,
                     "delaySamples": result.delaySamples as Any,
                     "delayCorrelation": result.delayCorrelation as Any,
