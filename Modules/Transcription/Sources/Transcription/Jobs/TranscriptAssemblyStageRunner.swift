@@ -47,8 +47,50 @@ struct DiarizationRecord: Codable, Sendable {
         let overlapsAnotherSpeaker: Bool
     }
 
+    struct Engine: Codable, Sendable {
+        let runtime: String
+        let runtimeRevision: String
+        let modelRevision: String
+    }
+
+    struct AppliedConfiguration: Codable, Sendable {
+        let knownSpeakerCount: Int?
+        let clusteringThreshold: Double
+        let embeddingExcludeOverlap: Bool
+        let minimumEmbeddingDurationSeconds: Double
+        let segmentationStepRatio: Double
+        let preserveOverlappingIntervals: Bool
+        let constrainedAssignment: Bool
+        let warmStartFa: Double
+        let warmStartFb: Double
+        let maximumVBxIterations: Int
+    }
+
+    struct ClusteringDiagnostics: Codable, Sendable {
+        let heuristicVersion: String
+        let embeddingCount: Int
+        let intervalCount: Int
+        let overlapIntervalCount: Int
+        let occupancies: [Occupancy]
+        let dominantEmbeddingFraction: Double?
+        let dominantIntervalFraction: Double?
+        let separationAppearsCollapsed: Bool
+
+        struct Occupancy: Codable, Sendable {
+            let clusterID: String
+            let embeddingCount: Int
+            let intervalCount: Int
+            let intervalSeconds: TimeInterval
+        }
+    }
+
     let intervals: [Interval]
     let sourceDurationSeconds: TimeInterval
+    /// Optional for backward compatibility with runs created before clustering
+    /// diagnostics were added.
+    let engine: Engine?
+    let configuration: AppliedConfiguration?
+    let clusteringDiagnostics: ClusteringDiagnostics?
 }
 
 struct WorkerSpeakerEmbeddingRecord: Codable, Sendable {
@@ -202,6 +244,15 @@ public struct TranscriptAssemblyStageRunner: TranscriptionStageRunning {
         }
 
         var warnings = reconciled.warnings
+        if diarization.clusteringDiagnostics?.separationAppearsCollapsed == true {
+            let automatic = diarization.configuration?.knownSpeakerCount == nil
+            warnings.append(TranscriptWarning(
+                code: "transcription.diarization.collapsedOccupancy",
+                message: automatic
+                    ? "Automatic speaker separation appears highly imbalanced. Review speaker labels or reprocess with the known speaker count."
+                    : "Speaker separation appears highly imbalanced despite the selected speaker count. Review the speaker labels before relying on attribution."
+            ))
+        }
         let build: SpeakerTurnBuildResult
         if turns.isEmpty, !words.isEmpty {
             // Recognized speech with no usable diarization is a labelled-transcript
@@ -223,6 +274,59 @@ public struct TranscriptAssemblyStageRunner: TranscriptionStageRunning {
             ))
         }
 
+        let requestedSpeakerCount: TranscriptJSONValue = switch job.request.speakerCount {
+        case .automatic: .string("automatic")
+        case let .known(count): .number(Double(count))
+        }
+        var processingOptions: [String: TranscriptJSONValue] = [
+            "model_profile_id": .string(job.request.modelProfileID),
+            "speaker_matching": .string(job.request.speakerMatching.rawValue),
+            "configuration_fingerprint": .string(job.configurationFingerprint),
+            "speaker_count": requestedSpeakerCount,
+            "display_grouping": .object([
+                "pause_split_ms": .number(Double(turnBuilder.configuration.grouping.pauseSplitMs)),
+                "preferred_duration_ms": .number(Double(turnBuilder.configuration.grouping.preferredSegmentDurationMs)),
+                "preferred_word_count": .number(Double(turnBuilder.configuration.grouping.preferredWordCount)),
+                "maximum_duration_ms": .number(Double(turnBuilder.configuration.grouping.maximumSegmentDurationMs)),
+                "maximum_word_count": .number(Double(turnBuilder.configuration.grouping.maximumWordCount)),
+            ]),
+        ]
+        if let configuration = diarization.configuration {
+            processingOptions["diarization_configuration"] = .object([
+                "clustering_threshold": .number(configuration.clusteringThreshold),
+                "embedding_exclude_overlap": .boolean(configuration.embeddingExcludeOverlap),
+                "minimum_embedding_duration_seconds": .number(configuration.minimumEmbeddingDurationSeconds),
+                "segmentation_step_ratio": .number(configuration.segmentationStepRatio),
+                "preserve_overlapping_intervals": .boolean(configuration.preserveOverlappingIntervals),
+                "constrained_assignment": .boolean(configuration.constrainedAssignment),
+                "warm_start_fa": .number(configuration.warmStartFa),
+                "warm_start_fb": .number(configuration.warmStartFb),
+                "maximum_vbx_iterations": .number(Double(configuration.maximumVBxIterations)),
+            ])
+        }
+        if let diagnostics = diarization.clusteringDiagnostics {
+            processingOptions["diarization_diagnostics"] = .object([
+                "heuristic_version": .string(diagnostics.heuristicVersion),
+                "embedding_count": .number(Double(diagnostics.embeddingCount)),
+                "interval_count": .number(Double(diagnostics.intervalCount)),
+                "overlap_interval_count": .number(Double(diagnostics.overlapIntervalCount)),
+                "dominant_embedding_fraction": diagnostics.dominantEmbeddingFraction.map(TranscriptJSONValue.number) ?? .null,
+                "dominant_interval_fraction": diagnostics.dominantIntervalFraction.map(TranscriptJSONValue.number) ?? .null,
+                "separation_appears_collapsed": .boolean(diagnostics.separationAppearsCollapsed),
+                "occupancies": .array(diagnostics.occupancies.map { occupancy in .object([
+                    "cluster_id": .string(occupancy.clusterID),
+                    "embedding_count": .number(Double(occupancy.embeddingCount)),
+                    "interval_count": .number(Double(occupancy.intervalCount)),
+                    "interval_seconds": .number(occupancy.intervalSeconds),
+                ]) }),
+            ])
+        }
+        var resolvedEngineRevisions = engineRevisions
+        if let engine = diarization.engine {
+            resolvedEngineRevisions["diarization_runtime"] = "\(engine.runtime)@\(engine.runtimeRevision)"
+            resolvedEngineRevisions["diarization_models"] = engine.modelRevision
+        }
+
         let transcript = CanonicalTranscript(
             transcriptID: job.runID.uuidString,
             revision: 1,
@@ -242,12 +346,8 @@ public struct TranscriptAssemblyStageRunner: TranscriptionStageRunning {
             languageSource: job.request.expectedLanguage == nil ? .unknown : .userProvided,
             speakers: build.speakers,
             segments: build.segments,
-            processingOptions: [
-                "model_profile_id": .string(job.request.modelProfileID),
-                "speaker_matching": .string(job.request.speakerMatching.rawValue),
-                "configuration_fingerprint": .string(job.configurationFingerprint),
-            ],
-            engineRevisions: engineRevisions,
+            processingOptions: processingOptions,
+            engineRevisions: resolvedEngineRevisions,
             warnings: warnings
         )
         return TranscriptionStageOutput(artifactURL: try write(transcript, named: TranscriptRunArtifact.canonicalTranscript, in: job))

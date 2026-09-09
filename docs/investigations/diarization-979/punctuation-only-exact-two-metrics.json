@@ -1,0 +1,50 @@
+{
+  "word_count": 9650,
+  "reference_segments": 260,
+  "reference_lexical_tokens": 9543,
+  "scribe_lexical_tokens": 9650,
+  "matched_lexical_tokens": 9285,
+  "canonical_revision": 29,
+  "saved_canonical_segments": 1447,
+  "intervals_by_speaker": {
+    "speaker_1": 321,
+    "speaker_2": 269
+  },
+  "interval_seconds_by_speaker": {
+    "speaker_1": 1261.155,
+    "speaker_2": 1419.116
+  },
+  "word_duration_ms": {
+    "median": 240.0,
+    "maximum": 5280,
+    "over_1000": 313
+  },
+  "word_gaps_at_least_1000ms": 36,
+  "original": {
+    "unknown_words": 815,
+    "segments": 1415,
+    "one_word_segments": 538,
+    "median_words_per_segment": 3,
+    "mapping": {
+      "speaker_1": "reference_1",
+      "speaker_2": "reference_2"
+    },
+    "matched_token_agreement_pct": 90.1,
+    "matched_token_unknown_pct": 7.92,
+    "matched_token_wrong_speaker_pct": 1.98,
+    "confusion": {
+      "None": {
+        "reference_1": 402,
+        "reference_2": 333
+      },
+      "speaker_1": {
+        "reference_1": 3694,
+        "reference_2": 75
+      },
+      "speaker_2": {
+        "reference_1": 109,
+        "reference_2": 4672
+      }
+    }
+  }
+}

@@ -33,7 +33,6 @@ final class ScribeAppEnvironment: ObservableObject {
     @Published private(set) var detectedMeeting: DetectedMeeting?
     private let processingQueue: ProcessingQueue?
     private let outbox: TranscriptionRequestOutbox
-    private let handoff = FinalRecordingHandoff()
     /// Absent only when the transcript store cannot be opened at all; the
     /// recorder is unaffected either way.
     let transcription: TranscriptionHostService?
@@ -334,6 +333,7 @@ final class ScribeAppEnvironment: ObservableObject {
     private func handOffForTranscription(_ job: ProcessingQueue.QueuedJob) async {
         guard settings.transcribeWhenFinalRecordingIsReady else { return }
         do {
+            let handoff = FinalRecordingHandoff(speakerCount: Self.transcriptionSpeakerCount(settings.transcriptionSpeakerCount))
             let request = try handoff.request(forSessionAt: job.sessionDirectory)
             try await outbox.submit(request)
             // The request is durable now, so transcription can be told to pick it
@@ -353,6 +353,13 @@ final class ScribeAppEnvironment: ObservableObject {
                 message: "The final recording is ready but could not be handed to transcription: \(error.localizedDescription)",
                 recoveryHint: "Open the recordings folder; the recording itself is complete."
             ))
+        }
+    }
+
+    private static func transcriptionSpeakerCount(_ preference: RecorderSpeakerCountPreference) -> TranscriptionSpeakerCount {
+        switch preference {
+        case .automatic: .automatic
+        case .known(let count): .known(count)
         }
     }
 

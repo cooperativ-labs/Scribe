@@ -128,7 +128,30 @@ public struct WorkerJobRunner: Sendable {
                 embeddings: [.init(speakerID: "speaker_1", vector: [1, 0], modelID: "test", modelRevision: "test", preprocessingVersion: "test", normalizationVersion: "l2-unit-v1")],
                 sourceDurationSeconds: prepared.sourceDurationSeconds,
                 usedDiskBackedAudio: false,
-                timings: nil
+                timings: nil,
+                engine: .init(runtime: "test", runtimeRevision: "test", modelRevision: "test"),
+                configuration: .init(
+                    knownSpeakerCount: job.knownSpeakerCount,
+                    clusteringThreshold: 0.6,
+                    embeddingExcludeOverlap: true,
+                    minimumEmbeddingDurationSeconds: 1,
+                    segmentationStepRatio: 0.2,
+                    preserveOverlappingIntervals: true,
+                    constrainedAssignment: true,
+                    warmStartFa: 0.07,
+                    warmStartFb: 0.8,
+                    maximumVBxIterations: 20
+                ),
+                clusteringDiagnostics: .init(
+                    heuristicVersion: "dominant-occupancy-v1",
+                    embeddingCount: 0,
+                    intervalCount: 0,
+                    overlapIntervalCount: 0,
+                    occupancies: [],
+                    dominantEmbeddingFraction: nil,
+                    dominantIntervalFraction: nil,
+                    separationAppearsCollapsed: false
+                )
             )
         } else {
             result = try await OfflineDiarizationAdapter(
@@ -137,7 +160,15 @@ public struct WorkerJobRunner: Sendable {
                 configuration: .init(knownSpeakerCount: job.knownSpeakerCount)
             ).diarize(fileURL: URL(fileURLWithPath: prepared.preparedAudioPath))
         }
-        let checkpoint = DiarizationStage(intervals: result.intervals, sourceDurationSeconds: result.sourceDurationSeconds, usedDiskBackedAudio: result.usedDiskBackedAudio, timings: result.timings)
+        let checkpoint = DiarizationStage(
+            intervals: result.intervals,
+            sourceDurationSeconds: result.sourceDurationSeconds,
+            usedDiskBackedAudio: result.usedDiskBackedAudio,
+            timings: result.timings,
+            engine: result.engine,
+            configuration: result.configuration,
+            clusteringDiagnostics: result.clusteringDiagnostics
+        )
         let resultURL = job.runDirectory.appending(path: "diarization.json")
         try commit(checkpoint, to: resultURL)
         emit(stageResult(requestID: requestID, stage: "diarize", resultURL: resultURL))
@@ -244,6 +275,9 @@ private struct DiarizationStage: Codable {
     let sourceDurationSeconds: TimeInterval
     let usedDiskBackedAudio: Bool
     let timings: OfflineDiarizationAdapter.Timings?
+    let engine: OfflineDiarizationAdapter.Engine
+    let configuration: OfflineDiarizationAdapter.AppliedConfiguration
+    let clusteringDiagnostics: OfflineDiarizationAdapter.ClusteringDiagnostics
 }
 
 private struct Cancellation: LocalizedError {

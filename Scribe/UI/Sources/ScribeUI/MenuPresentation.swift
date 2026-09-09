@@ -37,6 +37,10 @@ public struct MenuPresentation: Equatable, Sendable {
     public let copyTimestampShortcut: GlobalShortcut
     /// True while a recording has an elapsed figure that can be copied.
     public let isCopyTimestampEnabled: Bool
+    /// A live session — recording or held. What the status item's red dot
+    /// reports, since the chip only stays on screen for the first few seconds
+    /// of it.
+    public let isCapturing: Bool
     /// What launch recovery found, if anything.
     public let recoveryNotice: String?
     public let recordingsFolderName: String
@@ -107,6 +111,7 @@ public struct MenuPresentation: Equatable, Sendable {
         shortcutIssues = snapshot.shortcutIssues
         self.copyTimestampShortcut = copyTimestampShortcut
         isCopyTimestampEnabled = RecordingTimestamp.copyableText(state: snapshot.state, at: date) != nil
+        isCapturing = snapshot.state.isCapturing
         recoveryNotice = snapshot.recoveryNotice
         recordingsFolderName = snapshot.recordingsFolderURL.lastPathComponent
     }

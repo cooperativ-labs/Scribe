@@ -14,7 +14,14 @@ let package = Package(
     dependencies: [
         // Deliberately exact rather than `from:`: token timing and diarization
         // behaviour are part of the worker protocol's compatibility surface.
-        .package(url: "https://github.com/FluidInference/FluidAudio.git", exact: "0.12.4"),
+        //
+        // Keep the release exact: ASR token timing, long-file merge behavior,
+        // and offline diarization are part of the worker protocol's
+        // compatibility surface. v0.15.6 retains the staged Parakeet v3 and
+        // offline diarizer model filenames while adding upstream seam-gap,
+        // final-window, and pyannote-parity clustering fixes. The worker uses
+        // the explicit local-model APIs and does not enable runtime downloads.
+        .package(url: "https://github.com/FluidInference/FluidAudio.git", exact: "0.15.6"),
         .package(path: "../../Modules/Speakers"),
     ],
     targets: [

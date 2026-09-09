@@ -32,8 +32,12 @@ The pinned library already implements the correct engine:
   vocabulary term has stronger CTC evidence and passes similarity / stopword /
   length guards.
 
-That API is in FluidAudio **v0.12.4** (`9830ce83`). No library bump is
-required for the first version.
+That API was already in FluidAudio **v0.12.4** (`9830ce83`), so this decision
+required no library bump. The pin later moved to **v0.12.5**
+(`2d297948`) for the token-duration fix and now to **v0.15.6**
+(`4dbf4f9f`) for the current worker release. The vocabulary and CTC rescoring
+sources remain outside the upgraded adapter path, and every 0.12.4 statement
+below is historical design context rather than the current dependency pin.
 
 ## Product model: one list, packs as an escape hatch
 

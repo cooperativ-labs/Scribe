@@ -41,6 +41,12 @@ public final class ScribeSettings: ObservableObject {
     @Published public var transcribeWhenFinalRecordingIsReady: Bool {
         didSet { defaults.set(transcribeWhenFinalRecordingIsReady, forKey: Key.transcribeWhenFinalRecordingIsReady) }
     }
+    /// The diarization constraint used for new imports and recorder handoffs.
+    /// Automatic remains the default because attendance is not evidence that
+    /// every invited person spoke or was captured.
+    @Published public var transcriptionSpeakerCount: RecorderSpeakerCountPreference {
+        didSet { defaults.set(transcriptionSpeakerCount.persistedValue, forKey: Key.transcriptionSpeakerCount) }
+    }
     @Published public private(set) var launchAtLogin: Bool
     @Published public private(set) var launchAtLoginError: String?
 
@@ -114,6 +120,9 @@ public final class ScribeSettings: ObservableObject {
         stopShortcut = Self.loadShortcut(from: defaults, key: Key.stopShortcut) ?? .defaultStop
         copyTimestampShortcut = Self.loadShortcut(from: defaults, key: Key.copyTimestampShortcut) ?? .defaultCopyTimestamp
         transcribeWhenFinalRecordingIsReady = defaults.object(forKey: Key.transcribeWhenFinalRecordingIsReady) as? Bool ?? false
+        transcriptionSpeakerCount = RecorderSpeakerCountPreference(
+            persistedValue: defaults.object(forKey: Key.transcriptionSpeakerCount)
+        )
         launchAtLogin = loginItemManager.status == .enabled
         launchAtLoginError = nil
         meetingDetectionEnabled = defaults.object(forKey: Key.meetingDetectionEnabled) as? Bool ?? true
@@ -320,6 +329,7 @@ public final class ScribeSettings: ObservableObject {
         static let stopShortcut = "scribe.settings.stopShortcut"
         static let copyTimestampShortcut = "scribe.settings.copyTimestampShortcut"
         static let transcribeWhenFinalRecordingIsReady = "scribe.settings.transcribeWhenFinalRecordingIsReady"
+        static let transcriptionSpeakerCount = "scribe.settings.transcriptionSpeakerCount"
         static let meetingDetectionEnabled = "scribe.settings.meetingDetectionEnabled"
         static let stopRecordingWhenMeetingEnds = "scribe.settings.stopRecordingWhenMeetingEnds"
         static let disabledMeetingApplicationIDs = "scribe.settings.disabledMeetingApplicationIDs"
@@ -395,6 +405,28 @@ public final class ScribeSettings: ObservableObject {
             defaults.set(refreshedBookmark, forKey: key)
         }
         return url
+    }
+}
+
+/// A settings-layer representation kept independent of the transcription
+/// module so recording preferences never make capture depend on the worker.
+public enum RecorderSpeakerCountPreference: Hashable, Sendable {
+    case automatic
+    case known(Int)
+
+    init(persistedValue: Any?) {
+        if let count = persistedValue as? Int, count > 0 {
+            self = .known(count)
+        } else {
+            self = .automatic
+        }
+    }
+
+    var persistedValue: Any {
+        switch self {
+        case .automatic: "automatic"
+        case .known(let count): count
+        }
     }
 }
 

@@ -8,7 +8,6 @@ struct MeetingChipActions {
     var dismiss: @MainActor () -> Void = {}
     var hold: @MainActor () -> Void = {}
     var stop: @MainActor () -> Void = {}
-    var copyTimestamp: @MainActor () -> Void = {}
 }
 
 /// The floating chip that appears under the menu bar icon.
@@ -104,7 +103,12 @@ struct MeetingChipView: View {
                     .font(.system(size: 9))
                     .foregroundStyle(session.isPaused ? AnyShapeStyle(.secondary) : AnyShapeStyle(Color.red))
                     .accessibilityLabel(session.isPaused ? "Paused" : "Recording")
-                ElapsedTimestampButton(elapsedText: session.elapsedText, copy: actions.copyTimestamp)
+                // Plain text, not a control: the elapsed figure is here to
+                // say the recording is running, and Copy Timestamp lives in the
+                // menu and on its global shortcut.
+                Text(session.elapsedText)
+                    .font(.system(size: 14, weight: .medium))
+                    .monospacedDigit()
                 if let title = session.title {
                     Text(title)
                         .font(.system(size: 11))
@@ -164,42 +168,6 @@ struct MeetingChipView: View {
     }
 }
 
-/// The elapsed clock is also the copy control: notes taken during a meeting
-/// need the current time, and the figure itself is the thing a person looks at
-/// to get it.
-private struct ElapsedTimestampButton: View {
-    let elapsedText: String
-    var copy: @MainActor () -> Void
-
-    @State private var didCopy = false
-    @State private var resetTask: Task<Void, Never>?
-
-    var body: some View {
-        Button(action: copyAndAcknowledge) {
-            Text(didCopy ? "Copied" : elapsedText)
-                .font(.system(size: 14, weight: .medium))
-                .monospacedDigit()
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .help("Copy timestamp")
-        .accessibilityLabel(didCopy ? "Timestamp copied" : "Copy timestamp \(elapsedText)")
-        .accessibilityHint("Copies the current recording time for notes")
-        .onDisappear { resetTask?.cancel() }
-    }
-
-    private func copyAndAcknowledge() {
-        copy()
-        didCopy = true
-        resetTask?.cancel()
-        resetTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(1.2))
-            guard !Task.isCancelled else { return }
-            didCopy = false
-        }
-    }
-}
-
 // MARK: - Liquid Glass
 
 private extension View {
@@ -250,8 +218,7 @@ struct MeetingChipHost: View {
                 record: { model.record() },
                 dismiss: { model.dismiss() },
                 hold: { model.toggleHold() },
-                stop: { model.stop() },
-                copyTimestamp: { model.copyTimestamp() }
+                stop: { model.stop() }
             )
         )
     }

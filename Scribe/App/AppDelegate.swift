@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import ScribeAppCore
 import ScribeUI
 import SwiftUI
@@ -15,6 +16,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// window, so it can reach a person who is looking at their meeting rather
     /// than at Scribe's menu.
     private var meetingChip: MeetingChipController?
+    /// Keeps the status item's recording dot and the chip from saying the same
+    /// thing at once: the chip withdraws a few seconds into a recording, and the
+    /// dot takes over from there.
+    private var chipVisibilityObservation: AnyCancellable?
     /// Retained while visible because the status item is otherwise Scribe's
     /// only AppKit-owned surface.
     private var settingsWindow: NSWindow?
@@ -37,6 +42,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             model: environment.meetingChipModel,
             anchor: { [weak menuBar] in menuBar?.statusItemAnchor }
         )
+        chipVisibilityObservation = environment.meetingChipModel.$presentation.sink { [weak menuBar] presentation in
+            menuBar?.isMeetingChipVisible = presentation.isVisible
+        }
         environment.presentFirstRunPermissionsIfNeeded()
         environment.checkForUpdates()
     }

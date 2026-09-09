@@ -1,0 +1,36 @@
+{
+  "engine": {
+    "runtime": "FluidAudio 0.15.6",
+    "revision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b"
+  },
+  "configuration": {
+    "knownSpeakerCount": null,
+    "clusteringThreshold": 0.6,
+    "embeddingExcludeOverlap": true,
+    "minimumEmbeddingDurationSeconds": 1.0,
+    "segmentationStepRatio": 0.2,
+    "preserveOverlappingIntervals": true
+  },
+  "embedding_count": 5232,
+  "fallback_mask_count": 3832,
+  "interval_count": 582,
+  "intervals_by_speaker": {
+    "speaker_1": 577,
+    "speaker_2": 5
+  },
+  "interval_seconds_by_speaker": {
+    "speaker_1": 2684.736,
+    "speaker_2": 7.046
+  },
+  "matched_lexical_tokens": 9285,
+  "matched_token_agreement_pct": 51.06,
+  "matched_token_unknown_pct": 8.15,
+  "matched_token_wrong_speaker_pct": 40.79,
+  "wall_clock_seconds": 75.61,
+  "accuracy_note": "Matched-text agreement against a timestamp-free reference; not human-annotated DER or WDER.",
+  "validation_status": {
+    "status": "superseded_unverified_executable_provenance",
+    "replacement": "combined-evaluation.json",
+    "reason": "Current verified 0.15.6 rebuild separates both voices. The prior artifact lacks executable evidence and must not be used to claim current collapse or regression."
+  }
+}

@@ -478,6 +478,21 @@ public struct TranscriptWindow: View {
                 Task { await viewModel.refreshLabelsFromLibrary() }
             }
             .help("Applies current speaker-library names to this transcript as a new revision.")
+            Menu("Reprocess", systemImage: "person.2.badge.gearshape") {
+                Button("Automatic speaker count") {
+                    Task { await viewModel.reprocess(speakerCount: .automatic) }
+                }
+                Divider()
+                ForEach(1...8, id: \.self) { count in
+                    Button("Exactly \(count) speaker\(count == 1 ? "" : "s")") {
+                        Task { await viewModel.reprocess(speakerCount: .known(count)) }
+                    }
+                }
+                Divider()
+                Text("Creates a new run and keeps this transcript’s edits. Exact counts can use FluidAudio’s K-means fallback.")
+            }
+            .disabled(!viewModel.canReprocess)
+            .help("Run the retained source again with a chosen speaker count without replacing this transcript.")
             if viewModel.canOpenVocabularySettings {
                 Button("Vocabulary", systemImage: "character.book.closed") { viewModel.openVocabulary() }
                     .help("Names and spellings Scribe should get right. Opens Settings; new terms apply to transcriptions made afterwards.")

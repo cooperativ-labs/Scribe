@@ -110,6 +110,7 @@ final class ScribeSettingsTests: XCTestCase {
         firstLaunch.startShortcut = GlobalShortcut(keyCode: 18, modifiers: 256)
         firstLaunch.copyTimestampShortcut = GlobalShortcut(keyCode: 17, modifiers: 256)
         firstLaunch.transcribeWhenFinalRecordingIsReady = true
+        firstLaunch.transcriptionSpeakerCount = .known(2)
 
         let secondLaunch = ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: FileManager.default.temporaryDirectory)
         XCTAssertEqual(secondLaunch.rememberedApplicationBundleIdentifier, "us.zoom.xos")
@@ -118,6 +119,7 @@ final class ScribeSettingsTests: XCTestCase {
         XCTAssertEqual(secondLaunch.startShortcut, GlobalShortcut(keyCode: 18, modifiers: 256))
         XCTAssertEqual(secondLaunch.copyTimestampShortcut, GlobalShortcut(keyCode: 17, modifiers: 256))
         XCTAssertTrue(secondLaunch.transcribeWhenFinalRecordingIsReady)
+        XCTAssertEqual(secondLaunch.transcriptionSpeakerCount, .known(2))
     }
 
     func testLaunchAtLoginUsesSystemServiceAndCanBeToggled() throws {

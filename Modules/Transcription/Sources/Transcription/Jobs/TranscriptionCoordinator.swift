@@ -369,6 +369,33 @@ public actor TranscriptionCoordinator {
         return job
     }
 
+    /// Queues a fresh processing run over a retained source with a deliberate
+    /// diarization constraint. Unlike `retry`, no checkpoint is copied: the
+    /// configuration fingerprint changes with the speaker count, so reusing an
+    /// ASR or diarization artifact could mix incompatible output. The prior run
+    /// directory, including any review revisions, is never touched.
+    @discardableResult
+    public func reprocess(_ previous: TranscriptionJob, speakerCount: TranscriptionSpeakerCount) throws -> TranscriptionJob {
+        let request = TranscriptionRequest(
+            sourceURL: previous.sourceSnapshotURL,
+            languageMode: previous.request.languageMode,
+            expectedLanguage: previous.request.expectedLanguage,
+            speakerCount: speakerCount,
+            speakerMatching: previous.request.speakerMatching,
+            speakerLibraryRevision: previous.request.speakerLibraryRevision,
+            vocabularyRevision: previous.request.vocabularyRevision,
+            modelProfileID: previous.request.modelProfileID,
+            exportDirectory: previous.request.exportDirectory,
+            provenance: previous.request.provenance,
+            title: previous.request.title
+        )
+        var job = try enqueue(request)
+        job.retryOfRunID = previous.runID
+        try write(job)
+        jobs[job.id] = job
+        return job
+    }
+
     /// Drives at most one worker run at a time.  Starts are deferred while
     /// capture is active, and captures that start mid-run suspend at the next
     /// persisted stage boundary.

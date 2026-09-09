@@ -25,6 +25,9 @@ public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
     private let transcription: () -> TranscriptionMenuCommands?
     private let updates: () -> UpdateMenuCommands?
     private let openSettings: () -> Void
+    /// The plain label for the status item, kept so the recording dot can be
+    /// added to and taken off the end of it.
+    private let accessibilityLabel: String
 
     private let statusItem: NSStatusItem
     /// Internal, not private, so the menu a build produces can be inspected
@@ -38,6 +41,34 @@ public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
     let microphoneMenu = NSMenu()
     let recordingModeMenu = NSMenu()
     private var presentationObservation: AnyCancellable?
+    /// A live session, from the recorder.
+    private var isCapturing = false
+
+    /// Whether the floating chip is on screen right now.
+    ///
+    /// The dot and the chip say the same thing, so only one of them says it:
+    /// the chip withdraws a few seconds into a recording, and the dot is what
+    /// carries that fact for the rest of it. Set from outside because the chip
+    /// is a separate window that the menu bar knows nothing else about.
+    public var isMeetingChipVisible = false {
+        didSet {
+            guard oldValue != isMeetingChipVisible else { return }
+            applyRecordingIndicator()
+        }
+    }
+
+    /// The red dot drawn beside the mark. A coloured attributed title rather
+    /// than a second image: the mark itself is a template so the menu bar tints
+    /// it with the appearance, and compositing a red dot into it would give
+    /// that up for the whole icon.
+    private static let recordingIndicator = NSAttributedString(
+        string: " \u{25CF}",
+        attributes: [
+            .foregroundColor: NSColor.systemRed,
+            .font: NSFont.systemFont(ofSize: 7),
+            .baselineOffset: 2,
+        ]
+    )
 
     public init(
         model: RecorderMenuModel,
@@ -51,6 +82,7 @@ public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
         self.transcription = transcription
         self.updates = updates
         self.openSettings = openSettings
+        self.accessibilityLabel = accessibilityLabel
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
 
@@ -58,6 +90,9 @@ public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
         // tints the mark itself and it stays legible in both appearances.
         image?.isTemplate = true
         statusItem.button?.image = image
+        // The dot is the button's title, so it needs somewhere to go; the item
+        // has variable length and grows by the few points it takes.
+        statusItem.button?.imagePosition = .imageLeading
         statusItem.button?.setAccessibilityLabel(accessibilityLabel)
 
         for submenu in [menu, applicationMenu, microphoneMenu, recordingModeMenu] {
@@ -124,6 +159,20 @@ public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
         statusItemRow.title = presentation.statusTitle
         statusItemRow.image = NSImage(systemSymbolName: presentation.statusSymbol, accessibilityDescription: nil)
         applyCopyTimestampItem(copyTimestampRow, presentation: presentation)
+        isCapturing = presentation.isCapturing
+        applyRecordingIndicator()
+    }
+
+    /// True while the status item is wearing the red dot.
+    var showsRecordingIndicator: Bool { isCapturing && !isMeetingChipVisible }
+
+    private func applyRecordingIndicator() {
+        guard let button = statusItem.button else { return }
+        let shows = showsRecordingIndicator
+        button.attributedTitle = shows ? Self.recordingIndicator : NSAttributedString()
+        // Read aloud too: the dot is the only thing that says a recording is
+        // running once the chip has gone.
+        button.setAccessibilityLabel(shows ? "\(accessibilityLabel) — recording" : accessibilityLabel)
     }
 
     private func perform(_ action: (RecorderMenuModel) -> Void) {

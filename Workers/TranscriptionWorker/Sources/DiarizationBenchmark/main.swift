@@ -13,7 +13,13 @@ struct DiarizationBenchmark {
             let adapter = OfflineDiarizationAdapter(
                 manifest: manifest,
                 modelsDirectory: options.modelsURL,
-                configuration: .init(knownSpeakerCount: options.knownSpeakerCount)
+                configuration: .init(
+                    knownSpeakerCount: options.knownSpeakerCount,
+                    clusteringThreshold: options.clusteringThreshold,
+                    embeddingExcludeOverlap: options.embeddingExcludeOverlap,
+                    minimumEmbeddingDurationSeconds: options.minimumEmbeddingDurationSeconds,
+                    segmentationStepRatio: options.segmentationStepRatio
+                )
             )
             let startedAt = ContinuousClock.now
             let result = try await adapter.diarize(fileURL: options.audioURL)
@@ -26,7 +32,10 @@ struct DiarizationBenchmark {
                 intervals: result.intervals,
                 embeddings: result.embeddings,
                 timings: result.timings,
-                usedDiskBackedAudio: result.usedDiskBackedAudio
+                usedDiskBackedAudio: result.usedDiskBackedAudio,
+                engine: result.engine,
+                configuration: result.configuration,
+                clusteringDiagnostics: result.clusteringDiagnostics
             )
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
@@ -53,6 +62,9 @@ private struct Output: Codable {
     let embeddings: [OfflineDiarizationAdapter.SpeakerEmbedding]
     let timings: OfflineDiarizationAdapter.Timings?
     let usedDiskBackedAudio: Bool
+    let engine: OfflineDiarizationAdapter.Engine
+    let configuration: OfflineDiarizationAdapter.AppliedConfiguration
+    let clusteringDiagnostics: OfflineDiarizationAdapter.ClusteringDiagnostics
 }
 
 private struct Options {
@@ -60,6 +72,10 @@ private struct Options {
     let manifestURL: URL
     let modelsURL: URL
     let knownSpeakerCount: Int?
+    let clusteringThreshold: Double
+    let embeddingExcludeOverlap: Bool
+    let minimumEmbeddingDurationSeconds: Double
+    let segmentationStepRatio: Double
 
     init(arguments: [String]) throws {
         var values: [String: String] = [:]
@@ -82,6 +98,25 @@ private struct Options {
         audioURL = URL(fileURLWithPath: audio)
         manifestURL = URL(fileURLWithPath: manifest)
         modelsURL = URL(fileURLWithPath: models, isDirectory: true)
+        clusteringThreshold = try Self.double(values["--clustering-threshold"], default: 0.6)
+        embeddingExcludeOverlap = try Self.bool(values["--embedding-exclude-overlap"], default: true)
+        minimumEmbeddingDurationSeconds = try Self.double(values["--minimum-embedding-duration"], default: 1.0)
+        segmentationStepRatio = try Self.double(values["--segmentation-step-ratio"], default: 0.2)
+    }
+
+    private static func double(_ value: String?, default defaultValue: Double) throws -> Double {
+        guard let value else { return defaultValue }
+        guard let parsed = Double(value) else { throw OptionsError.usage }
+        return parsed
+    }
+
+    private static func bool(_ value: String?, default defaultValue: Bool) throws -> Bool {
+        guard let value else { return defaultValue }
+        switch value {
+        case "true": return true
+        case "false": return false
+        default: throw OptionsError.usage
+        }
     }
 }
 
@@ -89,6 +124,6 @@ private enum OptionsError: LocalizedError {
     case usage
 
     var errorDescription: String? {
-        "Usage: DiarizationBenchmark --audio <audio-file> --manifest <model_manifest.json> --models <models-dir> [--known-speaker-count <positive-int>]"
+        "Usage: DiarizationBenchmark --audio <audio-file> --manifest <model_manifest.json> --models <models-dir> [--known-speaker-count <positive-int>] [--clustering-threshold <0...2>] [--embedding-exclude-overlap <true|false>] [--minimum-embedding-duration <seconds>] [--segmentation-step-ratio <0...1>]"
     }
 }

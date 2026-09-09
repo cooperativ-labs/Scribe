@@ -40,7 +40,9 @@ final class TokenTimingReconcilerTests: XCTestCase {
 
         XCTAssertEqual(result.texts, ["Hi?"])
         XCTAssertEqual(result.words[0].startMs, 80)
-        XCTAssertEqual(result.words[0].endMs, 480)
+        // The "?" keeps its text but contributes no acoustic extent, so the word
+        // still ends where "Hi" stopped rather than where the mark was decoded.
+        XCTAssertEqual(result.words[0].endMs, 400)
     }
 
     func testChunkBoundaryFixturesDropProvenDuplicatesAndKeepEveryUniqueWord() throws {

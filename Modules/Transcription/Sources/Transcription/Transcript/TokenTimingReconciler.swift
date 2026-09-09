@@ -2,11 +2,17 @@ import Foundation
 
 /// Reconstructs source-relative words from the worker's timed Parakeet tokens.
 ///
-/// Behavior is pinned to FluidAudio v0.12.4 / `docs/feasibility/asr-timing.md`:
+/// Behavior is pinned to FluidAudio v0.15.6 / `docs/feasibility/asr-timing.md`:
 /// SentencePiece `▁` (or a leading space after `normalizedTimingToken`) starts a
 /// word, punctuation attaches to the preceding lexical word, chunk timestamps are
 /// restored from the audio-preparation mapping plus optional chunk offsets, and
 /// only tokens that match on text and time are dropped at chunk seams.
+///
+/// A word's acoustic span comes from its lexical tokens alone. Punctuation
+/// contributes its text and nothing else: the decoder emits a terminal mark at
+/// whatever frame it settles on, which is routinely after the speech it closes,
+/// so absorbing its timing would stretch the last word of a sentence across the
+/// following pause and hand that silence to the speaker attributor.
 public struct TokenTimingReconciler: Sendable {
     public struct Configuration: Sendable, Equatable {
         /// Pinned ChunkProcessor actual-audio window.
@@ -226,7 +232,8 @@ public struct TokenTimingReconciler: Sendable {
                 if current.text.isEmpty {
                     heldPunctuation += mark
                 } else {
-                    current.append(text: mark, token: token)
+                    // Text only: see the type comment on punctuation timing.
+                    current.appendTextOnly(mark)
                 }
                 lastWasPunctuation = true
                 continue
@@ -247,11 +254,10 @@ public struct TokenTimingReconciler: Sendable {
 
         if !heldPunctuation.isEmpty {
             if current.text.isEmpty, var last = words.last {
-                last.text += heldPunctuation
-                last.absorb(endSeconds: last.endSeconds)
+                last.appendTextOnly(heldPunctuation)
                 words[words.count - 1] = last
             } else {
-                current.text += heldPunctuation
+                current.appendTextOnly(heldPunctuation)
             }
         }
         flush()
@@ -367,6 +373,12 @@ public struct TokenTimingReconciler: Sendable {
         mutating func append(text piece: String, token: InternalToken) {
             text += piece
             absorb(startSeconds: token.startSeconds, endSeconds: token.endSeconds)
+        }
+
+        /// Attaches text that carries no acoustic extent of its own, such as a
+        /// terminal punctuation mark.
+        mutating func appendTextOnly(_ piece: String) {
+            text += piece
         }
 
         mutating func absorb(startSeconds: TimeInterval? = nil, endSeconds: TimeInterval?) {

@@ -14,18 +14,72 @@ public struct OfflineDiarizationAdapter: Sendable {
         /// The pinned FluidAudio build exposes overlap through nonexclusive
         /// reconstruction. This must remain true for canonical transcripts.
         public let preserveOverlappingIntervals: Bool
+        /// FluidAudio's AHC dendrogram cut distance. Exposed so the offline
+        /// benchmark can compare supported configurations without patching a
+        /// SwiftPM checkout; production keeps the pinned community default.
+        public let clusteringThreshold: Double
+        public let embeddingExcludeOverlap: Bool
+        public let minimumEmbeddingDurationSeconds: Double
+        public let segmentationStepRatio: Double
 
         public init(
             knownSpeakerCount: Int? = nil,
             computeUnits: ASRComputeUnits = .cpuAndNeuralEngine,
             allowLowPrecisionAccumulationOnGPU: Bool = true,
-            preserveOverlappingIntervals: Bool = true
+            preserveOverlappingIntervals: Bool = true,
+            clusteringThreshold: Double = 0.6,
+            embeddingExcludeOverlap: Bool = true,
+            minimumEmbeddingDurationSeconds: Double = 1.0,
+            segmentationStepRatio: Double = 0.2
         ) {
             self.knownSpeakerCount = knownSpeakerCount
             self.computeUnits = computeUnits
             self.allowLowPrecisionAccumulationOnGPU = allowLowPrecisionAccumulationOnGPU
             self.preserveOverlappingIntervals = preserveOverlappingIntervals
+            self.clusteringThreshold = clusteringThreshold
+            self.embeddingExcludeOverlap = embeddingExcludeOverlap
+            self.minimumEmbeddingDurationSeconds = minimumEmbeddingDurationSeconds
+            self.segmentationStepRatio = segmentationStepRatio
         }
+    }
+
+    public struct Engine: Codable, Sendable, Equatable {
+        public let runtime: String
+        public let runtimeRevision: String
+        public let modelRevision: String
+    }
+
+    public struct AppliedConfiguration: Codable, Sendable, Equatable {
+        public let knownSpeakerCount: Int?
+        public let clusteringThreshold: Double
+        public let embeddingExcludeOverlap: Bool
+        public let minimumEmbeddingDurationSeconds: Double
+        public let segmentationStepRatio: Double
+        public let preserveOverlappingIntervals: Bool
+        public let constrainedAssignment: Bool
+        public let warmStartFa: Double
+        public let warmStartFb: Double
+        public let maximumVBxIterations: Int
+    }
+
+    public struct ClusterOccupancy: Codable, Sendable, Equatable {
+        public let clusterID: String
+        public let embeddingCount: Int
+        public let intervalCount: Int
+        public let intervalSeconds: TimeInterval
+    }
+
+    public struct ClusteringDiagnostics: Codable, Sendable, Equatable {
+        public let heuristicVersion: String
+        public let embeddingCount: Int
+        public let intervalCount: Int
+        public let overlapIntervalCount: Int
+        public let occupancies: [ClusterOccupancy]
+        public let dominantEmbeddingFraction: Double?
+        public let dominantIntervalFraction: Double?
+        /// This is deliberately a review signal, not an inferred speaker
+        /// count. A genuine monologue can be highly imbalanced too.
+        public let separationAppearsCollapsed: Bool
     }
 
     public struct SpeakerInterval: Codable, Sendable, Equatable {
@@ -54,6 +108,9 @@ public struct OfflineDiarizationAdapter: Sendable {
         public let sourceDurationSeconds: TimeInterval
         public let usedDiskBackedAudio: Bool
         public let timings: Timings?
+        public let engine: Engine
+        public let configuration: AppliedConfiguration
+        public let clusteringDiagnostics: ClusteringDiagnostics
     }
 
     public struct Timings: Codable, Sendable, Equatable {
@@ -82,7 +139,13 @@ public struct OfflineDiarizationAdapter: Sendable {
     }
 
     private static let embeddingModelID = "wespeaker-embedding-coreml"
-    private static let preprocessingVersion = "fluidaudio-offline-fbank-16khz-mono-v0.12.4"
+    public static let fluidAudioVersion = "0.15.6"
+    public static let fluidAudioRevision = "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b"
+    /// v0.15.6 fixes the mask-matrix transpose and rejects very low-support
+    /// masks before embedding. Those operations change vector semantics even
+    /// though the WeSpeaker weights are unchanged, so old voiceprints must not
+    /// be compared as if they shared a representation.
+    private static let preprocessingVersion = "fluidaudio-offline-fbank-16khz-mono-v0.15.6"
     private static let normalizationVersion = "l2-unit-v1"
 
     public let manifest: ModelManifest
@@ -108,11 +171,16 @@ public struct OfflineDiarizationAdapter: Sendable {
 
         var diarizerConfiguration = OfflineDiarizerConfig.default
         diarizerConfiguration.postProcessing.exclusiveSegments = !configuration.preserveOverlappingIntervals
+        diarizerConfiguration.clustering.threshold = configuration.clusteringThreshold
+        diarizerConfiguration.embedding.excludeOverlap = configuration.embeddingExcludeOverlap
+        diarizerConfiguration.embedding.minSegmentDurationSeconds = configuration.minimumEmbeddingDurationSeconds
+        diarizerConfiguration.segmentation.stepRatio = configuration.segmentationStepRatio
+        diarizerConfiguration.exposeChunkEmbeddings = true
         if let count = configuration.knownSpeakerCount {
             diarizerConfiguration = diarizerConfiguration.withSpeakers(exactly: count)
         }
 
-        let sourceResult = try StreamingAudioSourceFactory().makeDiskBackedSource(
+        let sourceResult = try AudioSourceFactory().makeDiskBackedSource(
             from: fileURL,
             targetSampleRate: diarizerConfiguration.segmentation.sampleRate
         )
@@ -131,12 +199,16 @@ public struct OfflineDiarizationAdapter: Sendable {
             audioLoadingSeconds: sourceResult.loadDuration
         )
         let duration = Double(sourceResult.source.sampleCount) / Double(diarizerConfiguration.segmentation.sampleRate)
-        return try makeResult(rawResult, sourceDuration: duration)
+        return try makeResult(rawResult, sourceDuration: duration, diarizerConfiguration: diarizerConfiguration)
     }
 
     /// Kept internal for deterministic tests of labels, overlap preservation,
     /// and vector compatibility without invoking Core ML.
-    func makeResult(_ rawResult: DiarizationResult, sourceDuration: TimeInterval) throws -> Result {
+    func makeResult(
+        _ rawResult: DiarizationResult,
+        sourceDuration: TimeInterval,
+        diarizerConfiguration: OfflineDiarizerConfig = .default
+    ) throws -> Result {
         let ordered = rawResult.segments.sorted {
             if $0.startTimeSeconds == $1.startTimeSeconds { return $0.endTimeSeconds < $1.endTimeSeconds }
             return $0.startTimeSeconds < $1.startTimeSeconds
@@ -189,6 +261,24 @@ public struct OfflineDiarizationAdapter: Sendable {
         }.sorted { $0.speakerID < $1.speakerID }
         guard embeddings.count == stableIDs.count else { throw Error.noEmbeddings }
 
+        let configurationSnapshot = AppliedConfiguration(
+            knownSpeakerCount: configuration.knownSpeakerCount,
+            clusteringThreshold: diarizerConfiguration.clustering.threshold,
+            embeddingExcludeOverlap: diarizerConfiguration.embedding.excludeOverlap,
+            minimumEmbeddingDurationSeconds: diarizerConfiguration.embedding.minSegmentDurationSeconds,
+            segmentationStepRatio: diarizerConfiguration.segmentation.stepRatio,
+            preserveOverlappingIntervals: !diarizerConfiguration.postProcessing.exclusiveSegments,
+            constrainedAssignment: diarizerConfiguration.clustering.constrainedAssignment,
+            warmStartFa: diarizerConfiguration.clustering.warmStartFa,
+            warmStartFb: diarizerConfiguration.clustering.warmStartFb,
+            maximumVBxIterations: diarizerConfiguration.vbx.maxIterations
+        )
+        let diagnostics = makeDiagnostics(
+            rawResult: rawResult,
+            intervals: intervals,
+            stableIDs: stableIDs
+        )
+
         return Result(
             intervals: intervals,
             embeddings: embeddings,
@@ -203,7 +293,59 @@ public struct OfflineDiarizationAdapter: Sendable {
                     postProcessingSeconds: $0.postProcessingSeconds,
                     totalProcessingSeconds: $0.totalProcessingSeconds
                 )
-            }
+            },
+            engine: Engine(
+                runtime: "FluidAudio \(Self.fluidAudioVersion)",
+                runtimeRevision: Self.fluidAudioRevision,
+                modelRevision: revision
+            ),
+            configuration: configurationSnapshot,
+            clusteringDiagnostics: diagnostics
+        )
+    }
+
+    private func makeDiagnostics(
+        rawResult: DiarizationResult,
+        intervals: [SpeakerInterval],
+        stableIDs: [String: String]
+    ) -> ClusteringDiagnostics {
+        let rawEmbeddingCounts = Dictionary(grouping: rawResult.chunkEmbeddings ?? [], by: \.speakerId)
+            .mapValues(\.count)
+        let intervalGroups = Dictionary(grouping: intervals, by: \.speakerID)
+        let rawIDs = Set(rawEmbeddingCounts.keys).union(stableIDs.keys)
+        let unobservedIDs = Dictionary(uniqueKeysWithValues: rawIDs.sorted().enumerated().map {
+            ($0.element, "unobserved_cluster_\($0.offset + 1)")
+        })
+        let occupancies = rawIDs.map { rawID -> ClusterOccupancy in
+            let clusterID = stableIDs[rawID] ?? unobservedIDs[rawID]!
+            let speakerIntervals = intervalGroups[clusterID] ?? []
+            return ClusterOccupancy(
+                clusterID: clusterID,
+                embeddingCount: rawEmbeddingCounts[rawID, default: 0],
+                intervalCount: speakerIntervals.count,
+                intervalSeconds: speakerIntervals.reduce(0) { $0 + $1.endSeconds - $1.startSeconds }
+            )
+        }.sorted { $0.clusterID < $1.clusterID }
+        let totalEmbeddings = occupancies.reduce(0) { $0 + $1.embeddingCount }
+        let totalIntervalSeconds = occupancies.reduce(0) { $0 + $1.intervalSeconds }
+        let dominantEmbeddingFraction = totalEmbeddings > 0
+            ? Double(occupancies.map(\.embeddingCount).max() ?? 0) / Double(totalEmbeddings)
+            : nil
+        let dominantIntervalFraction = totalIntervalSeconds > 0
+            ? (occupancies.map(\.intervalSeconds).max() ?? 0) / totalIntervalSeconds
+            : nil
+        let appearsCollapsed = occupancies.count >= 2
+            && (dominantEmbeddingFraction ?? 0) >= 0.95
+            && (dominantIntervalFraction ?? 0) >= 0.98
+        return ClusteringDiagnostics(
+            heuristicVersion: "dominant-occupancy-v1",
+            embeddingCount: totalEmbeddings,
+            intervalCount: intervals.count,
+            overlapIntervalCount: intervals.filter(\.overlapsAnotherSpeaker).count,
+            occupancies: occupancies,
+            dominantEmbeddingFraction: dominantEmbeddingFraction,
+            dominantIntervalFraction: dominantIntervalFraction,
+            separationAppearsCollapsed: appearsCollapsed
         )
     }
 

@@ -5,10 +5,10 @@ staged ASR and diarization model assets. This directory holds the notices that
 must ship with the application. They are committed so a fresh checkout has them
 before any package or model download has run.
 
-## FluidAudio 0.12.4
+## FluidAudio 0.15.6
 
 - Upstream: <https://github.com/FluidInference/FluidAudio>
-- Pin: tag `0.12.4`, revision `9830ce835881c0d0d40f90aabfaae3a6da5bebfb`
+- Pin: tag `0.15.6`, revision `4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b`
 - Licence: Apache License 2.0
 - File: `FluidAudio.txt`
 

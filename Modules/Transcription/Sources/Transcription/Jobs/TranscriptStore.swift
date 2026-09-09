@@ -52,11 +52,16 @@ public struct TranscriptStore: Sendable {
         meetingDirectories().flatMap(runs(inMeetingAt:)).sorted { $0.job.createdAt > $1.job.createdAt }
     }
 
-    /// The runs review should show: the newest run per source, so a rerun
-    /// replaces its predecessor in the list without deleting it from the store.
+    /// The runs review should show: the newest completed transcript per source.
+    /// While a reprocess is queued or running, keep its predecessor visible so
+    /// the reviewer can continue using its saved edits; once the new run has a
+    /// transcript it replaces the predecessor in the list without deleting it
+    /// from the store.
     public func latestRunPerSource() -> [StoredTranscriptRun] {
         meetingDirectories().compactMap { meeting in
-            runs(inMeetingAt: meeting).max { $0.job.createdAt < $1.job.createdAt }
+            let runs = runs(inMeetingAt: meeting)
+            return runs.filter { $0.transcript != nil }.max { $0.job.createdAt < $1.job.createdAt }
+                ?? runs.max { $0.job.createdAt < $1.job.createdAt }
         }
         .sorted { $0.job.createdAt > $1.job.createdAt }
     }

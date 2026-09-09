@@ -1,0 +1,1163 @@
+{
+  "schema_version": 1,
+  "reference_sha256": "56d91520a31fa46e4530583834bce485f788764c274085a347944504dc1c22ca",
+  "asr_transcript_sha256": "c8f81ed1a7e6ad27d06a661f2156a4765967bf0d2d44365807678f89fe47db77",
+  "human_audio_annotation": false,
+  "held_out_accuracy_coverage": 0,
+  "runs": [
+    {
+      "recording": "meeting--2419c5a36d92dfa7d7238a81e0b17c4b",
+      "reference_available": false,
+      "source_duration_seconds": 155.277,
+      "source_canonical_revision": 8,
+      "source_canonical_sha256": "9010edbb6097035947b36f55e16c4de97b6a3344f6293c59b8034f3a6d2b1f1e",
+      "audio_sha256": "9bb71c9cfed8af4c4e9e5b9589e7bd2fa4c5b7017409994f19135a1215af177b",
+      "engine": "fluid",
+      "mode": "automatic",
+      "revision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b",
+      "binary_sha256": "292441d5f822b6f614e7f873b3aee50c2e91d4d0cb227b10feb20cb09719983c",
+      "process_wall_seconds": 3.134,
+      "asr": "saved words fixed across engines; historical duration limitations",
+      "words": 212,
+      "unknown_words": 22,
+      "unknown_word_pct": 10.377,
+      "paragraphs": {
+        "segments": 35,
+        "single_word_segments": 16,
+        "median_words": 2
+      },
+      "known_paragraphs": {
+        "segments": 17,
+        "single_word_segments": 2,
+        "median_words": 6
+      },
+      "unknown_paragraphs": {
+        "segments": 18,
+        "single_word_segments": 14,
+        "median_words": 1.0
+      },
+      "legacy_sentence_rows": {
+        "segments": 40,
+        "single_word_segments": 16,
+        "median_words": 2.0
+      },
+      "emitted_speakers": 3,
+      "intervals": 26,
+      "interval_seconds_by_speaker": {
+        "speaker_1": 41.664,
+        "speaker_2": 33.192,
+        "speaker_3": 19.576
+      },
+      "dominant_interval_fraction": 0.441208,
+      "overlap_intervals": 0,
+      "actual_swift_parity": true,
+      "worker_engine": {
+        "modelRevision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594",
+        "runtime": "FluidAudio 0.15.6",
+        "runtimeRevision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b"
+      },
+      "worker_configuration": {
+        "clusteringThreshold": 0.6,
+        "constrainedAssignment": true,
+        "embeddingExcludeOverlap": true,
+        "maximumVBxIterations": 20,
+        "minimumEmbeddingDurationSeconds": 1,
+        "preserveOverlappingIntervals": true,
+        "segmentationStepRatio": 0.2,
+        "warmStartFa": 0.07,
+        "warmStartFb": 0.8
+      },
+      "worker_clusteringDiagnostics": {
+        "dominantEmbeddingFraction": 0.4342105263157895,
+        "dominantIntervalFraction": 0.44120804988698414,
+        "embeddingCount": 76,
+        "heuristicVersion": "dominant-occupancy-v1",
+        "intervalCount": 26,
+        "occupancies": [
+          {
+            "clusterID": "speaker_1",
+            "embeddingCount": 33,
+            "intervalCount": 9,
+            "intervalSeconds": 41.6638320684433
+          },
+          {
+            "clusterID": "speaker_2",
+            "embeddingCount": 26,
+            "intervalCount": 9,
+            "intervalSeconds": 33.191858768463135
+          },
+          {
+            "clusterID": "speaker_3",
+            "embeddingCount": 17,
+            "intervalCount": 8,
+            "intervalSeconds": 19.57556915283203
+          }
+        ],
+        "overlapIntervalCount": 0,
+        "separationAppearsCollapsed": false
+      }
+    },
+    {
+      "recording": "meeting--2419c5a36d92dfa7d7238a81e0b17c4b",
+      "reference_available": false,
+      "source_duration_seconds": 155.277,
+      "source_canonical_revision": 8,
+      "source_canonical_sha256": "9010edbb6097035947b36f55e16c4de97b6a3344f6293c59b8034f3a6d2b1f1e",
+      "audio_sha256": "9bb71c9cfed8af4c4e9e5b9589e7bd2fa4c5b7017409994f19135a1215af177b",
+      "engine": "fluid",
+      "mode": "exact-two",
+      "revision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b",
+      "binary_sha256": "292441d5f822b6f614e7f873b3aee50c2e91d4d0cb227b10feb20cb09719983c",
+      "process_wall_seconds": 1.263,
+      "asr": "saved words fixed across engines; historical duration limitations",
+      "words": 212,
+      "unknown_words": 22,
+      "unknown_word_pct": 10.377,
+      "paragraphs": {
+        "segments": 35,
+        "single_word_segments": 16,
+        "median_words": 2
+      },
+      "known_paragraphs": {
+        "segments": 17,
+        "single_word_segments": 2,
+        "median_words": 6
+      },
+      "unknown_paragraphs": {
+        "segments": 18,
+        "single_word_segments": 14,
+        "median_words": 1.0
+      },
+      "legacy_sentence_rows": {
+        "segments": 40,
+        "single_word_segments": 16,
+        "median_words": 2.0
+      },
+      "emitted_speakers": 2,
+      "intervals": 26,
+      "interval_seconds_by_speaker": {
+        "speaker_1": 41.511,
+        "speaker_2": 52.818
+      },
+      "dominant_interval_fraction": 0.559935,
+      "overlap_intervals": 0,
+      "actual_swift_parity": true,
+      "worker_engine": {
+        "modelRevision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594",
+        "runtime": "FluidAudio 0.15.6",
+        "runtimeRevision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b"
+      },
+      "worker_configuration": {
+        "clusteringThreshold": 0.6,
+        "constrainedAssignment": true,
+        "embeddingExcludeOverlap": true,
+        "knownSpeakerCount": 2,
+        "maximumVBxIterations": 20,
+        "minimumEmbeddingDurationSeconds": 1,
+        "preserveOverlappingIntervals": true,
+        "segmentationStepRatio": 0.2,
+        "warmStartFa": 0.07,
+        "warmStartFb": 0.8
+      },
+      "worker_clusteringDiagnostics": {
+        "dominantEmbeddingFraction": 0.5657894736842105,
+        "dominantIntervalFraction": 0.5599353534462626,
+        "embeddingCount": 76,
+        "heuristicVersion": "dominant-occupancy-v1",
+        "intervalCount": 26,
+        "occupancies": [
+          {
+            "clusterID": "speaker_1",
+            "embeddingCount": 33,
+            "intervalCount": 9,
+            "intervalSeconds": 41.51103079319
+          },
+          {
+            "clusterID": "speaker_2",
+            "embeddingCount": 43,
+            "intervalCount": 17,
+            "intervalSeconds": 52.81836175918579
+          }
+        ],
+        "overlapIntervalCount": 0,
+        "separationAppearsCollapsed": false
+      }
+    },
+    {
+      "recording": "meeting--2419c5a36d92dfa7d7238a81e0b17c4b",
+      "reference_available": false,
+      "source_duration_seconds": 155.277,
+      "source_canonical_revision": 8,
+      "source_canonical_sha256": "9010edbb6097035947b36f55e16c4de97b6a3344f6293c59b8034f3a6d2b1f1e",
+      "audio_sha256": "9bb71c9cfed8af4c4e9e5b9589e7bd2fa4c5b7017409994f19135a1215af177b",
+      "engine": "speakerkit",
+      "mode": "automatic",
+      "revision": "ea872ffd35705aa757f33033500b9b0d40bd38df",
+      "binary_sha256": "d9bec0af35aabfcf2b9a756cab6679945c11c18d57b034bb3b8178b36d0d3da3",
+      "process_wall_seconds": 0.675,
+      "asr": "saved words fixed across engines; historical duration limitations",
+      "words": 212,
+      "unknown_words": 19,
+      "unknown_word_pct": 8.962,
+      "paragraphs": {
+        "segments": 30,
+        "single_word_segments": 12,
+        "median_words": 2.0
+      },
+      "known_paragraphs": {
+        "segments": 15,
+        "single_word_segments": 1,
+        "median_words": 8
+      },
+      "unknown_paragraphs": {
+        "segments": 15,
+        "single_word_segments": 11,
+        "median_words": 1
+      },
+      "legacy_sentence_rows": {
+        "segments": 35,
+        "single_word_segments": 12,
+        "median_words": 2
+      },
+      "emitted_speakers": 3,
+      "intervals": 26,
+      "interval_seconds_by_speaker": {
+        "B": 42.581,
+        "A": 33.292,
+        "C": 21.054
+      },
+      "dominant_interval_fraction": 0.43931,
+      "overlap_intervals": 2,
+      "actual_swift_parity": true
+    },
+    {
+      "recording": "meeting--2419c5a36d92dfa7d7238a81e0b17c4b",
+      "reference_available": false,
+      "source_duration_seconds": 155.277,
+      "source_canonical_revision": 8,
+      "source_canonical_sha256": "9010edbb6097035947b36f55e16c4de97b6a3344f6293c59b8034f3a6d2b1f1e",
+      "audio_sha256": "9bb71c9cfed8af4c4e9e5b9589e7bd2fa4c5b7017409994f19135a1215af177b",
+      "engine": "speakerkit",
+      "mode": "exact-two",
+      "revision": "ea872ffd35705aa757f33033500b9b0d40bd38df",
+      "binary_sha256": "d9bec0af35aabfcf2b9a756cab6679945c11c18d57b034bb3b8178b36d0d3da3",
+      "process_wall_seconds": 0.577,
+      "asr": "saved words fixed across engines; historical duration limitations",
+      "words": 212,
+      "unknown_words": 19,
+      "unknown_word_pct": 8.962,
+      "paragraphs": {
+        "segments": 30,
+        "single_word_segments": 12,
+        "median_words": 2.0
+      },
+      "known_paragraphs": {
+        "segments": 15,
+        "single_word_segments": 1,
+        "median_words": 8
+      },
+      "unknown_paragraphs": {
+        "segments": 15,
+        "single_word_segments": 11,
+        "median_words": 1
+      },
+      "legacy_sentence_rows": {
+        "segments": 35,
+        "single_word_segments": 12,
+        "median_words": 2
+      },
+      "emitted_speakers": 2,
+      "intervals": 26,
+      "interval_seconds_by_speaker": {
+        "A": 42.581,
+        "B": 54.925
+      },
+      "dominant_interval_fraction": 0.563299,
+      "overlap_intervals": 2,
+      "actual_swift_parity": true
+    },
+    {
+      "recording": "meeting--50e77e27064606f264fea516fb3f8ca4",
+      "reference_available": false,
+      "source_duration_seconds": 37.482,
+      "source_canonical_revision": 2,
+      "source_canonical_sha256": "080c68f4419eb90d2d5cfd959c9c9eb4b031de847cc45569c69ab45b5879a1a7",
+      "audio_sha256": "5196ff235307bbafbae95b9be19acbce73b751b3aa4eb3d5012b69f8aa011191",
+      "engine": "fluid",
+      "mode": "automatic",
+      "revision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b",
+      "binary_sha256": "292441d5f822b6f614e7f873b3aee50c2e91d4d0cb227b10feb20cb09719983c",
+      "process_wall_seconds": 0.657,
+      "asr": "saved words fixed across engines; historical duration limitations",
+      "words": 59,
+      "unknown_words": 7,
+      "unknown_word_pct": 11.864,
+      "paragraphs": {
+        "segments": 12,
+        "single_word_segments": 5,
+        "median_words": 3.0
+      },
+      "known_paragraphs": {
+        "segments": 7,
+        "single_word_segments": 1,
+        "median_words": 6
+      },
+      "unknown_paragraphs": {
+        "segments": 5,
+        "single_word_segments": 4,
+        "median_words": 1
+      },
+      "legacy_sentence_rows": {
+        "segments": 15,
+        "single_word_segments": 6,
+        "median_words": 3
+      },
+      "emitted_speakers": 2,
+      "intervals": 7,
+      "interval_seconds_by_speaker": {
+        "speaker_1": 12.394,
+        "speaker_2": 16.723
+      },
+      "dominant_interval_fraction": 0.574344,
+      "overlap_intervals": 2,
+      "actual_swift_parity": true,
+      "worker_engine": {
+        "modelRevision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594",
+        "runtime": "FluidAudio 0.15.6",
+        "runtimeRevision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b"
+      },
+      "worker_configuration": {
+        "clusteringThreshold": 0.6,
+        "constrainedAssignment": true,
+        "embeddingExcludeOverlap": true,
+        "maximumVBxIterations": 20,
+        "minimumEmbeddingDurationSeconds": 1,
+        "preserveOverlappingIntervals": true,
+        "segmentationStepRatio": 0.2,
+        "warmStartFa": 0.07,
+        "warmStartFb": 0.8
+      },
+      "worker_clusteringDiagnostics": {
+        "dominantEmbeddingFraction": 0.5652173913043478,
+        "dominantIntervalFraction": 0.5743440480554816,
+        "embeddingCount": 23,
+        "heuristicVersion": "dominant-occupancy-v1",
+        "intervalCount": 7,
+        "occupancies": [
+          {
+            "clusterID": "speaker_1",
+            "embeddingCount": 10,
+            "intervalCount": 3,
+            "intervalSeconds": 12.393887519836426
+          },
+          {
+            "clusterID": "speaker_2",
+            "embeddingCount": 13,
+            "intervalCount": 4,
+            "intervalSeconds": 16.7232608795166
+          }
+        ],
+        "overlapIntervalCount": 2,
+        "separationAppearsCollapsed": false
+      }
+    },
+    {
+      "recording": "meeting--50e77e27064606f264fea516fb3f8ca4",
+      "reference_available": false,
+      "source_duration_seconds": 37.482,
+      "source_canonical_revision": 2,
+      "source_canonical_sha256": "080c68f4419eb90d2d5cfd959c9c9eb4b031de847cc45569c69ab45b5879a1a7",
+      "audio_sha256": "5196ff235307bbafbae95b9be19acbce73b751b3aa4eb3d5012b69f8aa011191",
+      "engine": "fluid",
+      "mode": "exact-two",
+      "revision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b",
+      "binary_sha256": "292441d5f822b6f614e7f873b3aee50c2e91d4d0cb227b10feb20cb09719983c",
+      "process_wall_seconds": 0.666,
+      "asr": "saved words fixed across engines; historical duration limitations",
+      "words": 59,
+      "unknown_words": 7,
+      "unknown_word_pct": 11.864,
+      "paragraphs": {
+        "segments": 12,
+        "single_word_segments": 5,
+        "median_words": 3.0
+      },
+      "known_paragraphs": {
+        "segments": 7,
+        "single_word_segments": 1,
+        "median_words": 6
+      },
+      "unknown_paragraphs": {
+        "segments": 5,
+        "single_word_segments": 4,
+        "median_words": 1
+      },
+      "legacy_sentence_rows": {
+        "segments": 15,
+        "single_word_segments": 6,
+        "median_words": 3
+      },
+      "emitted_speakers": 2,
+      "intervals": 7,
+      "interval_seconds_by_speaker": {
+        "speaker_1": 12.394,
+        "speaker_2": 16.723
+      },
+      "dominant_interval_fraction": 0.574344,
+      "overlap_intervals": 2,
+      "actual_swift_parity": true,
+      "worker_engine": {
+        "modelRevision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594",
+        "runtime": "FluidAudio 0.15.6",
+        "runtimeRevision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b"
+      },
+      "worker_configuration": {
+        "clusteringThreshold": 0.6,
+        "constrainedAssignment": true,
+        "embeddingExcludeOverlap": true,
+        "knownSpeakerCount": 2,
+        "maximumVBxIterations": 20,
+        "minimumEmbeddingDurationSeconds": 1,
+        "preserveOverlappingIntervals": true,
+        "segmentationStepRatio": 0.2,
+        "warmStartFa": 0.07,
+        "warmStartFb": 0.8
+      },
+      "worker_clusteringDiagnostics": {
+        "dominantEmbeddingFraction": 0.5652173913043478,
+        "dominantIntervalFraction": 0.5743440480554816,
+        "embeddingCount": 23,
+        "heuristicVersion": "dominant-occupancy-v1",
+        "intervalCount": 7,
+        "occupancies": [
+          {
+            "clusterID": "speaker_1",
+            "embeddingCount": 10,
+            "intervalCount": 3,
+            "intervalSeconds": 12.393887519836426
+          },
+          {
+            "clusterID": "speaker_2",
+            "embeddingCount": 13,
+            "intervalCount": 4,
+            "intervalSeconds": 16.7232608795166
+          }
+        ],
+        "overlapIntervalCount": 2,
+        "separationAppearsCollapsed": false
+      }
+    },
+    {
+      "recording": "meeting--50e77e27064606f264fea516fb3f8ca4",
+      "reference_available": false,
+      "source_duration_seconds": 37.482,
+      "source_canonical_revision": 2,
+      "source_canonical_sha256": "080c68f4419eb90d2d5cfd959c9c9eb4b031de847cc45569c69ab45b5879a1a7",
+      "audio_sha256": "5196ff235307bbafbae95b9be19acbce73b751b3aa4eb3d5012b69f8aa011191",
+      "engine": "speakerkit",
+      "mode": "automatic",
+      "revision": "ea872ffd35705aa757f33033500b9b0d40bd38df",
+      "binary_sha256": "d9bec0af35aabfcf2b9a756cab6679945c11c18d57b034bb3b8178b36d0d3da3",
+      "process_wall_seconds": 0.386,
+      "asr": "saved words fixed across engines; historical duration limitations",
+      "words": 59,
+      "unknown_words": 8,
+      "unknown_word_pct": 13.559,
+      "paragraphs": {
+        "segments": 15,
+        "single_word_segments": 7,
+        "median_words": 3
+      },
+      "known_paragraphs": {
+        "segments": 9,
+        "single_word_segments": 2,
+        "median_words": 6
+      },
+      "unknown_paragraphs": {
+        "segments": 6,
+        "single_word_segments": 5,
+        "median_words": 1.0
+      },
+      "legacy_sentence_rows": {
+        "segments": 17,
+        "single_word_segments": 8,
+        "median_words": 2
+      },
+      "emitted_speakers": 4,
+      "intervals": 9,
+      "interval_seconds_by_speaker": {
+        "B": 10.272,
+        "A": 13.175,
+        "C": 3.752,
+        "D": 2.19
+      },
+      "dominant_interval_fraction": 0.448297,
+      "overlap_intervals": 4,
+      "actual_swift_parity": true
+    },
+    {
+      "recording": "meeting--50e77e27064606f264fea516fb3f8ca4",
+      "reference_available": false,
+      "source_duration_seconds": 37.482,
+      "source_canonical_revision": 2,
+      "source_canonical_sha256": "080c68f4419eb90d2d5cfd959c9c9eb4b031de847cc45569c69ab45b5879a1a7",
+      "audio_sha256": "5196ff235307bbafbae95b9be19acbce73b751b3aa4eb3d5012b69f8aa011191",
+      "engine": "speakerkit",
+      "mode": "exact-two",
+      "revision": "ea872ffd35705aa757f33033500b9b0d40bd38df",
+      "binary_sha256": "d9bec0af35aabfcf2b9a756cab6679945c11c18d57b034bb3b8178b36d0d3da3",
+      "process_wall_seconds": 0.377,
+      "asr": "saved words fixed across engines; historical duration limitations",
+      "words": 59,
+      "unknown_words": 8,
+      "unknown_word_pct": 13.559,
+      "paragraphs": {
+        "segments": 13,
+        "single_word_segments": 7,
+        "median_words": 1
+      },
+      "known_paragraphs": {
+        "segments": 7,
+        "single_word_segments": 2,
+        "median_words": 6
+      },
+      "unknown_paragraphs": {
+        "segments": 6,
+        "single_word_segments": 5,
+        "median_words": 1.0
+      },
+      "legacy_sentence_rows": {
+        "segments": 17,
+        "single_word_segments": 8,
+        "median_words": 2
+      },
+      "emitted_speakers": 2,
+      "intervals": 8,
+      "interval_seconds_by_speaker": {
+        "A": 16.351,
+        "B": 13.175
+      },
+      "dominant_interval_fraction": 0.553783,
+      "overlap_intervals": 4,
+      "actual_swift_parity": true
+    },
+    {
+      "recording": "meeting--53d2add96b6032cb20a6f729be056a82",
+      "reference_available": false,
+      "source_duration_seconds": 7.827,
+      "source_canonical_revision": 5,
+      "source_canonical_sha256": "38f6e8a933879589418030b1ea22cee20d0a74418ef0d9043bb47317ccc41449",
+      "audio_sha256": "118040463ea19d2f022bb498075f2ea30645ecffe1f9771c4953d0efc6864d24",
+      "engine": "fluid",
+      "mode": "automatic",
+      "revision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b",
+      "binary_sha256": "292441d5f822b6f614e7f873b3aee50c2e91d4d0cb227b10feb20cb09719983c",
+      "process_wall_seconds": 0.4,
+      "asr": "saved words fixed across engines; historical duration limitations",
+      "words": 14,
+      "unknown_words": 1,
+      "unknown_word_pct": 7.143,
+      "paragraphs": {
+        "segments": 2,
+        "single_word_segments": 1,
+        "median_words": 7.0
+      },
+      "known_paragraphs": {
+        "segments": 1,
+        "single_word_segments": 0,
+        "median_words": 13
+      },
+      "unknown_paragraphs": {
+        "segments": 1,
+        "single_word_segments": 1,
+        "median_words": 1
+      },
+      "legacy_sentence_rows": {
+        "segments": 3,
+        "single_word_segments": 1,
+        "median_words": 4
+      },
+      "emitted_speakers": 1,
+      "intervals": 1,
+      "interval_seconds_by_speaker": {
+        "speaker_1": 5.263
+      },
+      "dominant_interval_fraction": 1.0,
+      "overlap_intervals": 0,
+      "actual_swift_parity": true,
+      "worker_engine": {
+        "modelRevision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594",
+        "runtime": "FluidAudio 0.15.6",
+        "runtimeRevision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b"
+      },
+      "worker_configuration": {
+        "clusteringThreshold": 0.6,
+        "constrainedAssignment": true,
+        "embeddingExcludeOverlap": true,
+        "maximumVBxIterations": 20,
+        "minimumEmbeddingDurationSeconds": 1,
+        "preserveOverlappingIntervals": true,
+        "segmentationStepRatio": 0.2,
+        "warmStartFa": 0.07,
+        "warmStartFb": 0.8
+      },
+      "worker_clusteringDiagnostics": {
+        "dominantEmbeddingFraction": 0.6666666666666666,
+        "dominantIntervalFraction": 1,
+        "embeddingCount": 3,
+        "heuristicVersion": "dominant-occupancy-v1",
+        "intervalCount": 1,
+        "occupancies": [
+          {
+            "clusterID": "speaker_1",
+            "embeddingCount": 2,
+            "intervalCount": 1,
+            "intervalSeconds": 5.263157844543457
+          },
+          {
+            "clusterID": "unobserved_cluster_2",
+            "embeddingCount": 1,
+            "intervalCount": 0,
+            "intervalSeconds": 0
+          }
+        ],
+        "overlapIntervalCount": 0,
+        "separationAppearsCollapsed": false
+      }
+    },
+    {
+      "recording": "meeting--53d2add96b6032cb20a6f729be056a82",
+      "reference_available": false,
+      "source_duration_seconds": 7.827,
+      "source_canonical_revision": 5,
+      "source_canonical_sha256": "38f6e8a933879589418030b1ea22cee20d0a74418ef0d9043bb47317ccc41449",
+      "audio_sha256": "118040463ea19d2f022bb498075f2ea30645ecffe1f9771c4953d0efc6864d24",
+      "engine": "fluid",
+      "mode": "exact-two",
+      "revision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b",
+      "binary_sha256": "292441d5f822b6f614e7f873b3aee50c2e91d4d0cb227b10feb20cb09719983c",
+      "process_wall_seconds": 0.402,
+      "asr": "saved words fixed across engines; historical duration limitations",
+      "words": 14,
+      "unknown_words": 1,
+      "unknown_word_pct": 7.143,
+      "paragraphs": {
+        "segments": 2,
+        "single_word_segments": 1,
+        "median_words": 7.0
+      },
+      "known_paragraphs": {
+        "segments": 1,
+        "single_word_segments": 0,
+        "median_words": 13
+      },
+      "unknown_paragraphs": {
+        "segments": 1,
+        "single_word_segments": 1,
+        "median_words": 1
+      },
+      "legacy_sentence_rows": {
+        "segments": 3,
+        "single_word_segments": 1,
+        "median_words": 4
+      },
+      "emitted_speakers": 1,
+      "intervals": 1,
+      "interval_seconds_by_speaker": {
+        "speaker_1": 5.263
+      },
+      "dominant_interval_fraction": 1.0,
+      "overlap_intervals": 0,
+      "actual_swift_parity": true,
+      "worker_engine": {
+        "modelRevision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594",
+        "runtime": "FluidAudio 0.15.6",
+        "runtimeRevision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b"
+      },
+      "worker_configuration": {
+        "clusteringThreshold": 0.6,
+        "constrainedAssignment": true,
+        "embeddingExcludeOverlap": true,
+        "knownSpeakerCount": 2,
+        "maximumVBxIterations": 20,
+        "minimumEmbeddingDurationSeconds": 1,
+        "preserveOverlappingIntervals": true,
+        "segmentationStepRatio": 0.2,
+        "warmStartFa": 0.07,
+        "warmStartFb": 0.8
+      },
+      "worker_clusteringDiagnostics": {
+        "dominantEmbeddingFraction": 0.6666666666666666,
+        "dominantIntervalFraction": 1,
+        "embeddingCount": 3,
+        "heuristicVersion": "dominant-occupancy-v1",
+        "intervalCount": 1,
+        "occupancies": [
+          {
+            "clusterID": "speaker_1",
+            "embeddingCount": 2,
+            "intervalCount": 1,
+            "intervalSeconds": 5.263157844543457
+          },
+          {
+            "clusterID": "unobserved_cluster_2",
+            "embeddingCount": 1,
+            "intervalCount": 0,
+            "intervalSeconds": 0
+          }
+        ],
+        "overlapIntervalCount": 0,
+        "separationAppearsCollapsed": false
+      }
+    },
+    {
+      "recording": "meeting--53d2add96b6032cb20a6f729be056a82",
+      "reference_available": false,
+      "source_duration_seconds": 7.827,
+      "source_canonical_revision": 5,
+      "source_canonical_sha256": "38f6e8a933879589418030b1ea22cee20d0a74418ef0d9043bb47317ccc41449",
+      "audio_sha256": "118040463ea19d2f022bb498075f2ea30645ecffe1f9771c4953d0efc6864d24",
+      "engine": "speakerkit",
+      "mode": "automatic",
+      "revision": "ea872ffd35705aa757f33033500b9b0d40bd38df",
+      "binary_sha256": "d9bec0af35aabfcf2b9a756cab6679945c11c18d57b034bb3b8178b36d0d3da3",
+      "process_wall_seconds": 0.309,
+      "asr": "saved words fixed across engines; historical duration limitations",
+      "words": 14,
+      "unknown_words": 1,
+      "unknown_word_pct": 7.143,
+      "paragraphs": {
+        "segments": 2,
+        "single_word_segments": 1,
+        "median_words": 7.0
+      },
+      "known_paragraphs": {
+        "segments": 1,
+        "single_word_segments": 0,
+        "median_words": 13
+      },
+      "unknown_paragraphs": {
+        "segments": 1,
+        "single_word_segments": 1,
+        "median_words": 1
+      },
+      "legacy_sentence_rows": {
+        "segments": 3,
+        "single_word_segments": 1,
+        "median_words": 4
+      },
+      "emitted_speakers": 1,
+      "intervals": 1,
+      "interval_seconds_by_speaker": {
+        "A": 5.28
+      },
+      "dominant_interval_fraction": 1.0,
+      "overlap_intervals": 0,
+      "actual_swift_parity": true
+    },
+    {
+      "recording": "meeting--53d2add96b6032cb20a6f729be056a82",
+      "reference_available": false,
+      "source_duration_seconds": 7.827,
+      "source_canonical_revision": 5,
+      "source_canonical_sha256": "38f6e8a933879589418030b1ea22cee20d0a74418ef0d9043bb47317ccc41449",
+      "audio_sha256": "118040463ea19d2f022bb498075f2ea30645ecffe1f9771c4953d0efc6864d24",
+      "engine": "speakerkit",
+      "mode": "exact-two",
+      "revision": "ea872ffd35705aa757f33033500b9b0d40bd38df",
+      "binary_sha256": "d9bec0af35aabfcf2b9a756cab6679945c11c18d57b034bb3b8178b36d0d3da3",
+      "process_wall_seconds": 0.3,
+      "asr": "saved words fixed across engines; historical duration limitations",
+      "words": 14,
+      "unknown_words": 1,
+      "unknown_word_pct": 7.143,
+      "paragraphs": {
+        "segments": 2,
+        "single_word_segments": 1,
+        "median_words": 7.0
+      },
+      "known_paragraphs": {
+        "segments": 1,
+        "single_word_segments": 0,
+        "median_words": 13
+      },
+      "unknown_paragraphs": {
+        "segments": 1,
+        "single_word_segments": 1,
+        "median_words": 1
+      },
+      "legacy_sentence_rows": {
+        "segments": 3,
+        "single_word_segments": 1,
+        "median_words": 4
+      },
+      "emitted_speakers": 1,
+      "intervals": 1,
+      "interval_seconds_by_speaker": {
+        "A": 5.28
+      },
+      "dominant_interval_fraction": 1.0,
+      "overlap_intervals": 0,
+      "actual_swift_parity": true
+    },
+    {
+      "recording": "meeting--817e841cbedcb1d46484bd9eaa4dca44",
+      "reference_available": true,
+      "source_duration_seconds": 3487.171,
+      "source_canonical_revision": 29,
+      "source_canonical_sha256": "3adb782ba530ed578a575a0e4e6e1e2e37eb7cc48cb36581776be7a842075df3",
+      "audio_sha256": "b39e5539f81fb62da681e645008aa67e71b62dd0855e3a6b76bbfacc0d2cb861",
+      "engine": "fluid",
+      "mode": "automatic",
+      "revision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b",
+      "binary_sha256": "292441d5f822b6f614e7f873b3aee50c2e91d4d0cb227b10feb20cb09719983c",
+      "process_wall_seconds": 17.308,
+      "asr": "fresh FluidAudio 0.15.6 fixed across engines",
+      "words": 9657,
+      "unknown_words": 813,
+      "unknown_word_pct": 8.419,
+      "paragraphs": {
+        "segments": 1032,
+        "single_word_segments": 401,
+        "median_words": 2.5
+      },
+      "known_paragraphs": {
+        "segments": 483,
+        "single_word_segments": 9,
+        "median_words": 15
+      },
+      "unknown_paragraphs": {
+        "segments": 549,
+        "single_word_segments": 392,
+        "median_words": 1
+      },
+      "legacy_sentence_rows": {
+        "segments": 1343,
+        "single_word_segments": 486,
+        "median_words": 3
+      },
+      "emitted_speakers": 2,
+      "intervals": 606,
+      "interval_seconds_by_speaker": {
+        "speaker_1": 1239.711,
+        "speaker_2": 1392.648
+      },
+      "dominant_interval_fraction": 0.52905,
+      "overlap_intervals": 13,
+      "actual_swift_parity": true,
+      "worker_engine": {
+        "modelRevision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594",
+        "runtime": "FluidAudio 0.15.6",
+        "runtimeRevision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b"
+      },
+      "worker_configuration": {
+        "clusteringThreshold": 0.6,
+        "constrainedAssignment": true,
+        "embeddingExcludeOverlap": true,
+        "maximumVBxIterations": 20,
+        "minimumEmbeddingDurationSeconds": 1,
+        "preserveOverlappingIntervals": true,
+        "segmentationStepRatio": 0.2,
+        "warmStartFa": 0.07,
+        "warmStartFb": 0.8
+      },
+      "worker_clusteringDiagnostics": {
+        "dominantEmbeddingFraction": 0.5032715376226826,
+        "dominantIntervalFraction": 0.5290495573166054,
+        "embeddingCount": 1834,
+        "heuristicVersion": "dominant-occupancy-v1",
+        "intervalCount": 606,
+        "occupancies": [
+          {
+            "clusterID": "speaker_1",
+            "embeddingCount": 911,
+            "intervalCount": 331,
+            "intervalSeconds": 1239.7105255126953
+          },
+          {
+            "clusterID": "speaker_2",
+            "embeddingCount": 923,
+            "intervalCount": 275,
+            "intervalSeconds": 1392.6482391357422
+          }
+        ],
+        "overlapIntervalCount": 13,
+        "separationAppearsCollapsed": false
+      },
+      "proxy": {
+        "metric": "exact-matched-text reference agreement proxy, not DER/WDER or human ground truth",
+        "matched_tokens": 9287,
+        "hypothesis_tokens": 9657,
+        "reference_tokens": 9543,
+        "unmatched_hypothesis_tokens": 370,
+        "unmatched_reference_tokens": 256,
+        "words_without_matched_tokens": 370,
+        "hypothesis_coverage_pct": 96.169,
+        "reference_coverage_pct": 97.317,
+        "agreement_pct": 91.257,
+        "unknown_pct": 7.796,
+        "wrong_speaker_pct": 0.948,
+        "matched_correct": 8475,
+        "matched_unknown": 724,
+        "matched_wrong": 88
+      },
+      "timing": {
+        "first_word_ms": 67760,
+        "last_word_end_ms": 3481520,
+        "longest_word_ms": 1760,
+        "words_over_one_second": 28,
+        "adjacent_gaps_at_least_one_second": 168
+      }
+    },
+    {
+      "recording": "meeting--817e841cbedcb1d46484bd9eaa4dca44",
+      "reference_available": true,
+      "source_duration_seconds": 3487.171,
+      "source_canonical_revision": 29,
+      "source_canonical_sha256": "3adb782ba530ed578a575a0e4e6e1e2e37eb7cc48cb36581776be7a842075df3",
+      "audio_sha256": "b39e5539f81fb62da681e645008aa67e71b62dd0855e3a6b76bbfacc0d2cb861",
+      "engine": "fluid",
+      "mode": "exact-two",
+      "revision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b",
+      "binary_sha256": "292441d5f822b6f614e7f873b3aee50c2e91d4d0cb227b10feb20cb09719983c",
+      "process_wall_seconds": 17.305,
+      "asr": "fresh FluidAudio 0.15.6 fixed across engines",
+      "words": 9657,
+      "unknown_words": 813,
+      "unknown_word_pct": 8.419,
+      "paragraphs": {
+        "segments": 1032,
+        "single_word_segments": 401,
+        "median_words": 2.5
+      },
+      "known_paragraphs": {
+        "segments": 483,
+        "single_word_segments": 9,
+        "median_words": 15
+      },
+      "unknown_paragraphs": {
+        "segments": 549,
+        "single_word_segments": 392,
+        "median_words": 1
+      },
+      "legacy_sentence_rows": {
+        "segments": 1343,
+        "single_word_segments": 486,
+        "median_words": 3
+      },
+      "emitted_speakers": 2,
+      "intervals": 606,
+      "interval_seconds_by_speaker": {
+        "speaker_1": 1239.711,
+        "speaker_2": 1392.648
+      },
+      "dominant_interval_fraction": 0.52905,
+      "overlap_intervals": 13,
+      "actual_swift_parity": true,
+      "worker_engine": {
+        "modelRevision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594",
+        "runtime": "FluidAudio 0.15.6",
+        "runtimeRevision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b"
+      },
+      "worker_configuration": {
+        "clusteringThreshold": 0.6,
+        "constrainedAssignment": true,
+        "embeddingExcludeOverlap": true,
+        "knownSpeakerCount": 2,
+        "maximumVBxIterations": 20,
+        "minimumEmbeddingDurationSeconds": 1,
+        "preserveOverlappingIntervals": true,
+        "segmentationStepRatio": 0.2,
+        "warmStartFa": 0.07,
+        "warmStartFb": 0.8
+      },
+      "worker_clusteringDiagnostics": {
+        "dominantEmbeddingFraction": 0.5032715376226826,
+        "dominantIntervalFraction": 0.5290495573166054,
+        "embeddingCount": 1834,
+        "heuristicVersion": "dominant-occupancy-v1",
+        "intervalCount": 606,
+        "occupancies": [
+          {
+            "clusterID": "speaker_1",
+            "embeddingCount": 911,
+            "intervalCount": 331,
+            "intervalSeconds": 1239.7105255126953
+          },
+          {
+            "clusterID": "speaker_2",
+            "embeddingCount": 923,
+            "intervalCount": 275,
+            "intervalSeconds": 1392.6482391357422
+          }
+        ],
+        "overlapIntervalCount": 13,
+        "separationAppearsCollapsed": false
+      },
+      "proxy": {
+        "metric": "exact-matched-text reference agreement proxy, not DER/WDER or human ground truth",
+        "matched_tokens": 9287,
+        "hypothesis_tokens": 9657,
+        "reference_tokens": 9543,
+        "unmatched_hypothesis_tokens": 370,
+        "unmatched_reference_tokens": 256,
+        "words_without_matched_tokens": 370,
+        "hypothesis_coverage_pct": 96.169,
+        "reference_coverage_pct": 97.317,
+        "agreement_pct": 91.257,
+        "unknown_pct": 7.796,
+        "wrong_speaker_pct": 0.948,
+        "matched_correct": 8475,
+        "matched_unknown": 724,
+        "matched_wrong": 88
+      },
+      "timing": {
+        "first_word_ms": 67760,
+        "last_word_end_ms": 3481520,
+        "longest_word_ms": 1760,
+        "words_over_one_second": 28,
+        "adjacent_gaps_at_least_one_second": 168
+      }
+    },
+    {
+      "recording": "meeting--817e841cbedcb1d46484bd9eaa4dca44",
+      "reference_available": true,
+      "source_duration_seconds": 3487.171,
+      "source_canonical_revision": 29,
+      "source_canonical_sha256": "3adb782ba530ed578a575a0e4e6e1e2e37eb7cc48cb36581776be7a842075df3",
+      "audio_sha256": "b39e5539f81fb62da681e645008aa67e71b62dd0855e3a6b76bbfacc0d2cb861",
+      "engine": "speakerkit",
+      "mode": "automatic",
+      "revision": "ea872ffd35705aa757f33033500b9b0d40bd38df",
+      "binary_sha256": "d9bec0af35aabfcf2b9a756cab6679945c11c18d57b034bb3b8178b36d0d3da3",
+      "process_wall_seconds": 9.023,
+      "asr": "fresh FluidAudio 0.15.6 fixed across engines",
+      "words": 9657,
+      "unknown_words": 511,
+      "unknown_word_pct": 5.291,
+      "paragraphs": {
+        "segments": 988,
+        "single_word_segments": 446,
+        "median_words": 2.0
+      },
+      "known_paragraphs": {
+        "segments": 560,
+        "single_word_segments": 80,
+        "median_words": 12.5
+      },
+      "unknown_paragraphs": {
+        "segments": 428,
+        "single_word_segments": 366,
+        "median_words": 1.0
+      },
+      "legacy_sentence_rows": {
+        "segments": 1329,
+        "single_word_segments": 552,
+        "median_words": 2
+      },
+      "emitted_speakers": 2,
+      "intervals": 872,
+      "interval_seconds_by_speaker": {
+        "A": 1346.043,
+        "B": 1500.126
+      },
+      "dominant_interval_fraction": 0.527068,
+      "overlap_intervals": 226,
+      "actual_swift_parity": true,
+      "proxy": {
+        "metric": "exact-matched-text reference agreement proxy, not DER/WDER or human ground truth",
+        "matched_tokens": 9287,
+        "hypothesis_tokens": 9657,
+        "reference_tokens": 9543,
+        "unmatched_hypothesis_tokens": 370,
+        "unmatched_reference_tokens": 256,
+        "words_without_matched_tokens": 370,
+        "hypothesis_coverage_pct": 96.169,
+        "reference_coverage_pct": 97.317,
+        "agreement_pct": 94.304,
+        "unknown_pct": 4.932,
+        "wrong_speaker_pct": 0.765,
+        "matched_correct": 8758,
+        "matched_unknown": 458,
+        "matched_wrong": 71
+      },
+      "timing": {
+        "first_word_ms": 67760,
+        "last_word_end_ms": 3481520,
+        "longest_word_ms": 1760,
+        "words_over_one_second": 28,
+        "adjacent_gaps_at_least_one_second": 168
+      }
+    },
+    {
+      "recording": "meeting--817e841cbedcb1d46484bd9eaa4dca44",
+      "reference_available": true,
+      "source_duration_seconds": 3487.171,
+      "source_canonical_revision": 29,
+      "source_canonical_sha256": "3adb782ba530ed578a575a0e4e6e1e2e37eb7cc48cb36581776be7a842075df3",
+      "audio_sha256": "b39e5539f81fb62da681e645008aa67e71b62dd0855e3a6b76bbfacc0d2cb861",
+      "engine": "speakerkit",
+      "mode": "exact-two",
+      "revision": "ea872ffd35705aa757f33033500b9b0d40bd38df",
+      "binary_sha256": "d9bec0af35aabfcf2b9a756cab6679945c11c18d57b034bb3b8178b36d0d3da3",
+      "process_wall_seconds": 8.273,
+      "asr": "fresh FluidAudio 0.15.6 fixed across engines",
+      "words": 9657,
+      "unknown_words": 511,
+      "unknown_word_pct": 5.291,
+      "paragraphs": {
+        "segments": 988,
+        "single_word_segments": 446,
+        "median_words": 2.0
+      },
+      "known_paragraphs": {
+        "segments": 560,
+        "single_word_segments": 80,
+        "median_words": 12.5
+      },
+      "unknown_paragraphs": {
+        "segments": 428,
+        "single_word_segments": 366,
+        "median_words": 1.0
+      },
+      "legacy_sentence_rows": {
+        "segments": 1329,
+        "single_word_segments": 552,
+        "median_words": 2
+      },
+      "emitted_speakers": 2,
+      "intervals": 872,
+      "interval_seconds_by_speaker": {
+        "A": 1346.043,
+        "B": 1500.126
+      },
+      "dominant_interval_fraction": 0.527068,
+      "overlap_intervals": 226,
+      "actual_swift_parity": true,
+      "proxy": {
+        "metric": "exact-matched-text reference agreement proxy, not DER/WDER or human ground truth",
+        "matched_tokens": 9287,
+        "hypothesis_tokens": 9657,
+        "reference_tokens": 9543,
+        "unmatched_hypothesis_tokens": 370,
+        "unmatched_reference_tokens": 256,
+        "words_without_matched_tokens": 370,
+        "hypothesis_coverage_pct": 96.169,
+        "reference_coverage_pct": 97.317,
+        "agreement_pct": 94.304,
+        "unknown_pct": 4.932,
+        "wrong_speaker_pct": 0.765,
+        "matched_correct": 8758,
+        "matched_unknown": 458,
+        "matched_wrong": 71
+      },
+      "timing": {
+        "first_word_ms": 67760,
+        "last_word_end_ms": 3481520,
+        "longest_word_ms": 1760,
+        "words_over_one_second": 28,
+        "adjacent_gaps_at_least_one_second": 168
+      }
+    }
+  ]
+}

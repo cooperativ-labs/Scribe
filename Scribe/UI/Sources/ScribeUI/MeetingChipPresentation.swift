@@ -73,11 +73,21 @@ public enum MeetingChipPresentation: Equatable, Sendable {
 
     public var isVisible: Bool { self != .hidden }
 
+    /// How long the transport stays on screen once a recording has started.
+    ///
+    /// The chip's job while recording is to confirm that capture began, not to
+    /// hover over the call for its whole length. It says so and then gets out of
+    /// the way; from there the red dot beside the menu bar icon is what says a
+    /// recording is running, and the menu is where the transport lives.
+    public static let sessionVisibleDuration: TimeInterval = 3
+
     /// Derives what the chip shows.
     ///
-    /// Two rules decide this. A live capture takes precedence over an offer —
+    /// Three rules decide this. A live capture takes precedence over an offer —
     /// once recording starts the chip becomes the transport for it, so the
-    /// person who said yes is never asked again. And the chip stays out of the
+    /// person who said yes is never asked again. That transport is temporary:
+    /// `sessionVisibleDuration` into the recording it withdraws, leaving the
+    /// menu bar to report the running capture. And the chip stays out of the
     /// way otherwise: no call, a dismissed one, or permissions that would make
     /// Record fail all leave it hidden rather than showing a control that
     /// cannot work.
@@ -107,6 +117,14 @@ public enum MeetingChipPresentation: Equatable, Sendable {
             // `.starting` has no activity yet; the clock reads zero rather than
             // the chip flickering between two shapes a moment apart.
             let elapsed = snapshot.state.activity?.elapsed(at: date) ?? 0
+            // Past the window the chip withdraws for the rest of the recording.
+            // Measured from the recording itself rather than from when the chip
+            // appeared, so a call noticed midway through a capture that is
+            // already running does not put the transport back on screen.
+            guard elapsed < Self.sessionVisibleDuration else {
+                self = .hidden
+                return
+            }
             self = .session(Session(
                 elapsedText: MenuPresentation.elapsedText(elapsed),
                 isPaused: snapshot.state.isPaused,

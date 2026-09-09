@@ -150,16 +150,11 @@ public final class MeetingChipModel: ObservableObject {
         refreshPresentation()
     }
 
-    /// Copies the elapsed figure currently on the chip, for pasting into notes.
-    public func copyTimestamp() {
-        guard case .session = presentation else { return }
-        coordinator.submit(.copyTimestamp)
-    }
-
     // MARK: Elapsed time
 
     /// The clock runs only while the chip is showing one, so a hidden chip costs
-    /// nothing.
+    /// nothing — and the chip shows a session for three seconds, so this ticks
+    /// for about that long per recording.
     private func updateElapsedTimeTicker() {
         guard case .session = presentation else {
             elapsedTimeTicker?.invalidate()
@@ -170,7 +165,12 @@ public final class MeetingChipModel: ObservableObject {
         // Added to the main run loop, so the block always runs on the main actor.
         // It holds the model weakly and is retired as soon as the chip stops
         // showing a session, which is the only time it can be running.
-        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+        //
+        // Faster than the once-a-second the clock itself needs: the same tick
+        // decides when the three-second window is up, and a whole second of
+        // slop there is the difference between the chip leaving on time and
+        // outstaying its welcome by a third.
+        let timer = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.refreshPresentation() }
         }
         RunLoop.main.add(timer, forMode: .common)

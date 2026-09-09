@@ -45,7 +45,7 @@ final class SpeakerTurnBuilderTests: XCTestCase {
         XCTAssertEqual(result.segments.map(\.speakerID), ["speaker_1", "speaker_2"])
     }
 
-    func testPauseAndSentenceBoundaryRetainSourceTimestamps() throws {
+    func testPauseSplitsAndPunctuationDoesNot() throws {
         let result = try SpeakerTurnBuilder().build(
             words: [
                 word("one", "Hello.", 0, 250), word("two", "After", 300, 550), word("three", "pause", 1_550, 1_800),
@@ -53,8 +53,9 @@ final class SpeakerTurnBuilderTests: XCTestCase {
             diarizedTurns: [turn("A", 0, 2_000)]
         )
 
-        XCTAssertEqual(result.segments.map(\.startMs), [0, 300, 1_550])
-        XCTAssertEqual(result.segments.map(\.endMs), [250, 550, 1_800])
+        XCTAssertEqual(result.segments.map(\.text), ["Hello. After", "pause"])
+        XCTAssertEqual(result.segments.map(\.startMs), [0, 1_550])
+        XCTAssertEqual(result.segments.map(\.endMs), [550, 1_800])
     }
 
     func testLongRunsCapAtWordBoundary() throws {

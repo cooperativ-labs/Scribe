@@ -1,4 +1,5 @@
 import Foundation
+import ScribeAppCore
 import XCTest
 @testable import Transcription
 
@@ -217,6 +218,26 @@ final class TranscriptViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.speakerActionMessage?.text.hasPrefix("Could not delete") == true)
     }
 
+    func testReprocessSendsTheSelectedExactCountToTheHostWithoutEditingTheTranscript() async throws {
+        let transcript = try fixture(named: "two-speakers")
+        let file = TranscriptReviewFile(
+            id: "revision-29-run",
+            sourceSnapshotURL: URL(fileURLWithPath: "/tmp/investigation.flac"),
+            transcript: transcript,
+            jobState: .complete
+        )
+        let reprocessor = ReprocessorSpy()
+        let viewModel = TranscriptViewModel(files: [file], playback: PlaybackSpy(), reprocessor: reprocessor)
+
+        await viewModel.reprocess(speakerCount: .known(2))
+
+        XCTAssertEqual(reprocessor.requests.count, 1)
+        XCTAssertEqual(reprocessor.requests.first?.0, file.id)
+        XCTAssertEqual(reprocessor.requests.first?.1, .known(2))
+        XCTAssertEqual(viewModel.selectedTranscript?.revision, transcript.revision, "Reprocessing must not overwrite the reviewed revision.")
+        XCTAssertEqual(viewModel.speakerActionMessage?.isFailure, false)
+    }
+
     private func fixture(named name: String) throws -> CanonicalTranscript {
         let url = try XCTUnwrap(Bundle.module.url(forResource: name, withExtension: "json"))
         return try CanonicalTranscriptCodec.decode(Data(contentsOf: url))
@@ -306,6 +327,15 @@ private final class DeleterSpy: TranscriptFileDeleting, @unchecked Sendable {
     func delete(fileID: TranscriptReviewFile.ID) throws {
         if let error { throw error }
         deleted.append(fileID)
+    }
+}
+
+private final class ReprocessorSpy: TranscriptReprocessing, @unchecked Sendable {
+    private(set) var requests: [(TranscriptReviewFile.ID, TranscriptionSpeakerCount)] = []
+
+    func reprocess(fileID: TranscriptReviewFile.ID, speakerCount: TranscriptionSpeakerCount) async -> TranscriptReprocessingOutcome {
+        requests.append((fileID, speakerCount))
+        return TranscriptReprocessingOutcome(message: "Queued a new run.", isFailure: false)
     }
 }
 

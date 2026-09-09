@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import ScribeAppCore
 import Speakers
 
 /// The state shown for an imported source while no production job coordinator is attached.
@@ -316,4 +317,21 @@ public struct TranscriptImportOutcome: Equatable, Sendable {
 /// simply does not accept drops.
 public protocol TranscriptFileImporting: Sendable {
     func importFiles(at urls: [URL]) async -> TranscriptImportOutcome
+}
+
+/// Starts a new run from a reviewed transcript's retained source. It is kept
+/// distinct from revision editing: re-diarization must not overwrite edits to
+/// the transcript currently on screen.
+public protocol TranscriptReprocessing: Sendable {
+    func reprocess(fileID: TranscriptReviewFile.ID, speakerCount: TranscriptionSpeakerCount) async -> TranscriptReprocessingOutcome
+}
+
+public struct TranscriptReprocessingOutcome: Equatable, Sendable {
+    public let message: String
+    public let isFailure: Bool
+
+    public init(message: String, isFailure: Bool) {
+        self.message = message
+        self.isFailure = isFailure
+    }
 }

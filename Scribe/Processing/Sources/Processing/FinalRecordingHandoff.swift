@@ -95,12 +95,14 @@ public struct FinalRecordingHandoff: Sendable {
     public static let supportedSchemaVersions: Set<Int> = [RecorderSessionManifest.currentSchemaVersion]
 
     private let modelProfileID: String
+    private let speakerCount: TranscriptionSpeakerCount
     private let supportedSchemaVersions: Set<Int>
     private let exportDirectory: URL?
     private let checksumOfFile: @Sendable (URL) throws -> String
 
     public init(
         modelProfileID: String = FinalRecordingHandoff.defaultModelProfileID,
+        speakerCount: TranscriptionSpeakerCount = .automatic,
         supportedSchemaVersions: Set<Int> = FinalRecordingHandoff.supportedSchemaVersions,
         exportDirectory: URL? = nil,
         // Injected so a test can force a mismatch, and so the hash that verifies
@@ -108,6 +110,7 @@ public struct FinalRecordingHandoff: Sendable {
         checksumOfFile: @escaping @Sendable (URL) throws -> String = { try FLACEncoder.sha256(ofFileAt: $0) }
     ) {
         self.modelProfileID = modelProfileID
+        self.speakerCount = speakerCount
         self.supportedSchemaVersions = supportedSchemaVersions
         self.exportDirectory = exportDirectory
         self.checksumOfFile = checksumOfFile
@@ -153,6 +156,7 @@ public struct FinalRecordingHandoff: Sendable {
 
         return TranscriptionRequest(
             sourceURL: finalURL,
+            speakerCount: speakerCount,
             modelProfileID: modelProfileID,
             exportDirectory: exportDirectory,
             provenance: TranscriptionProvenance(producerID: Self.producerID, sessionID: manifest.sessionID),

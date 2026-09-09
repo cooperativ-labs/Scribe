@@ -143,6 +143,28 @@ final class ScribeMenuBarControllerTests: XCTestCase {
         XCTAssertEqual(coordinator.performedCommands, [.start, .copyTimestamp])
     }
 
+    func testTheStatusItemWearsARedDotWhileRecordingWithoutTheChip() async {
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
+        let model = RecorderMenuModel(coordinator: coordinator)
+        let controller = makeController(coordinator, model: model)
+
+        XCTAssertFalse(controller.showsRecordingIndicator)
+
+        // The chip is on screen for the first seconds of a recording it started,
+        // and says the same thing the dot would; only one of them says it.
+        controller.isMeetingChipVisible = true
+        coordinator.submit(.start)
+        await coordinator.waitUntilIdle()
+        XCTAssertFalse(controller.showsRecordingIndicator)
+
+        controller.isMeetingChipVisible = false
+        XCTAssertTrue(controller.showsRecordingIndicator)
+
+        coordinator.submit(.stop)
+        await coordinator.waitUntilIdle()
+        XCTAssertFalse(controller.showsRecordingIndicator)
+    }
+
     // MARK: Helpers
 
     private func makeController(

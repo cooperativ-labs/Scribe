@@ -1,0 +1,37 @@
+{
+  "note": "Aggregate grouping comparison only. No transcript text, names, or audio. Replay uses saved words.json and diarization.json, not revision-29 edits. Original word timings still have the duration-loss defect; grouping is measured independently of speaker accuracy.",
+  "saved_canonical_revision": 29,
+  "saved_canonical_segments": 1447,
+  "word_count": 9650,
+  "unknown_words": 833,
+  "reference_segments_macwhisper": 260,
+  "legacy_sentence_grouping": {
+    "segments": 1447,
+    "one_word_segments": 577,
+    "median_words_per_segment": 3,
+    "known_speaker_segments": 832,
+    "known_speaker_one_word_segments": 92,
+    "known_speaker_median_words": 9,
+    "known_speaker_mean_words": 10.6
+  },
+  "display_grouping": {
+    "pause_split_ms": 1000,
+    "preferred_duration_ms": 12000,
+    "preferred_word_count": 40,
+    "maximum_duration_ms": 30000,
+    "maximum_word_count": 80,
+    "segments": 1136,
+    "one_word_segments": 498,
+    "median_words_per_segment": 2,
+    "mean_words_per_segment": 8.49,
+    "max_words_per_segment": 80,
+    "median_duration_ms": 1760,
+    "known_speaker_segments": 521,
+    "known_speaker_one_word_segments": 13,
+    "known_speaker_median_words": 13,
+    "known_speaker_mean_words": 16.92,
+    "known_speaker_median_duration_ms": 3920,
+    "unknown_segments": 615,
+    "unknown_one_word_segments": 485
+  }
+}

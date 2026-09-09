@@ -202,7 +202,7 @@ final class TranscriptionHostService {
             report(failure: "The bundled media prober is unavailable, so folders cannot be imported.")
             return nil
         }
-        let configuration = ImportConfiguration(modelProfileID: modelProfileID)
+        let configuration = ImportConfiguration(modelProfileID: modelProfileID, speakerCount: speakerCount)
         let options = FolderImportOptions(
             configuration: configuration,
             includeSubfolders: includeSubfolders,
@@ -233,6 +233,7 @@ final class TranscriptionHostService {
             do {
                 _ = try await coordinator.enqueue(TranscriptionRequest(
                     sourceURL: file.url,
+                    speakerCount: speakerCount,
                     modelProfileID: modelProfileID,
                     provenance: sessionID.map { TranscriptionProvenance(producerID: "scribe.recorder", sessionID: $0) }
                 ))
@@ -306,7 +307,11 @@ final class TranscriptionHostService {
                 continue
             }
             do {
-                _ = try await coordinator.enqueue(TranscriptionRequest(sourceURL: url, modelProfileID: modelProfileID))
+                _ = try await coordinator.enqueue(TranscriptionRequest(
+                    sourceURL: url,
+                    speakerCount: speakerCount,
+                    modelProfileID: modelProfileID
+                ))
                 queued += 1
             } catch {
                 refusals.append(.init(url: url, message: "\(url.lastPathComponent) could not be queued: \(error.localizedDescription)"))
@@ -354,6 +359,7 @@ final class TranscriptionHostService {
             revisionStore: TranscriptStoreRevisionWriter(store: store),
             fileDeleter: TranscriptStoreFileDeleter(store: store),
             fileImporter: DroppedFileImporter(host: self),
+            reprocessor: TranscriptReprocessor(host: self),
             agentDispatcher: agentDispatcher,
             openVocabularySettings: openVocabularySettings
         )
@@ -377,8 +383,36 @@ final class TranscriptionHostService {
         store.latestRunPerSource().map(TranscriptReviewFile.init)
     }
 
+    private var speakerCount: TranscriptionSpeakerCount {
+        switch settings.transcriptionSpeakerCount {
+        case .automatic: .automatic
+        case .known(let count): .known(count)
+        }
+    }
+
     private func refreshReview() async {
         reviewModel?.reload(files: reviewFiles())
+    }
+
+    func reprocessTranscript(fileID: TranscriptReviewFile.ID, speakerCount: TranscriptionSpeakerCount) async -> TranscriptReprocessingOutcome {
+        guard let runID = UUID(uuidString: fileID), let previous = store.run(withRunID: runID) else {
+            return TranscriptReprocessingOutcome(message: "The original transcription run could not be found.", isFailure: true)
+        }
+        do {
+            _ = try await coordinator.reprocess(previous.job, speakerCount: speakerCount)
+            await refreshReview()
+            Task { [weak self] in await self?.runPending() }
+            let description = switch speakerCount {
+            case .automatic: "automatic speaker count"
+            case .known(let count): "exactly \(count) speaker\(count == 1 ? "" : "s")"
+            }
+            return TranscriptReprocessingOutcome(
+                message: "Queued a new run with \(description). This transcript and its edits were kept.",
+                isFailure: false
+            )
+        } catch {
+            return TranscriptReprocessingOutcome(message: "Could not queue reprocessing: \(error.localizedDescription)", isFailure: true)
+        }
     }
 
     private func speakerDirectory() -> (any TranscriptSpeakerDirectory)? {
@@ -496,6 +530,26 @@ private struct DroppedFileImporter: TranscriptFileImporting {
     }
 
     /// The host is main-actor bound; the reference is only ever read there.
+    private final class WeakHost: @unchecked Sendable {
+        weak var value: TranscriptionHostService?
+        init(_ value: TranscriptionHostService) { self.value = value }
+    }
+}
+
+private struct TranscriptReprocessor: TranscriptReprocessing {
+    private let host: WeakHost
+
+    init(host: TranscriptionHostService) {
+        self.host = WeakHost(host)
+    }
+
+    func reprocess(fileID: TranscriptReviewFile.ID, speakerCount: TranscriptionSpeakerCount) async -> TranscriptReprocessingOutcome {
+        guard let host = await MainActor.run(body: { host.value }) else {
+            return TranscriptReprocessingOutcome(message: "Transcription is not available right now.", isFailure: true)
+        }
+        return await host.reprocessTranscript(fileID: fileID, speakerCount: speakerCount)
+    }
+
     private final class WeakHost: @unchecked Sendable {
         weak var value: TranscriptionHostService?
         init(_ value: TranscriptionHostService) { self.value = value }

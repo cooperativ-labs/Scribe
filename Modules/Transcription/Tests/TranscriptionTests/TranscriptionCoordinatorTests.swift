@@ -104,6 +104,23 @@ final class TranscriptionCoordinatorTests: XCTestCase {
         XCTAssertEqual(retry.retryOfRunID, original.runID)
     }
 
+    func testReprocessWithKnownSpeakerCountCreatesAnIndependentUncheckpointedRun() async throws {
+        let store = root.appendingPathComponent("Meeting Transcripts", isDirectory: true)
+        let source = root.appendingPathComponent("meeting.flac")
+        try Data("audio bytes".utf8).write(to: source)
+        let coordinator = try TranscriptionCoordinator(configuration: .init(transcriptStoreURL: store), stageRunner: RecordingRunner())
+        let original = try await coordinator.enqueue(.init(sourceURL: source, speakerCount: .automatic, modelProfileID: "parakeet-v3"))
+        let revised = try await coordinator.reprocess(original, speakerCount: .known(2))
+
+        XCTAssertNotEqual(revised.runID, original.runID)
+        XCTAssertEqual(revised.retryOfRunID, original.runID)
+        XCTAssertEqual(revised.request.speakerCount, .known(2))
+        XCTAssertEqual(revised.sourceSnapshotURL, original.sourceSnapshotURL, "Reprocessing must retain the source-relative timeline, including leading silence.")
+        XCTAssertNotEqual(revised.configurationFingerprint, original.configurationFingerprint)
+        XCTAssertTrue(revised.checkpoints.isEmpty, "A changed diarization constraint invalidates every old checkpoint.")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: original.jobFileURL.path), "The prior run, including review edits, stays on disk.")
+    }
+
     func testCancellationAtABoundaryKeepsAlreadyCommittedCheckpoints() async throws {
         let store = root.appendingPathComponent("Meeting Transcripts", isDirectory: true)
         let source = root.appendingPathComponent("meeting.flac")

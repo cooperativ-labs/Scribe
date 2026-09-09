@@ -29,6 +29,14 @@ import Testing
         #expect(request.title == "Weekly Sync")
     }
 
+    @Test func theConfiguredSpeakerCountTravelsWithTheRecorderHandoff() throws {
+        let session = try handoffSession(finalContents: "verified-final-mix")
+        let request = try FinalRecordingHandoff(speakerCount: .known(2), checksumOfFile: fakeChecksum)
+            .request(forSessionAt: session.directory)
+
+        #expect(request.speakerCount == .known(2))
+    }
+
     @Test func failedCleanupIsSurfacedRatherThanHandingOffARawTrack() throws {
         let session = try handoffSession(
             processing: ProcessingMetadata(

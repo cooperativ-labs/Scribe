@@ -16,6 +16,14 @@ struct ASRBenchmark {
             )
             let startedAt = ContinuousClock.now
             let transcript = try await adapter.transcribe(fileURL: options.audioURL)
+            if let tokensURL = options.tokensURL {
+                // The full worker transcript, in the same shape the host reads
+                // from a run's `transcript.json`, so a benchmark run can be fed
+                // straight into the host timing/diarization comparison.
+                let tokenEncoder = JSONEncoder()
+                tokenEncoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+                try tokenEncoder.encode(transcript).write(to: tokensURL, options: .atomic)
+            }
             let elapsedComponents = startedAt.duration(to: .now).components
             let elapsed = Double(elapsedComponents.seconds)
                 + Double(elapsedComponents.attoseconds) / 1_000_000_000_000_000_000
@@ -31,7 +39,8 @@ struct ASRBenchmark {
                 usedChunkedProcessing: transcript.usedChunkedProcessing,
                 firstTokenStartSeconds: transcript.tokens.first?.startSeconds,
                 lastTokenEndSeconds: transcript.tokens.last?.endSeconds,
-                timingsAreMonotonicAndInBounds: timingsAreMonotonicAndInBounds(transcript)
+                timingsAreMonotonicAndInBounds: timingsAreMonotonicAndInBounds(transcript),
+                tokenDurationMs: tokenDurationSummary(transcript)
             )
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
@@ -58,6 +67,28 @@ private func timingsAreMonotonicAndInBounds(_ transcript: ParakeetAdapter.Transc
     return true
 }
 
+/// Distinguishes decoder durations from the pre-0.12.5 behaviour of ending each
+/// token where the next one starts, which showed up as a zero-gap token stream.
+private func tokenDurationSummary(_ transcript: ParakeetAdapter.Transcript) -> TokenDurationSummary {
+    let durations = transcript.tokens.map { ($0.endSeconds - $0.startSeconds) * 1_000 }.sorted()
+    let gaps = zip(transcript.tokens, transcript.tokens.dropFirst()).map {
+        ($1.startSeconds - $0.endSeconds) * 1_000
+    }
+    return TokenDurationSummary(
+        median: durations.isEmpty ? 0 : durations[durations.count / 2],
+        maximum: durations.last ?? 0,
+        overOneSecond: durations.filter { $0 > 1_000 }.count,
+        gapsOverOneSecond: gaps.filter { $0 > 1_000 }.count
+    )
+}
+
+private struct TokenDurationSummary: Codable {
+    let median: Double
+    let maximum: Double
+    let overOneSecond: Int
+    let gapsOverOneSecond: Int
+}
+
 private struct BenchmarkOutput: Codable {
     let audioPath: String
     let computeUnits: String
@@ -71,6 +102,7 @@ private struct BenchmarkOutput: Codable {
     let firstTokenStartSeconds: Double?
     let lastTokenEndSeconds: Double?
     let timingsAreMonotonicAndInBounds: Bool
+    let tokenDurationMs: TokenDurationSummary
 }
 
 private struct Options {
@@ -78,6 +110,8 @@ private struct Options {
     let manifestURL: URL
     let modelsURL: URL
     let computeUnits: ASRComputeUnits
+    /// Optional worker-transcript sidecar for offline timing comparisons.
+    let tokensURL: URL?
 
     init(arguments: [String]) throws {
         var values: [String: String] = [:]
@@ -98,6 +132,7 @@ private struct Options {
         manifestURL = URL(fileURLWithPath: manifest)
         modelsURL = URL(fileURLWithPath: models, isDirectory: true)
         self.computeUnits = computeUnits
+        tokensURL = values["--tokens-json"].map { URL(fileURLWithPath: $0) }
     }
 }
 
@@ -105,6 +140,6 @@ private enum OptionsError: LocalizedError {
     case usage
 
     var errorDescription: String? {
-        "Usage: ASRBenchmark --audio <16k-mono-file> --manifest <model_manifest.json> --models <models-dir> --compute-units <cpuOnly|cpuAndGPU|cpuAndNeuralEngine|all>"
+        "Usage: ASRBenchmark --audio <16k-mono-file> --manifest <model_manifest.json> --models <models-dir> --compute-units <cpuOnly|cpuAndGPU|cpuAndNeuralEngine|all> [--tokens-json <out.json>]"
     }
 }

@@ -100,6 +100,15 @@ public struct ScribeSettingsView: View {
 
             Section("Processing") {
                 Toggle("Transcribe when the final recording is ready", isOn: $settings.transcribeWhenFinalRecordingIsReady)
+                Picker("Speakers", selection: $settings.transcriptionSpeakerCount) {
+                    Text("Automatic").tag(RecorderSpeakerCountPreference.automatic)
+                    ForEach(1...8, id: \.self) { count in
+                        Text("Exactly \(count)").tag(RecorderSpeakerCountPreference.known(count))
+                    }
+                }
+                Text("Automatic lets diarization choose. An exact count is for meetings you know were captured with that many speakers; it may use FluidAudio’s K-means fallback.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
 
             Section {

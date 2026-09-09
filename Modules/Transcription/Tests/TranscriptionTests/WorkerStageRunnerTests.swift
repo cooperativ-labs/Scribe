@@ -47,6 +47,24 @@ final class WorkerStageRunnerTests: XCTestCase {
         await runner.shutdown()
     }
 
+    func testKnownSpeakerCountIsDeliveredToTheWorkerRunRequest() async throws {
+        var worker = FakeTranscriptionWorker.healthyRun()
+        worker.steps.insert(.requireRunRequestContains(#""knownSpeakerCount":2"#), at: 0)
+        let runner = try makeRunner(worker)
+        let coordinator = try TranscriptionCoordinator(configuration: .init(transcriptStoreURL: root.appending(path: "store")), stageRunner: runner)
+        let job = try await coordinator.enqueue(.init(
+            sourceURL: try makeSource(),
+            speakerCount: .known(2),
+            modelProfileID: "parakeet-v3"
+        ))
+
+        await coordinator.runPending()
+
+        let completed = await coordinator.job(id: job.id)
+        XCTAssertEqual(completed?.state, .complete)
+        await runner.shutdown()
+    }
+
     func testAHelperCrashFailsTheJobAndLeavesTheEarlierCheckpointForARetry() async throws {
         let worker = FakeTranscriptionWorker(steps: [
             .emit(kind: "stage_result", payload: #"{"stage":"prepare","status":"complete","resultPath":"prepare.json"}"#),

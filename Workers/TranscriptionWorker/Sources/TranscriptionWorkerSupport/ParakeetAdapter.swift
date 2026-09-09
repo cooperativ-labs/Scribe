@@ -4,11 +4,18 @@ import Foundation
 
 /// Offline Parakeet v3 adapter for a *already prepared* 16 kHz mono source.
 ///
-/// `AsrManager.transcribe(_:source:)` is deliberately used instead of a custom
-/// window implementation. In the pinned FluidAudio v0.12.4 it switches long
+/// `AsrManager.transcribe(_:decoderState:)` is deliberately used instead of a
+/// custom window implementation. In the pinned FluidAudio v0.15.6 it switches long
 /// files to its disk-backed `ChunkProcessor`, which keeps 80 ms left context,
 /// uses a 2 s overlap, rebases decoder frames by the chunk start, and removes
 /// boundary duplicates before returning `ASRResult.tokenTimings` in seconds.
+///
+/// v0.12.5 first carried the decoder's own token durations all the way through
+/// that chunk merge. v0.15.6 retains that fix and adds upstream seam-gap
+/// repair, final-window alignment, and token-order preservation. Word ends are
+/// decoder durations rather than next-token endpoints, so a token may
+/// legitimately end a few frames past the prepared audio; that tail is clamped
+/// to the source duration rather than rejected.
 public struct ParakeetAdapter: Sendable {
     public struct Configuration: Sendable, Equatable {
         public let computeUnits: ASRComputeUnits
@@ -92,8 +99,9 @@ public struct ParakeetAdapter: Sendable {
             streamingEnabled: true,
             streamingThreshold: configuration.streamingThresholdSamples
         ))
-        try await manager.initialize(models: models)
-        let result = try await manager.transcribe(fileURL, source: .system)
+        try await manager.loadModels(models)
+        var decoderState = TdtDecoderState.make(decoderLayers: models.version.decoderLayers)
+        let result = try await manager.transcribe(fileURL, decoderState: &decoderState)
         return try makeTranscript(result, sourceDuration: sourceDuration)
     }
 
@@ -105,16 +113,22 @@ public struct ParakeetAdapter: Sendable {
             throw Error.missingTokenTimings
         }
         let tokens = try timings.enumerated().map { index, timing in
+            // `startTime` still has to land inside the recording: a start past
+            // the end is the signature of a chunk-rebasing bug and must fail
+            // loudly. `endTime` is now a decoder duration rather than the next
+            // token's start, so the final tokens of a recording can round a
+            // frame or two past the prepared audio; clamp those instead.
             guard timing.startTime.isFinite, timing.endTime.isFinite,
                   timing.startTime >= 0, timing.endTime >= timing.startTime,
-                  timing.endTime <= sourceDuration + 0.001 else {
+                  timing.startTime <= sourceDuration + 0.001 else {
                 throw Error.invalidTokenTiming(index: index)
             }
+            let startSeconds = min(timing.startTime, sourceDuration)
             return TimedToken(
                 text: timing.token,
                 tokenID: timing.tokenId,
-                startSeconds: timing.startTime,
-                endSeconds: min(timing.endTime, sourceDuration),
+                startSeconds: startSeconds,
+                endSeconds: max(startSeconds, min(timing.endTime, sourceDuration)),
                 confidence: timing.confidence
             )
         }

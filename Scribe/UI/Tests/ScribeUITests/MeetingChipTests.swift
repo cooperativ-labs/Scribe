@@ -141,15 +141,56 @@ final class MeetingChipTests: XCTestCase {
 
         model.record()
         await coordinator.waitUntilIdle()
-        now = start.addingTimeInterval(83)
+        now = start.addingTimeInterval(2)
         model.refreshPresentation()
 
         XCTAssertEqual(model.presentation, .session(.init(
-            elapsedText: "01:23",
+            elapsedText: "00:02",
             isPaused: false,
             isHoldEnabled: true,
             isStopEnabled: true
         )))
+    }
+
+    func testTheTransportWithdrawsThreeSecondsIntoTheRecording() async {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot(), now: { start })
+        var now = start
+        let model = makeModel(coordinator, now: { now })
+        model.meetingWasDetected(zoomCall())
+        model.record()
+        await coordinator.waitUntilIdle()
+
+        now = start.addingTimeInterval(MeetingChipPresentation.sessionVisibleDuration - 0.1)
+        model.refreshPresentation()
+        guard case .session = model.presentation else { return XCTFail("expected the transport") }
+
+        now = start.addingTimeInterval(MeetingChipPresentation.sessionVisibleDuration)
+        model.refreshPresentation()
+
+        // The chip's job was to say the recording started. A floating window
+        // over the call for the next hour is not that, and the menu bar's red
+        // dot says the same thing without taking any room.
+        XCTAssertEqual(model.presentation, .hidden)
+
+        // And it stays away: the recording running is not a reason to ask again.
+        now = start.addingTimeInterval(600)
+        model.refreshPresentation()
+        XCTAssertEqual(model.presentation, .hidden)
+    }
+
+    func testACallNoticedWellIntoARecordingDoesNotPutTheTransportBack() async {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot(), now: { start })
+        var now = start
+        let model = makeModel(coordinator, now: { now })
+        coordinator.submit(.start)
+        await coordinator.waitUntilIdle()
+
+        now = start.addingTimeInterval(300)
+        model.meetingWasDetected(zoomCall())
+
+        XCTAssertEqual(model.presentation, .hidden)
     }
 
     func testTheTransportStaysAfterTheCallItselfHasEnded() async {
@@ -265,13 +306,13 @@ final class MeetingChipTests: XCTestCase {
         model.toggleHold()
         await coordinator.waitUntilIdle()
 
-        now = start.addingTimeInterval(3_723)
+        now = start.addingTimeInterval(2)
         model.refreshPresentation()
 
         // A paused span is reconstructed as silence, so this is the length of the
         // file being produced rather than only the audible part of it.
         XCTAssertEqual(model.presentation, .session(.init(
-            elapsedText: "1:02:03",
+            elapsedText: "00:02",
             isPaused: true,
             isHoldEnabled: true,
             isStopEnabled: true
@@ -322,31 +363,16 @@ final class MeetingChipTests: XCTestCase {
         XCTAssertEqual(model.presentation, .hidden)
     }
 
-    func testCopyingTheElapsedFigureWritesTheClockOnTheChip() async {
-        let start = Date(timeIntervalSince1970: 1_000)
-        var now = start
-        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot(), now: { now })
-        let model = makeModel(coordinator, now: { now })
-        model.meetingWasDetected(zoomCall())
-        model.record()
-        await coordinator.waitUntilIdle()
-        now = start.addingTimeInterval(83)
-        model.refreshPresentation()
-
-        model.copyTimestamp()
-        await coordinator.waitUntilIdle()
-
-        XCTAssertEqual(coordinator.copiedTimestamps, ["01:23"])
-    }
-
-    func testCopyingDoesNothingWhileTheChipIsOnlyAnOffer() async {
+    func testTheChipHasNoTimestampControlOfItsOwn() async {
         let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
         let model = makeModel(coordinator)
         model.meetingWasDetected(zoomCall())
-
-        model.copyTimestamp()
+        model.record()
         await coordinator.waitUntilIdle()
 
+        // The clock on the chip is a label. Copy Timestamp is a menu command
+        // with a global shortcut, which is what a person reaches for mid-call
+        // anyway — the chip is gone seconds after the recording starts.
         XCTAssertTrue(coordinator.copiedTimestamps.isEmpty)
         XCTAssertFalse(coordinator.performedCommands.contains(.copyTimestamp))
     }

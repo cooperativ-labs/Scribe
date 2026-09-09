@@ -75,6 +75,14 @@ final class ModuleIntegrationTests: XCTestCase {
         // A → B → A stays in chronological order through the whole pipeline.
         XCTAssertEqual(transcript.segments.map(\.startMs).sorted(), transcript.segments.map(\.startMs))
         XCTAssertNoThrow(try CanonicalTranscriptValidator.validate(transcript))
+        guard case let .object(grouping)? = transcript.processingOptions["display_grouping"] else {
+            return XCTFail("Missing display grouping provenance")
+        }
+        XCTAssertEqual(grouping["pause_split_ms"], .number(1_000))
+        XCTAssertEqual(grouping["preferred_duration_ms"], .number(12_000))
+        XCTAssertEqual(grouping["preferred_word_count"], .number(40))
+        XCTAssertEqual(grouping["maximum_duration_ms"], .number(30_000))
+        XCTAssertEqual(grouping["maximum_word_count"], .number(80))
 
         let playback = RecordingPlayback()
         let model = await TranscriptViewModel(
@@ -99,6 +107,33 @@ final class ModuleIntegrationTests: XCTestCase {
         XCTAssertTrue(srt.contains("-->"), "SRT export was:\n\(srt)")
         let json = try CanonicalTranscriptCodec.decode(Data(contentsOf: exports.appending(path: "team sync.json")))
         XCTAssertEqual(json.segments.count, transcript.segments.count)
+    }
+
+    func testCollapsedAutomaticDiarizationIsReviewableAndKeepsEngineEvidence() async throws {
+        let source = try writeAudio(named: "imbalanced call.wav", in: root, seconds: 6)
+        let coordinator = try TranscriptionCoordinator(
+            configuration: .init(transcriptStoreURL: storeURL),
+            stageRunner: ScriptedWorkerStageRunner(
+                hostStageRunner: TranscriptAssemblyStageRunner(),
+                collapsedDiagnostics: true
+            )
+        )
+        _ = try await coordinator.enqueue(TranscriptionRequest(sourceURL: source, modelProfileID: "parakeet-v3"))
+        await coordinator.runPending()
+
+        let transcript = try XCTUnwrap(TranscriptStore(storeDirectoryURL: storeURL).latestRunPerSource().first?.transcript)
+        XCTAssertEqual(transcript.status, .completeWithWarnings)
+        XCTAssertTrue(transcript.warnings.contains { $0.code == "transcription.diarization.collapsedOccupancy" })
+        XCTAssertEqual(
+            transcript.engineRevisions["diarization_runtime"],
+            "FluidAudio 0.15.6@4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b"
+        )
+        XCTAssertEqual(transcript.engineRevisions["diarization_models"], "model-revision")
+        XCTAssertEqual(transcript.processingOptions["speaker_count"], .string("automatic"))
+        guard case let .object(diagnostics)? = transcript.processingOptions["diarization_diagnostics"] else {
+            return XCTFail("Missing diarization diagnostics")
+        }
+        XCTAssertEqual(diagnostics["separation_appears_collapsed"], .boolean(true))
     }
 
     func testCompletedRunRecognizesAnEnrolledSpeaker() async throws {
@@ -267,6 +302,7 @@ struct ScriptedWorkerStageRunner: TranscriptionStageRunning {
     let hostStageRunner: any TranscriptionStageRunning
     var writesDiarization = true
     var embeddings: [WorkerSpeakerEmbeddingRecord] = []
+    var collapsedDiagnostics = false
 
     func run(stage: TranscriptionJobState, job: TranscriptionJob) async throws -> TranscriptionStageOutput {
         switch stage {
@@ -288,7 +324,7 @@ struct ScriptedWorkerStageRunner: TranscriptionStageRunning {
             return TranscriptionStageOutput(artifactURL: url)
         case .diarizing:
             guard writesDiarization else { return TranscriptionStageOutput() }
-            return TranscriptionStageOutput(artifactURL: try write([
+            var artifact: [String: TranscriptJSONValue] = [
                 "sourceDurationSeconds": .number(6),
                 "usedDiskBackedAudio": .boolean(false),
                 "intervals": .array([
@@ -296,7 +332,41 @@ struct ScriptedWorkerStageRunner: TranscriptionStageRunning {
                     interval(speaker: "speaker_2", start: 1.7, end: 3.4),
                     interval(speaker: "speaker_1", start: 3.5, end: 5.4),
                 ]),
-            ], named: TranscriptRunArtifact.diarization, in: job))
+            ]
+            if collapsedDiagnostics {
+                artifact["engine"] = .object([
+                    "runtime": .string("FluidAudio 0.15.6"),
+                    "runtimeRevision": .string("4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b"),
+                    "modelRevision": .string("model-revision"),
+                ])
+                artifact["configuration"] = .object([
+                    "knownSpeakerCount": .null,
+                    "clusteringThreshold": .number(0.6),
+                    "embeddingExcludeOverlap": .boolean(true),
+                    "minimumEmbeddingDurationSeconds": .number(1),
+                    "segmentationStepRatio": .number(0.2),
+                    "preserveOverlappingIntervals": .boolean(true),
+                    "constrainedAssignment": .boolean(true),
+                    "warmStartFa": .number(0.07),
+                    "warmStartFb": .number(0.8),
+                    "maximumVBxIterations": .number(20),
+                ])
+                artifact["clusteringDiagnostics"] = .object([
+                    "heuristicVersion": .string("dominant-occupancy-v1"),
+                    "embeddingCount": .number(100),
+                    "intervalCount": .number(3),
+                    "overlapIntervalCount": .number(0),
+                    "occupancies": .array([]),
+                    "dominantEmbeddingFraction": .number(0.96),
+                    "dominantIntervalFraction": .number(0.99),
+                    "separationAppearsCollapsed": .boolean(true),
+                ])
+            }
+            return TranscriptionStageOutput(artifactURL: try write(
+                artifact,
+                named: TranscriptRunArtifact.diarization,
+                in: job
+            ))
         case .matchingSpeakers:
             let url = job.runDirectoryURL.appending(path: TranscriptRunArtifact.embeddings)
             try AtomicReplaceFileWriter().write(try JSONEncoder().encode(embeddings), to: url)

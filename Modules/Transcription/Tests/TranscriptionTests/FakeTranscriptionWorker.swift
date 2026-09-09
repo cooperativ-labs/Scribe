@@ -17,6 +17,8 @@ struct FakeTranscriptionWorker {
         /// Writes the contents of a file verbatim, for oversize records.
         case emitContentsOfFile(URL)
         case pauseSeconds(Double)
+        /// Fails the helper unless the run request contains this JSON fragment.
+        case requireRunRequestContains(String)
         /// Blocks until the host sends another record, such as a cancel.
         case awaitRecord
         /// Leaves abruptly, the way a crashing helper does.
@@ -77,6 +79,9 @@ struct FakeTranscriptionWorker {
                 lines.append("printf '\\n'")
             case let .pauseSeconds(seconds):
                 lines.append("sleep \(seconds)")
+            case let .requireRunRequestContains(fragment):
+                let quoted = fragment.replacingOccurrences(of: "'", with: "'\\\"'\\\"'")
+                lines.append("printf '%s' \"$line\" | grep -F '\(quoted)' >/dev/null || exit 42")
             case .awaitRecord:
                 lines.append("IFS= read -r cancel_line || exit 0")
             case .crash:

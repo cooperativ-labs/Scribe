@@ -62,6 +62,46 @@ func parakeetTimingContract() throws {
     #expect(transcript.timestampUnit == "seconds")
     #expect(transcript.tokens.map(\.text) == ["Hello", ",", "world", "!"])
     #expect(transcript.tokens.map(\.startSeconds) == [0.08, 0.40, 0.56, 0.88])
+    // Ends are the decoder's own durations and are passed through untouched.
+    #expect(transcript.tokens.map(\.endSeconds) == [0.40, 0.48, 0.88, 0.96])
+}
+
+@Test("Parakeet timing adapter clamps a duration that overruns the recording but rejects an out-of-range start")
+func parakeetTailDurationContract() throws {
+    let manifest = try ModelManifest.load(from: URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .appending(path: "model_manifest.json"))
+    let adapter = ParakeetAdapter(
+        manifest: manifest,
+        modelsDirectory: URL(fileURLWithPath: "/models-not-needed-for-this-test")
+    )
+
+    // Since FluidAudio 0.12.5 a token end is `start + duration`, so the last
+    // token of a recording can round past the prepared audio. That is a tail to
+    // clamp, not a reason to fail an otherwise complete transcript.
+    let overrunning = ASRResult(
+        text: "Bye",
+        confidence: 0.9,
+        duration: 2.0,
+        processingTime: 0.1,
+        tokenTimings: [TokenTiming(token: "Bye", tokenId: 1, startTime: 1.84, endTime: 2.24, confidence: 0.9)]
+    )
+    let transcript = try adapter.makeTranscript(overrunning, sourceDuration: 2.0)
+    #expect(transcript.tokens.map(\.startSeconds) == [1.84])
+    #expect(transcript.tokens.map(\.endSeconds) == [2.0])
+
+    // A start beyond the recording is still the signature of a chunk-rebasing
+    // bug and must not be quietly absorbed.
+    let misplaced = ASRResult(
+        text: "Bye",
+        confidence: 0.9,
+        duration: 2.0,
+        processingTime: 0.1,
+        tokenTimings: [TokenTiming(token: "Bye", tokenId: 1, startTime: 2.4, endTime: 2.8, confidence: 0.9)]
+    )
+    #expect(throws: ParakeetAdapter.Error.invalidTokenTiming(index: 0)) {
+        try adapter.makeTranscript(misplaced, sourceDuration: 2.0)
+    }
 }
 
 @Test("offline diarization preserves overlap, first-appearance labels, and compatible vectors")
@@ -89,7 +129,43 @@ func offlineDiarizationContract() throws {
     #expect(result.embeddings.map(\.speakerID) == ["speaker_1", "speaker_2"])
     #expect(result.embeddings.allSatisfy { abs($0.vector.reduce(0) { $1 * $1 + $0 }.squareRoot() - 1) < 0.0001 })
     #expect(result.embeddings.allSatisfy { $0.modelID == "wespeaker-embedding-coreml" })
-    #expect(result.embeddings.allSatisfy { $0.preprocessingVersion == "fluidaudio-offline-fbank-16khz-mono-v0.12.4" })
+    #expect(result.embeddings.allSatisfy { $0.preprocessingVersion == "fluidaudio-offline-fbank-16khz-mono-v0.15.6" })
+    #expect(result.engine.runtime == "FluidAudio 0.15.6")
+    #expect(result.configuration.clusteringThreshold == 0.6)
+    #expect(result.clusteringDiagnostics.separationAppearsCollapsed == false)
+}
+
+@Test("offline diarization records occupancy and flags collapse without changing assignments")
+func offlineDiarizationCollapseDiagnostics() throws {
+    let manifest = try ModelManifest.load(from: URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .appending(path: "model_manifest.json"))
+    let adapter = OfflineDiarizationAdapter(
+        manifest: manifest,
+        modelsDirectory: URL(fileURLWithPath: "/models-not-needed-for-this-test")
+    )
+    let dominantChunks = (0..<96).map {
+        ChunkEmbedding(speakerId: "S1", chunkIndex: $0, speakerIndex: 0, startTimeSeconds: Double($0), endTimeSeconds: Double($0 + 1), embedding256: [1, 0])
+    }
+    let minorChunks = (96..<100).map {
+        ChunkEmbedding(speakerId: "S2", chunkIndex: $0, speakerIndex: 0, startTimeSeconds: Double($0), endTimeSeconds: Double($0 + 1), embedding256: [0, 1])
+    }
+    let raw = DiarizationResult(
+        segments: [
+            TimedSpeakerSegment(speakerId: "S1", embedding: [1, 0], startTimeSeconds: 0, endTimeSeconds: 99, qualityScore: 0.9),
+            TimedSpeakerSegment(speakerId: "S2", embedding: [0, 1], startTimeSeconds: 99, endTimeSeconds: 100, qualityScore: 0.9),
+        ],
+        speakerDatabase: ["S1": [1, 0], "S2": [0, 1]],
+        chunkEmbeddings: dominantChunks + minorChunks
+    )
+
+    let result = try adapter.makeResult(raw, sourceDuration: 100)
+    #expect(result.intervals.map(\.speakerID) == ["speaker_1", "speaker_2"])
+    #expect(result.clusteringDiagnostics.embeddingCount == 100)
+    #expect(result.clusteringDiagnostics.occupancies.map(\.embeddingCount) == [96, 4])
+    #expect(result.clusteringDiagnostics.dominantEmbeddingFraction == 0.96)
+    #expect(result.clusteringDiagnostics.dominantIntervalFraction == 0.99)
+    #expect(result.clusteringDiagnostics.separationAppearsCollapsed)
 }
 
 @Test("worker binary streams each sequential stage to the host run directory")

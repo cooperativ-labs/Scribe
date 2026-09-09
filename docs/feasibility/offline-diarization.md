@@ -1,6 +1,6 @@
 # Offline diarization and speaker-embedding feasibility
 
-The worker uses FluidAudio **v0.12.4**'s `OfflineDiarizerManager` over one complete recording. It manually initializes `OfflineDiarizerModels` from the staged Core ML bundles, so it does not call `prepareModels()` or any download/cache helper. The adapter converts every source through `StreamingAudioSourceFactory.makeDiskBackedSource`; decoding produces a temporary 16 kHz mono mmap-backed PCM file rather than retaining a full waveform in the Swift heap. This is the selected two-hour-file memory strategy.
+The worker uses FluidAudio **v0.15.6**'s `OfflineDiarizerManager` over one complete recording. It manually initializes `OfflineDiarizerModels` from the staged Core ML bundles, so it does not call `prepareModels()` or any download/cache helper. The adapter converts every source through `AudioSourceFactory.makeDiskBackedSource`; decoding produces a temporary 16 kHz mono mmap-backed PCM file rather than retaining a full waveform in the Swift heap. This is the selected two-hour-file memory strategy.
 
 `OfflineDiarizationAdapter.Configuration.knownSpeakerCount` maps to the pinned API's `OfflineDiarizerConfig.withSpeakers(exactly:)`, constraining its one global VBx clustering pass. With no count, the pipeline chooses the count. The adapter sets `postProcessing.exclusiveSegments` to `false` by default. In this pinned build, that preserves concurrent `TimedSpeakerSegment` intervals; setting it to `true` trims later intervals and is therefore not suitable for the canonical transcript.
 
@@ -12,8 +12,14 @@ Every exported vector records all values that must match before a future speaker
 
 - `modelID`: `wespeaker-embedding-coreml`
 - `modelRevision`: the pinned `wespeaker-embeddings` asset revision from `model_manifest.json`
-- `preprocessingVersion`: `fluidaudio-offline-fbank-16khz-mono-v0.12.4`
+- `preprocessingVersion`: `fluidaudio-offline-fbank-16khz-mono-v0.15.6`
 - `normalizationVersion`: `l2-unit-v1`
+
+`preprocessingVersion` was bumped for v0.15.6 because FluidAudio fixed the
+speaker-mask matrix transpose and changed low-support mask selection. Those
+operations change the vector representation even though the WeSpeaker model
+weights are unchanged. Existing v0.12.4 signatures remain stored but are
+incompatible by design and require re-enrollment before automatic matching.
 
 The vectors originate from FluidAudio's result speaker database and are normalized again by the worker because the pinned reconstruction averages per-segment centroids without a final L2 normalization. The runner refuses an empty or incompatible exported representation rather than silently emitting a zero vector.
 

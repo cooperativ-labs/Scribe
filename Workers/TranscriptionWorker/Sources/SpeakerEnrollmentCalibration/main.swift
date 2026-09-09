@@ -306,7 +306,7 @@ struct SpeakerEnrollmentCalibration {
         var lines: [String] = [
             "# Speaker identity calibration",
             "",
-            "Local-synthesis stand-in run using the worker's pinned WeSpeaker export (`wespeaker-embedding-coreml`, revision `1ed7a662fdc7109e36d822db793ee6eebdaf8594`, preprocessing `fluidaudio-offline-fbank-16khz-mono-v0.12.4`, normalization `l2-unit-v1`, transform `identity-v1`). Enrollment used confirmed 16 kHz excerpts totaling about 20–60 seconds per person. Evaluation used disjoint sessions, a 44.1 kHz device-shift condition, similar US-English voices (Samantha vs Shelley), a UK-English enrolled voice, an unknown voice (Albert), and a brief utterance.",
+            "Local-synthesis stand-in run using the worker's pinned WeSpeaker export (`wespeaker-embedding-coreml`, revision `1ed7a662fdc7109e36d822db793ee6eebdaf8594`, preprocessing `fluidaudio-offline-fbank-16khz-mono-v0.15.6`, normalization `l2-unit-v1`, transform `identity-v1`). Enrollment used confirmed 16 kHz excerpts totaling about 20–60 seconds per person. Evaluation used disjoint sessions, a 44.1 kHz device-shift condition, similar US-English voices (Samantha vs Shelley), a UK-English enrolled voice, an unknown voice (Albert), and a brief utterance.",
             "",
             "This is **not** the consented human evaluation set required by the 1% wrong-name release gate. It measures whether the worker-exported representation plus the matcher can be calibrated at all.",
             "",

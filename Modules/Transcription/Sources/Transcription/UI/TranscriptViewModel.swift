@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import ScribeAppCore
 import Speakers
 
 /// One recording-local speaker as the review window presents it.
@@ -166,6 +167,7 @@ public final class TranscriptViewModel {
     @ObservationIgnored private let revisionStore: (any TranscriptRevisionStoring)?
     @ObservationIgnored private let fileDeleter: (any TranscriptFileDeleting)?
     @ObservationIgnored private let fileImporter: (any TranscriptFileImporting)?
+    @ObservationIgnored private let reprocessor: (any TranscriptReprocessing)?
     /// Hands a finished transcript to a coding agent. Absent in a build with no
     /// agent host, which hides the action rather than offering a dead end.
     @ObservationIgnored private let agentDispatcher: (any TranscriptAgentDispatching)?
@@ -199,6 +201,7 @@ public final class TranscriptViewModel {
         revisionStore: (any TranscriptRevisionStoring)? = nil,
         fileDeleter: (any TranscriptFileDeleting)? = nil,
         fileImporter: (any TranscriptFileImporting)? = nil,
+        reprocessor: (any TranscriptReprocessing)? = nil,
         agentDispatcher: (any TranscriptAgentDispatching)? = nil,
         openVocabularySettings: (@MainActor () -> Void)? = nil
     ) {
@@ -210,6 +213,7 @@ public final class TranscriptViewModel {
         self.revisionStore = revisionStore
         self.fileDeleter = fileDeleter
         self.fileImporter = fileImporter
+        self.reprocessor = reprocessor
         self.agentDispatcher = agentDispatcher
         self.openVocabularySettings = openVocabularySettings
         selectFileIfNeeded()
@@ -511,6 +515,16 @@ public final class TranscriptViewModel {
     /// importer there is nowhere to queue them, so the drop is refused up
     /// front rather than accepted and silently lost.
     public var canImportFiles: Bool { fileImporter != nil }
+    public var canReprocess: Bool { reprocessor != nil && selectedFile != nil }
+
+    /// Re-diarizes from the preserved source as a new run. The selected file
+    /// stays in place until the new run is completed and becomes the latest
+    /// run for that source.
+    public func reprocess(speakerCount: TranscriptionSpeakerCount) async {
+        guard let reprocessor, let fileID = selectedFileID else { return }
+        let outcome = await reprocessor.reprocess(fileID: fileID, speakerCount: speakerCount)
+        speakerActionMessage = TranscriptSpeakerActionMessage(text: outcome.message, isFailure: outcome.isFailure)
+    }
 
     /// Hands files dropped on the window to the host for transcription.
     ///

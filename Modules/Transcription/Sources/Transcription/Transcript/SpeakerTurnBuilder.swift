@@ -2,8 +2,10 @@ import Foundation
 
 /// Converts recognized words and recording-wide diarization intervals into chronological transcript turns.
 ///
-/// The diarizer's speaker IDs are intentionally only an input detail. The resulting canonical IDs are
-/// assigned as `speaker_1`, `speaker_2`, and so on when a diarized speaker first receives text.
+/// Attribution (who spoke each word) is independent of display grouping (how those
+/// words become readable paragraphs) and of subtitle cue generation. The diarizer's
+/// speaker IDs are only an input detail; canonical IDs are assigned as `speaker_1`,
+/// `speaker_2`, and so on when a diarized speaker first appears on the timeline.
 public struct SpeakerTurnBuilder: Sendable {
     public struct Configuration: Sendable, Equatable {
         /// A candidate needs both this many milliseconds and this fraction of the word interval.
@@ -11,21 +13,38 @@ public struct SpeakerTurnBuilder: Sendable {
         public var minimumOverlapRatio: Double
         /// A tie (or near tie) is ambiguous and is represented as the unknown speaker.
         public var minimumLeadMs: Int
-        public var pauseSplitMs: Int
-        public var maximumSegmentDurationMs: Int
+        /// Display-paragraph grouping. Does not change speaker identity.
+        public var grouping: TranscriptDisplayGrouper.Configuration
 
         public init(
             minimumOverlapMs: Int = 50,
             minimumOverlapRatio: Double = 0.5,
             minimumLeadMs: Int = 1,
-            pauseSplitMs: Int = 1_000,
-            maximumSegmentDurationMs: Int = 30_000
+            grouping: TranscriptDisplayGrouper.Configuration = TranscriptDisplayGrouper.Configuration()
         ) {
             self.minimumOverlapMs = minimumOverlapMs
             self.minimumOverlapRatio = minimumOverlapRatio
             self.minimumLeadMs = minimumLeadMs
-            self.pauseSplitMs = pauseSplitMs
-            self.maximumSegmentDurationMs = maximumSegmentDurationMs
+            self.grouping = grouping
+        }
+
+        /// Convenience for the historical flat grouping knobs used by tests and assembly.
+        public init(
+            minimumOverlapMs: Int = 50,
+            minimumOverlapRatio: Double = 0.5,
+            minimumLeadMs: Int = 1,
+            pauseSplitMs: Int,
+            maximumSegmentDurationMs: Int
+        ) {
+            self.init(
+                minimumOverlapMs: minimumOverlapMs,
+                minimumOverlapRatio: minimumOverlapRatio,
+                minimumLeadMs: minimumLeadMs,
+                grouping: TranscriptDisplayGrouper.Configuration(
+                    pauseSplitMs: pauseSplitMs,
+                    maximumSegmentDurationMs: maximumSegmentDurationMs
+                )
+            )
         }
     }
 
@@ -134,8 +153,7 @@ public struct SpeakerTurnBuilder: Sendable {
         guard configuration.minimumOverlapMs >= 0,
               (0...1).contains(configuration.minimumOverlapRatio),
               configuration.minimumLeadMs >= 0,
-              configuration.pauseSplitMs >= 0,
-              configuration.maximumSegmentDurationMs > 0 else { throw Error.invalidConfiguration }
+              TranscriptDisplayGrouper(configuration: configuration.grouping).isValid else { throw Error.invalidConfiguration }
     }
 
     private func attribute(_ word: NormalizedWord, using turns: [DiarizedSpeakerTurn]) -> Attribution {
@@ -165,16 +183,16 @@ public struct SpeakerTurnBuilder: Sendable {
     }
 
     private func canAppend(_ next: Attribution, to current: DraftSegment, canonicalSpeakerID: String?) -> Bool {
-        guard current.canonicalSpeakerID == canonicalSpeakerID,
-              !endsSentence(current.attributions.last!.word.word.text),
-              next.word.startMs - current.endMs < configuration.pauseSplitMs,
-              next.word.endMs - current.startMs <= configuration.maximumSegmentDurationMs else { return false }
-        return true
-    }
-
-    private func endsSentence(_ text: String) -> Bool {
-        let terminalCharacters = CharacterSet(charactersIn: ".?!")
-        return text.unicodeScalars.reversed().first.map { terminalCharacters.contains($0) } ?? false
+        TranscriptDisplayGrouper(configuration: configuration.grouping).shouldContinue(
+            currentSpeakerID: current.canonicalSpeakerID,
+            currentStartMs: current.startMs,
+            currentEndMs: current.endMs,
+            currentWordCount: current.attributions.count,
+            lastText: current.attributions.last!.word.word.text,
+            nextSpeakerID: canonicalSpeakerID,
+            nextStartMs: next.word.startMs,
+            nextEndMs: next.word.endMs
+        )
     }
 
     private struct NormalizedWord: Sendable {
