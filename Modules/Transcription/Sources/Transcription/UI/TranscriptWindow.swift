@@ -53,6 +53,14 @@ public struct TranscriptWindow: View {
             newPersonScope = nil
             Task { await viewModel.loadPeople() }
         }
+        .sheet(
+            isPresented: Binding(
+                get: { viewModel.reprocessSession != nil },
+                set: { if !$0 { viewModel.dismissReprocessSession() } }
+            )
+        ) {
+            TranscriptReprocessSheet(viewModel: viewModel)
+        }
     }
 
     // MARK: - Sidebar
@@ -496,12 +504,12 @@ public struct TranscriptWindow: View {
             .help("Applies current speaker-library names to this transcript as a new revision.")
             Menu("Reprocess", systemImage: "person.2.badge.gearshape") {
                 Button("Automatic speaker count") {
-                    Task { await viewModel.reprocess(speakerCount: .automatic) }
+                    viewModel.presentReprocessConfirmation(speakerCount: .automatic)
                 }
                 Divider()
                 ForEach(1...8, id: \.self) { count in
                     Button("Exactly \(count) speaker\(count == 1 ? "" : "s")") {
-                        Task { await viewModel.reprocess(speakerCount: .known(count)) }
+                        viewModel.presentReprocessConfirmation(speakerCount: .known(count))
                     }
                 }
                 Divider()

@@ -313,6 +313,59 @@ final class TranscriptViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.speakerActionMessage?.isFailure, false)
     }
 
+    func testReprocessConfirmationSheetShowsProgressAndCompletion() async throws {
+        let transcript = try fixture(named: "two-speakers")
+        let file = TranscriptReviewFile(
+            id: "revision-31-run",
+            sourceSnapshotURL: URL(fileURLWithPath: "/tmp/standup.flac"),
+            transcript: transcript,
+            jobState: .complete
+        )
+        let reprocessor = ReprocessorSpy()
+        reprocessor.queuedRunID = "new-run-42"
+        let viewModel = TranscriptViewModel(files: [file], playback: PlaybackSpy(), reprocessor: reprocessor)
+
+        viewModel.presentReprocessConfirmation(speakerCount: .known(2))
+        XCTAssertEqual(viewModel.reprocessSession?.phase, .confirming)
+        XCTAssertEqual(viewModel.reprocessSession?.speakerCount, .known(2))
+        XCTAssertTrue(reprocessor.requests.isEmpty, "Nothing is queued until confirmation.")
+
+        await viewModel.confirmReprocess()
+        XCTAssertEqual(reprocessor.requests.count, 1)
+        XCTAssertEqual(viewModel.reprocessSession?.phase, .queued)
+        XCTAssertEqual(viewModel.reprocessSession?.queuedRunID, "new-run-42")
+
+        viewModel.applyReprocessProgress(runID: "new-run-42", stage: .diarizing)
+        guard case let .processing(label, progress) = viewModel.reprocessSession?.phase else {
+            return XCTFail("Expected processing phase")
+        }
+        XCTAssertEqual(label, TranscriptionJobState.diarizing.progressLabel)
+        XCTAssertEqual(progress, TranscriptionJobState.diarizing.progressFractionOnStart)
+
+        viewModel.applyReprocessCheckpoint(runID: "new-run-42", stage: .diarizing)
+        guard case let .processing(_, checkpointProgress) = viewModel.reprocessSession?.phase else {
+            return XCTFail("Expected processing phase after checkpoint")
+        }
+        XCTAssertEqual(checkpointProgress, TranscriptionJobState.diarizing.progressFractionOnCheckpoint)
+
+        viewModel.finishReprocess(runID: "new-run-42", success: true)
+        XCTAssertEqual(viewModel.reprocessSession?.phase, .complete)
+        XCTAssertEqual(viewModel.speakerActionMessage?.isFailure, false)
+        XCTAssertTrue(viewModel.speakerActionMessage?.text.contains("Finished re-transcribing") == true)
+    }
+
+    func testReprocessIsUnavailableWhileAJobIsStillProcessing() throws {
+        let file = TranscriptReviewFile(
+            id: "in-flight",
+            sourceSnapshotURL: URL(fileURLWithPath: "/tmp/live.flac"),
+            transcript: nil,
+            jobState: .processing(progress: 0.4)
+        )
+        let viewModel = TranscriptViewModel(files: [file], playback: PlaybackSpy(), reprocessor: ReprocessorSpy())
+
+        XCTAssertFalse(viewModel.canReprocess)
+    }
+
     func testRetranscribeSendsTheFileIDToTheHostWithoutEditingTheTranscript() async throws {
         let transcript = try fixture(named: "two-speakers")
         let file = TranscriptReviewFile(
@@ -439,10 +492,11 @@ private final class DeleterSpy: TranscriptFileDeleting, @unchecked Sendable {
 
 private final class ReprocessorSpy: TranscriptReprocessing, @unchecked Sendable {
     private(set) var requests: [(TranscriptReviewFile.ID, TranscriptionSpeakerCount)] = []
+    var queuedRunID: String? = "queued-run"
 
     func reprocess(fileID: TranscriptReviewFile.ID, speakerCount: TranscriptionSpeakerCount) async -> TranscriptReprocessingOutcome {
         requests.append((fileID, speakerCount))
-        return TranscriptReprocessingOutcome(message: "Queued a new run.", isFailure: false)
+        return TranscriptReprocessingOutcome(message: "Queued a new run.", isFailure: false, queuedRunID: queuedRunID)
     }
 }
 

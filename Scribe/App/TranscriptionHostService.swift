@@ -402,7 +402,7 @@ final class TranscriptionHostService {
             return TranscriptReprocessingOutcome(message: "The original transcription run could not be found.", isFailure: true)
         }
         do {
-            _ = try await coordinator.reprocess(previous.job, speakerCount: speakerCount)
+            let job = try await coordinator.reprocess(previous.job, speakerCount: speakerCount)
             await refreshReview()
             Task { [weak self] in await self?.runPending() }
             let description = switch speakerCount {
@@ -411,7 +411,8 @@ final class TranscriptionHostService {
             }
             return TranscriptReprocessingOutcome(
                 message: "Queued a new run with \(description). This transcript and its edits were kept.",
-                isFailure: false
+                isFailure: false,
+                queuedRunID: job.runID.uuidString
             )
         } catch {
             return TranscriptReprocessingOutcome(message: "Could not queue reprocessing: \(error.localizedDescription)", isFailure: true)
@@ -501,22 +502,35 @@ final class TranscriptionHostService {
         case let .stageStarted(job):
             status.lines = ["Transcribing \(job.request.sourceURL.lastPathComponent) — \(job.state.rawValue)"]
             publishStatus()
-        case .checkpointCompleted:
-            break
-        case .completed:
+            reviewModel?.applyReprocessProgress(runID: job.runID.uuidString, stage: job.state)
+        case let .checkpointCompleted(job, stage):
+            reviewModel?.applyReprocessCheckpoint(runID: job.runID.uuidString, stage: stage)
+        case .completed(let job):
+            reviewModel?.finishReprocess(runID: job.runID.uuidString, success: true)
             await updateQueueStatus()
             await refreshReview()
-        case .cancelled:
+        case .cancelled(let job):
+            reviewModel?.finishReprocess(
+                runID: job.runID.uuidString,
+                success: false,
+                message: "Re-transcription was cancelled."
+            )
             await updateQueueStatus()
             await refreshReview()
         case let .failed(job, diagnostic):
             report(failure: "Transcription of \(job.request.sourceURL.lastPathComponent) failed: \(diagnostic.message)")
+            reviewModel?.finishReprocess(
+                runID: job.runID.uuidString,
+                success: false,
+                message: diagnostic.message
+            )
             await refreshReview()
         case let .suspended(job):
             // Recording has priority; saying so is more useful than a job that
             // silently stops making progress.
             status.lines = ["Transcription of \(job.request.sourceURL.lastPathComponent) paused while recording"]
             publishStatus()
+            reviewModel?.applyReprocessProgress(runID: job.runID.uuidString, stage: job.state)
         }
     }
 

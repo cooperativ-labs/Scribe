@@ -23,6 +23,38 @@ public enum TranscriptionJobState: String, Codable, Sendable, CaseIterable {
         .preparing, .transcribing, .reconcilingTimings, .diarizing,
         .assembling, .matchingSpeakers,
     ]
+
+    /// Short label for progress UI while a run is in flight.
+    public var progressLabel: String {
+        switch self {
+        case .queued: "Queued"
+        case .preparing: "Preparing audio"
+        case .transcribing: "Transcribing"
+        case .reconcilingTimings: "Aligning timings"
+        case .diarizing: "Separating speakers"
+        case .assembling: "Assembling transcript"
+        case .matchingSpeakers: "Matching speakers"
+        case .complete: "Complete"
+        case .cancelled: "Cancelled"
+        case .failed: "Failed"
+        }
+    }
+
+    /// Fraction of the fixed processing pipeline completed when this stage starts.
+    public var progressFractionOnStart: Double {
+        guard let index = Self.processingStages.firstIndex(of: self) else {
+            return self == .complete ? 1 : 0
+        }
+        return Double(index) / Double(Self.processingStages.count)
+    }
+
+    /// Fraction completed once this stage's checkpoint is written.
+    public var progressFractionOnCheckpoint: Double {
+        guard let index = Self.processingStages.firstIndex(of: self) else {
+            return self == .complete ? 1 : 0
+        }
+        return Double(index + 1) / Double(Self.processingStages.count)
+    }
 }
 
 /// Export failures are deliberately independent from the canonical transcript.

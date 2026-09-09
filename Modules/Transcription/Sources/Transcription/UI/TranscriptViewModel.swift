@@ -134,6 +134,8 @@ public final class TranscriptViewModel {
     /// People available to the speaker picker, refreshed from the library.
     public private(set) var people: [SpeakerPersonRef] = []
     public private(set) var speakerActionMessage: TranscriptSpeakerActionMessage?
+    /// Speaker-count reprocess confirmation and progress sheet, when one is open.
+    public private(set) var reprocessSession: TranscriptReprocessSession?
     /// Candidate excerpts for the in-progress "Remember this voice" action.
     public private(set) var enrollmentCandidates: [TranscriptEnrollmentCandidate] = []
     public private(set) var enrollmentSpeakerID: String?
@@ -241,6 +243,7 @@ public final class TranscriptViewModel {
     /// screen when the incoming copy is not newer, so a routine refresh cannot
     /// silently discard an edit that is still being made.
     public func reload(files incoming: [TranscriptReviewFile]) {
+        let previousSelection = selectedFile
         let edited = Dictionary(files.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         self.files = incoming.map { file in
             guard let existing = edited[file.id],
@@ -251,6 +254,16 @@ public final class TranscriptViewModel {
             return file.replacingTranscript(existingTranscript)
         }
         if let selectedFileID, self.files.contains(where: { $0.id == selectedFileID }) { return }
+        // A finished reprocess replaces the run ID; keep the same source selected
+        // so the confirmation sheet and review stay on the meeting that just finished.
+        if let previousSelection,
+           let replacement = self.files.first(where: {
+               $0.sourceSnapshotURL.standardizedFileURL == previousSelection.sourceSnapshotURL.standardizedFileURL
+           })
+        {
+            self.selectedFileID = replacement.id
+            return
+        }
         selectedFileID = self.files.first?.id
     }
 
@@ -518,7 +531,16 @@ public final class TranscriptViewModel {
     /// importer there is nowhere to queue them, so the drop is refused up
     /// front rather than accepted and silently lost.
     public var canImportFiles: Bool { fileImporter != nil }
-    public var canReprocess: Bool { reprocessor != nil && selectedFile != nil }
+
+    /// Whether the toolbar offers speaker-count reprocess. An in-flight job or
+    /// an open reprocess sheet blocks another queue until that one settles.
+    public var canReprocess: Bool {
+        guard reprocessor != nil, let file = selectedFile, reprocessSession == nil else { return false }
+        switch file.jobState {
+        case .ready, .queued, .processing: return false
+        case .complete, .completeWithWarnings, .noSpeech, .failed: return true
+        }
+    }
 
     /// Whether the sidebar offers to retranscribe this file. A job still in
     /// flight is left alone: queuing another full run of the same source while
@@ -531,9 +553,79 @@ public final class TranscriptViewModel {
         }
     }
 
+    /// Opens the confirmation sheet for a chosen speaker count. The run is not
+    /// queued until the person confirms on that screen.
+    public func presentReprocessConfirmation(speakerCount: TranscriptionSpeakerCount) {
+        guard canReprocess, let file = selectedFile else { return }
+        reprocessSession = TranscriptReprocessSession(
+            fileID: file.id,
+            displayName: file.displayName,
+            speakerCount: speakerCount
+        )
+    }
+
+    /// Closes the reprocess sheet. An already-queued run keeps going; progress
+    /// simply stops being shown here.
+    public func dismissReprocessSession() {
+        reprocessSession = nil
+    }
+
+    /// Queues the confirmed speaker-count reprocess and moves the sheet into
+    /// its progress phase.
+    public func confirmReprocess() async {
+        guard let reprocessor,
+              let session = reprocessSession,
+              session.phase == .confirming
+        else { return }
+        let outcome = await reprocessor.reprocess(fileID: session.fileID, speakerCount: session.speakerCount)
+        speakerActionMessage = TranscriptSpeakerActionMessage(text: outcome.message, isFailure: outcome.isFailure)
+        guard var current = reprocessSession, current.id == session.id else { return }
+        if outcome.isFailure {
+            current.phase = .failed(message: outcome.message)
+            reprocessSession = current
+            return
+        }
+        current.queuedRunID = outcome.queuedRunID
+        current.phase = .queued
+        reprocessSession = current
+    }
+
+    /// Applies a coordinator stage update to the open reprocess sheet when the
+    /// event belongs to the run that sheet queued.
+    public func applyReprocessProgress(runID: String, stage: TranscriptionJobState) {
+        guard var session = reprocessSession, session.queuedRunID == runID else { return }
+        session.phase = .processing(stageLabel: stage.progressLabel, progress: stage.progressFractionOnStart)
+        reprocessSession = session
+    }
+
+    /// Marks a tracked reprocess stage as checkpointed for progress fraction.
+    public func applyReprocessCheckpoint(runID: String, stage: TranscriptionJobState) {
+        guard var session = reprocessSession, session.queuedRunID == runID else { return }
+        session.phase = .processing(stageLabel: stage.progressLabel, progress: stage.progressFractionOnCheckpoint)
+        reprocessSession = session
+    }
+
+    /// Ends a tracked reprocess when the queued run finishes or fails.
+    public func finishReprocess(runID: String, success: Bool, message: String? = nil) {
+        guard var session = reprocessSession, session.queuedRunID == runID else { return }
+        if success {
+            session.phase = .complete
+            speakerActionMessage = TranscriptSpeakerActionMessage(
+                text: "Finished re-transcribing with \(session.speakerCountDescription).",
+                isFailure: false
+            )
+        } else {
+            let failure = message ?? "Re-transcription failed."
+            session.phase = .failed(message: failure)
+            speakerActionMessage = TranscriptSpeakerActionMessage(text: failure, isFailure: true)
+        }
+        reprocessSession = session
+    }
+
     /// Re-diarizes from the preserved source as a new run. The selected file
     /// stays in place until the new run is completed and becomes the latest
-    /// run for that source.
+    /// run for that source. Prefer `presentReprocessConfirmation` from UI so
+    /// the person sees progress; this remains for direct host-path tests.
     public func reprocess(speakerCount: TranscriptionSpeakerCount) async {
         guard let reprocessor, let fileID = selectedFileID else { return }
         let outcome = await reprocessor.reprocess(fileID: fileID, speakerCount: speakerCount)

@@ -139,7 +139,14 @@ public final class AVFoundationTranscriptPlayback: TranscriptPlaybackSeeking {
     public func load(sourceSnapshotURL: URL) {
         guard loadedURL != sourceSnapshotURL else { return }
         loadedURL = sourceSnapshotURL
-        player.replaceCurrentItem(with: AVPlayerItem(url: sourceSnapshotURL))
+        // Exact seek tolerances alone are not enough: unindexed formats such as
+        // FLAC otherwise use approximate byte offsets, even while reporting the
+        // requested time. Parse the asset for precise random access first.
+        let asset = AVURLAsset(
+            url: sourceSnapshotURL,
+            options: [AVURLAssetPreferPreciseDurationAndTimingKey: true]
+        )
+        player.replaceCurrentItem(with: AVPlayerItem(asset: asset))
         observeEndOfCurrentItem()
     }
 
@@ -391,9 +398,69 @@ public protocol TranscriptRetranscribing: Sendable {
 public struct TranscriptReprocessingOutcome: Equatable, Sendable {
     public let message: String
     public let isFailure: Bool
+    /// The new run queued for this action, when queueing succeeded.
+    public let queuedRunID: String?
 
-    public init(message: String, isFailure: Bool) {
+    public init(message: String, isFailure: Bool, queuedRunID: String? = nil) {
         self.message = message
         self.isFailure = isFailure
+        self.queuedRunID = queuedRunID
+    }
+}
+
+/// Phases of the speaker-count reprocess confirmation sheet.
+public enum TranscriptReprocessPhase: Equatable, Sendable {
+    case confirming
+    case queued
+    case processing(stageLabel: String, progress: Double)
+    case complete
+    case failed(message: String)
+
+    public var isTerminal: Bool {
+        switch self {
+        case .complete, .failed: true
+        case .confirming, .queued, .processing: false
+        }
+    }
+
+    public var isInFlight: Bool {
+        switch self {
+        case .queued, .processing: true
+        case .confirming, .complete, .failed: false
+        }
+    }
+}
+
+/// One deliberate speaker-count reprocess, from confirmation through completion.
+public struct TranscriptReprocessSession: Identifiable, Equatable, Sendable {
+    public let id: UUID
+    public let fileID: TranscriptReviewFile.ID
+    public let displayName: String
+    public let speakerCount: TranscriptionSpeakerCount
+    public var phase: TranscriptReprocessPhase
+    /// The run queued after confirmation, used to match coordinator progress events.
+    public var queuedRunID: String?
+
+    public init(
+        id: UUID = UUID(),
+        fileID: TranscriptReviewFile.ID,
+        displayName: String,
+        speakerCount: TranscriptionSpeakerCount,
+        phase: TranscriptReprocessPhase = .confirming,
+        queuedRunID: String? = nil
+    ) {
+        self.id = id
+        self.fileID = fileID
+        self.displayName = displayName
+        self.speakerCount = speakerCount
+        self.phase = phase
+        self.queuedRunID = queuedRunID
+    }
+
+    public var speakerCountDescription: String {
+        switch speakerCount {
+        case .automatic: "automatic speaker count"
+        case .known(let count): "exactly \(count) speaker\(count == 1 ? "" : "s")"
+        }
     }
 }
