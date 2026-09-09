@@ -217,8 +217,57 @@ public protocol TranscriptExportWriting: Sendable {
     func write(
         _ transcript: CanonicalTranscript,
         formats: Set<TranscriptExportFormat>,
-        to directoryURL: URL
+        to directoryURL: URL,
+        basename: String
     ) -> [TranscriptExportOutcome]
+
+    func write(
+        _ transcript: CanonicalTranscript,
+        format: TranscriptExportFormat,
+        toFile fileURL: URL
+    ) -> TranscriptExportOutcome
+}
+
+extension TranscriptExportWriting {
+    /// Names files after the transcript when the caller has not chosen a different name.
+    public func write(
+        _ transcript: CanonicalTranscript,
+        formats: Set<TranscriptExportFormat>,
+        to directoryURL: URL
+    ) -> [TranscriptExportOutcome] {
+        write(
+            transcript,
+            formats: formats,
+            to: directoryURL,
+            basename: FileTranscriptExportWriter.basename(for: transcript)
+        )
+    }
+}
+
+/// The folder and shared file name implied by a Save panel URL.
+public struct TranscriptExportDestination: Equatable, Sendable {
+    public let directoryURL: URL
+    public let basename: String
+
+    public init(directoryURL: URL, basename: String) {
+        self.directoryURL = directoryURL
+        self.basename = basename
+    }
+
+    /// Treats a Save panel URL as a destination folder plus a name. A known export
+    /// extension is stripped so TXT, JSON, and SRT copies can share that name.
+    public static func fromSaveURL(_ url: URL) -> TranscriptExportDestination {
+        let filename = url.lastPathComponent
+        let knownExtensions = Set(TranscriptExportFormat.allCases.map(\.fileExtension))
+        let basename: String
+        if knownExtensions.contains(url.pathExtension.lowercased()) {
+            let stripped = url.deletingPathExtension().lastPathComponent
+            basename = stripped.isEmpty ? filename : stripped
+        } else {
+            basename = filename
+        }
+        return TranscriptExportDestination(directoryURL: url.deletingLastPathComponent(), basename: basename)
+    }
 }
 
 public struct FileTranscriptExportWriter: TranscriptExportWriting {
@@ -238,21 +287,27 @@ public struct FileTranscriptExportWriter: TranscriptExportWriting {
     public func write(
         _ transcript: CanonicalTranscript,
         formats: Set<TranscriptExportFormat>,
-        to directoryURL: URL
+        to directoryURL: URL,
+        basename: String
     ) -> [TranscriptExportOutcome] {
-        let basename = Self.basename(for: transcript)
-
-        return TranscriptExportFormat.allCases.compactMap { format in
+        TranscriptExportFormat.allCases.compactMap { format in
             guard formats.contains(format) else { return nil }
             let destination = directoryURL.appendingPathComponent(basename).appendingPathExtension(format.fileExtension)
+            return write(transcript, format: format, toFile: destination)
+        }
+    }
 
-            do {
-                let data = try TranscriptExporter.export(transcript, as: format)
-                try data.write(to: destination, options: .atomic)
-                return TranscriptExportOutcome(format: format, destinationURL: destination, errorMessage: nil)
-            } catch {
-                return TranscriptExportOutcome(format: format, destinationURL: nil, errorMessage: error.localizedDescription)
-            }
+    public func write(
+        _ transcript: CanonicalTranscript,
+        format: TranscriptExportFormat,
+        toFile fileURL: URL
+    ) -> TranscriptExportOutcome {
+        do {
+            let data = try TranscriptExporter.export(transcript, as: format)
+            try data.write(to: fileURL, options: .atomic)
+            return TranscriptExportOutcome(format: format, destinationURL: fileURL, errorMessage: nil)
+        } catch {
+            return TranscriptExportOutcome(format: format, destinationURL: nil, errorMessage: error.localizedDescription)
         }
     }
 }

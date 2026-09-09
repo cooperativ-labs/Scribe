@@ -9,13 +9,11 @@
 # in that prefix, so a successful run here is what makes `swift build` work.
 #
 # Usage:
-#   build-webrtc-apm.sh [--arch arm64|x86_64] [--clean] [--force] [--verify-only]
+#   build-webrtc-apm.sh [--arch arm64] [--clean] [--force] [--verify-only]
 #
 # Environment overrides:
 #   MESON, NINJA                 use an existing toolchain instead of the venv
 #   SCRIBE_NATIVE_CACHE          shared download cache (default Vendor/cache)
-#   SCRIBE_ALLOW_UNVALIDATED_ARCH=1
-#                                permit --arch x86_64 (see README, Intel path)
 
 set -euo pipefail
 
@@ -52,14 +50,7 @@ done
 HOST_ARCH="$(uname -m)"
 case "${ARCH}" in
   arm64) ;;
-  x86_64)
-    # The Intel path is implemented but deliberately not exercised. See
-    # Native/WebRTCBridge/README.md, "Intel (x86_64) path".
-    if [[ "${SCRIBE_ALLOW_UNVALIDATED_ARCH:-0}" != "1" ]]; then
-      die "x86_64 is documented but not validated. Read Native/WebRTCBridge/README.md
-       and re-run with SCRIBE_ALLOW_UNVALIDATED_ARCH=1 if you intend to build it."
-    fi
-    ;;
+  x86_64) die "x86_64 builds are not supported; Scribe is Apple Silicon only." ;;
   *) die "unsupported architecture: ${ARCH}" ;;
 esac
 

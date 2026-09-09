@@ -103,6 +103,81 @@ final class TranscriptViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.exportOutcomes.contains { $0.format == .subtitles && !$0.succeeded })
     }
 
+    func testFileExporterWritesToTheExactFileTheSavePanelChose() throws {
+        let transcript = try fixture(named: "two-speakers")
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("scribe-named-export-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let destination = directory.appendingPathComponent("weekly notes.txt")
+
+        let outcome = FileTranscriptExportWriter().write(transcript, format: .plainText, toFile: destination)
+
+        XCTAssertTrue(outcome.succeeded)
+        XCTAssertEqual(outcome.destinationURL, destination)
+        XCTAssertEqual(try String(contentsOf: destination, encoding: .utf8), try TranscriptExporter.plainText(transcript))
+    }
+
+    func testFileExporterHonorsAChosenBasenameForEveryFormat() throws {
+        let transcript = try fixture(named: "two-speakers")
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("scribe-basename-export-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let outcomes = FileTranscriptExportWriter().write(
+            transcript,
+            formats: Set(TranscriptExportFormat.allCases),
+            to: directory,
+            basename: "weekly notes"
+        )
+
+        XCTAssertEqual(outcomes.count, 3)
+        XCTAssertTrue(outcomes.allSatisfy(\.succeeded))
+        for format in TranscriptExportFormat.allCases {
+            let url = directory.appendingPathComponent("weekly notes").appendingPathExtension(format.fileExtension)
+            XCTAssertTrue(FileManager.default.fileExists(atPath: url.path), "missing \(url.lastPathComponent)")
+        }
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: directory.appendingPathComponent("interview.txt").path),
+            "the transcript title must not be used when a Save panel name was chosen"
+        )
+    }
+
+    func testViewModelExportsASingleFormatToTheChosenFile() throws {
+        let transcript = try fixture(named: "one-speaker")
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("scribe-vm-file-export-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let destination = directory.appendingPathComponent("handoff.srt")
+        let viewModel = TranscriptViewModel(
+            files: [
+                TranscriptReviewFile(
+                    sourceSnapshotURL: URL(fileURLWithPath: "/tmp/scribe-snapshot.flac"),
+                    transcript: transcript,
+                    jobState: .complete
+                )
+            ],
+            playback: PlaybackSpy()
+        )
+
+        viewModel.export(.subtitles, toFile: destination)
+
+        XCTAssertEqual(viewModel.exportOutcomes.count, 1)
+        XCTAssertEqual(viewModel.exportOutcomes.first?.destinationURL, destination)
+        XCTAssertEqual(try String(contentsOf: destination, encoding: .utf8), try TranscriptExporter.srt(transcript))
+    }
+
+    func testSavePanelURLBecomesAFolderAndSharedBasename() {
+        let txt = TranscriptExportDestination.fromSaveURL(URL(fileURLWithPath: "/Users/jake/Desktop/Weekly Standup.txt"))
+        XCTAssertEqual(txt.directoryURL.path, "/Users/jake/Desktop")
+        XCTAssertEqual(txt.basename, "Weekly Standup")
+
+        let untitled = TranscriptExportDestination.fromSaveURL(URL(fileURLWithPath: "/Users/jake/Desktop/Weekly Standup"))
+        XCTAssertEqual(untitled.basename, "Weekly Standup")
+
+        let dotted = TranscriptExportDestination.fromSaveURL(URL(fileURLWithPath: "/tmp/my.meeting.notes"))
+        XCTAssertEqual(dotted.basename, "my.meeting.notes")
+    }
+
     func testPlayingASegmentStartsThereAndFollowsTheTurnsUntilTheLastOneEnds() throws {
         let transcript = try fixture(named: "two-speakers")
         let playback = PlaybackSpy()
@@ -345,6 +420,16 @@ private struct StubExportWriter: TranscriptExportWriting {
     func write(
         _: CanonicalTranscript,
         formats _: Set<TranscriptExportFormat>,
-        to _: URL
+        to _: URL,
+        basename _: String
     ) -> [TranscriptExportOutcome] { outcomes }
+
+    func write(
+        _: CanonicalTranscript,
+        format: TranscriptExportFormat,
+        toFile fileURL: URL
+    ) -> TranscriptExportOutcome {
+        outcomes.first { $0.format == format }
+            ?? TranscriptExportOutcome(format: format, destinationURL: fileURL, errorMessage: nil)
+    }
 }

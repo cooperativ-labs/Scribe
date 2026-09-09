@@ -31,25 +31,25 @@ done
 
 cd "${PACKAGE_DIR}"
 
-if [[ ! -f "Vendor/prefix/macos-$(uname -m)/lib/libwebrtc-audio-processing-2.a" ]]; then
+if [[ ! -f "Vendor/prefix/macos-arm64/lib/libwebrtc-audio-processing-2.a" ]]; then
   die "the pinned module has not been built. Run Scripts/build-native-dependencies.sh first."
 fi
 
 log "swift test"
-swift test
+swift test --arch arm64
 
 if [[ "${RUN_ASAN}" == "1" ]]; then
   log "swift test --sanitize=address"
-  swift test --sanitize=address
+  swift test --arch arm64 --sanitize=address
 fi
 
 if [[ "${RUN_LEAKS}" == "1" ]]; then
   # Rebuild without the sanitizer: an ASan-instrumented bundle cannot be launched
   # by `leaks` (the interceptors load too late through xctest's dlopen).
   log "rebuilding without the sanitizer for the leak check"
-  swift build --build-tests >/dev/null
+  swift build --arch arm64 --build-tests >/dev/null
 
-  BIN_PATH="$(swift build --build-tests --show-bin-path | tail -1)"
+  BIN_PATH="$(swift build --arch arm64 --build-tests --show-bin-path | tail -1)"
   BUNDLE="${BIN_PATH}/WebRTCBridgeTests.xctest"
   [[ -d "${BUNDLE}" ]] || die "could not find the test bundle at ${BUNDLE}"
 

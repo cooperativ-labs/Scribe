@@ -11,11 +11,9 @@ import PackageDescription
 let packageDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
 
 #if arch(x86_64)
-// Documented but not validated; see README.md, "Intel (x86_64) path".
-let platformSlice = "macos-x86_64"
-#else
-let platformSlice = "macos-arm64"
+#error("Scribe is Apple Silicon only; WebRTC APM is not built for Intel macOS.")
 #endif
+let platformSlice = "macos-arm64"
 
 let vendorDirectory = packageDirectory.appendingPathComponent("Vendor")
 let prefixDirectory = vendorDirectory.appendingPathComponent("prefix/\(platformSlice)")

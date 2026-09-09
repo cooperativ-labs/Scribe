@@ -14,10 +14,10 @@ ENTITLEMENTS="$PACKAGE_DIR/Resources/CaptureHarness.entitlements"
 IDENTIFIER="io.cooperativ.scribe.captureharness"
 
 cd "$PACKAGE_DIR"
-swift build -c "$CONFIGURATION" \
+swift build -c "$CONFIGURATION" --arch arm64 \
   -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker "$INFO_PLIST"
 
-BINARY="$(swift build -c "$CONFIGURATION" --show-bin-path)/capture-harness"
+BINARY="$(swift build -c "$CONFIGURATION" --arch arm64 --show-bin-path)/capture-harness"
 codesign --force --sign - \
   --identifier "$IDENTIFIER" \
   --entitlements "$ENTITLEMENTS" \

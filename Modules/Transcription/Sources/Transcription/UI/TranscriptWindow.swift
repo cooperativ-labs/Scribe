@@ -5,8 +5,6 @@ import UniformTypeIdentifiers
 /// A macOS review window. The host supplies files as jobs complete; this view does not own jobs.
 public struct TranscriptWindow: View {
     @Bindable private var viewModel: TranscriptViewModel
-    @State private var isChoosingExportDirectory = false
-    @State private var pendingFormats: Set<TranscriptExportFormat> = []
     @State private var fileAwaitingDeletion: TranscriptReviewFile?
     @State private var fileFilter = ""
 
@@ -41,21 +39,6 @@ public struct TranscriptWindow: View {
                 ContentUnavailableView(file.jobState.displayName, systemImage: "waveform", description: Text(file.processingError ?? "A transcript will appear here when processing is complete."))
             } else {
                 ContentUnavailableView("No file selected", systemImage: "text.bubble")
-            }
-        }
-        .fileImporter(
-            isPresented: $isChoosingExportDirectory,
-            allowedContentTypes: [.folder],
-            allowsMultipleSelection: false
-        ) { result in
-            guard case .success(let urls) = result, let directory = urls.first else { return }
-            let formats = pendingFormats
-            Task {
-                let granted = directory.startAccessingSecurityScopedResource()
-                defer { if granted { directory.stopAccessingSecurityScopedResource() } }
-                // Labels are brought up to date as a new revision first, so the
-                // exported files carry the names the library holds now.
-                await viewModel.exportRefreshingLabels(formats, to: directory)
             }
         }
         // A floor only: the window, not the transcript's length, decides the size.
@@ -503,13 +486,14 @@ public struct TranscriptWindow: View {
                     .help("Hand this transcript to a coding agent working in a folder you have connected. The session opens in Latch.")
             }
             Menu("Export", systemImage: "square.and.arrow.up") {
-                Button("Export TXT") { chooseDestination(for: [.plainText]) }
-                Button("Export JSON") { chooseDestination(for: [.json]) }
-                Button("Export SRT") { chooseDestination(for: [.subtitles]) }
+                Button("Export TXT") { exportTranscript(formats: [.plainText]) }
+                Button("Export JSON") { exportTranscript(formats: [.json]) }
+                Button("Export SRT") { exportTranscript(formats: [.subtitles]) }
                 Divider()
-                Button("Export All") { chooseDestination(for: Set(TranscriptExportFormat.allCases)) }
+                Button("Export All") { exportTranscript(formats: Set(TranscriptExportFormat.allCases)) }
             }
             .disabled(viewModel.selectedTranscript == nil)
+            .help("Save a copy of this transcript as TXT, JSON, or SRT. This does not change the recordings folder in Settings.")
             Button("Keyboard Shortcuts", systemImage: "keyboard") { isShowingShortcuts.toggle() }
                 .popover(isPresented: $isShowingShortcuts, arrowEdge: .bottom) { TranscriptShortcutsHelp() }
                 .help("Keyboard shortcuts")
@@ -570,9 +554,35 @@ public struct TranscriptWindow: View {
         viewModel.chronologicalSegments.first { $0.id == viewModel.selectedSegmentID }
     }
 
-    private func chooseDestination(for formats: Set<TranscriptExportFormat>) {
-        pendingFormats = formats
-        isChoosingExportDirectory = true
+    /// Opens a Save panel for the chosen formats. A cancelled panel writes nothing.
+    private func exportTranscript(formats: Set<TranscriptExportFormat>) {
+        guard let transcript = viewModel.selectedTranscript else { return }
+        let suggestedBasename = FileTranscriptExportWriter.basename(for: transcript)
+        let destinationURL: URL?
+        if formats.count == 1, let format = formats.first {
+            destinationURL = TranscriptExportSavePanel.pickFile(format: format, suggestedBasename: suggestedBasename)
+        } else {
+            destinationURL = TranscriptExportSavePanel.pickSharedName(suggestedBasename: suggestedBasename)
+        }
+        guard let destinationURL else { return }
+        Task {
+            let granted = destinationURL.startAccessingSecurityScopedResource()
+            defer { if granted { destinationURL.stopAccessingSecurityScopedResource() } }
+            // Labels are brought up to date as a new revision first, so the
+            // exported files carry the names the library holds now.
+            if formats.count == 1, let format = formats.first {
+                await viewModel.exportRefreshingLabels(format, toFile: destinationURL)
+            } else {
+                let destination = TranscriptExportDestination.fromSaveURL(destinationURL)
+                let directoryGranted = destination.directoryURL.startAccessingSecurityScopedResource()
+                defer { if directoryGranted { destination.directoryURL.stopAccessingSecurityScopedResource() } }
+                await viewModel.exportRefreshingLabels(
+                    formats,
+                    to: destination.directoryURL,
+                    basename: destination.basename
+                )
+            }
+        }
     }
 }
 

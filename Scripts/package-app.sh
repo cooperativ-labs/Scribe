@@ -110,12 +110,18 @@ mkdir -p "$release_root" "$distribution_dir"
 rm -rf "$archive_path"
 
 echo "Building signed Release archive…"
+# generic/platform=macOS otherwise archives both arm64 and x86_64 for SPM
+# packages, even when the app target is arm64-only. FluidAudio uses Float16,
+# which does not compile for Intel macOS, and Scribe does not ship an Intel slice.
 xcodebuild \
   -project "$repo_root/Scribe.xcodeproj" \
   -scheme Scribe \
   -configuration Release \
   -destination 'generic/platform=macOS' \
   -archivePath "$archive_path" \
+  ARCHS=arm64 \
+  EXCLUDED_ARCHS=x86_64 \
+  ONLY_ACTIVE_ARCH=NO \
   CODE_SIGN_STYLE=Manual \
   CODE_SIGN_IDENTITY="$DEVELOPER_ID_APPLICATION" \
   DEVELOPMENT_TEAM="$DEVELOPER_TEAM_ID" \

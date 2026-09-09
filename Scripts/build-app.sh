@@ -39,6 +39,8 @@ xcodebuild \
   -scheme Scribe \
   -configuration Debug \
   -destination 'platform=macOS,arch=arm64' \
+  ARCHS=arm64 \
+  EXCLUDED_ARCHS=x86_64 \
   build
 
 ((populate_helpers)) || exit 0
@@ -46,7 +48,7 @@ xcodebuild \
 # Ask the build for its own product directory rather than guessing at a
 # DerivedData path, which is neither stable nor the same on two machines.
 products_dir="$(xcodebuild -project Scribe.xcodeproj -scheme Scribe -configuration Debug \
-  -destination 'platform=macOS,arch=arm64' -showBuildSettings 2>/dev/null \
+  -destination 'platform=macOS,arch=arm64' ARCHS=arm64 EXCLUDED_ARCHS=x86_64 -showBuildSettings 2>/dev/null \
   | awk -F' = ' '/ BUILT_PRODUCTS_DIR = /{print $2; exit}')"
 [[ -n "$products_dir" && -d "$products_dir" ]] || die "could not resolve BUILT_PRODUCTS_DIR from the build settings"
 app_path="$products_dir/Scribe.app"

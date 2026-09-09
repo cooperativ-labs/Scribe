@@ -545,20 +545,46 @@ public final class TranscriptViewModel {
     }
 
     /// Exports each requested format separately so an SRT failure does not lose valid TXT/JSON.
-    public func export(_ formats: Set<TranscriptExportFormat>, to directoryURL: URL) {
+    public func export(_ formats: Set<TranscriptExportFormat>, to directoryURL: URL, basename: String? = nil) {
         guard let transcript = selectedTranscript else {
             exportOutcomes = formats.map {
                 TranscriptExportOutcome(format: $0, destinationURL: nil, errorMessage: "This file has no completed transcript to export.")
             }
             return
         }
-        exportOutcomes = exportWriter.write(transcript, formats: formats, to: directoryURL)
+        let name = basename ?? FileTranscriptExportWriter.basename(for: transcript)
+        exportOutcomes = exportWriter.write(transcript, formats: formats, to: directoryURL, basename: name)
+    }
+
+    /// Writes one format to the exact file the Save panel chose, including a renamed file.
+    public func export(_ format: TranscriptExportFormat, toFile fileURL: URL) {
+        guard let transcript = selectedTranscript else {
+            exportOutcomes = [
+                TranscriptExportOutcome(
+                    format: format,
+                    destinationURL: nil,
+                    errorMessage: "This file has no completed transcript to export."
+                )
+            ]
+            return
+        }
+        exportOutcomes = [exportWriter.write(transcript, format: format, toFile: fileURL)]
     }
 
     /// Brings saved labels up to date with the library, then exports that revision.
-    public func exportRefreshingLabels(_ formats: Set<TranscriptExportFormat>, to directoryURL: URL) async {
+    public func exportRefreshingLabels(
+        _ formats: Set<TranscriptExportFormat>,
+        to directoryURL: URL,
+        basename: String? = nil
+    ) async {
         await refreshLabelsFromLibrary(announceUnchanged: false)
-        export(formats, to: directoryURL)
+        export(formats, to: directoryURL, basename: basename)
+    }
+
+    /// Brings saved labels up to date with the library, then writes one format to `fileURL`.
+    public func exportRefreshingLabels(_ format: TranscriptExportFormat, toFile fileURL: URL) async {
+        await refreshLabelsFromLibrary(announceUnchanged: false)
+        export(format, toFile: fileURL)
     }
 
     // MARK: - Sending to an agent

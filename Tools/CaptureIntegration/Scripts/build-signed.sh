@@ -19,10 +19,10 @@ ENTITLEMENTS="$PACKAGE_DIR/Resources/CaptureIntegration.entitlements"
 IDENTIFIER="io.cooperativ.scribe.captureintegration"
 
 cd "$PACKAGE_DIR"
-swift build -c "$CONFIGURATION" \
+swift build -c "$CONFIGURATION" --arch arm64 \
   -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker "$INFO_PLIST"
 
-BINARY="$(swift build -c "$CONFIGURATION" --show-bin-path)/capture-integration"
+BINARY="$(swift build -c "$CONFIGURATION" --arch arm64 --show-bin-path)/capture-integration"
 
 APP="$PACKAGE_DIR/bin/CaptureIntegration.app"
 rm -rf "$APP"

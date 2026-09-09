@@ -374,11 +374,25 @@ private final class RecordingExportWriter: TranscriptExportWriting, @unchecked S
     func write(
         _ transcript: CanonicalTranscript,
         formats: Set<TranscriptExportFormat>,
-        to directoryURL: URL
+        to directoryURL: URL,
+        basename: String
     ) -> [TranscriptExportOutcome] {
         exported = transcript
         return formats.map {
-            TranscriptExportOutcome(format: $0, destinationURL: directoryURL.appendingPathComponent("out.\($0.fileExtension)"), errorMessage: nil)
+            TranscriptExportOutcome(
+                format: $0,
+                destinationURL: directoryURL.appendingPathComponent("\(basename).\($0.fileExtension)"),
+                errorMessage: nil
+            )
         }
+    }
+
+    func write(
+        _ transcript: CanonicalTranscript,
+        format: TranscriptExportFormat,
+        toFile fileURL: URL
+    ) -> TranscriptExportOutcome {
+        exported = transcript
+        return TranscriptExportOutcome(format: format, destinationURL: fileURL, errorMessage: nil)
     }
 }

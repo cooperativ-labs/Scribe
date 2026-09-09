@@ -157,40 +157,10 @@ section 2 puts DSP on one serial queue.
 `reset()` drops the adapted filter but keeps the declared stream delay, matching
 upstream. If the discontinuity also moved the delay, declare the new value.
 
-## Intel (x86_64) path — documented, not built
+## Apple Silicon only
 
-Section 1 of the plan is Apple Silicon first, with Intel validated separately
-before it is advertised. Nothing here has been built or run on x86_64.
-
-The plumbing exists. `build-webrtc-apm.sh --arch x86_64` selects the
-`macos-x86_64` prefix, writes a meson cross file when the host is arm64, and
-passes `-arch x86_64` through the compiler and linker flags; `Package.swift`
-picks the matching prefix when the manifest itself is compiled for x86_64. The
-architecture is gated behind `SCRIBE_ALLOW_UNVALIDATED_ARCH=1` so that nobody
-ships an Intel slice believing it was tested:
-
-```bash
-SCRIBE_ALLOW_UNVALIDATED_ARCH=1 \
-  Scripts/build-native-dependencies.sh webrtc-apm -- --arch x86_64
-```
-
-What still has to be settled before Intel can be supported:
-
-- **AVX2 objects.** On x86, upstream compiles the AVX2 kernels into a separate
-  `webrtc_audio_processing_privatearch` static library and links the module
-  against it. That target is not installed. On arm64 the equivalent internal
-  static libraries are merged into the installed archive, so this probably
-  works, but "probably" is not a link that has been performed. Confirm the AVX2
-  symbols are present in the installed archive, and extend the archive-collection
-  step in `build-webrtc-apm.sh` if they are not.
-- **Baseline SSE.** Upstream's `inline-sse` option defaults on, assuming SSE/SSE2.
-  That holds for every Intel Mac, so no change is expected.
-- **A universal binary.** Distribution needs one library per slice joined with
-  `lipo -create`, and a `Package.swift` that points at the universal prefix.
-  Neither exists; today the manifest picks one slice.
-- **Validation on Intel hardware.** The section 8 gates — 20 dB median echo
-  reduction, under 1 dB near-end level change, capture under 10% of a core — are
-  hardware-dependent and have not been measured on Intel.
+Scribe does not build or ship an Intel (`x86_64`) slice. `Package.swift` links
+the `macos-arm64` prefix only, and `build-webrtc-apm.sh` rejects `--arch x86_64`.
 
 ## Licences
 

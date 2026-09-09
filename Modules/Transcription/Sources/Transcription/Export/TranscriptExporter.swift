@@ -1,4 +1,5 @@
 import Foundation
+import UniformTypeIdentifiers
 
 /// The document formats an export action can produce from a saved transcript revision.
 public enum TranscriptExportFormat: String, CaseIterable, Sendable, Hashable {
@@ -7,6 +8,15 @@ public enum TranscriptExportFormat: String, CaseIterable, Sendable, Hashable {
     case subtitles = "srt"
 
     public var fileExtension: String { rawValue }
+
+    /// The type a Save panel offers for this format, so the exported file is a document rather than a folder.
+    public var contentType: UTType {
+        switch self {
+        case .plainText: .plainText
+        case .json: .json
+        case .subtitles: UTType(filenameExtension: fileExtension) ?? .plainText
+        }
+    }
 }
 
 public enum TranscriptExportError: Swift.Error, Equatable, Sendable, CustomStringConvertible {

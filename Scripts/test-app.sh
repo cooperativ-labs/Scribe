@@ -9,4 +9,6 @@ xcodebuild \
   -project Scribe.xcodeproj \
   -scheme Scribe \
   -destination 'platform=macOS,arch=arm64' \
+  ARCHS=arm64 \
+  EXCLUDED_ARCHS=x86_64 \
   test
