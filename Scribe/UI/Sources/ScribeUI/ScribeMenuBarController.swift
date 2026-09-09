@@ -254,9 +254,6 @@ public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
             for line in transcription.statusLines {
                 menu.addItem(.disabled(line))
             }
-            if let failure = transcription.failure {
-                menu.addItem(.disabled(failure))
-            }
             menu.addItem(ActionMenuItem(title: "Transcripts…", handler: transcription.openTranscripts))
             menu.addItem(ActionMenuItem(title: "Transcribe Folder…", handler: transcription.transcribeFolder))
             if let openSpeakers = transcription.openSpeakers {
@@ -303,8 +300,9 @@ public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
             menu.addItem(ActionMenuItem(title: "Restart and Install", handler: updates.installUpdate))
         case .installing:
             menu.addItem(.disabled("Restarting to install update…"))
-        case .failed(let message):
-            menu.addItem(.disabled(message))
+        case .failed:
+            // No diagnostic text here: the Check item is the recovery path.
+            menu.addItem(.disabled("Update failed"))
             menu.addItem(check)
         }
     }
@@ -416,12 +414,73 @@ private final class ActionMenuItem: NSMenuItem {
 }
 
 private extension NSMenuItem {
-    /// A row that states a fact. Menus have no other way to show one.
+    /// A row that states a fact. Menus have no other way to show one. Long copy
+    /// wraps inside a fixed maximum width so a meeting title or recovery notice
+    /// cannot stretch the whole menu.
+    @MainActor
     static func disabled(_ title: String) -> NSMenuItem {
         let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
         item.isEnabled = false
+        item.view = MenuWrappingLabelView(text: title)
         return item
     }
+}
+
+/// A disabled menu row whose text wraps at a fixed maximum width.
+///
+/// Plain `NSMenuItem` titles never wrap: they grow the menu sideways instead.
+/// Status copy — meeting titles, recovery notices, processing lines — can be
+/// long enough to push every other row out of reach, so those rows use this
+/// view rather than a title string.
+@MainActor
+private final class MenuWrappingLabelView: NSView {
+    /// Cap the menu's content column. Matches the transport row's starting
+    /// width so status text and the buttons share one visual column.
+    static let maximumWidth: CGFloat = 260
+    private static let horizontalInset: CGFloat = 14
+    private static let verticalInset: CGFloat = 4
+
+    private let label = NSTextField(wrappingLabelWithString: "")
+
+    init(text: String) {
+        super.init(frame: .zero)
+
+        label.stringValue = text
+        label.font = .menuFont(ofSize: 0)
+        label.textColor = .secondaryLabelColor
+        label.backgroundColor = .clear
+        label.isBezeled = false
+        label.isEditable = false
+        label.isSelectable = false
+        label.drawsBackground = false
+        label.lineBreakMode = .byWordWrapping
+        label.maximumNumberOfLines = 0
+        label.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(label)
+
+        let contentWidth = Self.maximumWidth - (Self.horizontalInset * 2)
+        label.preferredMaxLayoutWidth = contentWidth
+        let fitting = label.sizeThatFits(NSSize(width: contentWidth, height: .greatestFiniteMagnitude))
+        // Fixed width: these rows set the menu's content column rather than
+        // growing sideways with the string.
+        frame = NSRect(
+            x: 0,
+            y: 0,
+            width: Self.maximumWidth,
+            height: ceil(fitting.height) + (Self.verticalInset * 2)
+        )
+
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Self.horizontalInset),
+            label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Self.horizontalInset),
+            label.topAnchor.constraint(equalTo: topAnchor, constant: Self.verticalInset),
+            label.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -Self.verticalInset),
+        ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 }
 
 private extension GlobalShortcut {

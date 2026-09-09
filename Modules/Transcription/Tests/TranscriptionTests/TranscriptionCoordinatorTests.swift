@@ -121,6 +121,39 @@ final class TranscriptionCoordinatorTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: original.jobFileURL.path), "The prior run, including review edits, stays on disk.")
     }
 
+    func testRetranscribeUsesCurrentModelProfileAndLeavesPriorRunIntact() async throws {
+        let store = root.appendingPathComponent("Meeting Transcripts", isDirectory: true)
+        let source = root.appendingPathComponent("meeting.flac")
+        try Data("audio bytes".utf8).write(to: source)
+        let coordinator = try TranscriptionCoordinator(
+            configuration: .init(transcriptStoreURL: store),
+            stageRunner: RecordingRunner(),
+            vocabularyRevision: { "vocab-current" }
+        )
+        let original = try await coordinator.enqueue(.init(
+            sourceURL: source,
+            speakerCount: .automatic,
+            vocabularyRevision: "vocab-old",
+            modelProfileID: "parakeet-v2"
+        ))
+        let revised = try await coordinator.retranscribe(
+            original,
+            modelProfileID: "parakeet-v3",
+            speakerCount: .known(3)
+        )
+
+        XCTAssertNotEqual(revised.runID, original.runID)
+        XCTAssertEqual(revised.retryOfRunID, original.runID)
+        XCTAssertEqual(revised.request.modelProfileID, "parakeet-v3")
+        XCTAssertEqual(revised.request.speakerCount, .known(3))
+        XCTAssertNil(revised.request.vocabularyRevision, "Unset revision lets enqueue record the glossary in force now.")
+        XCTAssertEqual(revised.sourceSnapshotURL, original.sourceSnapshotURL)
+        XCTAssertTrue(revised.checkpoints.isEmpty)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: original.jobFileURL.path))
+        XCTAssertNotEqual(revised.modelFingerprint, original.modelFingerprint)
+        XCTAssertNotEqual(revised.configurationFingerprint, original.configurationFingerprint)
+    }
+
     func testCancellationAtABoundaryKeepsAlreadyCommittedCheckpoints() async throws {
         let store = root.appendingPathComponent("Meeting Transcripts", isDirectory: true)
         let source = root.appendingPathComponent("meeting.flac")

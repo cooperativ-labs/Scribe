@@ -381,6 +381,13 @@ public protocol TranscriptReprocessing: Sendable {
     func reprocess(fileID: TranscriptReviewFile.ID, speakerCount: TranscriptionSpeakerCount) async -> TranscriptReprocessingOutcome
 }
 
+/// Re-runs recognition and diarization from a retained source using the host's
+/// current models and settings. Distinct from speaker-count reprocess, which
+/// keeps the prior run's model profile.
+public protocol TranscriptRetranscribing: Sendable {
+    func retranscribe(fileID: TranscriptReviewFile.ID) async -> TranscriptReprocessingOutcome
+}
+
 public struct TranscriptReprocessingOutcome: Equatable, Sendable {
     public let message: String
     public let isFailure: Bool

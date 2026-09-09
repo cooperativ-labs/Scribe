@@ -145,8 +145,7 @@ else
   require_executable "$worker_path"
 fi
 ditto "$worker_path" "$helpers_dir/TranscriptionWorker"
-ditto "$SCRIBE_FFMPEG_PATH" "$helpers_dir/ffmpeg"
-ditto "$SCRIBE_FFPROBE_PATH" "$helpers_dir/ffprobe"
+bash "$repo_root/Scripts/embed-ffmpeg-runtime.sh" "$SCRIBE_FFMPEG_PATH" "$SCRIBE_FFPROBE_PATH" "$helpers_dir" "$frameworks_dir"
 
 if [[ -n "${SCRIBE_RUNTIME_PAYLOADS_DIR:-}" ]]; then
   echo "Embedding local helper runtime payloads…"

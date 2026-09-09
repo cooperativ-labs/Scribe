@@ -168,6 +168,7 @@ public final class TranscriptViewModel {
     @ObservationIgnored private let fileDeleter: (any TranscriptFileDeleting)?
     @ObservationIgnored private let fileImporter: (any TranscriptFileImporting)?
     @ObservationIgnored private let reprocessor: (any TranscriptReprocessing)?
+    @ObservationIgnored private let retranscriber: (any TranscriptRetranscribing)?
     /// Hands a finished transcript to a coding agent. Absent in a build with no
     /// agent host, which hides the action rather than offering a dead end.
     @ObservationIgnored private let agentDispatcher: (any TranscriptAgentDispatching)?
@@ -202,6 +203,7 @@ public final class TranscriptViewModel {
         fileDeleter: (any TranscriptFileDeleting)? = nil,
         fileImporter: (any TranscriptFileImporting)? = nil,
         reprocessor: (any TranscriptReprocessing)? = nil,
+        retranscriber: (any TranscriptRetranscribing)? = nil,
         agentDispatcher: (any TranscriptAgentDispatching)? = nil,
         openVocabularySettings: (@MainActor () -> Void)? = nil
     ) {
@@ -214,6 +216,7 @@ public final class TranscriptViewModel {
         self.fileDeleter = fileDeleter
         self.fileImporter = fileImporter
         self.reprocessor = reprocessor
+        self.retranscriber = retranscriber
         self.agentDispatcher = agentDispatcher
         self.openVocabularySettings = openVocabularySettings
         selectFileIfNeeded()
@@ -517,12 +520,32 @@ public final class TranscriptViewModel {
     public var canImportFiles: Bool { fileImporter != nil }
     public var canReprocess: Bool { reprocessor != nil && selectedFile != nil }
 
+    /// Whether the sidebar offers to retranscribe this file. A job still in
+    /// flight is left alone: queuing another full run of the same source while
+    /// its first pass is writing checkpoints is more confusing than useful.
+    public func canRetranscribe(_ file: TranscriptReviewFile) -> Bool {
+        guard retranscriber != nil else { return false }
+        switch file.jobState {
+        case .ready, .queued, .processing: return false
+        case .complete, .completeWithWarnings, .noSpeech, .failed: return true
+        }
+    }
+
     /// Re-diarizes from the preserved source as a new run. The selected file
     /// stays in place until the new run is completed and becomes the latest
     /// run for that source.
     public func reprocess(speakerCount: TranscriptionSpeakerCount) async {
         guard let reprocessor, let fileID = selectedFileID else { return }
         let outcome = await reprocessor.reprocess(fileID: fileID, speakerCount: speakerCount)
+        speakerActionMessage = TranscriptSpeakerActionMessage(text: outcome.message, isFailure: outcome.isFailure)
+    }
+
+    /// Re-runs recognition and diarization with the host's current models and
+    /// settings. The reviewed transcript stays on screen until the new run
+    /// finishes and becomes the latest for that source.
+    public func retranscribe(fileID: TranscriptReviewFile.ID) async {
+        guard let retranscriber, let file = files.first(where: { $0.id == fileID }), canRetranscribe(file) else { return }
+        let outcome = await retranscriber.retranscribe(fileID: fileID)
         speakerActionMessage = TranscriptSpeakerActionMessage(text: outcome.message, isFailure: outcome.isFailure)
     }
 

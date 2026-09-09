@@ -313,6 +313,38 @@ final class TranscriptViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.speakerActionMessage?.isFailure, false)
     }
 
+    func testRetranscribeSendsTheFileIDToTheHostWithoutEditingTheTranscript() async throws {
+        let transcript = try fixture(named: "two-speakers")
+        let file = TranscriptReviewFile(
+            id: "revision-30-run",
+            sourceSnapshotURL: URL(fileURLWithPath: "/tmp/standup.flac"),
+            transcript: transcript,
+            jobState: .complete
+        )
+        let retranscriber = RetranscriberSpy()
+        let viewModel = TranscriptViewModel(files: [file], playback: PlaybackSpy(), retranscriber: retranscriber)
+
+        XCTAssertTrue(viewModel.canRetranscribe(file))
+        await viewModel.retranscribe(fileID: file.id)
+
+        XCTAssertEqual(retranscriber.fileIDs, [file.id])
+        XCTAssertEqual(viewModel.selectedTranscript?.revision, transcript.revision, "Retranscribing must not overwrite the reviewed revision.")
+        XCTAssertEqual(viewModel.speakerActionMessage?.isFailure, false)
+        XCTAssertEqual(viewModel.speakerActionMessage?.text, "Queued a new transcription.")
+    }
+
+    func testRetranscribeIsUnavailableWhileAJobIsStillProcessing() throws {
+        let file = TranscriptReviewFile(
+            id: "in-flight",
+            sourceSnapshotURL: URL(fileURLWithPath: "/tmp/live.flac"),
+            transcript: nil,
+            jobState: .processing(progress: 0.4)
+        )
+        let viewModel = TranscriptViewModel(files: [file], playback: PlaybackSpy(), retranscriber: RetranscriberSpy())
+
+        XCTAssertFalse(viewModel.canRetranscribe(file))
+    }
+
     private func fixture(named name: String) throws -> CanonicalTranscript {
         let url = try XCTUnwrap(Bundle.module.url(forResource: name, withExtension: "json"))
         return try CanonicalTranscriptCodec.decode(Data(contentsOf: url))
@@ -411,6 +443,15 @@ private final class ReprocessorSpy: TranscriptReprocessing, @unchecked Sendable 
     func reprocess(fileID: TranscriptReviewFile.ID, speakerCount: TranscriptionSpeakerCount) async -> TranscriptReprocessingOutcome {
         requests.append((fileID, speakerCount))
         return TranscriptReprocessingOutcome(message: "Queued a new run.", isFailure: false)
+    }
+}
+
+private final class RetranscriberSpy: TranscriptRetranscribing, @unchecked Sendable {
+    private(set) var fileIDs: [TranscriptReviewFile.ID] = []
+
+    func retranscribe(fileID: TranscriptReviewFile.ID) async -> TranscriptReprocessingOutcome {
+        fileIDs.append(fileID)
+        return TranscriptReprocessingOutcome(message: "Queued a new transcription.", isFailure: false)
     }
 }
 

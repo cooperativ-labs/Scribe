@@ -362,6 +362,7 @@ final class TranscriptionHostService {
             fileDeleter: TranscriptStoreFileDeleter(store: store),
             fileImporter: DroppedFileImporter(host: self),
             reprocessor: TranscriptReprocessor(host: self),
+            retranscriber: TranscriptRetranscriber(host: self),
             agentDispatcher: agentDispatcher,
             openVocabularySettings: openVocabularySettings
         )
@@ -414,6 +415,29 @@ final class TranscriptionHostService {
             )
         } catch {
             return TranscriptReprocessingOutcome(message: "Could not queue reprocessing: \(error.localizedDescription)", isFailure: true)
+        }
+    }
+
+    /// Re-runs recognition and diarization from the retained source using the
+    /// models and speaker-count setting currently configured for new imports.
+    func retranscribeTranscript(fileID: TranscriptReviewFile.ID) async -> TranscriptReprocessingOutcome {
+        guard let runID = UUID(uuidString: fileID), let previous = store.run(withRunID: runID) else {
+            return TranscriptReprocessingOutcome(message: "The original transcription run could not be found.", isFailure: true)
+        }
+        do {
+            _ = try await coordinator.retranscribe(
+                previous.job,
+                modelProfileID: modelProfileID,
+                speakerCount: speakerCount
+            )
+            await refreshReview()
+            Task { [weak self] in await self?.runPending() }
+            return TranscriptReprocessingOutcome(
+                message: "Queued a new transcription with the current models and settings. This transcript and its edits were kept.",
+                isFailure: false
+            )
+        } catch {
+            return TranscriptReprocessingOutcome(message: "Could not queue retranscription: \(error.localizedDescription)", isFailure: true)
         }
     }
 
@@ -550,6 +574,26 @@ private struct TranscriptReprocessor: TranscriptReprocessing {
             return TranscriptReprocessingOutcome(message: "Transcription is not available right now.", isFailure: true)
         }
         return await host.reprocessTranscript(fileID: fileID, speakerCount: speakerCount)
+    }
+
+    private final class WeakHost: @unchecked Sendable {
+        weak var value: TranscriptionHostService?
+        init(_ value: TranscriptionHostService) { self.value = value }
+    }
+}
+
+private struct TranscriptRetranscriber: TranscriptRetranscribing {
+    private let host: WeakHost
+
+    init(host: TranscriptionHostService) {
+        self.host = WeakHost(host)
+    }
+
+    func retranscribe(fileID: TranscriptReviewFile.ID) async -> TranscriptReprocessingOutcome {
+        guard let host = await MainActor.run(body: { host.value }) else {
+            return TranscriptReprocessingOutcome(message: "Transcription is not available right now.", isFailure: true)
+        }
+        return await host.retranscribeTranscript(fileID: fileID)
     }
 
     private final class WeakHost: @unchecked Sendable {

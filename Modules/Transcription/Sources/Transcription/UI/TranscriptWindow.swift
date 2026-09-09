@@ -1,3 +1,4 @@
+import AppKit
 import Speakers
 import SwiftUI
 import UniformTypeIdentifiers
@@ -6,6 +7,7 @@ import UniformTypeIdentifiers
 public struct TranscriptWindow: View {
     @Bindable private var viewModel: TranscriptViewModel
     @State private var fileAwaitingDeletion: TranscriptReviewFile?
+    @State private var fileAwaitingRetranscription: TranscriptReviewFile?
     @State private var fileFilter = ""
 
     @State private var isRenaming = false
@@ -168,6 +170,12 @@ public struct TranscriptWindow: View {
                 }
                 .tag(file.id)
                 .contextMenu {
+                    Button("Open in Finder") {
+                        openTranscriptFolder(for: file)
+                    }
+                    Button("Retranscribe…") { fileAwaitingRetranscription = file }
+                        .disabled(!viewModel.canRetranscribe(file))
+                    Divider()
                     Button("Rename…") { beginRenaming(file) }
                         .disabled(file.transcript == nil)
                     Button("Delete…", role: .destructive) { fileAwaitingDeletion = file }
@@ -192,6 +200,29 @@ public struct TranscriptWindow: View {
         } message: { _ in
             Text("The transcript and the copy of the recording kept beside it are removed. Exported files are left alone.")
         }
+        .confirmationDialog(
+            "Retranscribe \u{201C}\(fileAwaitingRetranscription?.displayName ?? "")\u{201D}?",
+            isPresented: Binding(
+                get: { fileAwaitingRetranscription != nil },
+                set: { if !$0 { fileAwaitingRetranscription = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: fileAwaitingRetranscription
+        ) { file in
+            Button("Retranscribe") {
+                if viewModel.selectedFileID != file.id { viewModel.selectedFileID = file.id }
+                Task { await viewModel.retranscribe(fileID: file.id) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("Scribe will run recognition and speaker separation again with the models and settings currently in use. This transcript and its edits stay until the new run finishes.")
+        }
+    }
+
+    /// Opens the meeting folder that holds the retained source and run history.
+    private func openTranscriptFolder(for file: TranscriptReviewFile) {
+        let folderURL = file.sourceSnapshotURL.deletingLastPathComponent()
+        NSWorkspace.shared.open(folderURL)
     }
 
     private func beginRenaming(_ file: TranscriptReviewFile) {

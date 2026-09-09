@@ -396,6 +396,37 @@ public actor TranscriptionCoordinator {
         return job
     }
 
+    /// Queues a fresh run over a retained source with the host's current model
+    /// profile and speaker-count setting. Vocabulary revision is left unset so
+    /// enqueue records whatever glossary is in force now. No checkpoint is
+    /// copied: a model or settings change must not mix with old ASR output.
+    /// The prior run directory, including review revisions, is never touched.
+    @discardableResult
+    public func retranscribe(
+        _ previous: TranscriptionJob,
+        modelProfileID: String,
+        speakerCount: TranscriptionSpeakerCount
+    ) throws -> TranscriptionJob {
+        let request = TranscriptionRequest(
+            sourceURL: previous.sourceSnapshotURL,
+            languageMode: previous.request.languageMode,
+            expectedLanguage: previous.request.expectedLanguage,
+            speakerCount: speakerCount,
+            speakerMatching: previous.request.speakerMatching,
+            speakerLibraryRevision: nil,
+            vocabularyRevision: nil,
+            modelProfileID: modelProfileID,
+            exportDirectory: previous.request.exportDirectory,
+            provenance: previous.request.provenance,
+            title: previous.request.title
+        )
+        var job = try enqueue(request)
+        job.retryOfRunID = previous.runID
+        try write(job)
+        jobs[job.id] = job
+        return job
+    }
+
     /// Drives at most one worker run at a time.  Starts are deferred while
     /// capture is active, and captures that start mid-run suspend at the next
     /// persisted stage boundary.

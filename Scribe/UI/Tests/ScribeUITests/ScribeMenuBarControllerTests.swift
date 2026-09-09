@@ -197,19 +197,85 @@ final class ScribeMenuBarControllerTests: XCTestCase {
         XCTAssertTrue(controller.menu.items.contains { $0.title == "Open Recordings Folder" })
     }
 
+    func testRecordingFailuresOmitDiagnosticTextFromTheMenu() {
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
+        coordinator.simulateFailure(
+            RecorderFailure(
+                code: "capture.failed",
+                message: "The meeting app stopped sharing audio.",
+                recoveryHint: "Try again."
+            )
+        )
+        let controller = makeController(coordinator)
+
+        controller.menuNeedsUpdate(controller.menu)
+
+        XCTAssertTrue(controller.menu.items.contains { $0.title == "Recording failed" })
+        XCTAssertFalse(controller.menu.items.contains { $0.title.contains("stopped sharing") })
+        XCTAssertFalse(controller.menu.items.contains { $0.title.contains("Try again") })
+    }
+
+    func testTranscriptionFailuresAreNotListedInTheMenu() {
+        let controller = makeController(
+            MockRecordingCoordinator(snapshot: readySnapshot()),
+            transcription: TranscriptionMenuCommands(
+                failure: "Transcription of weekly-sync.flac failed: model missing",
+                openTranscripts: {},
+                transcribeFolder: {},
+                openTranscriptionsFolder: {}
+            )
+        )
+
+        controller.menuNeedsUpdate(controller.menu)
+
+        XCTAssertFalse(controller.menu.items.contains { $0.title.contains("model missing") })
+        XCTAssertTrue(controller.menu.items.contains { $0.title == "Transcripts…" })
+    }
+
+    func testUpdateFailuresShowAShortStatusInsteadOfTheDiagnostic() {
+        let controller = makeController(
+            MockRecordingCoordinator(snapshot: readySnapshot()),
+            updates: UpdateMenuCommands(
+                state: .failed(message: "The download could not be verified: signature mismatch on Scribe.zip"),
+                checkForUpdates: {},
+                downloadUpdate: {},
+                installUpdate: {}
+            )
+        )
+
+        controller.menuNeedsUpdate(controller.menu)
+
+        XCTAssertTrue(controller.menu.items.contains { $0.title == "Update failed" })
+        XCTAssertFalse(controller.menu.items.contains { $0.title.contains("signature mismatch") })
+    }
+
+    func testStatusCopyWrapsInsideAMaximumWidth() {
+        var snapshot = readySnapshot()
+        snapshot.recoveryNotice = String(repeating: "Recovered a long recording name from an interrupted session. ", count: 4)
+        let controller = makeController(MockRecordingCoordinator(snapshot: snapshot))
+
+        controller.menuNeedsUpdate(controller.menu)
+
+        let notice = controller.menu.items.first { $0.title == snapshot.recoveryNotice }
+        XCTAssertNotNil(notice?.view)
+        XCTAssertLessThanOrEqual(notice?.view?.frame.width ?? .greatestFiniteMagnitude, 260)
+        XCTAssertGreaterThan(notice?.view?.frame.height ?? 0, 20)
+    }
+
     // MARK: Helpers
 
     private func makeController(
         _ coordinator: MockRecordingCoordinator,
         model: RecorderMenuModel? = nil,
-        transcription: TranscriptionMenuCommands? = nil
+        transcription: TranscriptionMenuCommands? = nil,
+        updates: UpdateMenuCommands? = nil
     ) -> ScribeMenuBarController {
         ScribeMenuBarController(
             model: model ?? RecorderMenuModel(coordinator: coordinator),
             image: nil,
             accessibilityLabel: "Scribe",
             transcription: { transcription },
-            updates: { nil },
+            updates: { updates },
             openSettings: {}
         )
     }

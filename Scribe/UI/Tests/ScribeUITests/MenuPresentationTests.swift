@@ -199,7 +199,7 @@ final class MenuPresentationTests: XCTestCase {
         XCTAssertEqual(prompt?.requirements.map(\.pane), [.microphone])
     }
 
-    func testErrorStateShowsTheFailureAndAllowsAnotherAttempt() async {
+    func testErrorStateNamesTheFailureWithoutDetailAndAllowsAnotherAttempt() async {
         let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
         coordinator.simulateFailure(
             RecorderFailure(code: "capture.failed", message: "The meeting app stopped sharing audio.", recoveryHint: "Try again.")
@@ -208,7 +208,8 @@ final class MenuPresentationTests: XCTestCase {
         let presentation = presentation(for: coordinator)
 
         XCTAssertEqual(presentation.statusTitle, "Recording failed")
-        XCTAssertEqual(presentation.statusDetail, "The meeting app stopped sharing audio. Try again.")
+        // Detail stays out of the menu: long diagnostics stretched every row.
+        XCTAssertNil(presentation.statusDetail)
         XCTAssertTrue(presentation.isStartEnabled)
     }
 
@@ -250,7 +251,7 @@ final class MenuPresentationTests: XCTestCase {
         XCTAssertTrue(presentation.isStartEnabled)
     }
 
-    func testABackgroundFailureIsReadWithoutAPrefixThatWouldMisnameIt() {
+    func testABackgroundFailureIsKeptOutOfTheMenu() {
         var snapshot = readySnapshot()
         snapshot.processing.lastFailure = RecorderFailure(
             code: "handoff.cleanupFailed",
@@ -260,9 +261,7 @@ final class MenuPresentationTests: XCTestCase {
 
         let presentation = MenuPresentation(snapshot: snapshot, at: Date())
 
-        XCTAssertEqual(presentation.processingLines, [
-            "Audio cleanup failed, so there is no final recording to transcribe: the delay could not be trusted The original tracks were kept. Reprocess the session to try again."
-        ])
+        XCTAssertTrue(presentation.processingLines.isEmpty)
         // A background failure is not a recording failure.
         XCTAssertEqual(presentation.statusTitle, "Idle")
         XCTAssertTrue(presentation.isStartEnabled)

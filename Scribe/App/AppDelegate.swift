@@ -53,6 +53,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         environment.cleanUpPendingUpdateOnTermination()
     }
 
+    /// The Dock is Scribe's reliable way back to its primary review surface.
+    /// This is invoked for Dock activation even when the app currently has no
+    /// visible windows, such as after the Transcripts window was closed.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows _: Bool) -> Bool {
+        environment.openTranscriptWindow()
+        return true
+    }
+
     /// Quitting during capture performs a normal stop and saves the originals.
     ///
     /// The reply is deferred until the stop has actually drained. Exiting as soon

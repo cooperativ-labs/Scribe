@@ -75,9 +75,11 @@ public struct MenuPresentation: Equatable, Sendable {
             statusTitle = "Stopping…"
             statusDetail = nil
             statusSymbol = "stop.circle"
-        case .failed(let failure):
+        case .failed:
+            // The title is enough for the menu: the detailed message and
+            // recovery hint used to stretch the bar and bury the commands.
             statusTitle = "Recording failed"
-            statusDetail = [failure.message, failure.recoveryHint].compactMap { $0 }.joined(separator: " ")
+            statusDetail = nil
             statusSymbol = "exclamationmark.triangle"
         }
 
@@ -89,17 +91,12 @@ public struct MenuPresentation: Equatable, Sendable {
         // the session is still being finalized and cannot be restarted yet.
         transport = snapshot.state.isCapturing || snapshot.state.isTransitioning ? .running : .idle
 
-        var lines = snapshot.processing.jobs.map { job -> String in
+        // Progress only: failure detail stays out of the menu so a long cleanup
+        // or handoff message cannot stretch every other row.
+        processingLines = snapshot.processing.jobs.map { job -> String in
             guard let fraction = job.fractionCompleted else { return "\(job.title)…" }
             return "\(job.title) — \(Int((fraction * 100).rounded()))%"
         }
-        if let failure = snapshot.processing.lastFailure {
-            // The message is already self-describing — a failed cleanup and a
-            // refused transcription handoff are different facts and must not be
-            // flattened under one prefix.
-            lines.append([failure.message, failure.recoveryHint].compactMap { $0 }.joined(separator: " "))
-        }
-        processingLines = lines
 
         permissionPrompt = PermissionPrompt(requirements: permissions.blockingRequirements(for: snapshot.recordingMode))
         applications = snapshot.applications

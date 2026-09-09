@@ -54,17 +54,23 @@ products_dir="$(xcodebuild -project Scribe.xcodeproj -scheme Scribe -configurati
 app_path="$products_dir/Scribe.app"
 [[ -d "$app_path" ]] || die "the build did not produce $app_path"
 helpers_dir="$app_path/Contents/Library/Helpers"
-mkdir -p "$helpers_dir"
+frameworks_dir="$app_path/Contents/Frameworks"
+mkdir -p "$helpers_dir" "$frameworks_dir"
 
 # ffmpeg and ffprobe. A release requires the reviewed, pinned builds; a
 # development build falls back to whatever is on PATH and says so, because a
 # decoder difference is exactly the kind of thing that makes a local result
 # disagree with a release one.
 resolve_media_tool() {
-  local name="$1" override="$2" resolved
+  local name="$1" override="$2" resolved pinned
   if [[ -n "$override" ]]; then
     [[ -x "$override" ]] || die "$name override is not executable: $override"
     printf '%s' "$override"
+    return
+  fi
+  pinned="$repo_root/Native/FFmpeg/prefix/bin/$name"
+  if [[ -x "$pinned" ]]; then
+    printf '%s' "$pinned"
     return
   fi
   resolved="$(command -v "$name" 2>/dev/null || true)"
@@ -74,7 +80,8 @@ resolve_media_tool() {
 
 ffmpeg_path="$(resolve_media_tool ffmpeg "${SCRIBE_FFMPEG_PATH:-}")"
 ffprobe_path="$(resolve_media_tool ffprobe "${SCRIBE_FFPROBE_PATH:-}")"
-if [[ -z "${SCRIBE_FFMPEG_PATH:-}" || -z "${SCRIBE_FFPROBE_PATH:-}" ]]; then
+if [[ -z "${SCRIBE_FFMPEG_PATH:-}" || -z "${SCRIBE_FFPROBE_PATH:-}" ]] && \
+   [[ "$ffmpeg_path" != "$repo_root/Native/FFmpeg/prefix/bin/ffmpeg" || "$ffprobe_path" != "$repo_root/Native/FFmpeg/prefix/bin/ffprobe" ]]; then
   echo "note: using ffmpeg/ffprobe from PATH; these are not the reviewed pinned builds a release ships."
 fi
 
@@ -95,15 +102,16 @@ else
 fi
 
 ditto "$worker_path" "$helpers_dir/TranscriptionWorker"
-ditto "$ffmpeg_path" "$helpers_dir/ffmpeg"
-ditto "$ffprobe_path" "$helpers_dir/ffprobe"
+bash "$repo_root/Scripts/embed-ffmpeg-runtime.sh" "$ffmpeg_path" "$ffprobe_path" "$helpers_dir" "$frameworks_dir"
 
 # Xcode has already signed the bundle, and adding files to Contents invalidates
 # that seal. Re-sign ad hoc, leaves first, preserving the identifier and
 # entitlements so the app keeps its identity.
-for helper in TranscriptionWorker ffmpeg ffprobe; do
-  codesign --force --sign - "$helpers_dir/$helper"
-done
+while IFS= read -r -d '' candidate; do
+  if file -b "$candidate" | grep -q 'Mach-O'; then
+    codesign --force --sign - "$candidate"
+  fi
+done < <(find "$app_path/Contents" -type f -print0)
 codesign --force --sign - --preserve-metadata=identifier,entitlements "$app_path"
 codesign --verify --deep --strict "$app_path"
 
