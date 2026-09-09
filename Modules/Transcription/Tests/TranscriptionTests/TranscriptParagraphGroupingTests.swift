@@ -96,34 +96,90 @@ final class TranscriptParagraphGroupingTests: XCTestCase {
         XCTAssertEqual(paragraphs.map(\.overlap), [false, true])
     }
 
-    func testPauseAndPreferredLimitsStillSplitSameSpeakerSpeech() {
-        let pauseSplit = [
+    func testShortConnectedSentencesStayInOneParagraph() {
+        // A sentence ending under the minimum word count is not a reading break.
+        let segments = [
             segment("a", speaker: "speaker_1", start: 0, end: 400, text: "Hello."),
             segment("b", speaker: "speaker_1", start: 1_500, end: 1_800, text: "Later."),
         ]
-        XCTAssertEqual(TranscriptParagraphGrouper().paragraphs(from: pauseSplit).map(\.text), ["Hello.", "Later."])
+        let paragraphs = TranscriptParagraphGrouper().paragraphs(from: segments)
+        XCTAssertEqual(paragraphs.map(\.text), ["Hello. Later."])
+    }
 
-        let grouping = TranscriptDisplayGrouper.Configuration(
-            preferredSegmentDurationMs: 1_000,
-            preferredWordCount: 4,
-            maximumSegmentDurationMs: 30_000,
-            maximumWordCount: 80
-        )
-        let preferred = [
-            segment("a", speaker: "speaker_1", start: 0, end: 1_100, text: "One. Two. Three. Four.", words: [
-                TimedWord(text: "One.", startMs: 0, endMs: 200),
-                TimedWord(text: "Two.", startMs: 250, endMs: 500),
-                TimedWord(text: "Three.", startMs: 550, endMs: 800),
-                TimedWord(text: "Four.", startMs: 850, endMs: 1_100),
-            ]),
-            segment("b", speaker: "speaker_1", start: 1_150, end: 1_400, text: "Five.", words: [
-                TimedWord(text: "Five.", startMs: 1_150, endMs: 1_400),
-            ]),
+    func testMeaningfulPauseAtASentenceEndingStartsANewParagraph() {
+        let segments = [
+            segment("a", speaker: "speaker_1", start: 0, end: 400, text: "Hello."),
+            segment("b", speaker: "speaker_1", start: 1_950, end: 2_300, text: "Later."),
+        ]
+        let paragraphs = TranscriptParagraphGrouper().paragraphs(from: segments)
+        XCTAssertEqual(paragraphs.map(\.text), ["Hello.", "Later."])
+    }
+
+    func testMidSentencePauseOnlyBreaksAtTheHardLimit() {
+        // 1.6s inside a sentence reads as hesitation, not a paragraph break.
+        let hesitation = [
+            segment("a", speaker: "speaker_1", start: 0, end: 400, text: "So the thing is"),
+            segment("b", speaker: "speaker_1", start: 2_000, end: 2_400, text: "we should wait."),
         ]
         XCTAssertEqual(
-            TranscriptParagraphGrouper(configuration: grouping).paragraphs(from: preferred).map(\.text),
+            TranscriptParagraphGrouper().paragraphs(from: hesitation).map(\.text),
+            ["So the thing is we should wait."]
+        )
+
+        let longSilence = [
+            segment("a", speaker: "speaker_1", start: 0, end: 400, text: "So the thing is"),
+            segment("b", speaker: "speaker_1", start: 3_100, end: 3_500, text: "we should wait."),
+        ]
+        XCTAssertEqual(
+            TranscriptParagraphGrouper().paragraphs(from: longSilence).map(\.text),
+            ["So the thing is", "we should wait."]
+        )
+    }
+
+    func testLongPassageBreaksAtTheFirstSentenceEndingPastTheMinimum() {
+        let configuration = TranscriptParagraphGrouper.Configuration(minimumWordCount: 4, maximumWordCount: 110)
+        let segments = [
+            segment("a", speaker: "speaker_1", start: 0, end: 1_100, text: "One. Two. Three. Four."),
+            segment("b", speaker: "speaker_1", start: 1_150, end: 1_400, text: "Five."),
+        ]
+        XCTAssertEqual(
+            TranscriptParagraphGrouper(configuration: configuration).paragraphs(from: segments).map(\.text),
             ["One. Two. Three. Four.", "Five."]
         )
+    }
+
+    func testHardWordCapSplitsEvenMidSentence() {
+        let configuration = TranscriptParagraphGrouper.Configuration(minimumWordCount: 3, maximumWordCount: 4)
+        let segments = [
+            segment("a", speaker: "speaker_1", start: 0, end: 400, text: "one two three"),
+            segment("b", speaker: "speaker_1", start: 450, end: 800, text: "four five"),
+        ]
+        XCTAssertEqual(
+            TranscriptParagraphGrouper(configuration: configuration).paragraphs(from: segments).map(\.text),
+            ["one two three", "four five"]
+        )
+    }
+
+    func testOverlappingSpeechIsNotAbsorbedIntoCleanSpeech() {
+        let segments = [
+            segment("a", speaker: "speaker_1", start: 0, end: 400, text: "So the plan is", overlap: false),
+            segment("b", speaker: "speaker_1", start: 420, end: 800, text: "to ship it.", overlap: true),
+            segment("c", speaker: "speaker_1", start: 820, end: 1_200, text: "Next week", overlap: false),
+        ]
+        let paragraphs = TranscriptParagraphGrouper().paragraphs(from: segments)
+        XCTAssertEqual(paragraphs.map(\.text), ["So the plan is", "to ship it.", "Next week"])
+        XCTAssertEqual(paragraphs.map(\.overlap), [false, true, false])
+    }
+
+    func testUnknownFragmentsKeepTheTighterPauseLimit() {
+        // Two unresolved fragments a second apart are not evidence of one speaker.
+        let segments = [
+            segment("a", speaker: nil, start: 0, end: 200, text: "Maybe"),
+            segment("b", speaker: nil, start: 1_400, end: 1_700, text: "later"),
+        ]
+        let paragraphs = TranscriptParagraphGrouper().paragraphs(from: segments)
+        XCTAssertEqual(paragraphs.map(\.text), ["Maybe", "later"])
+        XCTAssertEqual(paragraphs.map(\.speakerID), [nil, nil])
     }
 
     func testGroupingDoesNotRewriteCanonicalAttributionOrWordTimings() {
@@ -190,6 +246,26 @@ final class TranscriptParagraphGroupingTests: XCTestCase {
             $0.speakerID == nil && $1.speakerID == nil
         }.count
 
+        // Readability: a break between two paragraphs of the same speaker should
+        // land on a sentence ending unless a long silence forced it.
+        let sentences = TranscriptDisplayGrouper()
+        let midSentenceBreaks = zip(paragraphs, paragraphs.dropFirst()).filter { current, next in
+            current.speakerID != nil
+                && current.speakerID == next.speakerID
+                && !sentences.endsSentence(current.words?.last?.text ?? current.text)
+        }
+        XCTAssertLessThanOrEqual(midSentenceBreaks.count, 2, "down from 32 at the display-grouper baseline")
+        XCTAssertTrue(
+            midSentenceBreaks.allSatisfy { $1.startMs - $0.endMs >= TranscriptParagraphGrouper.Configuration().hardPauseMs },
+            "a mid-sentence paragraph break must be justified by a long silence"
+        )
+
+        let knownWordCounts = paragraphs.filter { $0.speakerID != nil }.map { $0.words?.count ?? 0 }
+        XCTAssertLessThanOrEqual(
+            knownWordCounts.filter { $0 > 110 }.count, 0,
+            "no paragraph may exceed the hard word cap"
+        )
+
         let aroundContraction = paragraphs.filter { $0.startMs >= 97_000 && $0.startMs <= 103_000 }
         XCTAssertFalse(aroundContraction.isEmpty, "the split contraction near 01:38 should remain visible")
         XCTAssertTrue(
@@ -198,11 +274,11 @@ final class TranscriptParagraphGroupingTests: XCTestCase {
         )
 
         XCTAssertEqual(original.count, 1_033)
-        XCTAssertEqual(paragraphs.count, 1_033, "existing grouping limits are a 1:1 baseline on this already-grouped run")
-        XCTAssertEqual(grouped, 0)
+        XCTAssertEqual(paragraphs.count, 994, "reading boundaries group 32 same-speaker runs the display limits used to split")
+        XCTAssertEqual(grouped, 32)
         XCTAssertEqual(unknownParagraphs.count, 548)
         XCTAssertEqual(unknownWords, 814)
-        XCTAssertEqual(adjacentSameKnown, 70)
+        XCTAssertEqual(adjacentSameKnown, 31, "down from 70 at the display-grouper baseline")
         XCTAssertEqual(adjacentUnknown, 153)
         XCTAssertEqual(transcript.revision, 3)
     }

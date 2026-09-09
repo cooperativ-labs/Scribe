@@ -403,7 +403,7 @@ final class UnknownFragmentReconcilerTests: XCTestCase {
         let paragraphs = TranscriptParagraphGrouper().paragraphs(from: reconciled)
         XCTAssertEqual(paragraphs.flatMap(\.sourceSegmentIDs), original.segments.map(\.id))
         XCTAssertLessThan(paragraphs.count, original.segments.count)
-        XCTAssertEqual(paragraphs.count, 959)
+        XCTAssertEqual(paragraphs.count, 917, "959 before the reading-boundary refinement in coo:992.crzj")
         XCTAssertGreaterThan(paragraphs.filter(\.containsInferredAttribution).count, 0)
         XCTAssertTrue(paragraphs.contains { $0.overlap })
     }

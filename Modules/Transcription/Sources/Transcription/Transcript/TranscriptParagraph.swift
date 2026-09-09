@@ -62,24 +62,80 @@ public struct TranscriptParagraph: Identifiable, Equatable, Sendable {
 
 /// Groups consecutive canonical segments into reading paragraphs.
 ///
-/// Uses the same sentence-aware pause and length limits as
-/// `TranscriptDisplayGrouper`. Speaker identity is an input: a speaker change,
-/// including a known/unknown transition, always starts a new paragraph. Unknown
-/// spans are not treated as one speaker — `nil == nil` is not evidence of
-/// identity, so an unknown sentence boundary still splits.
+/// Paragraph boundaries are a reading decision, not the canonical segmentation
+/// decision. `TranscriptDisplayGrouper` still owns canonical rows and subtitle
+/// timing; this type only chooses where a reader wants a break inside one
+/// continuous speaker turn.
+///
+/// Speaker identity is an input: a speaker change, including a known/unknown
+/// transition, always starts a new paragraph. Unknown spans are not treated as
+/// one speaker — `nil == nil` is not evidence of identity, so an unknown
+/// sentence boundary still splits, and unknown fragments keep the tighter pause
+/// limit. An overlap transition also splits, so overlapping speech stays
+/// visible instead of being absorbed into clean speech.
 public struct TranscriptParagraphGrouper: Sendable {
-    public let configuration: TranscriptDisplayGrouper.Configuration
+    /// Where a reading paragraph is allowed to end.
+    ///
+    /// Within a continuous turn the preference order is: a sentence ending, then
+    /// a meaningful pause, then a hard cap. Short connected sentences below
+    /// `minimumWordCount` stay together; a long passage breaks at the first
+    /// sentence ending past it, so paragraphs normally land in the 40-80 word
+    /// reading range.
+    public struct Configuration: Sendable, Equatable {
+        /// A pause at a sentence ending that closes the paragraph.
+        public var sentencePauseMs: Int
+        /// Any gap this long closes the paragraph, even mid-sentence.
+        public var hardPauseMs: Int
+        /// The pause limit for an unresolved span. Unknown fragments only join
+        /// while they read as one interrupted phrase.
+        public var unknownPauseMs: Int
+        /// A sentence ending below this many words is not a break, so short
+        /// connected sentences stay in one paragraph.
+        public var minimumWordCount: Int
+        /// A hard cap: speech splits at a segment boundary here even mid-sentence.
+        public var maximumWordCount: Int
+        /// A hard cap on paragraph duration.
+        public var maximumDurationMs: Int
 
-    public init(configuration: TranscriptDisplayGrouper.Configuration = TranscriptDisplayGrouper.Configuration()) {
+        public init(
+            sentencePauseMs: Int = 1_500,
+            hardPauseMs: Int = 2_500,
+            unknownPauseMs: Int = 1_000,
+            minimumWordCount: Int = 40,
+            maximumWordCount: Int = 110,
+            maximumDurationMs: Int = 60_000
+        ) {
+            self.sentencePauseMs = sentencePauseMs
+            self.hardPauseMs = hardPauseMs
+            self.unknownPauseMs = unknownPauseMs
+            self.minimumWordCount = minimumWordCount
+            self.maximumWordCount = maximumWordCount
+            self.maximumDurationMs = maximumDurationMs
+        }
+    }
+
+    public let configuration: Configuration
+    private let sentences: TranscriptDisplayGrouper
+
+    public init(configuration: Configuration = Configuration()) {
         self.configuration = configuration
+        sentences = TranscriptDisplayGrouper()
+    }
+
+    public var isValid: Bool {
+        configuration.sentencePauseMs >= 0
+            && configuration.hardPauseMs >= configuration.sentencePauseMs
+            && configuration.unknownPauseMs >= 0
+            && configuration.minimumWordCount > 0
+            && configuration.maximumWordCount >= configuration.minimumWordCount
+            && configuration.maximumDurationMs > 0
     }
 
     public func paragraphs(from segments: [TranscriptSegment]) -> [TranscriptParagraph] {
         let chronological = segments.sorted { ($0.startMs, $0.endMs, $0.id) < ($1.startMs, $1.endMs, $1.id) }
         var drafts: [Draft] = []
-        let displayGrouper = TranscriptDisplayGrouper(configuration: configuration)
         for segment in chronological {
-            if var current = drafts.last, canAppend(segment, to: current, using: displayGrouper) {
+            if var current = drafts.last, canAppend(segment, to: current) {
                 current.append(segment)
                 drafts[drafts.count - 1] = current
             } else {
@@ -89,23 +145,32 @@ public struct TranscriptParagraphGrouper: Sendable {
         return drafts.map { $0.paragraph() }
     }
 
-    private func canAppend(
-        _ next: TranscriptSegment,
-        to current: Draft,
-        using displayGrouper: TranscriptDisplayGrouper
-    ) -> Bool {
-        let nextWordCount = next.storedWordCount
-        guard current.wordCount + nextWordCount <= configuration.maximumWordCount else { return false }
-        return displayGrouper.shouldContinue(
-            currentSpeakerID: current.groupingSpeakerID,
-            currentStartMs: current.startMs,
-            currentEndMs: current.endMs,
-            currentWordCount: current.wordCount,
-            lastText: current.lastText,
-            nextSpeakerID: next.effectiveSpeakerID,
-            nextStartMs: next.startMs,
-            nextEndMs: next.endMs
-        )
+    /// Whether `next` may continue the open paragraph.
+    private func canAppend(_ next: TranscriptSegment, to current: Draft) -> Bool {
+        // Identity is never a paragraph decision.
+        guard current.groupingSpeakerID == next.effectiveSpeakerID else { return false }
+        // Overlapping speech stays its own paragraph so the marker keeps meaning.
+        guard current.overlap == next.overlap else { return false }
+        // Hard caps apply to every span.
+        guard current.wordCount + next.storedWordCount <= configuration.maximumWordCount else { return false }
+        guard next.endMs - current.startMs <= configuration.maximumDurationMs else { return false }
+
+        let gap = next.startMs - current.endMs
+        let endsSentence = sentences.endsSentence(current.lastText)
+
+        guard current.groupingSpeakerID != nil else {
+            // An unresolved span is not one speaker. Fragments of a single
+            // interrupted phrase may join; a finished sentence never does.
+            if endsSentence { return false }
+            return gap < configuration.unknownPauseMs
+        }
+
+        guard gap < configuration.hardPauseMs else { return false }
+        if endsSentence {
+            if gap >= configuration.sentencePauseMs { return false }
+            if current.wordCount >= configuration.minimumWordCount { return false }
+        }
+        return true
     }
 
     private struct Draft {
