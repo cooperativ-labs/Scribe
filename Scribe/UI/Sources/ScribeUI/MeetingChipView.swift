@@ -203,23 +203,3 @@ private extension View {
         }
     }
 }
-
-// MARK: - Hosting
-
-/// Redraws the chip as the model publishes. Kept apart from `MeetingChipView`
-/// so the view itself stays a function of one presentation value.
-struct MeetingChipHost: View {
-    @ObservedObject var model: MeetingChipModel
-
-    var body: some View {
-        MeetingChipView(
-            presentation: model.presentation,
-            actions: MeetingChipActions(
-                record: { model.record() },
-                dismiss: { model.dismiss() },
-                hold: { model.toggleHold() },
-                stop: { model.stop() }
-            )
-        )
-    }
-}

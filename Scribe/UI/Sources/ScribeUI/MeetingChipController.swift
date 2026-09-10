@@ -26,20 +26,18 @@ public final class MeetingChipController {
     /// remembered position would drift away from its icon.
     private let anchor: @MainActor () -> NSRect?
     private let panel: NSPanel
-    private let host: NSHostingController<MeetingChipHost>
+    private let host: NSHostingController<MeetingChipView>
     private var presentationObservation: AnyCancellable?
-    /// Only ever touched on the main actor; marked so `deinit` may remove it.
-    nonisolated(unsafe) private var resizeObservation: (any NSObjectProtocol)?
 
     public init(model: MeetingChipModel, anchor: @escaping @MainActor () -> NSRect?) {
         self.model = model
         self.anchor = anchor
 
-        host = NSHostingController(rootView: MeetingChipHost(model: model))
-        // The chip changes shape when the offer becomes a transport, so the
-        // window is told to follow SwiftUI's own idea of the right size rather
-        // than being given one here.
-        host.sizingOptions = [.preferredContentSize]
+        host = NSHostingController(rootView: MeetingChipView(presentation: model.presentation))
+        // This controller owns window geometry. Letting the hosting view resize
+        // the window during windowDidLayout can re-enter AppKit layout when the
+        // offer becomes a recording transport (including during menu tracking).
+        host.sizingOptions = []
 
         panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: 320, height: 72),
@@ -70,20 +68,6 @@ public final class MeetingChipController {
         presentationObservation = model.$presentation.sink { [weak self] presentation in
             self?.apply(presentation)
         }
-        // SwiftUI resizes the panel a beat after the presentation changes, which
-        // is the moment the chip has to be moved back under its icon.
-        resizeObservation = NotificationCenter.default.addObserver(
-            forName: NSWindow.didResizeNotification, object: panel, queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.reposition() }
-        }
-        apply(model.presentation)
-    }
-
-    deinit {
-        if let resizeObservation {
-            NotificationCenter.default.removeObserver(resizeObservation)
-        }
     }
 
     /// The panel, so a test can assert what the chip did without a status bar.
@@ -93,6 +77,25 @@ public final class MeetingChipController {
         guard presentation.isVisible else {
             panel.orderOut(nil)
             return
+        }
+        // Render and measure the incoming snapshot, not the model's old value:
+        // @Published sends before assignment. Keep hidden content out of this
+        // path so it cannot collapse the panel to an empty view's ideal size.
+        host.rootView = MeetingChipView(
+            presentation: presentation,
+            actions: MeetingChipActions(
+                record: { [model] in model.record() },
+                dismiss: { [model] in model.dismiss() },
+                hold: { [model] in model.toggleHold() },
+                stop: { [model] in model.stop() }
+            )
+        )
+        let measured = host.sizeThatFits(in: NSSize(width: 1_000, height: 200))
+        let size = NSSize(width: ceil(measured.width), height: ceil(measured.height))
+        if size.width > 0, size.height > 0,
+           size.width.isFinite, size.height.isFinite,
+           panel.contentView?.frame.size != size {
+            panel.setContentSize(size)
         }
         reposition()
         // Ordered *regardless*: Scribe has no Dock icon and is rarely the active
@@ -131,7 +134,9 @@ public final class MeetingChipController {
 
         origin.x = min(max(origin.x, visible.minX - Self.screenMargin), visible.maxX - size.width + Self.screenMargin)
         origin.y = min(origin.y, ceiling - size.height)
-        panel.setFrameOrigin(origin)
+        if panel.frame.origin != origin {
+            panel.setFrameOrigin(origin)
+        }
     }
 
     private func screen(containing rect: NSRect?) -> NSScreen? {

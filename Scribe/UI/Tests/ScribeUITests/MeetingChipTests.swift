@@ -379,6 +379,55 @@ final class MeetingChipTests: XCTestCase {
 
     // MARK: The panel
 
+    func testPanelLayoutSettlesAcrossRecordingTransitions() async throws {
+        guard let screen = NSScreen.main else { throw XCTSkip("No display attached") }
+        let start = Date(timeIntervalSince1970: 1_000)
+        var now = start
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot(), now: { start })
+        let model = makeModel(coordinator, now: { now })
+        let anchor = NSRect(x: screen.frame.midX, y: screen.frame.maxY - 22, width: 24, height: 22)
+        let controller = MeetingChipController(model: model, anchor: { anchor })
+        defer { controller.window.orderOut(nil) }
+
+        func assertSettled(file: StaticString = #filePath, line: UInt = #line) {
+            controller.window.layoutIfNeeded()
+            controller.window.displayIfNeeded()
+            let frame = controller.window.frame
+            XCTAssertGreaterThan(frame.width, 100, file: file, line: line)
+            XCTAssertLessThan(frame.width, screen.frame.width, file: file, line: line)
+            XCTAssertEqual(frame.midX, anchor.midX, accuracy: 1, file: file, line: line)
+            XCTAssertEqual(frame.maxY, anchor.minY + 4, accuracy: 1, file: file, line: line)
+            for _ in 0..<10 {
+                controller.window.contentView?.needsLayout = true
+                controller.window.layoutIfNeeded()
+                controller.window.displayIfNeeded()
+                XCTAssertEqual(controller.window.frame, frame, file: file, line: line)
+            }
+        }
+
+        model.meetingWasDetected(zoomCall(calendarTitle: "Weekly planning with the entire product team"))
+        assertSettled()
+        model.record()
+        await coordinator.waitUntilIdle()
+        assertSettled()
+        model.toggleHold()
+        await coordinator.waitUntilIdle()
+        assertSettled()
+        model.toggleHold()
+        await coordinator.waitUntilIdle()
+        now = start.addingTimeInterval(2)
+        model.refreshPresentation()
+        assertSettled()
+        now = start.addingTimeInterval(MeetingChipPresentation.sessionVisibleDuration)
+        model.refreshPresentation()
+        XCTAssertFalse(controller.window.isVisible)
+        coordinator.submit(.stop)
+        await coordinator.waitUntilIdle()
+        model.meetingWasDetected(zoomCall(at: start.addingTimeInterval(100)))
+        XCTAssertTrue(controller.window.isVisible)
+        assertSettled()
+    }
+
     func testThePanelIsOrderedInAndOutWithTheChip() {
         let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
         let model = makeModel(coordinator)
