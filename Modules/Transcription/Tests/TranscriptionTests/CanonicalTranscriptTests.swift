@@ -54,6 +54,28 @@ final class CanonicalTranscriptTests: XCTestCase {
         ])))
     }
 
+    func testNearestInferenceRoundTripsAndMatchesSchema() throws {
+        let built = try SpeakerTurnBuilder().build(words: [RecognizedWord(id: "edge", text: "edge", startMs: 500, endMs: 530,
+            enclosingStartMs: 500, enclosingEndMs: 530)], diarizedTurns: [DiarizedSpeakerTurn(speakerID: "A", startMs: 0, endMs: 400)])
+        let value = transcript(source: TranscriptSource(filename: "test.wav", durationMs: 1_000, checksum: "sha256:test"), speakers: built.speakers, segments: built.segments)
+        let data = try CanonicalTranscriptCodec.encode(value)
+        XCTAssertEqual(try CanonicalTranscriptCodec.decode(data), value)
+        let schema = try XCTUnwrap(try JSONSerialization.jsonObject(with: CanonicalTranscriptSchema.data) as? [String: Any])
+        let validator = JSONSchemaFixtureValidator(rootSchema: schema)
+        var document = try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        var segments = try XCTUnwrap(document["segments"] as? [[String: Any]])
+        // The schema describes explicit-null export labels; the storage codec
+        // omits nil fields. Supply that existing normalization for this check.
+        segments[0]["speaker_id"] = NSNull()
+        document["segments"] = segments
+        try validator.validate(document)
+        var inference = try XCTUnwrap(segments[0]["speaker_inference"] as? [String: Any])
+        inference["evidence"] = ["type": "nearest_interval", "distance_ms": 251]
+        segments[0]["speaker_inference"] = inference
+        document["segments"] = segments
+        XCTAssertThrowsError(try validator.validate(document))
+    }
+
     private func transcript(source: TranscriptSource, speakers: [TranscriptSpeaker], segments: [TranscriptSegment]) -> CanonicalTranscript {
         CanonicalTranscript(
             transcriptID: "validator-test",

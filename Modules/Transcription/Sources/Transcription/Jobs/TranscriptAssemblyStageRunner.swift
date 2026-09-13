@@ -240,7 +240,12 @@ public struct TranscriptAssemblyStageRunner: TranscriptionStageRunning {
             let start = max(0, milliseconds(interval.startSeconds))
             let end = min(sourceDurationMs, milliseconds(interval.endSeconds))
             guard start < end else { return nil }
-            return DiarizedSpeakerTurn(speakerID: interval.speakerID, startMs: start, endMs: end)
+            return DiarizedSpeakerTurn(
+                speakerID: interval.speakerID,
+                startMs: start,
+                endMs: end,
+                qualityScore: Double(interval.qualityScore)
+            )
         }
 
         var warnings = reconciled.warnings
@@ -289,6 +294,28 @@ public struct TranscriptAssemblyStageRunner: TranscriptionStageRunning {
             "speaker_matching": .string(job.request.speakerMatching.rawValue),
             "configuration_fingerprint": .string(job.configurationFingerprint),
             "speaker_count": requestedSpeakerCount,
+            "speaker_attribution": .object([
+                "provenance": .string(SpeakerTurnBuilder.attributionProvenance),
+                "phrase": .object([
+                    "mode": .string("same_asr_span_pause_bounded_overlap_sum"),
+                    "override_minimum_lead_ratio": .number(0.2),
+                ]),
+                "nearest_interval": .object([
+                    "maximum_distance_ms": .number(250),
+                    "attribution_source": .string("inferred"),
+                    "rejects_competing_intervals": .boolean(true),
+                ]),
+                "confidence": .object([
+                    "provenance": .string(SpeakerTurnBuilder.confidenceProvenance),
+                    "formula": .string("(strongest_overlap_ms-runner_up_overlap_ms)/word_duration_ms"),
+                    "segment_aggregation": .string("minimum_word_confidence"),
+                ]),
+                "timeline": .object([
+                    "provenance": .string(SpeakerTurnBuilder.exclusiveTimelineProvenance),
+                    "mode": .string("exclusive_for_attribution_only"),
+                    "preserves_canonical_intervals": .boolean(true),
+                ]),
+            ]),
             "display_grouping": .object([
                 "pause_split_ms": .number(Double(turnBuilder.configuration.grouping.pauseSplitMs)),
                 "preferred_duration_ms": .number(Double(turnBuilder.configuration.grouping.preferredSegmentDurationMs)),

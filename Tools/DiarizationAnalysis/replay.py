@@ -31,12 +31,19 @@ def main():
         mapping_path.write_text('import Foundation\npublic struct AudioTimeMapping:' + mapping)
         bundle_path = temp / 'Bundle.swift'
         bundle_path.write_text('import Foundation\nextension Bundle { static var module: Bundle { .main } }\n')
-        names = ['CanonicalTranscript', 'WorkerASRTranscript', 'TokenTimingReconciler',
+        assembly = (host / 'Jobs/TranscriptAssemblyStageRunner.swift').read_text()
+        records_path = temp / 'Records.swift'
+        records_path.write_text('import Foundation\n' +
+            'public enum TranscriptRunArtifact {' + assembly.split('public enum TranscriptRunArtifact {', 1)[1].split('struct WorkerSpeakerEmbeddingRecord:', 1)[0])
+        review = (host / 'UI/TranscriptReviewPresentation.swift').read_text()
+        with records_path.open('a') as records:
+            records.write('\npublic extension TranscriptSegment {' + review.split('public extension TranscriptSegment {', 1)[1])
+        names = ['CanonicalTranscriptValidator', 'UnknownFragmentReconciler', 'TranscriptParagraph', 'CanonicalTranscript', 'WorkerASRTranscript', 'TokenTimingReconciler',
                  'SpeakerTurnBuilder', 'TranscriptDisplayGrouper']
         executable = temp / 'replay'
         subprocess.run(['swiftc', '-O', '-module-cache-path', str(temp / 'module-cache'),
                         *[str(host / f'Transcript/{n}.swift') for n in names],
-                        str(mapping_path), str(bundle_path), str(root / 'Tools/DiarizationAnalysis/Replay.swift'),
+                        str(mapping_path), str(bundle_path), str(records_path), str(root / 'Tools/DiarizationAnalysis/Replay.swift'),
                         '-o', str(executable)], check=True)
         if a.keep_executable:
             shutil.copy2(executable, a.keep_executable)

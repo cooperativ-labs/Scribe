@@ -27,12 +27,12 @@ public struct AcousticSpeakerInterval: Sendable, Equatable {
 /// Conservative second pass over unknown canonical turns.
 ///
 /// Original `speakerID` values are never rewritten. A short unknown fragment
-/// between two turns of the same named speaker is inferred only when diarization
-/// timing supports continuity: unique adequate overlap with that speaker, or a
-/// short unoccupied hole between that speaker's intervals. Neighbor identity and
+/// with at least one named neighbor is inferred only with unique adequate
+/// diarization coverage. Unoccupied holes still require two agreeing neighbors
+/// and at most three words; unique coverage permits up to six. Neighbor identity and
 /// wording are not evidence. Manual labels are left untouched.
 public struct UnknownFragmentReconciler: Sendable {
-    public static let provenance = "unknown-fragment-reconciliation-v1"
+    public static let provenance = "unknown-fragment-reconciliation-v2"
 
     public struct Configuration: Sendable, Equatable {
         public var maximumUnknownDurationMs: Int
@@ -47,7 +47,7 @@ public struct UnknownFragmentReconciler: Sendable {
             maximumUnknownDurationMs: Int = 1_000,
             maximumNeighborGapMs: Int = 1_500,
             maximumDiarizationHoleMs: Int = 1_500,
-            maximumWordCount: Int = 3,
+            maximumWordCount: Int = 6,
             minimumOverlapMs: Int = 50,
             minimumOverlapRatio: Double = 0.5,
             minimumIntervalQuality: Double = 0.8
@@ -80,11 +80,12 @@ public struct UnknownFragmentReconciler: Sendable {
             if lhs.element.endMs != rhs.element.endMs { return lhs.element.endMs < rhs.element.endMs }
             return lhs.offset < rhs.offset
         }
-        var reconciled = chronological.map(\.element)
+        let original = chronological.map(\.element)
+        var reconciled = original
         for index in reconciled.indices {
             reconciled[index] = decide(
                 at: index,
-                in: reconciled,
+                in: original,
                 intervals: mapped,
                 labels: labels
             )
@@ -125,25 +126,30 @@ public struct UnknownFragmentReconciler: Sendable {
         labels: [String: String]
     ) -> TranscriptSegment {
         let segment = segments[index]
-        guard segment.speakerID == nil, segment.attributionSource != .manual else { return segment }
+        guard segment.speakerID == nil, segment.speakerInference == nil, segment.attributionSource != .manual else { return segment }
 
         let acoustic = classify(segment, using: intervals)
         let unresolved = unresolvedEvidence(acoustic)
 
-        guard let previous = segments[safe: index - 1],
-              let next = segments[safe: index + 1],
-              let neighborID = previous.speakerID,
-              neighborID == next.speakerID,
-              isShortFragment(segment, previous: previous, next: next),
+        let previous = segments[safe: index - 1]
+        let next = segments[safe: index + 1]
+        let neighbors = [previous, next].compactMap { $0 }.filter { $0.speakerID != nil }
+        guard let neighborID = neighbors.first?.speakerID,
+              neighbors.allSatisfy({ $0.speakerID == neighborID }),
+              segment.endMs > segment.startMs,
+              segment.endMs - segment.startMs <= configuration.maximumUnknownDurationMs,
+              segment.storedWordCount <= configuration.maximumWordCount,
               !segment.overlap
-        else {
+        else { return segment.withUnresolvedEvidence(unresolved) }
+        let gap = (startMs: previous?.endMs ?? segment.startMs, endMs: next?.startMs ?? segment.endMs)
+        guard gap.endMs >= gap.startMs, gap.endMs - gap.startMs <= configuration.maximumNeighborGapMs else {
             return segment.withUnresolvedEvidence(unresolved)
         }
 
         switch acoustic {
         case let .uniqueSpeaker(speakerID, overlapMs):
             guard speakerID == neighborID,
-                  !competingSpeaker(in: neighborGap(previous: previous, next: next), otherThan: neighborID, intervals: intervals)
+                  !competingSpeaker(in: gap, otherThan: neighborID, intervals: intervals)
             else {
                 return segment.withUnresolvedEvidence(.competingSpeakers)
             }
@@ -156,7 +162,12 @@ public struct UnknownFragmentReconciler: Sendable {
                 diarizationHoleMs: nil
             )
         case .noCoverage:
-            guard let hole = diarizationHole(
+            // Holes still require both original neighbors and the historical
+            // three-word bound. Only unique acoustic coverage gets the wider limit.
+            guard let previous, let next,
+                  previous.speakerID == neighborID, next.speakerID == neighborID,
+                  segment.storedWordCount <= min(3, configuration.maximumWordCount),
+                  let hole = diarizationHole(
                 for: segment,
                 previous: previous,
                 next: next,
@@ -205,20 +216,6 @@ public struct UnknownFragmentReconciler: Sendable {
                 overlapMs: overlapMs
             )
         )
-    }
-
-    private func isShortFragment(
-        _ segment: TranscriptSegment,
-        previous: TranscriptSegment,
-        next: TranscriptSegment
-    ) -> Bool {
-        let duration = segment.endMs - segment.startMs
-        let gap = next.startMs - previous.endMs
-        return duration > 0
-            && duration <= configuration.maximumUnknownDurationMs
-            && gap >= 0
-            && gap <= configuration.maximumNeighborGapMs
-            && segment.storedWordCount <= configuration.maximumWordCount
     }
 
     private func neighborGap(previous: TranscriptSegment, next: TranscriptSegment) -> (startMs: Int, endMs: Int) {

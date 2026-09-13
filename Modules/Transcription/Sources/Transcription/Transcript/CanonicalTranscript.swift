@@ -262,9 +262,45 @@ public struct TranscriptSpeakerInference: Codable, Sendable, Equatable {
     }
 }
 
-public enum TranscriptSpeakerInferenceEvidence: String, Codable, Sendable, Equatable {
-    case diarizationCoverage = "diarization_coverage"
-    case diarizationBoundaryGap = "diarization_boundary_gap"
+public enum TranscriptSpeakerInferenceEvidence: Codable, Sendable, Equatable {
+    case diarizationCoverage
+    case diarizationBoundaryGap
+    case nearestInterval(distanceMs: Int)
+
+    private enum CodingKeys: String, CodingKey { case type; case distanceMs = "distance_ms" }
+
+    public init(from decoder: Decoder) throws {
+        if let value = try? decoder.singleValueContainer().decode(String.self) {
+            switch value {
+            case "diarization_coverage": self = .diarizationCoverage
+            case "diarization_boundary_gap": self = .diarizationBoundaryGap
+            default: throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "Unknown inference evidence"))
+            }
+        } else {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let type = try container.decode(String.self, forKey: .type)
+            let distance = try container.decode(Int.self, forKey: .distanceMs)
+            guard type == "nearest_interval", (0...250).contains(distance) else {
+                throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "Invalid nearest interval evidence"))
+            }
+            self = .nearestInterval(distanceMs: distance)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .diarizationCoverage, .diarizationBoundaryGap:
+            var container = encoder.singleValueContainer()
+            try container.encode(self == .diarizationCoverage ? "diarization_coverage" : "diarization_boundary_gap")
+        case let .nearestInterval(distance):
+            guard (0...250).contains(distance) else {
+                throw EncodingError.invalidValue(distance, .init(codingPath: encoder.codingPath, debugDescription: "Invalid nearest interval distance"))
+            }
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode("nearest_interval", forKey: .type)
+            try container.encode(distance, forKey: .distanceMs)
+        }
+    }
 }
 
 public enum TranscriptUnresolvedSpeakerEvidence: String, Codable, Sendable, Equatable {

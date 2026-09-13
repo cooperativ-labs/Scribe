@@ -408,6 +408,41 @@ final class UnknownFragmentReconcilerTests: XCTestCase {
         XCTAssertTrue(paragraphs.contains { $0.overlap })
     }
 
+    func testOneNeighborAndSixWordsRequireUniqueCoverage() {
+        let known = segment("a", speaker: "speaker_1", start: 0, end: 200, text: "Hello")
+        let unknown = segment("b", speaker: nil, start: 220, end: 800, text: "one two three four five six")
+        let coverage = [interval("speaker_1", 0, 900)]
+        let trailing = UnknownFragmentReconciler().reconcile(segments: [known, unknown], speakers: speakers, intervals: coverage)
+        XCTAssertEqual(trailing[1].speakerInference?.evidence, .diarizationCoverage)
+        let leading = UnknownFragmentReconciler().reconcile(segments: [
+            segment("a", speaker: nil, start: 0, end: 200, text: "Hello"),
+            segment("b", speaker: "speaker_1", start: 220, end: 800, text: "there")
+        ], speakers: speakers, intervals: coverage)
+        XCTAssertEqual(leading[0].effectiveSpeakerID, "speaker_1")
+        let hole = UnknownFragmentReconciler().reconcile(segments: [known, unknown], speakers: speakers,
+            intervals: [interval("speaker_1", 0, 200)])
+        XCTAssertNil(hole[1].speakerInference)
+        let seven = segment("b", speaker: nil, start: 220, end: 800, text: "one two three four five six seven")
+        XCTAssertNil(UnknownFragmentReconciler().reconcile(segments: [known, seven], speakers: speakers, intervals: coverage)[1].speakerInference)
+        let alone = UnknownFragmentReconciler().reconcile(segments: [unknown], speakers: speakers, intervals: coverage)
+        XCTAssertNil(alone[0].speakerInference)
+    }
+
+    func testInferenceIsStableAndDoesNotCascadeThroughUnknownRun() {
+        let segments = [segment("a", speaker: "speaker_1", start: 0, end: 100, text: "Hello"),
+            segment("b", speaker: nil, start: 120, end: 200, text: "one"),
+            segment("c", speaker: nil, start: 220, end: 300, text: "two")]
+        let reconciler = UnknownFragmentReconciler()
+        let first = reconciler.reconcile(segments: segments, speakers: speakers, intervals: [interval("speaker_1", 0, 400)])
+        XCTAssertNotNil(first[1].speakerInference)
+        XCTAssertNil(first[2].speakerInference)
+        XCTAssertEqual(first, reconciler.reconcile(segments: first, speakers: speakers, intervals: [interval("speaker_1", 0, 400)]))
+        let nearest = TranscriptSegment(id: "nearest", speakerID: nil, speakerLabel: "Unknown speaker", startMs: 500, endMs: 600,
+            text: "edge", overlap: false, timingQuality: .asrWord, attributionSource: .inferred, speakerInference: TranscriptSpeakerInference(
+                speakerID: "speaker_1", speakerLabel: "Speaker 1", evidence: .nearestInterval(distanceMs: 100), provenance: SpeakerTurnBuilder.attributionProvenance))
+        XCTAssertEqual(reconciler.reconcile(segments: [nearest], speakers: speakers, intervals: []), [nearest])
+    }
+
     private func segment(
         _ id: String,
         speaker: String?,

@@ -1,0 +1,54 @@
+{
+  "agreement": {
+    "correct_pct": 93.465,
+    "correct_words": 12258,
+    "optimal_one_to_one_mapping": {
+      "hypothesis_1": "reference_1",
+      "hypothesis_2": "reference_2"
+    },
+    "per_speaker_confusion": {
+      "hypothesis_1": {
+        "reference_1": 7650,
+        "reference_2": 35
+      },
+      "hypothesis_2": {
+        "reference_1": 74,
+        "reference_2": 4608
+      }
+    },
+    "scored_words": 13115,
+    "unknown_pct": 5.703,
+    "unknown_words": 748,
+    "wder_pct": 6.535,
+    "wrong_pct": 0.831,
+    "wrong_words": 109
+  },
+  "alignment": {
+    "matched_lexical_tokens": 13115,
+    "matched_reference_segments": 378,
+    "method": "text_sequence_matcher",
+    "reference_lexical_coverage_pct": 97.134,
+    "reference_lexical_tokens": 13502,
+    "reference_segment_coverage_pct": 100.0,
+    "reference_segments": 378,
+    "replay_lexical_coverage_pct": 96.683,
+    "replay_lexical_tokens": 13565
+  },
+  "ground_truth": {
+    "reference_format": "json",
+    "reference_sha256": "b11526c3eb7718725adfe0935052795e67f8c445514d1ada1ae799cf871196a4",
+    "source": "imported_reference"
+  },
+  "paragraphs": {
+    "paragraph_count": 1089,
+    "single_word_paragraph_count": 412
+  },
+  "provenance": {
+    "diarization_sha256": "023d47ded68abf29dbbee1839938b3daf5663b6d9963143e105071ed7c971ff9",
+    "engine_revision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b",
+    "executable_sha256": "71d7e06f421e8a694227bbe3664051024fb30bd6cd602d64ba66fc8dae19baef",
+    "run_revision": 3
+  },
+  "schema_version": 1,
+  "transcript_free": true
+}

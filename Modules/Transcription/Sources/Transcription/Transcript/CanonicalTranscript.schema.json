@@ -69,7 +69,12 @@
       "properties": {
         "speaker_id": { "type": "string", "minLength": 1 },
         "speaker_label": { "type": "string", "minLength": 1 },
-        "evidence": { "enum": ["diarization_coverage", "diarization_boundary_gap"] },
+        "evidence": { "oneOf": [
+          { "enum": ["diarization_coverage", "diarization_boundary_gap"] },
+          { "type": "object", "required": ["type", "distance_ms"], "additionalProperties": false,
+            "properties": { "type": { "const": "nearest_interval" },
+              "distance_ms": { "type": "integer", "minimum": 0, "maximum": 250 } } }
+        ] },
         "provenance": { "type": "string", "minLength": 1 },
         "diarization_hole_ms": { "type": "integer", "minimum": 0 },
         "overlap_ms": { "type": "integer", "minimum": 0 }

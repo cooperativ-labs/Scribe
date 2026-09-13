@@ -7,11 +7,15 @@ import Foundation
 /// speaker IDs are only an input detail; canonical IDs are assigned as `speaker_1`,
 /// `speaker_2`, and so on when a diarized speaker first appears on the timeline.
 public struct SpeakerTurnBuilder: Sendable {
+    public static let attributionProvenance = "speaker-turn-attribution-v3"
+    public static let confidenceProvenance = "word-overlap-margin-v1"
+    public static let exclusiveTimelineProvenance = "interval-extension-quality-v1"
+
     public struct Configuration: Sendable, Equatable {
         /// A candidate needs both this many milliseconds and this fraction of the word interval.
         public var minimumOverlapMs: Int
         public var minimumOverlapRatio: Double
-        /// A tie (or near tie) is ambiguous and is represented as the unknown speaker.
+        /// Minimum overlap lead; ambiguous words may use their phrase's dominant speaker.
         public var minimumLeadMs: Int
         /// Display-paragraph grouping. Does not change speaker identity.
         public var grouping: TranscriptDisplayGrouper.Configuration
@@ -95,8 +99,30 @@ public struct SpeakerTurnBuilder: Sendable {
             if lhs.endMs != rhs.endMs { return lhs.endMs < rhs.endMs }
             return lhs.index < rhs.index
         }
-        let attributions = chronologicalWords.map { word in
-            attribute(word, using: normalizedTurns)
+        let attributionTurns = exclusiveTimeline(from: normalizedTurns)
+        var phrases: [[NormalizedWord]] = []
+        for word in chronologicalWords {
+            if let last = phrases.last?.last,
+               last.word.enclosingStartMs == word.word.enclosingStartMs,
+               last.word.enclosingEndMs == word.word.enclosingEndMs,
+               word.startMs - last.endMs < configuration.grouping.pauseSplitMs {
+                phrases[phrases.count - 1].append(word)
+            } else {
+                phrases.append([word])
+            }
+        }
+        let attributions = phrases.flatMap { phrase in
+            var totals: [String: Int] = [:]
+            for word in phrase {
+                for (speaker, overlap) in overlaps(for: word, using: attributionTurns) {
+                    totals[speaker, default: 0] += overlap
+                }
+            }
+            let ranked = totals.sorted { $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value }
+            let phraseSpeaker = ranked.first.flatMap { best in
+                best.value - (ranked.dropFirst().first?.value ?? 0) > configuration.minimumLeadMs ? best.key : nil
+            }
+            return phrase.map { attribute($0, using: attributionTurns, canonicalTurns: normalizedTurns, phraseSpeaker: phraseSpeaker) }
         }
 
         // Number clusters from the diarizer's own source-relative timeline, not its arbitrary IDs
@@ -138,7 +164,7 @@ public struct SpeakerTurnBuilder: Sendable {
                 SpeakerTurnWordAssignment(
                     wordID: $0.word.word.id,
                     segmentID: segmentID,
-                    speakerID: draft.canonicalSpeakerID
+                    speakerID: draft.attributions.first?.nearestDistanceMs == nil ? draft.canonicalSpeakerID : nil
                 )
             })
             return draft.makeSegment(id: segmentID)
@@ -156,34 +182,138 @@ public struct SpeakerTurnBuilder: Sendable {
               TranscriptDisplayGrouper(configuration: configuration.grouping).isValid else { throw Error.invalidConfiguration }
     }
 
-    private func attribute(_ word: NormalizedWord, using turns: [DiarizedSpeakerTurn]) -> Attribution {
+    private func attribute(
+        _ word: NormalizedWord,
+        using turns: [DiarizedSpeakerTurn],
+        canonicalTurns: [DiarizedSpeakerTurn],
+        phraseSpeaker: String?
+    ) -> Attribution {
+        let overlapBySpeaker = overlaps(for: word, using: turns)
+        let orderedCandidates = overlapBySpeaker.sorted {
+            $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value
+        }
+        let canonicalSpeakerCount = Set(canonicalTurns.filter {
+            Self.overlapMs(startA: word.startMs, endA: word.endMs, startB: $0.startMs, endB: $0.endMs) > 0
+        }.map(\.speakerID)).count
+        let wordDuration = word.endMs - word.startMs
+        let requiredOverlap = max(configuration.minimumOverlapMs, Int(ceil(Double(wordDuration) * configuration.minimumOverlapRatio)))
+        let strongest = orderedCandidates.first
+        let runnerUp = orderedCandidates.dropFirst().first?.value ?? 0
+        let confidence = min(1, max(0, Double((strongest?.value ?? 0) - runnerUp) / Double(wordDuration)))
+        let adequate = (strongest?.value ?? 0) >= requiredOverlap && strongest != nil
+        var speaker: String?
+        var distance: Int?
+        if adequate, let strongest {
+            // Phrase context resolves marginal boundaries; a real word-level turn
+            // needs more than a 20% duration lead over the other speaker.
+            let overrideLead = max(configuration.minimumLeadMs, Int(ceil(Double(wordDuration) * 0.2)))
+            if strongest.key == phraseSpeaker || strongest.value - runnerUp > overrideLead {
+                speaker = strongest.key
+            } else if let phraseSpeaker, (overlapBySpeaker[phraseSpeaker] ?? 0) > 0 {
+                speaker = phraseSpeaker
+            }
+        } else if let nearest = nearestInterval(to: word, using: canonicalTurns) {
+            speaker = nearest.speakerID
+            distance = nearest.distanceMs
+        }
+        return Attribution(word: word, diarizedSpeakerID: speaker, overlap: canonicalSpeakerCount > 1,
+                           confidence: confidence, nearestDistanceMs: distance)
+    }
+
+    private func nearestInterval(to word: NormalizedWord, using turns: [DiarizedSpeakerTurn]) -> (speakerID: String, distanceMs: Int)? {
+        let candidates = turns.map { turn in
+            (turn: turn, distance: max(0, max(turn.startMs - word.endMs, word.startMs - turn.endMs)))
+        }.filter { $0.distance <= 250 }
+        guard let distance = candidates.map(\.distance).min() else { return nil }
+        let closest = candidates.filter { $0.distance == distance }
+        guard Set(closest.map { $0.turn.speakerID }).count == 1, let candidate = closest.first else { return nil }
+        let start = min(word.startMs, candidate.turn.endMs)
+        let end = max(word.endMs, candidate.turn.startMs)
+        guard !turns.contains(where: {
+            $0.speakerID != candidate.turn.speakerID && $0.startMs < end && $0.endMs > start
+        }) else { return nil }
+        return (candidate.turn.speakerID, distance)
+    }
+
+    private func overlaps(for word: NormalizedWord, using turns: [DiarizedSpeakerTurn]) -> [String: Int] {
         var overlapBySpeaker: [String: Int] = [:]
         for turn in turns {
             let overlap = max(0, min(word.endMs, turn.endMs) - max(word.startMs, turn.startMs))
             guard overlap > 0 else { continue }
-            // Multiple overlapping diarizer windows for one cluster must not make it look stronger.
-            overlapBySpeaker[turn.speakerID] = max(overlapBySpeaker[turn.speakerID] ?? 0, overlap)
+            // The attribution timeline is exclusive, so its disjoint slices can be summed safely.
+            overlapBySpeaker[turn.speakerID, default: 0] += overlap
         }
-        let orderedCandidates = overlapBySpeaker.sorted {
-            $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value
+        return overlapBySpeaker
+    }
+
+    /// Resolves simultaneous diarizer intervals into a single-owner timeline for attribution.
+    /// Original turns remain the source of overlap metadata and the canonical acoustic record.
+    private func exclusiveTimeline(from turns: [DiarizedSpeakerTurn]) -> [DiarizedSpeakerTurn] {
+        guard turns.count > 1 else { return turns }
+        var boundaries = Set(turns.flatMap { [$0.startMs, $0.endMs] })
+        for firstIndex in turns.indices {
+            for secondIndex in turns.indices where secondIndex > firstIndex {
+                let start = max(turns[firstIndex].startMs, turns[secondIndex].startMs)
+                let end = min(turns[firstIndex].endMs, turns[secondIndex].endMs)
+                if start < end { boundaries.insert(start + (end - start) / 2) }
+            }
         }
-        guard let strongest = orderedCandidates.first else {
-            return Attribution(word: word, diarizedSpeakerID: nil, overlap: false)
+        let orderedBoundaries = boundaries.sorted()
+        var result: [DiarizedSpeakerTurn] = []
+        for (start, end) in zip(orderedBoundaries, orderedBoundaries.dropFirst()) where start < end {
+            let midpoint = Double(start + end) / 2
+            let active = turns.enumerated().filter { _, turn in
+                turn.startMs < end && start < turn.endMs
+            }
+            guard let owner = active.max(by: { lhs, rhs in
+                ownershipRank(for: lhs, at: midpoint) < ownershipRank(for: rhs, at: midpoint)
+            })?.element else { continue }
+            if let previous = result.last,
+               previous.speakerID == owner.speakerID,
+               previous.endMs == start,
+               previous.qualityScore == owner.qualityScore {
+                result[result.count - 1] = DiarizedSpeakerTurn(
+                    speakerID: owner.speakerID,
+                    startMs: previous.startMs,
+                    endMs: end,
+                    qualityScore: owner.qualityScore
+                )
+            } else {
+                result.append(DiarizedSpeakerTurn(
+                    speakerID: owner.speakerID,
+                    startMs: start,
+                    endMs: end,
+                    qualityScore: owner.qualityScore
+                ))
+            }
         }
-        let requiredOverlap = max(configuration.minimumOverlapMs, Int(ceil(Double(word.endMs - word.startMs) * configuration.minimumOverlapRatio)))
-        let runnerUpOverlap = orderedCandidates.dropFirst().first?.value ?? 0
-        let hasAdequateEvidence = strongest.value >= requiredOverlap
-        // Even when callers allow a zero additional margin, equal evidence remains ambiguous.
-        let hasClearWinner = orderedCandidates.count == 1 || strongest.value - runnerUpOverlap > configuration.minimumLeadMs
-        return Attribution(
-            word: word,
-            diarizedSpeakerID: hasAdequateEvidence && hasClearWinner ? strongest.key : nil,
-            overlap: orderedCandidates.count > 1
+        return result
+    }
+
+    private func ownershipRank(
+        for indexedTurn: (offset: Int, element: DiarizedSpeakerTurn),
+        at midpoint: Double
+    ) -> OwnershipRank {
+        let turn = indexedTurn.element
+        let leftExtension = midpoint - Double(turn.startMs)
+        let rightExtension = Double(turn.endMs) - midpoint
+        return OwnershipRank(
+            bilateralExtension: min(leftExtension, rightExtension),
+            totalExtension: leftExtension + rightExtension,
+            qualityScore: turn.qualityScore,
+            inverseInputIndex: -indexedTurn.offset,
+            speakerID: turn.speakerID
         )
     }
 
+    private static func overlapMs(startA: Int, endA: Int, startB: Int, endB: Int) -> Int {
+        max(0, min(endA, endB) - max(startA, startB))
+    }
+
     private func canAppend(_ next: Attribution, to current: DraftSegment, canonicalSpeakerID: String?) -> Bool {
-        TranscriptDisplayGrouper(configuration: configuration.grouping).shouldContinue(
+        // Keep inferred evidence separate from confirmed words and from different distances.
+        guard current.attributions.last?.nearestDistanceMs == next.nearestDistanceMs else { return false }
+        return TranscriptDisplayGrouper(configuration: configuration.grouping).shouldContinue(
             currentSpeakerID: current.canonicalSpeakerID,
             currentStartMs: current.startMs,
             currentEndMs: current.endMs,
@@ -207,6 +337,24 @@ public struct SpeakerTurnBuilder: Sendable {
         let word: NormalizedWord
         let diarizedSpeakerID: String?
         let overlap: Bool
+        let confidence: Double
+        let nearestDistanceMs: Int?
+    }
+
+    private struct OwnershipRank: Comparable {
+        let bilateralExtension: Double
+        let totalExtension: Double
+        let qualityScore: Double
+        let inverseInputIndex: Int
+        let speakerID: String
+
+        static func < (lhs: Self, rhs: Self) -> Bool {
+            if lhs.bilateralExtension != rhs.bilateralExtension { return lhs.bilateralExtension < rhs.bilateralExtension }
+            if lhs.totalExtension != rhs.totalExtension { return lhs.totalExtension < rhs.totalExtension }
+            if lhs.qualityScore != rhs.qualityScore { return lhs.qualityScore < rhs.qualityScore }
+            if lhs.inverseInputIndex != rhs.inverseInputIndex { return lhs.inverseInputIndex < rhs.inverseInputIndex }
+            return lhs.speakerID > rhs.speakerID
+        }
     }
 
     private struct DraftSegment: Sendable {
@@ -237,14 +385,22 @@ public struct SpeakerTurnBuilder: Sendable {
             } : nil
             return TranscriptSegment(
                 id: id,
-                speakerID: canonicalSpeakerID,
-                speakerLabel: speakerLabel,
+                speakerID: attributions[0].nearestDistanceMs == nil ? canonicalSpeakerID : nil,
+                speakerLabel: attributions[0].nearestDistanceMs == nil ? speakerLabel : "Unknown speaker",
                 startMs: startMs,
                 endMs: endMs,
                 text: join(attributions.map { $0.word.word.text }),
                 overlap: attributions.contains(where: \.overlap),
                 timingQuality: hasOnlyPreciseWordTimings ? .asrWord : .segmentOnly,
-                words: words
+                speakerConfidence: attributions.map(\.confidence).min(),
+                words: words,
+                attributionSource: attributions[0].nearestDistanceMs == nil ? nil : .inferred,
+                speakerInference: attributions[0].nearestDistanceMs.flatMap { distance in
+                    canonicalSpeakerID.map { TranscriptSpeakerInference(
+                        speakerID: $0, speakerLabel: speakerLabel,
+                        evidence: .nearestInterval(distanceMs: distance), provenance: SpeakerTurnBuilder.attributionProvenance
+                    ) }
+                }
             )
         }
 
@@ -292,11 +448,13 @@ public struct DiarizedSpeakerTurn: Sendable, Equatable {
     public let speakerID: String
     public let startMs: Int
     public let endMs: Int
+    public let qualityScore: Double
 
-    public init(speakerID: String, startMs: Int, endMs: Int) {
+    public init(speakerID: String, startMs: Int, endMs: Int, qualityScore: Double = 1) {
         self.speakerID = speakerID
         self.startMs = startMs
         self.endMs = endMs
+        self.qualityScore = qualityScore
     }
 }
 

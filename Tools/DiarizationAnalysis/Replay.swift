@@ -37,16 +37,30 @@ struct Replay {
         let turns = (document["intervals"] as! [[String: Any]]).map { t in
             DiarizedSpeakerTurn(speakerID: t["speakerID"] as! String,
                 startMs: Int(((t["startSeconds"] as! Double) * 1000).rounded()),
-                endMs: Int(((t["endSeconds"] as! Double) * 1000).rounded()))
+                endMs: Int(((t["endSeconds"] as! Double) * 1000).rounded()),
+                qualityScore: (t["qualityScore"] as? NSNumber)?.doubleValue ?? 1)
         }
         let result = try SpeakerTurnBuilder().build(words: words, diarizedTurns: turns)
+        let reconciled = UnknownFragmentReconciler().reconcile(
+            segments: result.segments, speakers: result.speakers,
+            intervals: (document["intervals"] as! [[String: Any]]).map { t in
+                AcousticSpeakerInterval(speakerID: t["speakerID"] as! String,
+                    startMs: Int(((t["startSeconds"] as! Double) * 1000).rounded()),
+                    endMs: Int(((t["endSeconds"] as! Double) * 1000).rounded()),
+                    overlapsAnotherSpeaker: t["overlapsAnotherSpeaker"] as? Bool ?? false,
+                    qualityScore: (t["qualityScore"] as? NSNumber)?.doubleValue)
+            })
+        let effectiveBySegment = Dictionary(uniqueKeysWithValues: reconciled.map { ($0.id, $0.effectiveSpeakerID) })
+        let paragraphs = TranscriptParagraphGrouper().paragraphs(from: reconciled)
         let encoder = JSONEncoder()
         let segments = try JSONSerialization.jsonObject(with: encoder.encode(result.segments))
         let output: [String: Any] = ["words": words.map { w -> [String: Any] in
             ["id": w.id, "text": w.text, "startMs": w.startMs as Any? ?? NSNull(),
              "endMs": w.endMs as Any? ?? NSNull(), "enclosingStartMs": w.enclosingStartMs,
              "enclosingEndMs": w.enclosingEndMs]
-        }, "labels": result.wordAssignments.map { $0.speakerID as Any? ?? NSNull() }, "segments": segments]
+        }, "labels": result.wordAssignments.map { $0.speakerID as Any? ?? NSNull() }, "segments": segments,
+            "effective_labels": result.wordAssignments.map { (effectiveBySegment[$0.segmentID] ?? nil) as Any? ?? NSNull() },
+            "display_paragraphs": paragraphs.map { ["word_count": $0.words?.count ?? $0.text.split(whereSeparator: \.isWhitespace).count] } ]
         FileHandle.standardOutput.write(try JSONSerialization.data(withJSONObject: output, options: [.sortedKeys]))
     }
 }

@@ -10,17 +10,28 @@ struct JSONSchemaFixtureValidator {
 
     private func validate(_ value: Any, against schema: [String: Any]) throws {
         let schema = try resolve(schema)
+        if let alternatives = schema["oneOf"] as? [[String: Any]] {
+            let matches = alternatives.filter { alternative in
+                do { try validate(value, against: alternative); return true } catch { return false }
+            }.count
+            guard matches == 1 else { throw ValidationError.invalidType }
+        }
         if let constant = schema["const"] as? NSNumber, let value = value as? NSNumber, value != constant { throw ValidationError.invalidConstant }
         if let constant = schema["const"] as? String, value as? String != constant { throw ValidationError.invalidConstant }
         if let values = schema["enum"] as? [String], !values.contains(value as? String ?? "") { throw ValidationError.invalidEnum }
         if let types = schema["type"] as? [String], !types.contains(where: { matches(value, type: $0) }) { throw ValidationError.invalidType }
         if let type = schema["type"] as? String, !matches(value, type: type) { throw ValidationError.invalidType }
         if let minimum = schema["minimum"] as? NSNumber, let number = value as? NSNumber, number.doubleValue < minimum.doubleValue { throw ValidationError.invalidMinimum }
+        if let maximum = schema["maximum"] as? NSNumber, let number = value as? NSNumber, number.doubleValue > maximum.doubleValue { throw ValidationError.invalidMaximum }
         if let minLength = schema["minLength"] as? NSNumber, let string = value as? String, string.count < minLength.intValue { throw ValidationError.invalidLength }
         if let array = value as? [Any], let itemSchema = schema["items"] as? [String: Any] {
             try array.forEach { try validate($0, against: itemSchema) }
         }
         guard let object = value as? [String: Any] else { return }
+        if schema["additionalProperties"] as? Bool == false {
+            let allowed = Set((schema["properties"] as? [String: Any] ?? [:]).keys)
+            guard Set(object.keys).isSubset(of: allowed) else { throw ValidationError.invalidType }
+        }
         for key in schema["required"] as? [String] ?? [] where object[key] == nil { throw ValidationError.missingRequiredField(key) }
         for (key, propertySchema) in schema["properties"] as? [String: [String: Any]] ?? [:] {
             if let property = object[key] { try validate(property, against: propertySchema) }
@@ -49,6 +60,6 @@ struct JSONSchemaFixtureValidator {
     }
 
     private enum ValidationError: Swift.Error {
-        case invalidConstant, invalidEnum, invalidType, invalidMinimum, invalidLength, missingRequiredField(String), unsupportedReference
+        case invalidConstant, invalidEnum, invalidType, invalidMinimum, invalidMaximum, invalidLength, missingRequiredField(String), unsupportedReference
     }
 }

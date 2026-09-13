@@ -130,6 +130,31 @@ final class ModuleIntegrationTests: XCTestCase {
         )
         XCTAssertEqual(transcript.engineRevisions["diarization_models"], "model-revision")
         XCTAssertEqual(transcript.processingOptions["speaker_count"], .string("automatic"))
+        XCTAssertEqual(
+            transcript.processingOptions["speaker_attribution"],
+            .object([
+                "provenance": .string("speaker-turn-attribution-v3"),
+                "phrase": .object([
+                    "mode": .string("same_asr_span_pause_bounded_overlap_sum"),
+                    "override_minimum_lead_ratio": .number(0.2),
+                ]),
+                "nearest_interval": .object([
+                    "maximum_distance_ms": .number(250),
+                    "attribution_source": .string("inferred"),
+                    "rejects_competing_intervals": .boolean(true),
+                ]),
+                "confidence": .object([
+                    "provenance": .string("word-overlap-margin-v1"),
+                    "formula": .string("(strongest_overlap_ms-runner_up_overlap_ms)/word_duration_ms"),
+                    "segment_aggregation": .string("minimum_word_confidence"),
+                ]),
+                "timeline": .object([
+                    "provenance": .string("interval-extension-quality-v1"),
+                    "mode": .string("exclusive_for_attribution_only"),
+                    "preserves_canonical_intervals": .boolean(true),
+                ]),
+            ])
+        )
         guard case let .object(diagnostics)? = transcript.processingOptions["diarization_diagnostics"] else {
             return XCTFail("Missing diarization diagnostics")
         }

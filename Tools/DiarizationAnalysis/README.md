@@ -1,6 +1,6 @@
 # Local diarization evaluation
 
-`compare.py` reports exact-matched-text **reference agreement**, not DER, WDER, or human ground truth. `summarize.py` compares automatic/exact-two outputs with actual current Swift host replay and emits transcript-free aggregates. Read [the evaluation](../../docs/investigations/diarization-979-evaluation.md) for measurement limits and the retain decision.
+`compare.py` reports exact-matched-text **reference agreement**, not DER, WDER, or human ground truth. `summarize.py` compares automatic/exact-two outputs with actual current Swift host replay and emits transcript-free aggregates. `wder.py` adds a WDER-style score against either explicitly manual canonical rows or a supplied local reference transcript. Read [the evaluation](../../docs/investigations/diarization-979-evaluation.md) for measurement limits and the retain decision.
 
 Requirements: macOS, Swift/Xcode, Python 3, installed Scribe models. Excerpt generation also uses `ffmpeg`. Model download/build access is separate from inference: all meeting audio stays local. Keep raw outputs, transcripts, clips and embeddings in a private directory outside tracked source.
 
@@ -63,6 +63,65 @@ python3 Tools/DiarizationAnalysis/summarize.py \
 The host harness compiles the production `TokenTimingReconciler`, `SpeakerTurnBuilder`, `TranscriptDisplayGrouper`, transcript types, and the complete production `AudioTimeMapping` type. Only resource-bundle plumbing is supplied for standalone compilation; schema loading is unused. Historical `prepare.json` without mapping uses an identity source-time mapping only after checking equal full-source durations. This fallback is for these untrimmed recordings, not arbitrary edited audio.
 
 The reference run uses fresh fixed ASR. Other runs use fixed historical saved words and are explicitly labeled as such. Python labels are normalized to the Swift first-appearance speaker IDs; all assignments and paragraph word counts must agree or aggregation fails. `compare.py --words /path/to/replay.json` also accepts the reconstructed words for individual investigations.
+
+## WDER-style ground-truth scoring
+
+`wder.py` always gets its hypothesis assignments and paragraph rows from the
+production Swift host harness. Its output contains aggregate counts, normalized
+speaker IDs, hashes and engine revision only: it deliberately contains neither
+transcript text nor original speaker names. WDER here means word speaker error
+on the scoreable alignment set (`wrong + unknown`); it is not time-weighted DER.
+
+Use manually approved canonical rows when a reviewer changed their attribution.
+Only rows with `attribution_source == "manual"` are scored; automatic and
+inferred rows are deliberately excluded.
+
+```sh
+python3 Tools/DiarizationAnalysis/wder.py "$RUN" \
+  --diarization "$EVAL/results/fluid.json" --transcript "$EVAL/transcript.json" \
+  --output "$EVAL/wder-manual.json"
+```
+
+Or pass an external transcript of exactly the same audio. Supported formats are
+MacWhisper-style JSON `[{"speaker", "text", "start"?, "end"?}]`, SRT/VTT
+captions whose text starts with `Speaker:`, and plain text consisting of one
+`Speaker: utterance` per line. JSON `start`/`end` are seconds (use
+`start_ms`/`end_ms` for milliseconds); caption timestamps are standard SRT/VTT.
+Timestamped references align replay words by greatest time overlap. Untimed
+references align normalized lexical tokens with `SequenceMatcher(autojunk=False)`.
+Both report coverage, and the scorer finds a globally optimal one-to-one mapping
+between anonymous Scribe and reference speakers before classifying words.
+
+```sh
+python3 Tools/DiarizationAnalysis/wder.py "$RUN" \
+  --diarization "$EVAL/results/fluid.json" --transcript "$EVAL/transcript.json" \
+  --reference "$REFERENCE" --output "$EVAL/wder-reference.json"
+```
+
+By default each call compiles/replays via `replay.py` and discards the private
+replay JSON. For a batch that already built the same harness, pass
+`--host-replay "$EVAL/host-replay"`; its SHA-256 is still recorded. The output
+also records the diarization document hash, canonical revision and engine
+revision where supplied by the worker artifact.
+
+### Canonical labels versus inferred display labels
+
+Canonical labels remain the default score. Pass `--effective-speakers` to score
+`effectiveSpeakerID` after the production `UnknownFragmentReconciler`, including
+bounded nearest-interval evidence from `SpeakerTurnBuilder`:
+
+```sh
+python3 Tools/DiarizationAnalysis/wder.py "$RUN" --reference "$REFERENCE" \
+  --effective-speakers --output "$EVAL/wder-effective.json"
+```
+
+The replay now also compiles the production reconciler and paragraph grouper;
+small dependency types are extracted from production sources just like the audio
+time mapping. `attribution_view` identifies the selected score. `paragraphs`
+retains the historical canonical-row count; `display_paragraphs` counts actual
+reading paragraphs after reconciliation. Inferred labels remain suggestions:
+canonical `speaker_id` stays null and canonical exports retain that uncertainty.
+Rebuild old cached host executables before using `--effective-speakers`.
 
 ## Excerpt review and checks
 
