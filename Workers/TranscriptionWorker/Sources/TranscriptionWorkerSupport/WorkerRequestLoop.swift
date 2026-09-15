@@ -73,7 +73,7 @@ public final class WorkerRequestLoop: @unchecked Sendable {
             writer.write(WorkerEnvelope(kind: .stageResult, requestID: envelope.requestID, payload: .object([
                 "stage": .string("handshake"), "protocolVersion": .number(Double(WorkerEnvelope.currentVersion)),
                 "workerVersion": .string("0.2.0"), "networking": .string("disabled"),
-                "runtimeDownloads": .bool(false), "telemetry": .bool(false), "fluidAudio": .string("0.15.6"),
+                "runtimeDownloads": .bool(false), "telemetry": .bool(false), "fluidAudio": .string(OfflineDiarizationAdapter.fluidAudioVersion),
             ])))
         case "validate_assets":
             validateAssets(requestID: envelope.requestID)

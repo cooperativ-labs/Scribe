@@ -459,6 +459,7 @@ public struct TranscriptReprocessSession: Identifiable, Equatable, Sendable {
         switch speakerCount {
         case .automatic: "automatic speaker count"
         case .known(let count): "exactly \(count) speaker\(count == 1 ? "" : "s")"
+        case .upTo(let count): "up to \(count) speaker\(count == 1 ? "" : "s")"
         }
     }
 }

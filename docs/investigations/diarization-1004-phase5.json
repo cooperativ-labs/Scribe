@@ -1,0 +1,2089 @@
+{
+  "date": "2026-09-15",
+  "decision": {
+    "best_cab_gap_seconds": 0.75,
+    "conservative_candidate_gap_seconds": 0.25,
+    "production_minimum_gap_seconds": 0.1,
+    "production_minimum_segment_duration_seconds": 0.0,
+    "reason": "Larger gaps reduce CAB WDER, but 0.75 s adds four and five wrong assignments on the two sparse manual subsets. Retain production defaults pending broader ground truth."
+  },
+  "executables": {
+    "ASRBenchmark": {
+      "build_system": "swiftbuild",
+      "configuration": "release",
+      "sha256": "4e09d7058488aff3ff412218e16d8483d3e2cc7426bccf43ab08b57168c4fbf4"
+    },
+    "DiarizationBenchmark": {
+      "build_system": "swiftbuild",
+      "configuration": "release",
+      "sha256": "b09ba8206b284b0c59a3c87df52ae3768dad35df53ce0c0d2c2e376224f3474b"
+    }
+  },
+  "host_replay_sha256": "706873b5236ee016d090e1caf785c93a374403348a001e551f383b555819bae7",
+  "inputs": [
+    {
+      "canonical_sha256": "6434c6843b588a0edb3e367968cc6c2ddef2d23f84743ef075fac4d07d40ff58",
+      "manual_segment_count": 9,
+      "prepared_audio_sha256": "e3017031d4d0948b8cf6b9b0c8f9ef58ca890e06aa27827c3cea3fe899acfc27",
+      "run_id": "013BED54-9350-4CEE-B2D0-FAF49752F5B7",
+      "saved_diarization_engine": {
+        "modelRevision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594",
+        "runtime": "FluidAudio 0.15.6",
+        "runtimeRevision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b"
+      },
+      "saved_diarization_sha256": "ff503e09d277438218665bb2764dd236303e0af05ff5092e85742c173c78cb36",
+      "source_duration_ms": 2280762,
+      "source_sha256": "62fd7fc9f295f6606969bed7667299780f637c1604a421ba33b538ccee827a72",
+      "words_sha256": "f1c95555da256cc6634e1885e43d087144c60c80b8e13a0fb06aaf9a45a968ca"
+    },
+    {
+      "canonical_sha256": "e8096e5fe0709cc8d9e44c76f116bbfff709d9b0670f9ad6522abbfc071c2dac",
+      "manual_segment_count": 0,
+      "prepared_audio_sha256": "26a4d005f6ff7666f375b3677bc5c7d8f2c794b9ac6753eb6c82caa32e1ffae6",
+      "run_id": "01D75E08-6B5B-4C90-935D-7786C61BABA3",
+      "saved_diarization_engine": {
+        "modelRevision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594",
+        "runtime": "FluidAudio 0.15.6",
+        "runtimeRevision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b"
+      },
+      "saved_diarization_sha256": "2465dd7f543f4799a0131626a4e67e845b1061d8f84de309f16ba11f36cffcaa",
+      "source_duration_ms": 7021027,
+      "source_sha256": "cecb678e89d2e0bc89c9687e1c980d5b385bd6047623e93b18a35468baa4c514",
+      "words_sha256": "261c4c792c6ce0fb2d302758446f3cb2ecaef06514bbd912116d966e69dacc59"
+    },
+    {
+      "canonical_sha256": "3cf74ae8719249483059d24dbc55e83dce1e50a77b092f761b521104dd1d09d0",
+      "manual_segment_count": 0,
+      "prepared_audio_sha256": "ac87ba03704073d4d499867edd2b5cf6a0249787d9f06f8964e24f7f3ca33dcb",
+      "run_id": "542B3CF1-A62B-4B69-8894-D57D027CB7C5",
+      "saved_diarization_engine": {
+        "modelRevision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594",
+        "runtime": "FluidAudio 0.15.6",
+        "runtimeRevision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b"
+      },
+      "saved_diarization_sha256": "f36f90f81fc128c04cc0734f014e203c498c24ff680414ce30f1560d52539681",
+      "source_duration_ms": 3090397,
+      "source_sha256": "a318bd9ee3a9a33463319782a05cfa43278aa7d0ce52060b8d4fc2dd3e5a1f82",
+      "words_sha256": "d701ca1d6d424388c0e80bf99a06979b8d8ce554b424153203333cd39d9cdedc"
+    },
+    {
+      "canonical_sha256": "76c25ee7439a185e8bee20c27073c54c51bea1d91624edbec8b394ef0a6680cc",
+      "manual_segment_count": 0,
+      "prepared_audio_sha256": "861af0e612202c6fc60bf9e3e68aa51bb0538c416ed2782011f1eb5fa17aa400",
+      "run_id": "624C6ADF-07EA-4B51-A880-FB0A2A13EE7F",
+      "saved_diarization_engine": {
+        "modelRevision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594",
+        "runtime": "FluidAudio 0.15.6",
+        "runtimeRevision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b"
+      },
+      "saved_diarization_sha256": "eb49a36dfcff389f6ceab89a7581d0b8601c06b9091006b2e632c03c24189388",
+      "source_duration_ms": 2642290,
+      "source_sha256": "918a8766d112db70ddb2feae8bf05e673e88a64c1bf7f14ecff023d20827aa37",
+      "words_sha256": "da9e613bb0f16adddfe700a78f18707d09079f1e658731f52ecc51e17237c964"
+    },
+    {
+      "canonical_sha256": "8d6da0247d208b813ccc2c306700729c9838c4970587a0bfc69686060b4e601d",
+      "manual_segment_count": 5,
+      "prepared_audio_sha256": "23b92fe38d5c2791397e87cb2a31faccd2d117366dabdbe9d964afc3db043349",
+      "run_id": "837AEE5B-B010-45BE-8A5A-2FB04549D515",
+      "saved_diarization_engine": {
+        "modelRevision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594",
+        "runtime": "FluidAudio 0.15.6",
+        "runtimeRevision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b"
+      },
+      "saved_diarization_sha256": "b85ee72b4fd25e284010b7db4675eed5aad585e7ef9602f99934fe6d6c7a4d28",
+      "source_duration_ms": 4230580,
+      "source_sha256": "fc63c879cf9147b65407c13643fb4ae6c2706db77b03da822153b5e7c59dd10d",
+      "words_sha256": "d02ca46d7ac38a69e8a06ab27fb0bf339a64cf97e825acb03be17d7fa9cdc4e2"
+    }
+  ],
+  "method": {
+    "asr": "fixed historical saved words; no fresh ASR inference",
+    "cab_paragraph_alignment": "text SequenceMatcher",
+    "cab_segment_alignment": "timestamp",
+    "clustering_threshold": 0.6,
+    "gaps_seconds": [
+      0.1,
+      0.25,
+      0.5,
+      0.75
+    ],
+    "minimum_embedding_duration_seconds": 1,
+    "minimum_segment_duration_seconds": 0,
+    "other_reference": "only explicitly manual canonical segments, when available",
+    "overlap": "preserved",
+    "private_outputs": "/private/tmp/scribe-coo1004-phase5",
+    "runtime_caveat": "Serial inference; initial runs overlapped compilation. Wall time is recorded for provenance, not a controlled speed comparison.",
+    "speaker_count": "automatic"
+  },
+  "objective": "coo:1004.ky2c",
+  "reference_files": [
+    {
+      "path": "benchmark-files/BENCHMARK CALL - Paragraphs.json",
+      "sha256": "5d7c8d081e35769ff43810d8b3fe533092abfd15d0f40e28df770fcf49a6cd78"
+    },
+    {
+      "path": "benchmark-files/BENCHMARK CALL - Transcrpt segments.json",
+      "sha256": "cf9664ca8970c228360ae374870659826db4d4a0262bea702495a06166677eb5"
+    }
+  ],
+  "schema_version": 1,
+  "source_audit": {
+    "changed_offline_files": [
+      {
+        "path": "Sources/FluidAudio/Diarizer/Offline/Clustering/VBxClustering.swift",
+        "v0_15_6_sha256": "4fcb0a80eea39cf7960c8150e03812005980def65c5a16fd17e2502c7c0f6549",
+        "v0_15_7_sha256": "5af3e04c6fbf5dd9e8d7ad29f818936ca51d11d8a69d0a79c418cdfd9fe1139e"
+      },
+      {
+        "path": "Sources/FluidAudio/Diarizer/Offline/Core/OfflineDiarizerManager.swift",
+        "v0_15_6_sha256": "08581af77c3d45cac4fab07a47639f3facd5c29c77bd02eefbb750e1a518df8b",
+        "v0_15_7_sha256": "5ac1c05b04068c76617c3c78bdf779e703e4bccec8874d3220f77331d0bf6f10"
+      },
+      {
+        "path": "Sources/FluidAudio/Diarizer/Offline/Core/OfflineDiarizerModels.swift",
+        "v0_15_6_sha256": "ef8b3828bf0bced2fd3e59a1a51f0435d074ba0a0a80b10dd7d5dd653ae95b3e",
+        "v0_15_7_sha256": "89407ffa029ca71aa63c419020cd6898f61b48bfa1a12b0dc114f6a94fc6641c"
+      }
+    ],
+    "decision": "Retain compatibility: source changes affect task lifecycle and constrained cluster membership, not vector representation.",
+    "new_revision": "41540ea237350afe5117a082b5c28eda642d0612",
+    "old_revision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b",
+    "preprocessing_version": "fluidaudio-offline-fbank-16khz-mono-v0.15.6",
+    "unchanged_offline_files": [
+      {
+        "path": "Sources/FluidAudio/Diarizer/Offline/Clustering/AHCClustering.swift",
+        "v0_15_6_sha256": "6d4469390620a07fbdbdddc986b5d59bf7aa1d00848f24e51bcbfb752a2aa56e",
+        "v0_15_7_sha256": "6d4469390620a07fbdbdddc986b5d59bf7aa1d00848f24e51bcbfb752a2aa56e"
+      },
+      {
+        "path": "Sources/FluidAudio/Diarizer/Offline/Clustering/ConstrainedClusterAssignment.swift",
+        "v0_15_6_sha256": "bd997ad7030a03f7f26d3def0395d28a82b60c82dd39901dabbc232225e471ab",
+        "v0_15_7_sha256": "bd997ad7030a03f7f26d3def0395d28a82b60c82dd39901dabbc232225e471ab"
+      },
+      {
+        "path": "Sources/FluidAudio/Diarizer/Offline/Clustering/KMeansClustering.swift",
+        "v0_15_6_sha256": "d9dfaa4a5a728841a4c5c6581ef3a931dcbd69597509ba3f683220fa2f7062fe",
+        "v0_15_7_sha256": "d9dfaa4a5a728841a4c5c6581ef3a931dcbd69597509ba3f683220fa2f7062fe"
+      },
+      {
+        "path": "Sources/FluidAudio/Diarizer/Offline/Clustering/SpeakerCountConstraints.swift",
+        "v0_15_6_sha256": "04eb39e25609ab4c9c750b49be2348c4d932413669e043a6d218b4ed0d835737",
+        "v0_15_7_sha256": "04eb39e25609ab4c9c750b49be2348c4d932413669e043a6d218b4ed0d835737"
+      },
+      {
+        "path": "Sources/FluidAudio/Diarizer/Offline/Core/OfflineDiarizerTypes.swift",
+        "v0_15_6_sha256": "ff7e63e82330e48c7986ca5a5a6194a8f1a2304d2f5dd3afa1249932d8b6d271",
+        "v0_15_7_sha256": "ff7e63e82330e48c7986ca5a5a6194a8f1a2304d2f5dd3afa1249932d8b6d271"
+      },
+      {
+        "path": "Sources/FluidAudio/Diarizer/Offline/Core/PreparedDiarization.swift",
+        "v0_15_6_sha256": "68f4e93218676cd694e67d73214779281e384c28e3e0518401b32964661c96bf",
+        "v0_15_7_sha256": "68f4e93218676cd694e67d73214779281e384c28e3e0518401b32964661c96bf"
+      },
+      {
+        "path": "Sources/FluidAudio/Diarizer/Offline/Extraction/OfflineEmbeddingExtractor.swift",
+        "v0_15_6_sha256": "7b497d3cace01e8c98fce343838e8a322cce2d39275f9fb85d0352685f5af71c",
+        "v0_15_7_sha256": "7b497d3cace01e8c98fce343838e8a322cce2d39275f9fb85d0352685f5af71c"
+      },
+      {
+        "path": "Sources/FluidAudio/Diarizer/Offline/Extraction/PLDATransform.swift",
+        "v0_15_6_sha256": "5a3a8fd2166c37c6400c04ccd76b3aadf9c8da00de866520cee197e35ae7f706",
+        "v0_15_7_sha256": "5a3a8fd2166c37c6400c04ccd76b3aadf9c8da00de866520cee197e35ae7f706"
+      },
+      {
+        "path": "Sources/FluidAudio/Diarizer/Offline/Extraction/WeightInterpolation.swift",
+        "v0_15_6_sha256": "c51c661d523b7a35595b188192049ac403d3a0c3507bad8fe6dd5e7d2603e17f",
+        "v0_15_7_sha256": "c51c661d523b7a35595b188192049ac403d3a0c3507bad8fe6dd5e7d2603e17f"
+      },
+      {
+        "path": "Sources/FluidAudio/Diarizer/Offline/Segmentation/OfflineSegmentationProcessor.swift",
+        "v0_15_6_sha256": "8085de7a588cd9e1c2c7a1824a229ae9d4691d9a69301cb114fe1fb1d68d4d9f",
+        "v0_15_7_sha256": "8085de7a588cd9e1c2c7a1824a229ae9d4691d9a69301cb114fe1fb1d68d4d9f"
+      },
+      {
+        "path": "Sources/FluidAudio/Diarizer/Offline/Utils/OfflineReconstruction.swift",
+        "v0_15_6_sha256": "10a0db69e2cbc9acdd5495ee75020a3db979ea8830823a3e85b23177782ac348",
+        "v0_15_7_sha256": "10a0db69e2cbc9acdd5495ee75020a3db979ea8830823a3e85b23177782ac348"
+      },
+      {
+        "path": "Sources/FluidAudio/Diarizer/Offline/Utils/VDSPOperations.swift",
+        "v0_15_6_sha256": "0d5ee57d7155e566ce3021f58164aa28ed5f29dfa5212337d0222f17ce0a0850",
+        "v0_15_7_sha256": "0d5ee57d7155e566ce3021f58164aa28ed5f29dfa5212337d0222f17ce0a0850"
+      },
+      {
+        "path": "Sources/FluidAudio/Diarizer/Offline/Utils/ZeroVoteReembedder.swift",
+        "v0_15_6_sha256": "00498cbbf1e0f29e544de5d32e49b8e320674081beec90c92dc79cb0f0947400",
+        "v0_15_7_sha256": "00498cbbf1e0f29e544de5d32e49b8e320674081beec90c92dc79cb0f0947400"
+      }
+    ]
+  },
+  "sweep": [
+    {
+      "canonical_score": {
+        "agreement": {
+          "correct_pct": 0.0,
+          "correct_words": 0,
+          "scored_words": 17,
+          "unknown_pct": 100.0,
+          "unknown_words": 17,
+          "wder_pct": 100.0,
+          "wrong_pct": 0.0,
+          "wrong_words": 0
+        },
+        "alignment": {
+          "matched_reference_segments": 9,
+          "method": "time",
+          "reference_segment_coverage_pct": 100.0,
+          "reference_segments": 9,
+          "replay_word_coverage_pct": 0.266,
+          "replay_words": 6394,
+          "scored_words": 17
+        },
+        "attribution_view": "canonical",
+        "display_asides": {
+          "aside_count": 0,
+          "source_segment_count": 0,
+          "word_count": 0
+        },
+        "display_paragraphs": {
+          "paragraph_count": 227,
+          "single_word_paragraph_count": 52
+        },
+        "ground_truth": {
+          "canonical_sha256": "6434c6843b588a0edb3e367968cc6c2ddef2d23f84743ef075fac4d07d40ff58",
+          "manual_segments": 9,
+          "source": "manual_canonical_segments"
+        },
+        "paragraphs": {
+          "paragraph_count": 665,
+          "single_word_paragraph_count": 319
+        },
+        "provenance": {
+          "diarization_sha256": "88388750ad3a1bb8047b702191fa4d2233ea2d99d31488f9a9755359cd89aa93",
+          "engine_revision": "41540ea237350afe5117a082b5c28eda642d0612",
+          "executable_sha256": "706873b5236ee016d090e1caf785c93a374403348a001e551f383b555819bae7",
+          "run_revision": 12
+        },
+        "schema_version": 1,
+        "transcript_free": true
+      },
+      "configuration": {
+        "clusteringThreshold": 0.6,
+        "constrainedAssignment": true,
+        "embeddingExcludeOverlap": true,
+        "maximumVBxIterations": 20,
+        "minimumEmbeddingDurationSeconds": 1,
+        "minimumGapDurationSeconds": 0.1,
+        "minimumSegmentDurationSeconds": 0,
+        "preserveOverlappingIntervals": true,
+        "segmentationStepRatio": 0.2,
+        "warmStartFa": 0.07,
+        "warmStartFb": 0.8
+      },
+      "diarization_sha256": "88388750ad3a1bb8047b702191fa4d2233ea2d99d31488f9a9755359cd89aa93",
+      "effective_score": {
+        "agreement": {
+          "correct_pct": 23.529,
+          "correct_words": 4,
+          "scored_words": 17,
+          "unknown_pct": 76.471,
+          "unknown_words": 13,
+          "wder_pct": 76.471,
+          "wrong_pct": 0.0,
+          "wrong_words": 0
+        },
+        "alignment": {
+          "matched_reference_segments": 9,
+          "method": "time",
+          "reference_segment_coverage_pct": 100.0,
+          "reference_segments": 9,
+          "replay_word_coverage_pct": 0.266,
+          "replay_words": 6394,
+          "scored_words": 17
+        },
+        "attribution_view": "effective",
+        "display_asides": {
+          "aside_count": 0,
+          "source_segment_count": 0,
+          "word_count": 0
+        },
+        "display_paragraphs": {
+          "paragraph_count": 227,
+          "single_word_paragraph_count": 52
+        },
+        "ground_truth": {
+          "canonical_sha256": "6434c6843b588a0edb3e367968cc6c2ddef2d23f84743ef075fac4d07d40ff58",
+          "manual_segments": 9,
+          "source": "manual_canonical_segments"
+        },
+        "paragraphs": {
+          "paragraph_count": 665,
+          "single_word_paragraph_count": 319
+        },
+        "provenance": {
+          "diarization_sha256": "88388750ad3a1bb8047b702191fa4d2233ea2d99d31488f9a9755359cd89aa93",
+          "engine_revision": "41540ea237350afe5117a082b5c28eda642d0612",
+          "executable_sha256": "706873b5236ee016d090e1caf785c93a374403348a001e551f383b555819bae7",
+          "run_revision": 12
+        },
+        "schema_version": 1,
+        "transcript_free": true
+      },
+      "interval_count": 383,
+      "intervals_identical_to_saved_run": true,
+      "run_id": "013BED54-9350-4CEE-B2D0-FAF49752F5B7",
+      "speaker_count": 2,
+      "wall_clock_seconds": 14.214545625
+    },
+    {
+      "canonical_score": {
+        "agreement": {
+          "correct_pct": 0.0,
+          "correct_words": 0,
+          "scored_words": 17,
+          "unknown_pct": 100.0,
+          "unknown_words": 17,
+          "wder_pct": 100.0,
+          "wrong_pct": 0.0,
+          "wrong_words": 0
+        },
+        "alignment": {
+          "matched_reference_segments": 9,
+          "method": "time",
+          "reference_segment_coverage_pct": 100.0,
+          "reference_segments": 9,
+          "replay_word_coverage_pct": 0.266,
+          "replay_words": 6394,
+          "scored_words": 17
+        },
+        "attribution_view": "canonical",
+        "display_asides": {
+          "aside_count": 0,
+          "source_segment_count": 0,
+          "word_count": 0
+        },
+        "display_paragraphs": {
+          "paragraph_count": 221,
+          "single_word_paragraph_count": 48
+        },
+        "ground_truth": {
+          "canonical_sha256": "6434c6843b588a0edb3e367968cc6c2ddef2d23f84743ef075fac4d07d40ff58",
+          "manual_segments": 9,
+          "source": "manual_canonical_segments"
+        },
+        "paragraphs": {
+          "paragraph_count": 655,
+          "single_word_paragraph_count": 312
+        },
+        "provenance": {
+          "diarization_sha256": "afcec70b0d90a8864f010d96d91f090d8976fc3fc05502f102e2d45876e3ae6f",
+          "engine_revision": "41540ea237350afe5117a082b5c28eda642d0612",
+          "executable_sha256": "706873b5236ee016d090e1caf785c93a374403348a001e551f383b555819bae7",
+          "run_revision": 12
+        },
+        "schema_version": 1,
+        "transcript_free": true
+      },
+      "configuration": {
+        "clusteringThreshold": 0.6,
+        "constrainedAssignment": true,
+        "embeddingExcludeOverlap": true,
+        "maximumVBxIterations": 20,
+        "minimumEmbeddingDurationSeconds": 1,
+        "minimumGapDurationSeconds": 0.25,
+        "minimumSegmentDurationSeconds": 0,
+        "preserveOverlappingIntervals": true,
+        "segmentationStepRatio": 0.2,
+        "warmStartFa": 0.07,
+        "warmStartFb": 0.8
+      },
+      "diarization_sha256": "afcec70b0d90a8864f010d96d91f090d8976fc3fc05502f102e2d45876e3ae6f",
+      "effective_score": {
+        "agreement": {
+          "correct_pct": 23.529,
+          "correct_words": 4,
+          "scored_words": 17,
+          "unknown_pct": 76.471,
+          "unknown_words": 13,
+          "wder_pct": 76.471,
+          "wrong_pct": 0.0,
+          "wrong_words": 0
+        },
+        "alignment": {
+          "matched_reference_segments": 9,
+          "method": "time",
+          "reference_segment_coverage_pct": 100.0,
+          "reference_segments": 9,
+          "replay_word_coverage_pct": 0.266,
+          "replay_words": 6394,
+          "scored_words": 17
+        },
+        "attribution_view": "effective",
+        "display_asides": {
+          "aside_count": 0,
+          "source_segment_count": 0,
+          "word_count": 0
+        },
+        "display_paragraphs": {
+          "paragraph_count": 221,
+          "single_word_paragraph_count": 48
+        },
+        "ground_truth": {
+          "canonical_sha256": "6434c6843b588a0edb3e367968cc6c2ddef2d23f84743ef075fac4d07d40ff58",
+          "manual_segments": 9,
+          "source": "manual_canonical_segments"
+        },
+        "paragraphs": {
+          "paragraph_count": 655,
+          "single_word_paragraph_count": 312
+        },
+        "provenance": {
+          "diarization_sha256": "afcec70b0d90a8864f010d96d91f090d8976fc3fc05502f102e2d45876e3ae6f",
+          "engine_revision": "41540ea237350afe5117a082b5c28eda642d0612",
+          "executable_sha256": "706873b5236ee016d090e1caf785c93a374403348a001e551f383b555819bae7",
+          "run_revision": 12
+        },
+        "schema_version": 1,
+        "transcript_free": true
+      },
+      "interval_count": 366,
+      "intervals_identical_to_saved_run": false,
+      "run_id": "013BED54-9350-4CEE-B2D0-FAF49752F5B7",
+      "speaker_count": 2,
+      "wall_clock_seconds": 12.973033667
+    },
+    {
+      "canonical_score": {
+        "agreement": {
+          "correct_pct": 23.529,
+          "correct_words": 4,
+          "scored_words": 17,
+          "unknown_pct": 70.588,
+          "unknown_words": 12,
+          "wder_pct": 76.471,
+          "wrong_pct": 5.882,
+          "wrong_words": 1
+        },
+        "alignment": {
+          "matched_reference_segments": 9,
+          "method": "time",
+          "reference_segment_coverage_pct": 100.0,
+          "reference_segments": 9,
+          "replay_word_coverage_pct": 0.266,
+          "replay_words": 6394,
+          "scored_words": 17
+        },
+        "attribution_view": "canonical",
+        "display_asides": {
+          "aside_count": 0,
+          "source_segment_count": 0,
+          "word_count": 0
+        },
+        "display_paragraphs": {
+          "paragraph_count": 196,
+          "single_word_paragraph_count": 35
+        },
+        "ground_truth": {
+          "canonical_sha256": "6434c6843b588a0edb3e367968cc6c2ddef2d23f84743ef075fac4d07d40ff58",
+          "manual_segments": 9,
+          "source": "manual_canonical_segments"
+        },
+        "paragraphs": {
+          "paragraph_count": 601,
+          "single_word_paragraph_count": 280
+        },
+        "provenance": {
+          "diarization_sha256": "4a14ba51d872a961840b591eef49c85db857dbfd4b3d4ef044a866c00f8097bb",
+          "engine_revision": "41540ea237350afe5117a082b5c28eda642d0612",
+          "executable_sha256": "706873b5236ee016d090e1caf785c93a374403348a001e551f383b555819bae7",
+          "run_revision": 12
+        },
+        "schema_version": 1,
+        "transcript_free": true
+      },
+      "configuration": {
+        "clusteringThreshold": 0.6,
+        "constrainedAssignment": true,
+        "embeddingExcludeOverlap": true,
+        "maximumVBxIterations": 20,
+        "minimumEmbeddingDurationSeconds": 1,
+        "minimumGapDurationSeconds": 0.5,
+        "minimumSegmentDurationSeconds": 0,
+        "preserveOverlappingIntervals": true,
+        "segmentationStepRatio": 0.2,
+        "warmStartFa": 0.07,
+        "warmStartFb": 0.8
+      },
+      "diarization_sha256": "4a14ba51d872a961840b591eef49c85db857dbfd4b3d4ef044a866c00f8097bb",
+      "effective_score": {
+        "agreement": {
+          "correct_pct": 29.412,
+          "correct_words": 5,
+          "scored_words": 17,
+          "unknown_pct": 47.059,
+          "unknown_words": 8,
+          "wder_pct": 70.588,
+          "wrong_pct": 23.529,
+          "wrong_words": 4
+        },
+        "alignment": {
+          "matched_reference_segments": 9,
+          "method": "time",
+          "reference_segment_coverage_pct": 100.0,
+          "reference_segments": 9,
+          "replay_word_coverage_pct": 0.266,
+          "replay_words": 6394,
+          "scored_words": 17
+        },
+        "attribution_view": "effective",
+        "display_asides": {
+          "aside_count": 0,
+          "source_segment_count": 0,
+          "word_count": 0
+        },
+        "display_paragraphs": {
+          "paragraph_count": 196,
+          "single_word_paragraph_count": 35
+        },
+        "ground_truth": {
+          "canonical_sha256": "6434c6843b588a0edb3e367968cc6c2ddef2d23f84743ef075fac4d07d40ff58",
+          "manual_segments": 9,
+          "source": "manual_canonical_segments"
+        },
+        "paragraphs": {
+          "paragraph_count": 601,
+          "single_word_paragraph_count": 280
+        },
+        "provenance": {
+          "diarization_sha256": "4a14ba51d872a961840b591eef49c85db857dbfd4b3d4ef044a866c00f8097bb",
+          "engine_revision": "41540ea237350afe5117a082b5c28eda642d0612",
+          "executable_sha256": "706873b5236ee016d090e1caf785c93a374403348a001e551f383b555819bae7",
+          "run_revision": 12
+        },
+        "schema_version": 1,
+        "transcript_free": true
+      },
+      "interval_count": 314,
+      "intervals_identical_to_saved_run": false,
+      "run_id": "013BED54-9350-4CEE-B2D0-FAF49752F5B7",
+      "speaker_count": 2,
+      "wall_clock_seconds": 13.081809084
+    },
+    {
+      "canonical_score": {
+        "agreement": {
+          "correct_pct": 52.941,
+          "correct_words": 9,
+          "scored_words": 17,
+          "unknown_pct": 35.294,
+          "unknown_words": 6,
+          "wder_pct": 47.059,
+          "wrong_pct": 11.765,
+          "wrong_words": 2
+        },
+        "alignment": {
+          "matched_reference_segments": 9,
+          "method": "time",
+          "reference_segment_coverage_pct": 100.0,
+          "reference_segments": 9,
+          "replay_word_coverage_pct": 0.266,
+          "replay_words": 6394,
+          "scored_words": 17
+        },
+        "attribution_view": "canonical",
+        "display_asides": {
+          "aside_count": 0,
+          "source_segment_count": 0,
+          "word_count": 0
+        },
+        "display_paragraphs": {
+          "paragraph_count": 160,
+          "single_word_paragraph_count": 21
+        },
+        "ground_truth": {
+          "canonical_sha256": "6434c6843b588a0edb3e367968cc6c2ddef2d23f84743ef075fac4d07d40ff58",
+          "manual_segments": 9,
+          "source": "manual_canonical_segments"
+        },
+        "paragraphs": {
+          "paragraph_count": 482,
+          "single_word_paragraph_count": 215
+        },
+        "provenance": {
+          "diarization_sha256": "2401571c0fa265bca1216679b5b84b5ed137d31ee4082625aa24378e506c6da0",
+          "engine_revision": "41540ea237350afe5117a082b5c28eda642d0612",
+          "executable_sha256": "706873b5236ee016d090e1caf785c93a374403348a001e551f383b555819bae7",
+          "run_revision": 12
+        },
+        "schema_version": 1,
+        "transcript_free": true
+      },
+      "configuration": {
+        "clusteringThreshold": 0.6,
+        "constrainedAssignment": true,
+        "embeddingExcludeOverlap": true,
+        "maximumVBxIterations": 20,
+        "minimumEmbeddingDurationSeconds": 1,
+        "minimumGapDurationSeconds": 0.75,
+        "minimumSegmentDurationSeconds": 0,
+        "preserveOverlappingIntervals": true,
+        "segmentationStepRatio": 0.2,
+        "warmStartFa": 0.07,
+        "warmStartFb": 0.8
+      },
+      "diarization_sha256": "2401571c0fa265bca1216679b5b84b5ed137d31ee4082625aa24378e506c6da0",
+      "effective_score": {
+        "agreement": {
+          "correct_pct": 58.824,
+          "correct_words": 10,
+          "scored_words": 17,
+          "unknown_pct": 11.765,
+          "unknown_words": 2,
+          "wder_pct": 41.176,
+          "wrong_pct": 29.412,
+          "wrong_words": 5
+        },
+        "alignment": {
+          "matched_reference_segments": 9,
+          "method": "time",
+          "reference_segment_coverage_pct": 100.0,
+          "reference_segments": 9,
+          "replay_word_coverage_pct": 0.266,
+          "replay_words": 6394,
+          "scored_words": 17
+        },
+        "attribution_view": "effective",
+        "display_asides": {
+          "aside_count": 0,
+          "source_segment_count": 0,
+          "word_count": 0
+        },
+        "display_paragraphs": {
+          "paragraph_count": 160,
+          "single_word_paragraph_count": 21
+        },
+        "ground_truth": {
+          "canonical_sha256": "6434c6843b588a0edb3e367968cc6c2ddef2d23f84743ef075fac4d07d40ff58",
+          "manual_segments": 9,
+          "source": "manual_canonical_segments"
+        },
+        "paragraphs": {
+          "paragraph_count": 482,
+          "single_word_paragraph_count": 215
+        },
+        "provenance": {
+          "diarization_sha256": "2401571c0fa265bca1216679b5b84b5ed137d31ee4082625aa24378e506c6da0",
+          "engine_revision": "41540ea237350afe5117a082b5c28eda642d0612",
+          "executable_sha256": "706873b5236ee016d090e1caf785c93a374403348a001e551f383b555819bae7",
+          "run_revision": 12
+        },
+        "schema_version": 1,
+        "transcript_free": true
+      },
+      "interval_count": 240,
+      "intervals_identical_to_saved_run": false,
+      "run_id": "013BED54-9350-4CEE-B2D0-FAF49752F5B7",
+      "speaker_count": 2,
+      "wall_clock_seconds": 13.195446959
+    },
+    {
+      "canonical_score": {
+        "agreement": {
+          "correct_pct": 95.906,
+          "correct_words": 18460,
+          "scored_words": 19248,
+          "unknown_pct": 3.585,
+          "unknown_words": 690,
+          "wder_pct": 4.094,
+          "wrong_pct": 0.509,
+          "wrong_words": 98
+        },
+        "alignment": {
+          "matched_reference_segments": 1399,
+          "method": "time",
+          "reference_segment_coverage_pct": 94.527,
+          "reference_segments": 1480,
+          "replay_word_coverage_pct": 96.953,
+          "replay_words": 19853,
+          "scored_words": 19248
+        },
+        "attribution_view": "canonical",
+        "display_asides": {
+          "aside_count": 0,
+          "source_segment_count": 0,
+          "word_count": 0
+        },
+        "display_paragraphs": {
+          "paragraph_count": 630,
+          "single_word_paragraph_count": 94
+        },
+        "ground_truth": {
+          "reference_format": "json",
+          "reference_sha256": "cf9664ca8970c228360ae374870659826db4d4a0262bea702495a06166677eb5",
+          "source": "imported_reference"
+        },
+        "paragraphs": {
+          "paragraph_count": 1329,
+          "single_word_paragraph_count": 559
+        },
+        "provenance": {
+          "diarization_sha256": "8852fbf47b237be2be3687a97d8ed707b55c7672ba1b559648f6fedd473d1d56",
+          "engine_revision": "41540ea237350afe5117a082b5c28eda642d0612",
+          "executable_sha256": "706873b5236ee016d090e1caf785c93a374403348a001e551f383b555819bae7",
+          "run_revision": 14
+        },
+        "schema_version": 1,
+        "transcript_free": true
+      },
+      "configuration": {
+        "clusteringThreshold": 0.6,
+        "constrainedAssignment": true,
+        "embeddingExcludeOverlap": true,
+        "maximumVBxIterations": 20,
+        "minimumEmbeddingDurationSeconds": 1,
+        "minimumGapDurationSeconds": 0.1,
+        "minimumSegmentDurationSeconds": 0,
+        "preserveOverlappingIntervals": true,
+        "segmentationStepRatio": 0.2,
+        "warmStartFa": 0.07,
+        "warmStartFb": 0.8
+      },
+      "diarization_sha256": "8852fbf47b237be2be3687a97d8ed707b55c7672ba1b559648f6fedd473d1d56",
+      "effective_score": {
+        "agreement": {
+          "correct_pct": 98.192,
+          "correct_words": 18900,
+          "scored_words": 19248,
+          "unknown_pct": 1.231,
+          "unknown_words": 237,
+          "wder_pct": 1.808,
+          "wrong_pct": 0.577,
+          "wrong_words": 111
+        },
+        "alignment": {
+          "matched_reference_segments": 1399,
+          "method": "time",
+          "reference_segment_coverage_pct": 94.527,
+          "reference_segments": 1480,
+          "replay_word_coverage_pct": 96.953,
+          "replay_words": 19853,
+          "scored_words": 19248
+        },
+        "attribution_view": "effective",
+        "display_asides": {
+          "aside_count": 0,
+          "source_segment_count": 0,
+          "word_count": 0
+        },
+        "display_paragraphs": {
+          "paragraph_count": 630,
+          "single_word_paragraph_count": 94
+        },
+        "ground_truth": {
+          "reference_format": "json",
+          "reference_sha256": "cf9664ca8970c228360ae374870659826db4d4a0262bea702495a06166677eb5",
+          "source": "imported_reference"
+        },
+        "paragraphs": {
+          "paragraph_count": 1329,
+          "single_word_paragraph_count": 559
+        },
+        "provenance": {
+          "diarization_sha256": "8852fbf47b237be2be3687a97d8ed707b55c7672ba1b559648f6fedd473d1d56",
+          "engine_revision": "41540ea237350afe5117a082b5c28eda642d0612",
+          "executable_sha256": "706873b5236ee016d090e1caf785c93a374403348a001e551f383b555819bae7",
+          "run_revision": 14
+        },
+        "schema_version": 1,
+        "transcript_free": true
+      },
+      "interval_count": 779,
+      "intervals_identical_to_saved_run": true,
+      "paragraph_score": {
+        "agreement": {
+          "correct_pct": 98.273,
+          "correct_words": 18440,
+          "scored_words": 18764,
+          "unknown_pct": 1.263,
+          "unknown_words": 237,
+          "wder_pct": 1.727,
+          "wrong_pct": 0.464,
+          "wrong_words": 87
+        },
+        "alignment": {
+          "matched_lexical_tokens": 18764,
+          "matched_reference_segments": 430,
+          "method": "text_sequence_matcher",
+          "reference_lexical_coverage_pct": 95.832,
+          "reference_lexical_tokens": 19580,
+          "reference_segment_coverage_pct": 99.768,
+          "reference_segments": 431,
+          "replay_lexical_coverage_pct": 94.515,
+          "replay_lexical_tokens": 19853
+        },
+        "attribution_view": "effective",
+        "display_asides": {
+          "aside_count": 0,
+          "source_segment_count": 0,
+          "word_count": 0
+        },
+        "display_paragraphs": {
+          "paragraph_count": 630,
+          "single_word_paragraph_count": 94
+        },
+        "ground_truth": {
+          "reference_format": "json",
+          "reference_sha256": "5d7c8d081e35769ff43810d8b3fe533092abfd15d0f40e28df770fcf49a6cd78",
+          "source": "imported_reference"
+        },
+        "paragraphs": {
+          "paragraph_count": 1329,
+          "single_word_paragraph_count": 559
+        },
+        "provenance": {
+          "diarization_sha256": "8852fbf47b237be2be3687a97d8ed707b55c7672ba1b559648f6fedd473d1d56",
+          "engine_revision": "41540ea237350afe5117a082b5c28eda642d0612",
+          "executable_sha256": "706873b5236ee016d090e1caf785c93a374403348a001e551f383b555819bae7",
+          "run_revision": 14
+        },
+        "schema_version": 1,
+        "transcript_free": true
+      },
+      "run_id": "01D75E08-6B5B-4C90-935D-7786C61BABA3",
+      "speaker_count": 10,
+      "wall_clock_seconds": 41.3959545
+    },
+    {
+      "canonical_score": {
+        "agreement": {
+          "correct_pct": 96.103,
+          "correct_words": 18498,
+          "scored_words": 19248,
+          "unknown_pct": 3.398,
+          "unknown_words": 654,
+          "wder_pct": 3.897,
+          "wrong_pct": 0.499,
+          "wrong_words": 96
+        },
+        "alignment": {
+          "matched_reference_segments": 1399,
+          "method": "time",
+          "reference_segment_coverage_pct": 94.527,
+          "reference_segments": 1480,
+          "replay_word_coverage_pct": 96.953,
+          "replay_words": 19853,
+          "scored_words": 19248
+        },
+        "attribution_view": "canonical",
+        "display_asides": {
+          "aside_count": 0,
+          "source_segment_count": 0,
+          "word_count": 0
+        },
+        "display_paragraphs": {
+          "paragraph_count": 613,
+          "single_word_paragraph_count": 84
+        },
+        "ground_truth": {
+          "reference_format": "json",
+          "reference_sha256": "cf9664ca8970c228360ae374870659826db4d4a0262bea702495a06166677eb5",
+          "source": "imported_reference"
+        },
+        "paragraphs": {
+          "paragraph_count": 1289,
+          "single_word_paragraph_count": 532
+        },
+        "provenance": {
+          "diarization_sha256": "897ef832dd796fbeedb45229d610f87628e711db5561a1cbed135d097ecc0ae3",
+          "engine_revision": "41540ea237350afe5117a082b5c28eda642d0612",
+          "executable_sha256": "706873b5236ee016d090e1caf785c93a374403348a001e551f383b555819bae7",
+          "run_revision": 14
+        },
+        "schema_version": 1,
+        "transcript_free": true
+      },
+      "configuration": {
+        "clusteringThreshold": 0.6,
+        "constrainedAssignment": true,
+        "embeddingExcludeOverlap": true,
+        "maximumVBxIterations": 20,
+        "minimumEmbeddingDurationSeconds": 1,
+        "minimumGapDurationSeconds": 0.25,
+        "minimumSegmentDurationSeconds": 0,
+        "preserveOverlappingIntervals": true,
+        "segmentationStepRatio": 0.2,
+        "warmStartFa": 0.07,
+        "warmStartFb": 0.8
+      },
+      "diarization_sha256": "897ef832dd796fbeedb45229d610f87628e711db5561a1cbed135d097ecc0ae3",
+      "effective_score": {
+        "agreement": {
+          "correct_pct": 98.291,
+          "correct_words": 18919,
+          "scored_words": 19248,
+          "unknown_pct": 1.148,
+          "unknown_words": 221,
+          "wder_pct": 1.709,
+          "wrong_pct": 0.561,
+          "wrong_words": 108
+        },
+        "alignment": {
+          "matched_reference_segments": 1399,
+          "method": "time",
+          "reference_segment_coverage_pct": 94.527,
+          "reference_segments": 1480,
+          "replay_word_coverage_pct": 96.953,
+          "replay_words": 19853,
+          "scored_words": 19248
+        },
+        "attribution_view": "effective",
+        "display_asides": {
+          "aside_count": 0,
+          "source_segment_count": 0,
+          "word_count": 0
+        },
+        "display_paragraphs": {
+          "paragraph_count": 613,
+          "single_word_paragraph_count": 84
+        },
+        "ground_truth": {
+          "reference_format": "json",
+          "reference_sha256": "cf9664ca8970c228360ae374870659826db4d4a0262bea702495a06166677eb5",
+          "source": "imported_reference"
+        },
+        "paragraphs": {
+          "paragraph_count": 1289,
+          "single_word_paragraph_count": 532
+        },
+        "provenance": {
+          "diarization_sha256": "897ef832dd796fbeedb45229d610f87628e711db5561a1cbed135d097ecc0ae3",
+          "engine_revision": "41540ea237350afe5117a082b5c28eda642d0612",
+          "executable_sha256": "706873b5236ee016d090e1caf785c93a374403348a001e551f383b555819bae7",
+          "run_revision": 14
+        },
+        "schema_version": 1,
+        "transcript_free": true
+      },
+      "interval_count": 704,
+      "intervals_identical_to_saved_run": false,
+      "paragraph_score": {
+        "agreement": {
+          "correct_pct": 98.364,
+          "correct_words": 18457,
+          "scored_words": 18764,
+          "unknown_pct": 1.162,
+          "unknown_words": 218,
+          "wder_pct": 1.636,
+          "wrong_pct": 0.474,
+          "wrong_words": 89
+        },
+        "alignment": {
+          "matched_lexical_tokens": 18764,
+          "matched_reference_segments": 430,
+          "method": "text_sequence_matcher",
+          "reference_lexical_coverage_pct": 95.832,
+          "reference_lexical_tokens": 19580,
+          "reference_segment_coverage_pct": 99.768,
+          "reference_segments": 431,
+          "replay_lexical_coverage_pct": 94.515,
+          "replay_lexical_tokens": 19853
+        },
+        "attribution_view": "effective",
+        "display_asides": {
+          "aside_count": 0,
+          "source_segment_count": 0,
+          "word_count": 0
+        },
+        "display_paragraphs": {
+          "paragraph_count": 613,
+          "single_word_paragraph_count": 84
+        },
+        "ground_truth": {
+          "reference_format": "json",
+          "reference_sha256": "5d7c8d081e35769ff43810d8b3fe533092abfd15d0f40e28df770fcf49a6cd78",
+          "source": "imported_reference"
+        },
+        "paragraphs": {
+          "paragraph_count": 1289,
+          "single_word_paragraph_count": 532
+        },
+        "provenance": {
+          "diarization_sha256": "897ef832dd796fbeedb45229d610f87628e711db5561a1cbed135d097ecc0ae3",
+          "engine_revision": "41540ea237350afe5117a082b5c28eda642d0612",
+          "executable_sha256": "706873b5236ee016d090e1caf785c93a374403348a001e551f383b555819bae7",
+          "run_revision": 14
+        },
+        "schema_version": 1,
+        "transcript_free": true
+      },
+      "run_id": "01D75E08-6B5B-4C90-935D-7786C61BABA3",
+      "speaker_count": 10,
+      "wall_clock_seconds": 50.27500875
+    },
+    {
+      "canonical_score": {
+        "agreement": {
+          "correct_pct": 96.794,
+          "correct_words": 18631,
+          "scored_words": 19248,
+          "unknown_pct": 2.696,
+          "unknown_words": 519,
+          "wder_pct": 3.206,
+          "wrong_pct": 0.509,
+          "wrong_words": 98
+        },
+        "alignment": {
+          "matched_reference_segments": 1399,
+          "method": "time",
+          "reference_segment_coverage_pct": 94.527,
+          "reference_segments": 1480,
+          "replay_word_coverage_pct": 96.953,
+          "replay_words": 19853,
+          "scored_words": 19248
+        },
+        "attribution_view": "canonical",
+        "display_asides": {
+          "aside_count": 0,
+          "source_segment_count": 0,
+          "word_count": 0
+        },
+        "display_paragraphs": {
+          "paragraph_count": 575,
+          "single_word_paragraph_count": 66
+        },
+        "ground_truth": {
+          "reference_format": "json",
+          "reference_sha256": "cf9664ca8970c228360ae374870659826db4d4a0262bea702495a06166677eb5",
+          "source": "imported_reference"
+        },
+        "paragraphs": {
+          "paragraph_count": 1118,
+          "single_word_paragraph_count": 431
+        },
+        "provenance": {
+          "diarization_sha256": "6db50288129c2af4f305c40e121d97b92ab37870b362e31ace365f68dbfb8341",
+          "engine_revision": "41540ea237350afe5117a082b5c28eda642d0612",
+          "executable_sha256": "706873b5236ee016d090e1caf785c93a374403348a001e551f383b555819bae7",
+          "run_revision": 14
+        },
+        "schema_version": 1,
+        "transcript_free": true
+      },
+      "configuration": {
+        "clusteringThreshold": 0.6,
+        "constrainedAssignment": true,
+        "embeddingExcludeOverlap": true,
+        "maximumVBxIterations": 20,
+        "minimumEmbeddingDurationSeconds": 1,
+        "minimumGapDurationSeconds": 0.5,
+        "minimumSegmentDurationSeconds": 0,
+        "preserveOverlappingIntervals": true,
+        "segmentationStepRatio": 0.2,
+        "warmStartFa": 0.07,
+        "warmStartFb": 0.8
+      },
+      "diarization_sha256": "6db50288129c2af4f305c40e121d97b92ab37870b362e31ace365f68dbfb8341",
+      "effective_score": {
+        "agreement": {
+          "correct_pct": 98.519,
+          "correct_words": 18963,
+          "scored_words": 19248,
+          "unknown_pct": 0.914,
+          "unknown_words": 176,
+          "wder_pct": 1.481,
+          "wrong_pct": 0.566,
+          "wrong_words": 109
+        },
+        "alignment": {
+          "matched_reference_segments": 1399,
+          "method": "time",
+          "reference_segment_coverage_pct": 94.527,
+          "reference_segments": 1480,
+          "replay_word_coverage_pct": 96.953,
+          "replay_words": 19853,
+          "scored_words": 19248
+        },
+        "attribution_view": "effective",
+        "display_asides": {
+          "aside_count": 0,
+          "source_segment_count": 0,
+          "word_count": 0
+        },
+        "display_paragraphs": {
+          "paragraph_count": 575,
+          "single_word_paragraph_count": 66
+        },
+        "ground_truth": {
+          "reference_format": "json",
+          "reference_sha256": "cf9664ca8970c228360ae374870659826db4d4a0262bea702495a06166677eb5",
+          "source": "imported_reference"
+        },
+        "paragraphs": {
+          "paragraph_count": 1118,
+          "single_word_paragraph_count": 431
+        },
+        "provenance": {
+          "diarization_sha256": "6db50288129c2af4f305c40e121d97b92ab37870b362e31ace365f68dbfb8341",
+          "engine_revision": "41540ea237350afe5117a082b5c28eda642d0612",
+          "executable_sha256": "706873b5236ee016d090e1caf785c93a374403348a001e551f383b555819bae7",
+          "run_revision": 14
+        },
+        "schema_version": 1,
+        "transcript_free": true
+      },
+      "interval_count": 520,
+      "intervals_identical_to_saved_run": false,
+      "paragraph_score": {
+        "agreement": {
+          "correct_pct": 98.62,
+          "correct_words": 18505,
+          "scored_words": 18764,
+          "unknown_pct": 0.901,
+          "unknown_words": 169,
+          "wder_pct": 1.38,
+          "wrong_pct": 0.48,
+          "wrong_words": 90
+        },
+        "alignment": {
+          "matched_lexical_tokens": 18764,
+          "matched_reference_segments": 430,
+          "method": "text_sequence_matcher",
+          "reference_lexical_coverage_pct": 95.832,
+          "reference_lexical_tokens": 19580,
+          "reference_segment_coverage_pct": 99.768,
+          "reference_segments": 431,
+          "replay_lexical_coverage_pct": 94.515,
+          "replay_lexical_tokens": 19853
+        },
+        "attribution_view": "effective",
+        "display_asides": {
+          "aside_count": 0,
+          "source_segment_count": 0,
+          "word_count": 0
+        },
+        "display_paragraphs": {
+          "paragraph_count": 575,
+          "single_word_paragraph_count": 66
+        },
+        "ground_truth": {
+          "reference_format": "json",
+          "reference_sha256": "5d7c8d081e35769ff43810d8b3fe533092abfd15d0f40e28df770fcf49a6cd78",
+          "source": "imported_reference"
+        },
+        "paragraphs": {
+          "paragraph_count": 1118,
+          "single_word_paragraph_count": 431
+        },
+        "provenance": {
+          "diarization_sha256": "6db50288129c2af4f305c40e121d97b92ab37870b362e31ace365f68dbfb8341",
+          "engine_revision": "41540ea237350afe5117a082b5c28eda642d0612",
+          "executable_sha256": "706873b5236ee016d090e1caf785c93a374403348a001e551f383b555819bae7",
+          "run_revision": 14
+        },
+        "schema_version": 1,
+        "transcript_free": true
+      },
+      "run_id": "01D75E08-6B5B-4C90-935D-7786C61BABA3",
+      "speaker_count": 10,
+      "wall_clock_seconds": 39.632382625
+    },
+    {
+      "canonical_score": {
+        "agreement": {
+          "correct_pct": 97.335,
+          "correct_words": 18735,
+          "scored_words": 19248,
+          "unknown_pct": 2.146,
+          "unknown_words": 413,
+          "wder_pct": 2.665,
+          "wrong_pct": 0.52,
+          "wrong_words": 100
+        },
+        "alignment": {
+          "matched_reference_segments": 1399,
+          "method": "time",
+          "reference_segment_coverage_pct": 94.527,
+          "reference_segments": 1480,
+          "replay_word_coverage_pct": 96.953,
+          "replay_words": 19853,
+          "scored_words": 19248
+        },
+        "attribution_view": "canonical",
+        "display_asides": {
+          "aside_count": 0,
+          "source_segment_count": 0,
+          "word_count": 0
+        },
+        "display_paragraphs": {
+          "paragraph_count": 552,
+          "single_word_paragraph_count": 57
+        },
+        "ground_truth": {
+          "reference_format": "json",
+          "reference_sha256": "cf9664ca8970c228360ae374870659826db4d4a0262bea702495a06166677eb5",
+          "source": "imported_reference"
+        },
+        "paragraphs": {
+          "paragraph_count": 978,
+          "single_word_paragraph_count": 350
+        },
+        "provenance": {
+          "diarization_sha256": "9d1f9f14d42c8ce5f372a458634f831a6b00e622c5f343a184cd69d1e5b7daf9",
+          "engine_revision": "41540ea237350afe5117a082b5c28eda642d0612",
+          "executable_sha256": "706873b5236ee016d090e1caf785c93a374403348a001e551f383b555819bae7",
+          "run_revision": 14
+        },
+        "schema_version": 1,
+        "transcript_free": true
+      },
+      "configuration": {
+        "clusteringThreshold": 0.6,
+        "constrainedAssignment": true,
+        "embeddingExcludeOverlap": true,
+        "maximumVBxIterations": 20,
+        "minimumEmbeddingDurationSeconds": 1,
+        "minimumGapDurationSeconds": 0.75,
+        "minimumSegmentDurationSeconds": 0,
+        "preserveOverlappingIntervals": true,
+        "segmentationStepRatio": 0.2,
+        "warmStartFa": 0.07,
+        "warmStartFb": 0.8
+      },
+      "diarization_sha256": "9d1f9f14d42c8ce5f372a458634f831a6b00e622c5f343a184cd69d1e5b7daf9",
+      "effective_score": {
+        "agreement": {
+          "correct_pct": 98.654,
+          "correct_words": 18989,
+          "scored_words": 19248,
+          "unknown_pct": 0.769,
+          "unknown_words": 148,
+          "wder_pct": 1.346,
+          "wrong_pct": 0.577,
+          "wrong_words": 111
+        },
+        "alignment": {
+          "matched_reference_segments": 1399,
+          "method": "time",
+          "reference_segment_coverage_pct": 94.527,
+          "reference_segments": 1480,
+          "replay_word_coverage_pct": 96.953,
+          "replay_words": 19853,
+          "scored_words": 19248
+        },
+        "attribution_view": "effective",
+        "display_asides": {
+          "aside_count": 0,
+          "source_segment_count": 0,
+          "word_count": 0
+        },
+        "display_paragraphs": {
+          "paragraph_count": 552,
+          "single_word_paragraph_count": 57
+        },
+        "ground_truth": {
+          "reference_format": "json",
+          "reference_sha256": "cf9664ca8970c228360ae374870659826db4d4a0262bea702495a06166677eb5",
+          "source": "imported_reference"
+        },
+        "paragraphs": {
+          "paragraph_count": 978,
+          "single_word_paragraph_count": 350
+        },
+        "provenance": {
+          "diarization_sha256": "9d1f9f14d42c8ce5f372a458634f831a6b00e622c5f343a184cd69d1e5b7daf9",
+          "engine_revision": "41540ea237350afe5117a082b5c28eda642d0612",
+          "executable_sha256": "706873b5236ee016d090e1caf785c93a374403348a001e551f383b555819bae7",
+          "run_revision": 14
+        },
+        "schema_version": 1,
+        "transcript_free": true
+      },
+      "interval_count": 398,
+      "intervals_identical_to_saved_run": false,
+      "paragraph_score": {
+        "agreement": {
+          "correct_pct": 98.753,
+          "correct_words": 18530,
+          "scored_words": 18764,
+          "unknown_pct": 0.762,
+          "unknown_words": 143,
+          "wder_pct": 1.247,
+          "wrong_pct": 0.485,
+          "wrong_words": 91
+        },
+        "alignment": {
+          "matched_lexical_tokens": 18764,
+          "matched_reference_segments": 430,
+          "method": "text_sequence_matcher",
+          "reference_lexical_coverage_pct": 95.832,
+          "reference_lexical_tokens": 19580,
+          "reference_segment_coverage_pct": 99.768,
+          "reference_segments": 431,
+          "replay_lexical_coverage_pct": 94.515,
+          "replay_lexical_tokens": 19853
+        },
+        "attribution_view": "effective",
+        "display_asides": {
+          "aside_count": 0,
+          "source_segment_count": 0,
+          "word_count": 0
+        },
+        "display_paragraphs": {
+          "paragraph_count": 552,
+          "single_word_paragraph_count": 57
+        },
+        "ground_truth": {
+          "reference_format": "json",
+          "reference_sha256": "5d7c8d081e35769ff43810d8b3fe533092abfd15d0f40e28df770fcf49a6cd78",
+          "source": "imported_reference"
+        },
+        "paragraphs": {
+          "paragraph_count": 978,
+          "single_word_paragraph_count": 350
+        },
+        "provenance": {
+          "diarization_sha256": "9d1f9f14d42c8ce5f372a458634f831a6b00e622c5f343a184cd69d1e5b7daf9",
+          "engine_revision": "41540ea237350afe5117a082b5c28eda642d0612",
+          "executable_sha256": "706873b5236ee016d090e1caf785c93a374403348a001e551f383b555819bae7",
+          "run_revision": 14
+        },
+        "schema_version": 1,
+        "transcript_free": true
+      },
+      "run_id": "01D75E08-6B5B-4C90-935D-7786C61BABA3",
+      "speaker_count": 10,
+      "wall_clock_seconds": 39.068003458
+    },
+    {
+      "configuration": {
+        "clusteringThreshold": 0.6,
+        "constrainedAssignment": true,
+        "embeddingExcludeOverlap": true,
+        "maximumVBxIterations": 20,
+        "minimumEmbeddingDurationSeconds": 1,
+        "minimumGapDurationSeconds": 0.1,
+        "minimumSegmentDurationSeconds": 0,
+        "preserveOverlappingIntervals": true,
+        "segmentationStepRatio": 0.2,
+        "warmStartFa": 0.07,
+        "warmStartFb": 0.8
+      },
+      "diarization_sha256": "9232852ea2d519db5e91b3cdcfd0c21a984aa0dc28eddc037d6c0a10bee0095c",
+      "interval_count": 561,
+      "intervals_identical_to_saved_run": true,
+      "run_id": "542B3CF1-A62B-4B69-8894-D57D027CB7C5",
+      "speaker_count": 6,
+      "unannotated_replay": {
+        "display_paragraphs": 456,
+        "effective_unknown_words": 274,
+        "ground_truth": "unavailable",
+        "paragraphs": 1077,
+        "single_word_display_paragraphs": 117,
+        "unknown_words": 750,
+        "words": 8388
+      },
+      "wall_clock_seconds": 20.791054792
+    },
+    {
+      "configuration": {
+        "clusteringThreshold": 0.6,
+        "constrainedAssignment": true,
+        "embeddingExcludeOverlap": true,
+        "maximumVBxIterations": 20,
+        "minimumEmbeddingDurationSeconds": 1,
+        "minimumGapDurationSeconds": 0.25,
+        "minimumSegmentDurationSeconds": 0,
+        "preserveOverlappingIntervals": true,
+        "segmentationStepRatio": 0.2,
+        "warmStartFa": 0.07,
+        "warmStartFb": 0.8
+      },
+      "diarization_sha256": "ed802fa0eba7ef80807e1b2d8f1d9743a46f5ebc71273f9fa5d079361df10d69",
+      "interval_count": 534,
+      "intervals_identical_to_saved_run": false,
+      "run_id": "542B3CF1-A62B-4B69-8894-D57D027CB7C5",
+      "speaker_count": 6,
+      "unannotated_replay": {
+        "display_paragraphs": 443,
+        "effective_unknown_words": 260,
+        "ground_truth": "unavailable",
+        "paragraphs": 1050,
+        "single_word_display_paragraphs": 109,
+        "unknown_words": 724,
+        "words": 8388
+      },
+      "wall_clock_seconds": 19.508860042
+    },
+    {
+      "configuration": {
+        "clusteringThreshold": 0.6,
+        "constrainedAssignment": true,
+        "embeddingExcludeOverlap": true,
+        "maximumVBxIterations": 20,
+        "minimumEmbeddingDurationSeconds": 1,
+        "minimumGapDurationSeconds": 0.5,
+        "minimumSegmentDurationSeconds": 0,
+        "preserveOverlappingIntervals": true,
+        "segmentationStepRatio": 0.2,
+        "warmStartFa": 0.07,
+        "warmStartFb": 0.8
+      },
+      "diarization_sha256": "5661b62887c2c52e17d8c1082f54d14521e0a2ed4b065c7663d7b0114b1c22e1",
+      "interval_count": 430,
+      "intervals_identical_to_saved_run": false,
+      "run_id": "542B3CF1-A62B-4B69-8894-D57D027CB7C5",
+      "speaker_count": 6,
+      "unannotated_replay": {
+        "display_paragraphs": 400,
+        "effective_unknown_words": 207,
+        "ground_truth": "unavailable",
+        "paragraphs": 919,
+        "single_word_display_paragraphs": 92,
+        "unknown_words": 603,
+        "words": 8388
+      },
+      "wall_clock_seconds": 17.657109792
+    },
+    {
+      "configuration": {
+        "clusteringThreshold": 0.6,
+        "constrainedAssignment": true,
+        "embeddingExcludeOverlap": true,
+        "maximumVBxIterations": 20,
+        "minimumEmbeddingDurationSeconds": 1,
+        "minimumGapDurationSeconds": 0.75,
+        "minimumSegmentDurationSeconds": 0,
+        "preserveOverlappingIntervals": true,
+        "segmentationStepRatio": 0.2,
+        "warmStartFa": 0.07,
+        "warmStartFb": 0.8
+      },
+      "diarization_sha256": "5240a2842b805a1a120697cd22824a1596615f0cb7ab18a8c317823fed7ad1a9",
+      "interval_count": 339,
+      "intervals_identical_to_saved_run": false,
+      "run_id": "542B3CF1-A62B-4B69-8894-D57D027CB7C5",
+      "speaker_count": 6,
+      "unannotated_replay": {
+        "display_paragraphs": 355,
+        "effective_unknown_words": 153,
+        "ground_truth": "unavailable",
+        "paragraphs": 782,
+        "single_word_display_paragraphs": 73,
+        "unknown_words": 476,
+        "words": 8388
+      },
+      "wall_clock_seconds": 17.8689445
+    },
+    {
+      "configuration": {
+        "clusteringThreshold": 0.6,
+        "constrainedAssignment": true,
+        "embeddingExcludeOverlap": true,
+        "maximumVBxIterations": 20,
+        "minimumEmbeddingDurationSeconds": 1,
+        "minimumGapDurationSeconds": 0.1,
+        "minimumSegmentDurationSeconds": 0,
+        "preserveOverlappingIntervals": true,
+        "segmentationStepRatio": 0.2,
+        "warmStartFa": 0.07,
+        "warmStartFb": 0.8
+      },
+      "diarization_sha256": "55e49602144ea2bd076309d3b01a01edfd8585f4488516ee6358ed979e419963",
+      "interval_count": 437,
+      "intervals_identical_to_saved_run": true,
+      "run_id": "624C6ADF-07EA-4B51-A880-FB0A2A13EE7F",
+      "speaker_count": 2,
+      "unannotated_replay": {
+        "display_paragraphs": 271,
+        "effective_unknown_words": 179,
+        "ground_truth": "unavailable",
+        "paragraphs": 768,
+        "single_word_display_paragraphs": 73,
+        "unknown_words": 516,
+        "words": 7001
+      },
+      "wall_clock_seconds": 14.871735958
+    },
+    {
+      "configuration": {
+        "clusteringThreshold": 0.6,
+        "constrainedAssignment": true,
+        "embeddingExcludeOverlap": true,
+        "maximumVBxIterations": 20,
+        "minimumEmbeddingDurationSeconds": 1,
+        "minimumGapDurationSeconds": 0.25,
+        "minimumSegmentDurationSeconds": 0,
+        "preserveOverlappingIntervals": true,
+        "segmentationStepRatio": 0.2,
+        "warmStartFa": 0.07,
+        "warmStartFb": 0.8
+      },
+      "diarization_sha256": "d9ae849144e927ef2e0667ca0f883e88a79241840aeb712c1a79a9a82049f53a",
+      "interval_count": 405,
+      "intervals_identical_to_saved_run": false,
+      "run_id": "624C6ADF-07EA-4B51-A880-FB0A2A13EE7F",
+      "speaker_count": 2,
+      "unannotated_replay": {
+        "display_paragraphs": 253,
+        "effective_unknown_words": 153,
+        "ground_truth": "unavailable",
+        "paragraphs": 738,
+        "single_word_display_paragraphs": 65,
+        "unknown_words": 478,
+        "words": 7001
+      },
+      "wall_clock_seconds": 14.805869792
+    },
+    {
+      "configuration": {
+        "clusteringThreshold": 0.6,
+        "constrainedAssignment": true,
+        "embeddingExcludeOverlap": true,
+        "maximumVBxIterations": 20,
+        "minimumEmbeddingDurationSeconds": 1,
+        "minimumGapDurationSeconds": 0.5,
+        "minimumSegmentDurationSeconds": 0,
+        "preserveOverlappingIntervals": true,
+        "segmentationStepRatio": 0.2,
+        "warmStartFa": 0.07,
+        "warmStartFb": 0.8
+      },
+      "diarization_sha256": "cc64492fe657381d44b973068009e597144f3deb9a933efb4215be5fb8806f38",
+      "interval_count": 296,
+      "intervals_identical_to_saved_run": false,
+      "run_id": "624C6ADF-07EA-4B51-A880-FB0A2A13EE7F",
+      "speaker_count": 2,
+      "unannotated_replay": {
+        "display_paragraphs": 210,
+        "effective_unknown_words": 106,
+        "ground_truth": "unavailable",
+        "paragraphs": 600,
+        "single_word_display_paragraphs": 46,
+        "unknown_words": 366,
+        "words": 7001
+      },
+      "wall_clock_seconds": 13.237099375
+    },
+    {
+      "configuration": {
+        "clusteringThreshold": 0.6,
+        "constrainedAssignment": true,
+        "embeddingExcludeOverlap": true,
+        "maximumVBxIterations": 20,
+        "minimumEmbeddingDurationSeconds": 1,
+        "minimumGapDurationSeconds": 0.75,
+        "minimumSegmentDurationSeconds": 0,
+        "preserveOverlappingIntervals": true,
+        "segmentationStepRatio": 0.2,
+        "warmStartFa": 0.07,
+        "warmStartFb": 0.8
+      },
+      "diarization_sha256": "820734797776f1000388958dd143ae58dc1d6decfd53661ce32d921c0502e802",
+      "interval_count": 217,
+      "intervals_identical_to_saved_run": false,
+      "run_id": "624C6ADF-07EA-4B51-A880-FB0A2A13EE7F",
+      "speaker_count": 2,
+      "unannotated_replay": {
+        "display_paragraphs": 173,
+        "effective_unknown_words": 57,
+        "ground_truth": "unavailable",
+        "paragraphs": 463,
+        "single_word_display_paragraphs": 25,
+        "unknown_words": 243,
+        "words": 7001
+      },
+      "wall_clock_seconds": 14.339889292
+    },
+    {
+      "canonical_score": {
+        "agreement": {
+          "correct_pct": 47.368,
+          "correct_words": 9,
+          "scored_words": 19,
+          "unknown_pct": 26.316,
+          "unknown_words": 5,
+          "wder_pct": 52.632,
+          "wrong_pct": 26.316,
+          "wrong_words": 5
+        },
+        "alignment": {
+          "matched_reference_segments": 5,
+          "method": "time",
+          "reference_segment_coverage_pct": 100.0,
+          "reference_segments": 5,
+          "replay_word_coverage_pct": 0.14,
+          "replay_words": 13565,
+          "scored_words": 19
+        },
+        "attribution_view": "canonical",
+        "display_asides": {
+          "aside_count": 0,
+          "source_segment_count": 0,
+          "word_count": 0
+        },
+        "display_paragraphs": {
+          "paragraph_count": 518,
+          "single_word_paragraph_count": 92
+        },
+        "ground_truth": {
+          "canonical_sha256": "8d6da0247d208b813ccc2c306700729c9838c4970587a0bfc69686060b4e601d",
+          "manual_segments": 5,
+          "source": "manual_canonical_segments"
+        },
+        "paragraphs": {
+          "paragraph_count": 1170,
+          "single_word_paragraph_count": 548
+        },
+        "provenance": {
+          "diarization_sha256": "f5567eac98117e9f9e63564f0e1cc6d5924f7f1e4c711c9dfd44f4d9f1956160",
+          "engine_revision": "41540ea237350afe5117a082b5c28eda642d0612",
+          "executable_sha256": "706873b5236ee016d090e1caf785c93a374403348a001e551f383b555819bae7",
+          "run_revision": 14
+        },
+        "schema_version": 1,
+        "transcript_free": true
+      },
+      "configuration": {
+        "clusteringThreshold": 0.6,
+        "constrainedAssignment": true,
+        "embeddingExcludeOverlap": true,
+        "maximumVBxIterations": 20,
+        "minimumEmbeddingDurationSeconds": 1,
+        "minimumGapDurationSeconds": 0.1,
+        "minimumSegmentDurationSeconds": 0,
+        "preserveOverlappingIntervals": true,
+        "segmentationStepRatio": 0.2,
+        "warmStartFa": 0.07,
+        "warmStartFb": 0.8
+      },
+      "diarization_sha256": "f5567eac98117e9f9e63564f0e1cc6d5924f7f1e4c711c9dfd44f4d9f1956160",
+      "effective_score": {
+        "agreement": {
+          "correct_pct": 47.368,
+          "correct_words": 9,
+          "scored_words": 19,
+          "unknown_pct": 26.316,
+          "unknown_words": 5,
+          "wder_pct": 52.632,
+          "wrong_pct": 26.316,
+          "wrong_words": 5
+        },
+        "alignment": {
+          "matched_reference_segments": 5,
+          "method": "time",
+          "reference_segment_coverage_pct": 100.0,
+          "reference_segments": 5,
+          "replay_word_coverage_pct": 0.14,
+          "replay_words": 13565,
+          "scored_words": 19
+        },
+        "attribution_view": "effective",
+        "display_asides": {
+          "aside_count": 0,
+          "source_segment_count": 0,
+          "word_count": 0
+        },
+        "display_paragraphs": {
+          "paragraph_count": 518,
+          "single_word_paragraph_count": 92
+        },
+        "ground_truth": {
+          "canonical_sha256": "8d6da0247d208b813ccc2c306700729c9838c4970587a0bfc69686060b4e601d",
+          "manual_segments": 5,
+          "source": "manual_canonical_segments"
+        },
+        "paragraphs": {
+          "paragraph_count": 1170,
+          "single_word_paragraph_count": 548
+        },
+        "provenance": {
+          "diarization_sha256": "f5567eac98117e9f9e63564f0e1cc6d5924f7f1e4c711c9dfd44f4d9f1956160",
+          "engine_revision": "41540ea237350afe5117a082b5c28eda642d0612",
+          "executable_sha256": "706873b5236ee016d090e1caf785c93a374403348a001e551f383b555819bae7",
+          "run_revision": 14
+        },
+        "schema_version": 1,
+        "transcript_free": true
+      },
+      "interval_count": 635,
+      "intervals_identical_to_saved_run": true,
+      "run_id": "837AEE5B-B010-45BE-8A5A-2FB04549D515",
+      "speaker_count": 2,
+      "wall_clock_seconds": 26.016259125
+    },
+    {
+      "canonical_score": {
+        "agreement": {
+          "correct_pct": 52.632,
+          "correct_words": 10,
+          "scored_words": 19,
+          "unknown_pct": 21.053,
+          "unknown_words": 4,
+          "wder_pct": 47.368,
+          "wrong_pct": 26.316,
+          "wrong_words": 5
+        },
+        "alignment": {
+          "matched_reference_segments": 5,
+          "method": "time",
+          "reference_segment_coverage_pct": 100.0,
+          "reference_segments": 5,
+          "replay_word_coverage_pct": 0.14,
+          "replay_words": 13565,
+          "scored_words": 19
+        },
+        "attribution_view": "canonical",
+        "display_asides": {
+          "aside_count": 0,
+          "source_segment_count": 0,
+          "word_count": 0
+        },
+        "display_paragraphs": {
+          "paragraph_count": 496,
+          "single_word_paragraph_count": 87
+        },
+        "ground_truth": {
+          "canonical_sha256": "8d6da0247d208b813ccc2c306700729c9838c4970587a0bfc69686060b4e601d",
+          "manual_segments": 5,
+          "source": "manual_canonical_segments"
+        },
+        "paragraphs": {
+          "paragraph_count": 1131,
+          "single_word_paragraph_count": 523
+        },
+        "provenance": {
+          "diarization_sha256": "fdb884246f62d043d716627fa6a059a9b8eaf2cc1e3a7009b453d0258f20c8dd",
+          "engine_revision": "41540ea237350afe5117a082b5c28eda642d0612",
+          "executable_sha256": "706873b5236ee016d090e1caf785c93a374403348a001e551f383b555819bae7",
+          "run_revision": 14
+        },
+        "schema_version": 1,
+        "transcript_free": true
+      },
+      "configuration": {
+        "clusteringThreshold": 0.6,
+        "constrainedAssignment": true,
+        "embeddingExcludeOverlap": true,
+        "maximumVBxIterations": 20,
+        "minimumEmbeddingDurationSeconds": 1,
+        "minimumGapDurationSeconds": 0.25,
+        "minimumSegmentDurationSeconds": 0,
+        "preserveOverlappingIntervals": true,
+        "segmentationStepRatio": 0.2,
+        "warmStartFa": 0.07,
+        "warmStartFb": 0.8
+      },
+      "diarization_sha256": "fdb884246f62d043d716627fa6a059a9b8eaf2cc1e3a7009b453d0258f20c8dd",
+      "effective_score": {
+        "agreement": {
+          "correct_pct": 52.632,
+          "correct_words": 10,
+          "scored_words": 19,
+          "unknown_pct": 21.053,
+          "unknown_words": 4,
+          "wder_pct": 47.368,
+          "wrong_pct": 26.316,
+          "wrong_words": 5
+        },
+        "alignment": {
+          "matched_reference_segments": 5,
+          "method": "time",
+          "reference_segment_coverage_pct": 100.0,
+          "reference_segments": 5,
+          "replay_word_coverage_pct": 0.14,
+          "replay_words": 13565,
+          "scored_words": 19
+        },
+        "attribution_view": "effective",
+        "display_asides": {
+          "aside_count": 0,
+          "source_segment_count": 0,
+          "word_count": 0
+        },
+        "display_paragraphs": {
+          "paragraph_count": 496,
+          "single_word_paragraph_count": 87
+        },
+        "ground_truth": {
+          "canonical_sha256": "8d6da0247d208b813ccc2c306700729c9838c4970587a0bfc69686060b4e601d",
+          "manual_segments": 5,
+          "source": "manual_canonical_segments"
+        },
+        "paragraphs": {
+          "paragraph_count": 1131,
+          "single_word_paragraph_count": 523
+        },
+        "provenance": {
+          "diarization_sha256": "fdb884246f62d043d716627fa6a059a9b8eaf2cc1e3a7009b453d0258f20c8dd",
+          "engine_revision": "41540ea237350afe5117a082b5c28eda642d0612",
+          "executable_sha256": "706873b5236ee016d090e1caf785c93a374403348a001e551f383b555819bae7",
+          "run_revision": 14
+        },
+        "schema_version": 1,
+        "transcript_free": true
+      },
+      "interval_count": 572,
+      "intervals_identical_to_saved_run": false,
+      "run_id": "837AEE5B-B010-45BE-8A5A-2FB04549D515",
+      "speaker_count": 2,
+      "wall_clock_seconds": 24.935137833
+    },
+    {
+      "canonical_score": {
+        "agreement": {
+          "correct_pct": 52.632,
+          "correct_words": 10,
+          "scored_words": 19,
+          "unknown_pct": 21.053,
+          "unknown_words": 4,
+          "wder_pct": 47.368,
+          "wrong_pct": 26.316,
+          "wrong_words": 5
+        },
+        "alignment": {
+          "matched_reference_segments": 5,
+          "method": "time",
+          "reference_segment_coverage_pct": 100.0,
+          "reference_segments": 5,
+          "replay_word_coverage_pct": 0.14,
+          "replay_words": 13565,
+          "scored_words": 19
+        },
+        "attribution_view": "canonical",
+        "display_asides": {
+          "aside_count": 0,
+          "source_segment_count": 0,
+          "word_count": 0
+        },
+        "display_paragraphs": {
+          "paragraph_count": 432,
+          "single_word_paragraph_count": 62
+        },
+        "ground_truth": {
+          "canonical_sha256": "8d6da0247d208b813ccc2c306700729c9838c4970587a0bfc69686060b4e601d",
+          "manual_segments": 5,
+          "source": "manual_canonical_segments"
+        },
+        "paragraphs": {
+          "paragraph_count": 956,
+          "single_word_paragraph_count": 420
+        },
+        "provenance": {
+          "diarization_sha256": "3bd777c6635a47d1f234098ca3177e98b99fe413698f23aa0319ec13dfdf174e",
+          "engine_revision": "41540ea237350afe5117a082b5c28eda642d0612",
+          "executable_sha256": "706873b5236ee016d090e1caf785c93a374403348a001e551f383b555819bae7",
+          "run_revision": 14
+        },
+        "schema_version": 1,
+        "transcript_free": true
+      },
+      "configuration": {
+        "clusteringThreshold": 0.6,
+        "constrainedAssignment": true,
+        "embeddingExcludeOverlap": true,
+        "maximumVBxIterations": 20,
+        "minimumEmbeddingDurationSeconds": 1,
+        "minimumGapDurationSeconds": 0.5,
+        "minimumSegmentDurationSeconds": 0,
+        "preserveOverlappingIntervals": true,
+        "segmentationStepRatio": 0.2,
+        "warmStartFa": 0.07,
+        "warmStartFb": 0.8
+      },
+      "diarization_sha256": "3bd777c6635a47d1f234098ca3177e98b99fe413698f23aa0319ec13dfdf174e",
+      "effective_score": {
+        "agreement": {
+          "correct_pct": 52.632,
+          "correct_words": 10,
+          "scored_words": 19,
+          "unknown_pct": 21.053,
+          "unknown_words": 4,
+          "wder_pct": 47.368,
+          "wrong_pct": 26.316,
+          "wrong_words": 5
+        },
+        "alignment": {
+          "matched_reference_segments": 5,
+          "method": "time",
+          "reference_segment_coverage_pct": 100.0,
+          "reference_segments": 5,
+          "replay_word_coverage_pct": 0.14,
+          "replay_words": 13565,
+          "scored_words": 19
+        },
+        "attribution_view": "effective",
+        "display_asides": {
+          "aside_count": 0,
+          "source_segment_count": 0,
+          "word_count": 0
+        },
+        "display_paragraphs": {
+          "paragraph_count": 432,
+          "single_word_paragraph_count": 62
+        },
+        "ground_truth": {
+          "canonical_sha256": "8d6da0247d208b813ccc2c306700729c9838c4970587a0bfc69686060b4e601d",
+          "manual_segments": 5,
+          "source": "manual_canonical_segments"
+        },
+        "paragraphs": {
+          "paragraph_count": 956,
+          "single_word_paragraph_count": 420
+        },
+        "provenance": {
+          "diarization_sha256": "3bd777c6635a47d1f234098ca3177e98b99fe413698f23aa0319ec13dfdf174e",
+          "engine_revision": "41540ea237350afe5117a082b5c28eda642d0612",
+          "executable_sha256": "706873b5236ee016d090e1caf785c93a374403348a001e551f383b555819bae7",
+          "run_revision": 14
+        },
+        "schema_version": 1,
+        "transcript_free": true
+      },
+      "interval_count": 455,
+      "intervals_identical_to_saved_run": false,
+      "run_id": "837AEE5B-B010-45BE-8A5A-2FB04549D515",
+      "speaker_count": 2,
+      "wall_clock_seconds": 24.440691375
+    },
+    {
+      "canonical_score": {
+        "agreement": {
+          "correct_pct": 52.632,
+          "correct_words": 10,
+          "scored_words": 19,
+          "unknown_pct": 5.263,
+          "unknown_words": 1,
+          "wder_pct": 47.368,
+          "wrong_pct": 42.105,
+          "wrong_words": 8
+        },
+        "alignment": {
+          "matched_reference_segments": 5,
+          "method": "time",
+          "reference_segment_coverage_pct": 100.0,
+          "reference_segments": 5,
+          "replay_word_coverage_pct": 0.14,
+          "replay_words": 13565,
+          "scored_words": 19
+        },
+        "attribution_view": "canonical",
+        "display_asides": {
+          "aside_count": 1,
+          "source_segment_count": 1,
+          "word_count": 2
+        },
+        "display_paragraphs": {
+          "paragraph_count": 409,
+          "single_word_paragraph_count": 48
+        },
+        "ground_truth": {
+          "canonical_sha256": "8d6da0247d208b813ccc2c306700729c9838c4970587a0bfc69686060b4e601d",
+          "manual_segments": 5,
+          "source": "manual_canonical_segments"
+        },
+        "paragraphs": {
+          "paragraph_count": 824,
+          "single_word_paragraph_count": 336
+        },
+        "provenance": {
+          "diarization_sha256": "a735dbdd82fa100d51141bcf90f07dffb369a540d84ac2f7f19d51b9761de70e",
+          "engine_revision": "41540ea237350afe5117a082b5c28eda642d0612",
+          "executable_sha256": "706873b5236ee016d090e1caf785c93a374403348a001e551f383b555819bae7",
+          "run_revision": 14
+        },
+        "schema_version": 1,
+        "transcript_free": true
+      },
+      "configuration": {
+        "clusteringThreshold": 0.6,
+        "constrainedAssignment": true,
+        "embeddingExcludeOverlap": true,
+        "maximumVBxIterations": 20,
+        "minimumEmbeddingDurationSeconds": 1,
+        "minimumGapDurationSeconds": 0.75,
+        "minimumSegmentDurationSeconds": 0,
+        "preserveOverlappingIntervals": true,
+        "segmentationStepRatio": 0.2,
+        "warmStartFa": 0.07,
+        "warmStartFb": 0.8
+      },
+      "diarization_sha256": "a735dbdd82fa100d51141bcf90f07dffb369a540d84ac2f7f19d51b9761de70e",
+      "effective_score": {
+        "agreement": {
+          "correct_pct": 52.632,
+          "correct_words": 10,
+          "scored_words": 19,
+          "unknown_pct": 0.0,
+          "unknown_words": 0,
+          "wder_pct": 47.368,
+          "wrong_pct": 47.368,
+          "wrong_words": 9
+        },
+        "alignment": {
+          "matched_reference_segments": 5,
+          "method": "time",
+          "reference_segment_coverage_pct": 100.0,
+          "reference_segments": 5,
+          "replay_word_coverage_pct": 0.14,
+          "replay_words": 13565,
+          "scored_words": 19
+        },
+        "attribution_view": "effective",
+        "display_asides": {
+          "aside_count": 1,
+          "source_segment_count": 1,
+          "word_count": 2
+        },
+        "display_paragraphs": {
+          "paragraph_count": 409,
+          "single_word_paragraph_count": 48
+        },
+        "ground_truth": {
+          "canonical_sha256": "8d6da0247d208b813ccc2c306700729c9838c4970587a0bfc69686060b4e601d",
+          "manual_segments": 5,
+          "source": "manual_canonical_segments"
+        },
+        "paragraphs": {
+          "paragraph_count": 824,
+          "single_word_paragraph_count": 336
+        },
+        "provenance": {
+          "diarization_sha256": "a735dbdd82fa100d51141bcf90f07dffb369a540d84ac2f7f19d51b9761de70e",
+          "engine_revision": "41540ea237350afe5117a082b5c28eda642d0612",
+          "executable_sha256": "706873b5236ee016d090e1caf785c93a374403348a001e551f383b555819bae7",
+          "run_revision": 14
+        },
+        "schema_version": 1,
+        "transcript_free": true
+      },
+      "interval_count": 371,
+      "intervals_identical_to_saved_run": false,
+      "run_id": "837AEE5B-B010-45BE-8A5A-2FB04549D515",
+      "speaker_count": 2,
+      "wall_clock_seconds": 26.265490125
+    }
+  ],
+  "toolchain": "Apple Swift version 6.4 (swiftlang-6.4.0.27.1 clang-2100.3.27.1)\nTarget: arm64-apple-macosx27.0.0",
+  "transcript_free": true,
+  "validation": {
+    "analysis_tests": {
+      "passed": 12
+    },
+    "diff_check": "passed",
+    "final_focused_host_tests": {
+      "executed": 45,
+      "failures": 0
+    },
+    "scribe_xcode_build": "passed",
+    "transcription_full_suite": {
+      "executed": 303,
+      "failures": 0,
+      "skipped": 2
+    },
+    "visual_screenshot": "not performed",
+    "worker_tests": {
+      "passed": 12
+    }
+  }
+}

@@ -17,11 +17,10 @@ let package = Package(
         //
         // Keep the release exact: ASR token timing, long-file merge behavior,
         // and offline diarization are part of the worker protocol's
-        // compatibility surface. v0.15.6 retains the staged Parakeet v3 and
-        // offline diarizer model filenames while adding upstream seam-gap,
-        // final-window, and pyannote-parity clustering fixes. The worker uses
-        // the explicit local-model APIs and does not enable runtime downloads.
-        .package(url: "https://github.com/FluidInference/FluidAudio.git", exact: "0.15.6"),
+        // compatibility surface. v0.15.7 fixes speaker ceilings and structured
+        // cancellation while preserving the v0.15.6 embedding representation.
+        // Models remain staged locally; runtime downloads stay disabled.
+        .package(url: "https://github.com/FluidInference/FluidAudio.git", exact: "0.15.7"),
         .package(path: "../../Modules/Speakers"),
     ],
     targets: [

@@ -94,6 +94,7 @@ public enum TranscriptionLanguageMode: String, Codable, Sendable, Equatable {
 public enum TranscriptionSpeakerCount: Sendable, Equatable {
     case automatic
     case known(Int)
+    case upTo(Int)
 }
 
 extension TranscriptionSpeakerCount: Codable {
@@ -101,6 +102,8 @@ extension TranscriptionSpeakerCount: Codable {
         let container = try decoder.singleValueContainer()
         if let count = try? container.decode(Int.self) {
             self = .known(count)
+        } else if let bounds = try? container.decode([String: Int].self), let maximum = bounds["upTo"], maximum > 0 {
+            self = .upTo(maximum)
         } else if try container.decode(String.self) == "automatic" {
             self = .automatic
         } else {
@@ -113,6 +116,7 @@ extension TranscriptionSpeakerCount: Codable {
         switch self {
         case .automatic: try container.encode("automatic")
         case .known(let count): try container.encode(count)
+        case .upTo(let count): try container.encode(["upTo": count])
         }
     }
 }

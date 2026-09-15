@@ -1,10 +1,16 @@
 # Offline diarization and speaker-embedding feasibility
 
-The worker uses FluidAudio **v0.15.6**'s `OfflineDiarizerManager` over one complete recording. It manually initializes `OfflineDiarizerModels` from the staged Core ML bundles, so it does not call `prepareModels()` or any download/cache helper. The adapter converts every source through `AudioSourceFactory.makeDiskBackedSource`; decoding produces a temporary 16 kHz mono mmap-backed PCM file rather than retaining a full waveform in the Swift heap. This is the selected two-hour-file memory strategy.
+The worker uses FluidAudio **v0.15.7**'s `OfflineDiarizerManager` over one complete recording. It manually initializes `OfflineDiarizerModels` from the staged Core ML bundles, so it does not call `prepareModels()` or any download/cache helper. The adapter converts every source through `AudioSourceFactory.makeDiskBackedSource`; decoding produces a temporary 16 kHz mono mmap-backed PCM file rather than retaining a full waveform in the Swift heap. This is the selected two-hour-file memory strategy.
 
-`OfflineDiarizationAdapter.Configuration.knownSpeakerCount` maps to the pinned API's `OfflineDiarizerConfig.withSpeakers(exactly:)`, constraining its one global VBx clustering pass. With no count, the pipeline chooses the count. The adapter sets `postProcessing.exclusiveSegments` to `false` by default. In this pinned build, that preserves concurrent `TimedSpeakerSegment` intervals; setting it to `true` trims later intervals and is therefore not suitable for the canonical transcript.
+`OfflineDiarizationAdapter.Configuration.knownSpeakerCount` maps to the pinned API's `OfflineDiarizerConfig.withSpeakers(exactly:)`, constraining its one global VBx clustering pass. `maximumSpeakerCount` maps to `clustering.maxSpeakers` and lets the pipeline select fewer speakers. Exact and maximum counts are mutually exclusive. With neither count, the pipeline chooses the count. The adapter sets `postProcessing.exclusiveSegments` to `false` by default. In this pinned build, that preserves concurrent `TimedSpeakerSegment` intervals; setting it to `true` trims later intervals and is therefore not suitable for the canonical transcript.
 
 Raw FluidAudio cluster IDs are mapped to `speaker_1`, `speaker_2`, and so on in timestamp order, making identifiers stable within the produced recording. They are deliberately not reused between recordings. Each result also emits one L2-normalized global vector per local speaker from `DiarizationResult.speakerDatabase`.
+
+## Post-processing controls
+
+The adapter and benchmark expose `minimumGapDurationSeconds` (`--minimum-gap-duration`, default 0.1 s) and `minimumSegmentDurationSeconds` (`--minimum-segment-duration`, default 0 s). The former maps directly to `postProcessing.minGapDurationSeconds`. **There is no separate minimum-duration field in the pinned `PostProcessing` type**: the latter maps to `segmentation.minDurationOn`. Reconstruction takes the maximum of that value and `embedding.minSegmentDurationSeconds` (default 1 s), so values below 1 s do not lower the final segment floor. Both controls reject negative or nonfinite values. Overlapping intervals remain enabled and clustering threshold stays 0.6.
+
+Use `--maximum-speaker-count N` to benchmark the same "up to N" constraint offered in the reprocess menu and confirmation sheet. It is distinct from `--known-speaker-count N`, which requests exactly N. The request persists a ceiling as `{"upTo": N}` while old integer exact counts and `"automatic"` still decode. Fingerprints and canonical processing options distinguish all three modes.
 
 ## Embedding compatibility contract
 
@@ -21,6 +27,8 @@ operations change the vector representation even though the WeSpeaker model
 weights are unchanged. Existing v0.12.4 signatures remain stored but are
 incompatible by design and require re-enrollment before automatic matching.
 
+The v0.15.6 (`4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b`) to v0.15.7 (`41540ea237350afe5117a082b5c28eda642d0612`) source audit found only three changed offline production files: `VBxClustering.swift` fixes speaker constraints by checking both assigned and active cluster counts; `OfflineDiarizerManager.swift` introduces structured task cancellation, factors assignment into a testable helper, and adds an OS advisory; `OfflineDiarizerModels.swift` adds comments. `OfflineEmbeddingExtractor`, segmentation, reconstruction, filterbank, PLDA transforms, model assets, and normalization are unchanged. Scribe's enrollment extractor still runs the same adapter with exactly one speaker. Constrained clustering can change which samples form a centroid, but the vector representation is unchanged: **retain the v0.15.6 preprocessing version**, with no re-enrollment for this upgrade.
+
 The vectors originate from FluidAudio's result speaker database and are normalized again by the worker because the pinned reconstruction averages per-segment centroids without a final L2 normalization. The runner refuses an empty or incompatible exported representation rather than silently emitting a zero vector.
 
 To measure cross-recording consistency, run the same known speaker in at least two disjoint recordings and compare only these compatible normalized vectors with cosine similarity. The expected result is that each same-person pair scores above every different-person pair in the fixture set; otherwise enrollment must extract embeddings from confirmed clean excerpts with this identical conversion/preprocessing stack. `DiarizationBenchmark` emits the exact vector metadata and can be run under `/usr/bin/time -l` for peak RSS:
@@ -29,7 +37,9 @@ To measure cross-recording consistency, run the same known speaker in at least t
 swift run DiarizationBenchmark --audio sample.wav --manifest model_manifest.json --models models --known-speaker-count 2
 ```
 
-## Measurements on the validation Mac
+## Historical measurements on the validation Mac
+
+These synthetic measurements predate the 0.15.7 upgrade; they were not rerun as part of phase 5. See [phase 5](../investigations/diarization-1004-plan.md#phase-5--fluidaudio-0157-and-post-processing-sweep) for the new recording sweep and executable hashes.
 
 `DiarizationBenchmark` was run with the staged bundle on arm64 Apple Silicon, macOS 27.0. A 51.1255-second alternating two-voice fixture with an exact count of two produced the expected chronological `speaker_1 → speaker_2 → speaker_1 → speaker_2` pattern. Inference took 1.549 seconds after loading and peak RSS was 469,876,736 bytes. A 101.3049-second four-voice synthetic stress fixture with an exact count of four produced seven intervals covering all four local speaker IDs and four versioned embeddings; inference took 2.594 seconds and peak RSS was 469,942,272 bytes. Both runs used disk-backed audio.
 

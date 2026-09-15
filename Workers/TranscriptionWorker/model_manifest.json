@@ -3,7 +3,7 @@
   "profileID": "parakeet-v3-offline-diarization-v1",
   "fluidAudio": {
     "repository": "https://github.com/FluidInference/FluidAudio.git",
-    "revision": "v0.15.6 (4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b)"
+    "revision": "v0.15.7 (41540ea237350afe5117a082b5c28eda642d0612)"
   },
   "telemetry": {
     "enabled": false,
@@ -16,7 +16,7 @@
     "chosenComputeUnits": "cpuAndNeuralEngine",
     "allowLowPrecisionAccumulationOnGPU": true,
     "longFileProcessing": {
-      "implementation": "FluidAudio v0.15.6 disk-backed ChunkProcessor",
+      "implementation": "FluidAudio v0.15.7 disk-backed ChunkProcessor",
       "modelWindowSeconds": 14.88,
       "overlapSeconds": 2.0,
       "leftContextSeconds": 0.08,
@@ -24,6 +24,7 @@
       "tokenEnd": "decoder TDT duration (frames x 0.08 s, minimum one frame), carried through the chunk merge since v0.12.5; v0.15.6 additionally repairs seam gaps, final-window alignment, and merged token order"
     },
     "benchmark": {
+      "provenanceNote": "Historical synthetic measurements retained; not rerun for 0.15.7. Current release build hashes and recording sweep: docs/investigations/diarization-1004-phase5.json",
       "machine": "Apple Silicon (arm64), macOS 27.0",
       "fixtureGenerator": "macOS local speech voices; 16 kHz mono Float32 WAV",
       "measurement": "ASRBenchmark under /usr/bin/time -l; ASR throughput excludes model load, peak RSS includes it",
@@ -45,18 +46,26 @@
   },
   "diarizationRuntime": {
     "adapter": "OfflineDiarizationAdapter",
-    "pipeline": "FluidAudio v0.15.6 OfflineDiarizerManager with pyannote segmentation, WeSpeaker embeddings, and global VBx clustering",
+    "pipeline": "FluidAudio v0.15.7 OfflineDiarizerManager with pyannote segmentation, WeSpeaker embeddings, and global VBx clustering",
     "input": "any locally readable audio; streaming conversion to 16 kHz mono Float32 disk-backed PCM",
-    "knownSpeakerCount": "OfflineDiarizerConfig.withSpeakers(exactly:) when supplied; otherwise automatic global clustering",
+    "knownSpeakerCount": "OfflineDiarizerConfig.withSpeakers(exactly:) when supplied; clustering.maxSpeakers for an up-to ceiling; otherwise automatic global clustering",
+    "postProcessing": {
+      "minimumGapDurationSeconds": 0.1,
+      "minimumSegmentDurationSeconds": 0.0,
+      "minimumDurationMapping": "segmentation.minDurationOn; final reconstruction uses max(embedding.minSegmentDurationSeconds, segmentation.minDurationOn), currently a 1.0-second floor",
+      "clusteringThreshold": 0.6
+    },
     "overlap": "postProcessing.exclusiveSegments=false preserves pinned-build overlapping TimedSpeakerSegment intervals",
     "diagnostics": "dominant-occupancy-v1 records per-cluster chunk assignments and interval occupancy; a collapse flag is a review signal and never infers a speaker count",
     "embedding": {
       "modelID": "wespeaker-embedding-coreml",
       "preprocessingVersion": "fluidaudio-offline-fbank-16khz-mono-v0.15.6",
       "normalizationVersion": "l2-unit-v1",
-      "source": "DiarizationResult.speakerDatabase, re-normalized after FluidAudio's centroid averaging"
+      "source": "DiarizationResult.speakerDatabase, re-normalized after FluidAudio's centroid averaging",
+      "compatibilityAudit": "v0.15.6 to v0.15.7: extractor, filterbank, masks, PLDA transform and vector normalization unchanged; retain preprocessingVersion. Count-constrained cluster membership can change."
     },
     "benchmark": {
+      "provenanceNote": "Historical synthetic measurements retained; not rerun for 0.15.7. Current release build hashes and recording sweep: docs/investigations/diarization-1004-phase5.json",
       "machine": "Apple Silicon (arm64), macOS 27.0",
       "measurement": "DiarizationBenchmark under /usr/bin/time -l; peak RSS includes staged Core ML model loading",
       "twoSpeaker": {

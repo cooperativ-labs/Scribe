@@ -55,6 +55,9 @@ struct DiarizationRecord: Codable, Sendable {
 
     struct AppliedConfiguration: Codable, Sendable {
         let knownSpeakerCount: Int?
+        var maximumSpeakerCount: Int? = nil
+        var minimumGapDurationSeconds: Double? = nil
+        var minimumSegmentDurationSeconds: Double? = nil
         let clusteringThreshold: Double
         let embeddingExcludeOverlap: Bool
         let minimumEmbeddingDurationSeconds: Double
@@ -250,7 +253,7 @@ public struct TranscriptAssemblyStageRunner: TranscriptionStageRunning {
 
         var warnings = reconciled.warnings
         if diarization.clusteringDiagnostics?.separationAppearsCollapsed == true {
-            let automatic = diarization.configuration?.knownSpeakerCount == nil
+            let automatic = diarization.configuration?.knownSpeakerCount == nil && diarization.configuration?.maximumSpeakerCount == nil
             warnings.append(TranscriptWarning(
                 code: "transcription.diarization.collapsedOccupancy",
                 message: automatic
@@ -288,6 +291,7 @@ public struct TranscriptAssemblyStageRunner: TranscriptionStageRunning {
         let requestedSpeakerCount: TranscriptJSONValue = switch job.request.speakerCount {
         case .automatic: .string("automatic")
         case let .known(count): .number(Double(count))
+        case let .upTo(count): .object(["up_to": .number(Double(count))])
         }
         var processingOptions: [String: TranscriptJSONValue] = [
             "model_profile_id": .string(job.request.modelProfileID),
@@ -336,6 +340,9 @@ public struct TranscriptAssemblyStageRunner: TranscriptionStageRunning {
         ]
         if let configuration = diarization.configuration {
             processingOptions["diarization_configuration"] = .object([
+                "maximum_speaker_count": configuration.maximumSpeakerCount.map { .number(Double($0)) } ?? .null,
+                "minimum_gap_duration_seconds": configuration.minimumGapDurationSeconds.map { .number($0) } ?? .null,
+                "minimum_segment_duration_seconds": configuration.minimumSegmentDurationSeconds.map { .number($0) } ?? .null,
                 "clustering_threshold": .number(configuration.clusteringThreshold),
                 "embedding_exclude_overlap": .boolean(configuration.embeddingExcludeOverlap),
                 "minimum_embedding_duration_seconds": .number(configuration.minimumEmbeddingDurationSeconds),

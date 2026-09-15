@@ -188,6 +188,87 @@ background was needed because offscreen capture omits materials.
 - Verify whether the pinned config supports a speaker-count ceiling; if so,
   plumb "up to N" through the reprocess sheet.
 
+### Phase 5 implementation and audit (2026-09-15)
+
+The worker and Xcode lockfiles now pin FluidAudio exact **0.15.7**, revision
+`41540ea237350afe5117a082b5c28eda642d0612`. Both benchmark products were rebuilt
+with `swiftbuild -c release` in `/private/tmp/scribe-coo1004-phase5/worker-build`.
+The source audit and recording aggregates are recorded in
+[phase-5 evidence](diarization-1004-phase5.json).
+
+The upstream diff changes three of the 16 offline source files: structured
+cancellation and an OS advisory in the manager, a speaker-cap fix that checks
+both active and assigned VBx clusters, and model-loader comments. Embedding
+extraction, masks, filterbank, PLDA transforms and normalization are unchanged.
+`preprocessingVersion` remains `fluidaudio-offline-fbank-16khz-mono-v0.15.6`;
+existing compatible voiceprints do not need re-enrollment.
+
+The adapter and benchmark expose minimum gap and minimum segment duration.
+The pinned `PostProcessing` type has **only** a gap control, so duration maps to
+`segmentation.minDurationOn`; reconstruction still applies the maximum of this
+value and the 1 s embedding-duration floor. This limitation is documented in the
+manifest, CLI instructions and [feasibility audit](../feasibility/offline-diarization.md).
+
+The supported speaker ceiling is now available as **Up to N** in the reprocess
+menu and confirmation sheet. It passes through `TranscriptionRequest`, persisted
+job encoding, import fingerprinting, worker protocol, FluidAudio config, and
+canonical processing options. Exact and ceiling counts are mutually exclusive;
+old automatic/exact request encodings remain readable. Canonical intervals keep
+overlap, and clustering threshold remains **0.6**.
+
+#### Phase 5 CAB results and tuning decision
+
+Five distinct local recordings were swept serially at 0.1 s (control), 0.25 s,
+0.5 s and 0.75 s, using fixed saved ASR words, automatic clustering and threshold
+0.6. CAB was scored against both repository references. The timestamped segment
+reference aligns **19,248 / 19,853 words (96.953%)** at every gap; effective scores
+include the existing inferred speaker suggestions, while canonical scores leave
+those suggestions unassigned.
+
+| Gap (s) | Canonical WDER | Effective WDER | Effective wrong | Effective unknown | Reading paragraphs | Single-word reading paragraphs |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 0.10 (control) | 4.094% | 1.808% | 0.577% | 1.231% | 630 | 94 |
+| 0.25 | 3.897% | 1.709% | 0.561% | 1.148% | 613 | 84 |
+| 0.50 | 3.206% | 1.481% | 0.566% | 0.914% | 575 | 66 |
+| 0.75 | 2.665% | 1.346% | 0.577% | 0.769% | 552 | 57 |
+
+The 0.15.7 control's intervals are exactly equal to CAB's saved 0.15.6 intervals.
+The untimed paragraph-reference alignment also improves, from **1.727% to 1.247%**
+effective WDER at 0.75 s. The supplied reading reference remains **441 paragraphs /
+5 single-word paragraphs**, so even the best gap leaves a substantial readability
+gap. Canonical rows decrease from 1,329/559 single-word rows to 978/350; these are
+new benchmark hypotheses, not edits to any saved transcript.
+
+**Retain the production 0.1 s gap and 0 s duration setting for this objective.**
+0.75 s is the best CAB candidate and is now reproducible via the benchmark CLI,
+but CAB is the only fully annotated recording in the mounted corpus. The two
+manual-label subsets are tiny (19 and 17 aligned words), and **both show more
+wrong assignments at 0.75 s**: the 19-word subset rises from 5 to 9 wrong words,
+and the 17-word subset from 0 to 5. Total WDER falls because unknown labels become
+assigned, but some become incorrect. These subsets are too small and selectively
+edited to estimate whole-meeting accuracy; they nevertheless prevent treating
+CAB's improvement as a safe global win. The 0.25 s setting preserves wrong-word
+counts in both subsets and is a more conservative candidate for held-out testing.
+Two recordings have no scoreable ground truth, so their unknown/paragraph counts
+cannot establish a wrong-speaker regression guard. Validate additional fully
+annotated meetings before changing the default. No clustering-threshold change
+was made.
+
+The benchmark binaries were rebuilt and hashed; ASR was deliberately not rerun
+for this sweep so word recognition/timing stayed fixed. Runtime figures are
+recorded as observations only: initial sweeps overlapped compilation, so these
+are not controlled speed comparisons. Historical synthetic timings in the model
+manifest are explicitly labeled as predating this upgrade.
+
+Verification: all **12 worker tests** passed; the full Transcription suite passed
+**303 tests with two fixture skips** before the final three test additions;
+**40 focused worker/reprocess tests** and **5 fingerprint/serialization tests**
+then passed, including the added ceiling coverage. All **12 analysis tests** pass,
+and the real Scribe Xcode scheme builds successfully. No visual screenshot was
+captured for the native menu addition. Executable hashes and complete aggregate
+measurements are in the phase-5 evidence JSON; private raw outputs remain in
+`/private/tmp/scribe-coo1004-phase5`.
+
 ## Phase 6 — Microphone-track "you" prior (opt-in)
 
 **Files:** recorder session manifest, `AudioPreparationService`,

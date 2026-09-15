@@ -9,6 +9,10 @@ public struct OfflineDiarizationAdapter: Sendable {
     public struct Configuration: Sendable, Equatable {
         /// Applies FluidAudio's exact global-cluster constraint when supplied.
         public let knownSpeakerCount: Int?
+        public let maximumSpeakerCount: Int?
+        public let minimumGapDurationSeconds: Double
+        /// Maps to segmentation.minDurationOn; reconstruction also applies the embedding duration floor.
+        public let minimumSegmentDurationSeconds: Double
         public let computeUnits: ASRComputeUnits
         public let allowLowPrecisionAccumulationOnGPU: Bool
         /// The pinned FluidAudio build exposes overlap through nonexclusive
@@ -24,6 +28,9 @@ public struct OfflineDiarizationAdapter: Sendable {
 
         public init(
             knownSpeakerCount: Int? = nil,
+            maximumSpeakerCount: Int? = nil,
+            minimumGapDurationSeconds: Double = 0.1,
+            minimumSegmentDurationSeconds: Double = 0.0,
             computeUnits: ASRComputeUnits = .cpuAndNeuralEngine,
             allowLowPrecisionAccumulationOnGPU: Bool = true,
             preserveOverlappingIntervals: Bool = true,
@@ -33,6 +40,9 @@ public struct OfflineDiarizationAdapter: Sendable {
             segmentationStepRatio: Double = 0.2
         ) {
             self.knownSpeakerCount = knownSpeakerCount
+            self.maximumSpeakerCount = maximumSpeakerCount
+            self.minimumGapDurationSeconds = minimumGapDurationSeconds
+            self.minimumSegmentDurationSeconds = minimumSegmentDurationSeconds
             self.computeUnits = computeUnits
             self.allowLowPrecisionAccumulationOnGPU = allowLowPrecisionAccumulationOnGPU
             self.preserveOverlappingIntervals = preserveOverlappingIntervals
@@ -51,6 +61,10 @@ public struct OfflineDiarizationAdapter: Sendable {
 
     public struct AppliedConfiguration: Codable, Sendable, Equatable {
         public let knownSpeakerCount: Int?
+        public let maximumSpeakerCount: Int?
+        public let minimumGapDurationSeconds: Double
+        /// Maps to segmentation.minDurationOn; reconstruction also applies the embedding duration floor.
+        public let minimumSegmentDurationSeconds: Double
         public let clusteringThreshold: Double
         public let embeddingExcludeOverlap: Bool
         public let minimumEmbeddingDurationSeconds: Double
@@ -125,6 +139,7 @@ public struct OfflineDiarizationAdapter: Sendable {
     public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {
         case inputDoesNotExist(String)
         case invalidKnownSpeakerCount(Int)
+        case invalidConfiguration(String)
         case noEmbeddings
         case invalidInterval(Int)
 
@@ -132,6 +147,7 @@ public struct OfflineDiarizationAdapter: Sendable {
             switch self {
             case let .inputDoesNotExist(path): "Input audio does not exist at \(path)."
             case let .invalidKnownSpeakerCount(count): "knownSpeakerCount must be positive, got \(count)."
+            case let .invalidConfiguration(message): message
             case .noEmbeddings: "FluidAudio returned diarization intervals without exported speaker embeddings."
             case let .invalidInterval(index): "FluidAudio returned an invalid diarization interval at index \(index)."
             }
@@ -139,8 +155,8 @@ public struct OfflineDiarizationAdapter: Sendable {
     }
 
     private static let embeddingModelID = "wespeaker-embedding-coreml"
-    public static let fluidAudioVersion = "0.15.6"
-    public static let fluidAudioRevision = "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b"
+    public static let fluidAudioVersion = "0.15.7"
+    public static let fluidAudioRevision = "41540ea237350afe5117a082b5c28eda642d0612"
     /// v0.15.6 fixes the mask-matrix transpose and rejects very low-support
     /// masks before embedding. Those operations change vector semantics even
     /// though the WeSpeaker weights are unchanged, so old voiceprints must not
@@ -169,16 +185,7 @@ public struct OfflineDiarizationAdapter: Sendable {
             throw Error.invalidKnownSpeakerCount(count)
         }
 
-        var diarizerConfiguration = OfflineDiarizerConfig.default
-        diarizerConfiguration.postProcessing.exclusiveSegments = !configuration.preserveOverlappingIntervals
-        diarizerConfiguration.clustering.threshold = configuration.clusteringThreshold
-        diarizerConfiguration.embedding.excludeOverlap = configuration.embeddingExcludeOverlap
-        diarizerConfiguration.embedding.minSegmentDurationSeconds = configuration.minimumEmbeddingDurationSeconds
-        diarizerConfiguration.segmentation.stepRatio = configuration.segmentationStepRatio
-        diarizerConfiguration.exposeChunkEmbeddings = true
-        if let count = configuration.knownSpeakerCount {
-            diarizerConfiguration = diarizerConfiguration.withSpeakers(exactly: count)
-        }
+        let diarizerConfiguration = try makeDiarizerConfiguration()
 
         let sourceResult = try AudioSourceFactory().makeDiskBackedSource(
             from: fileURL,
@@ -200,6 +207,34 @@ public struct OfflineDiarizationAdapter: Sendable {
         )
         let duration = Double(sourceResult.source.sampleCount) / Double(diarizerConfiguration.segmentation.sampleRate)
         return try makeResult(rawResult, sourceDuration: duration, diarizerConfiguration: diarizerConfiguration)
+    }
+
+    func makeDiarizerConfiguration() throws -> OfflineDiarizerConfig {
+        if let count = configuration.maximumSpeakerCount, count <= 0 {
+            throw Error.invalidConfiguration("maximumSpeakerCount must be positive")
+        }
+        guard configuration.knownSpeakerCount == nil || configuration.maximumSpeakerCount == nil else {
+            throw Error.invalidConfiguration("Choose either an exact count or a maximum count")
+        }
+        guard configuration.minimumGapDurationSeconds.isFinite, configuration.minimumGapDurationSeconds >= 0,
+              configuration.minimumSegmentDurationSeconds.isFinite, configuration.minimumSegmentDurationSeconds >= 0 else {
+            throw Error.invalidConfiguration("Minimum gap and duration must be finite and nonnegative")
+        }
+        var diarizerConfiguration = OfflineDiarizerConfig.default
+        diarizerConfiguration.postProcessing.exclusiveSegments = !configuration.preserveOverlappingIntervals
+        diarizerConfiguration.clustering.threshold = configuration.clusteringThreshold
+        diarizerConfiguration.embedding.excludeOverlap = configuration.embeddingExcludeOverlap
+        diarizerConfiguration.embedding.minSegmentDurationSeconds = configuration.minimumEmbeddingDurationSeconds
+        diarizerConfiguration.segmentation.stepRatio = configuration.segmentationStepRatio
+        diarizerConfiguration.clustering.maxSpeakers = configuration.maximumSpeakerCount
+        diarizerConfiguration.postProcessing.minGapDurationSeconds = configuration.minimumGapDurationSeconds
+        diarizerConfiguration.segmentation.minDurationOn = configuration.minimumSegmentDurationSeconds
+        diarizerConfiguration.exposeChunkEmbeddings = true
+        if let count = configuration.knownSpeakerCount {
+            diarizerConfiguration = diarizerConfiguration.withSpeakers(exactly: count)
+        }
+
+        return diarizerConfiguration
     }
 
     /// Kept internal for deterministic tests of labels, overlap preservation,
@@ -263,6 +298,9 @@ public struct OfflineDiarizationAdapter: Sendable {
 
         let configurationSnapshot = AppliedConfiguration(
             knownSpeakerCount: configuration.knownSpeakerCount,
+            maximumSpeakerCount: diarizerConfiguration.clustering.maxSpeakers,
+            minimumGapDurationSeconds: diarizerConfiguration.postProcessing.minGapDurationSeconds,
+            minimumSegmentDurationSeconds: diarizerConfiguration.segmentation.minDurationOn,
             clusteringThreshold: diarizerConfiguration.clustering.threshold,
             embeddingExcludeOverlap: diarizerConfiguration.embedding.excludeOverlap,
             minimumEmbeddingDurationSeconds: diarizerConfiguration.embedding.minSegmentDurationSeconds,

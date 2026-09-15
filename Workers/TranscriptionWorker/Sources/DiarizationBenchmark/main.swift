@@ -15,6 +15,9 @@ struct DiarizationBenchmark {
                 modelsDirectory: options.modelsURL,
                 configuration: .init(
                     knownSpeakerCount: options.knownSpeakerCount,
+                    maximumSpeakerCount: options.maximumSpeakerCount,
+                    minimumGapDurationSeconds: options.minimumGapDurationSeconds,
+                    minimumSegmentDurationSeconds: options.minimumSegmentDurationSeconds,
                     clusteringThreshold: options.clusteringThreshold,
                     embeddingExcludeOverlap: options.embeddingExcludeOverlap,
                     minimumEmbeddingDurationSeconds: options.minimumEmbeddingDurationSeconds,
@@ -68,6 +71,9 @@ private struct Output: Codable {
 }
 
 private struct Options {
+    let maximumSpeakerCount: Int?
+    let minimumGapDurationSeconds: Double
+    let minimumSegmentDurationSeconds: Double
     let audioURL: URL
     let manifestURL: URL
     let modelsURL: URL
@@ -95,6 +101,12 @@ private struct Options {
         } else {
             knownSpeakerCount = nil
         }
+        if let value = values["--maximum-speaker-count"] {
+            guard let count = Int(value), count > 0, knownSpeakerCount == nil else { throw OptionsError.usage }
+            maximumSpeakerCount = count
+        } else { maximumSpeakerCount = nil }
+        minimumGapDurationSeconds = try Self.double(values["--minimum-gap-duration"], default: 0.1)
+        minimumSegmentDurationSeconds = try Self.double(values["--minimum-segment-duration"], default: 0.0)
         audioURL = URL(fileURLWithPath: audio)
         manifestURL = URL(fileURLWithPath: manifest)
         modelsURL = URL(fileURLWithPath: models, isDirectory: true)
@@ -124,6 +136,6 @@ private enum OptionsError: LocalizedError {
     case usage
 
     var errorDescription: String? {
-        "Usage: DiarizationBenchmark --audio <audio-file> --manifest <model_manifest.json> --models <models-dir> [--known-speaker-count <positive-int>] [--clustering-threshold <0...2>] [--embedding-exclude-overlap <true|false>] [--minimum-embedding-duration <seconds>] [--segmentation-step-ratio <0...1>]"
+        "Usage: DiarizationBenchmark --audio <audio-file> --manifest <model_manifest.json> --models <models-dir> [--known-speaker-count <positive-int>] [--maximum-speaker-count <positive-int>] [--minimum-gap-duration <seconds>] [--minimum-segment-duration <seconds>] [--clustering-threshold <0...2>] [--embedding-exclude-overlap <true|false>] [--minimum-embedding-duration <seconds>] [--segmentation-step-ratio <0...1>]"
     }
 }

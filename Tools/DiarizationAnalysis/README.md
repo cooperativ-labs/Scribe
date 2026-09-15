@@ -17,7 +17,7 @@ swift build --package-path Workers/TranscriptionWorker --scratch-path "$EVAL/wor
   --build-system swiftbuild -c release --product ASRBenchmark
 ```
 
-For this Swift build system, executables are under `worker-build/out/Products/Release`. Confirm the actual build output path on your toolchain. The worker pin is FluidAudio `4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b` (0.15.6).
+For this Swift build system, executables are under `worker-build/out/Products/Release`. Confirm the actual build output path on your toolchain. The worker pin is FluidAudio `41540ea237350afe5117a082b5c28eda642d0612` (0.15.7).
 
 Build the public SpeakerKit SDK in a separate checkout of `https://github.com/argmaxinc/argmax-oss-swift.git`, at commit `ea872ffd35705aa757f33033500b9b0d40bd38df`, with `swift build -c release --product argmax-cli`. Its executable is `.build/release/argmax-cli`.
 
@@ -37,7 +37,7 @@ python3 Tools/DiarizationAnalysis/benchmark.py RUNS \
   --engine fluid --binary "$EVAL/worker-build/out/Products/Release/DiarizationBenchmark" \
   --models "$HOME/Library/Application Support/Scribe/Models" \
   --manifest Workers/TranscriptionWorker/model_manifest.json \
-  --revision 4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b --output "$EVAL/results"
+  --revision 41540ea237350afe5117a082b5c28eda642d0612 --output "$EVAL/results"
 
 python3 Tools/DiarizationAnalysis/benchmark.py RUNS \
   --engine speakerkit --binary /path/to/argmax-cli --models /path/to/speakerkit-coreml \
@@ -45,6 +45,30 @@ python3 Tools/DiarizationAnalysis/benchmark.py RUNS \
 ```
 
 Do not run engines concurrently when comparing runtimes. The runner executes automatic followed by requested exact-two per recording. On unannotated recordings this is a sensitivity test, not a known true count. It preserves RTTM overlap and keeps SpeakerKit exclusive reconciliation off. Repeated runs need separate output folders to retain their measurements.
+
+## Post-processing sweep (FluidAudio 0.15.7)
+
+Keep one fixed saved-word or ASR transcript per recording and run inference serially. Include the 0.1 s production default as the control, then 0.25, 0.5 and 0.75 s. Keep `--clustering-threshold 0.6`, automatic speaker count, overlap preservation and the duration default fixed. Each fresh benchmark JSON records the applied configuration. Core ML logs may share stdout: extract the final JSON line before passing it to replay/WDER.
+
+```sh
+for GAP in 0.1 0.25 0.5 0.75; do
+  "$EVAL/worker-build/out/Products/Release/DiarizationBenchmark" \
+    --audio "$RUN/prepared.wav" --manifest Workers/TranscriptionWorker/model_manifest.json \
+    --models "$HOME/Library/Application Support/Scribe/Models" \
+    --minimum-gap-duration "$GAP" --minimum-segment-duration 0 --clustering-threshold 0.6 \
+    > "$EVAL/gap-$GAP.log" 2>&1
+  python3 -c 'import json,sys; rows=open(sys.argv[1]).read().splitlines(); d=next(json.loads(x) for x in reversed(rows) if x.startswith("{") and "\"intervals\"" in x); json.dump(d,open(sys.argv[2],"w"))' \
+    "$EVAL/gap-$GAP.log" "$EVAL/gap-$GAP.json"
+  python3 Tools/DiarizationAnalysis/wder.py "$RUN" --diarization "$EVAL/gap-$GAP.json" \
+    --reference "$REFERENCE" --effective-speakers --output "$EVAL/gap-$GAP-wder.json"
+done
+shasum -a 256 "$EVAL/worker-build/out/Products/Release/DiarizationBenchmark" \
+  "$EVAL/worker-build/out/Products/Release/ASRBenchmark"
+```
+
+Omit `--reference` only when scoring explicit manual canonical labels. Unannotated recordings can supply replay paragraph/unknown counts but cannot supply WDER. Sparse manual labels measure only their aligned subset, not full-meeting accuracy. Use the repository segment reference for timestamped CAB scoring and the paragraph reference for a separate untimed alignment/readability comparison.
+
+`--maximum-speaker-count N` requests up to N; `--known-speaker-count N` requests exactly N. Do not combine them. The pinned API has no standalone post-processing minimum-duration field: `--minimum-segment-duration` maps to segmentation `minDurationOn`; final reconstruction also applies the embedding-duration floor (1 s by default). Lower values cannot shorten that floor. See the [source compatibility audit](../../docs/feasibility/offline-diarization.md).
 
 ## Actual Swift host replay and aggregate
 

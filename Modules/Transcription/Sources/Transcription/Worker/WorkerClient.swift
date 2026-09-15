@@ -87,6 +87,7 @@ public struct WorkerRunRequest: Sendable, Equatable {
     public var sourceURL: URL
     public var runDirectoryURL: URL
     public var knownSpeakerCount: Int?
+    public var maximumSpeakerCount: Int?
     /// Extra payload values. The production helper refuses its test-only keys
     /// unless its own test environment variable is set, so this cannot weaken a
     /// shipped build.
@@ -97,12 +98,14 @@ public struct WorkerRunRequest: Sendable, Equatable {
         sourceURL: URL,
         runDirectoryURL: URL,
         knownSpeakerCount: Int? = nil,
+        maximumSpeakerCount: Int? = nil,
         additionalOptions: [String: WorkerJSONValue] = [:]
     ) {
         self.requestID = requestID
         self.sourceURL = sourceURL
         self.runDirectoryURL = runDirectoryURL
         self.knownSpeakerCount = knownSpeakerCount
+        self.maximumSpeakerCount = maximumSpeakerCount
         self.additionalOptions = additionalOptions
     }
 }
@@ -242,6 +245,7 @@ public actor WorkerClient {
             "sourcePath": .string(request.sourceURL.path),
             "runDirectory": .string(request.runDirectoryURL.path),
         ]
+        if let maximumSpeakerCount = request.maximumSpeakerCount { payload["maximumSpeakerCount"] = .number(Double(maximumSpeakerCount)) }
         if let knownSpeakerCount = request.knownSpeakerCount { payload["knownSpeakerCount"] = .number(Double(knownSpeakerCount)) }
         payload.merge(request.additionalOptions) { _, new in new }
         activeRequestID = request.requestID

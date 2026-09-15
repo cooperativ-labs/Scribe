@@ -566,13 +566,20 @@ public struct TranscriptWindow: View {
                     viewModel.presentReprocessConfirmation(speakerCount: .automatic)
                 }
                 Divider()
+                Menu("Up to") {
+                    ForEach(1...8, id: \.self) { count in
+                        Button("Up to \(count) speaker\(count == 1 ? "" : "s")") {
+                            viewModel.presentReprocessConfirmation(speakerCount: .upTo(count))
+                        }
+                    }
+                }
                 ForEach(1...8, id: \.self) { count in
                     Button("Exactly \(count) speaker\(count == 1 ? "" : "s")") {
                         viewModel.presentReprocessConfirmation(speakerCount: .known(count))
                     }
                 }
                 Divider()
-                Text("Creates a new run and keeps this transcript’s edits. Exact counts can use FluidAudio’s K-means fallback.")
+                Text("Creates a new run and keeps this transcript’s edits. A maximum lets Scribe detect fewer speakers.")
             }
             .disabled(!viewModel.canReprocess)
             .help("Run the retained source again with a chosen speaker count without replacing this transcript.")

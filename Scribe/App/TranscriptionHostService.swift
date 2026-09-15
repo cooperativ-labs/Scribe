@@ -407,6 +407,7 @@ final class TranscriptionHostService {
             let description = switch speakerCount {
             case .automatic: "automatic speaker count"
             case .known(let count): "exactly \(count) speaker\(count == 1 ? "" : "s")"
+            case .upTo(let count): "up to \(count) speaker\(count == 1 ? "" : "s")"
             }
             return TranscriptReprocessingOutcome(
                 message: "Queued a new run with \(description). This transcript and its edits were kept.",

@@ -94,6 +94,7 @@ public struct ImportConfiguration: Codable, Equatable, Sendable {
                 switch speakerCount {
                 case .automatic: "automatic"
                 case .known(let count): String(count)
+                case .upTo(let count): "upTo:\(count)"
                 }
             }(),
             "speakerLibraryRevision": speakerLibraryRevision ?? "",

@@ -14,6 +14,20 @@ final class ImportFingerprintTests: XCTestCase {
 
     override func tearDownWithError() throws { try? FileManager.default.removeItem(at: directory) }
 
+    func testSpeakerCeilingRoundTripsAndHasDistinctFingerprint() throws {
+        XCTAssertEqual(try JSONDecoder().decode(TranscriptionSpeakerCount.self, from: Data("2".utf8)), .known(2))
+        XCTAssertEqual(try JSONDecoder().decode(TranscriptionSpeakerCount.self, from: Data(#""automatic""#.utf8)), .automatic)
+        let ceiling = TranscriptionSpeakerCount.upTo(4)
+        XCTAssertEqual(try JSONDecoder().decode(TranscriptionSpeakerCount.self, from: JSONEncoder().encode(ceiling)), ceiling)
+        let automatic = ImportConfiguration(modelProfileID: "test")
+        var exact = automatic
+        exact.speakerCount = .known(4)
+        var capped = automatic
+        capped.speakerCount = ceiling
+        XCTAssertNotEqual(capped.fingerprint, exact.fingerprint)
+        XCTAssertNotEqual(capped.fingerprint, automatic.fingerprint)
+    }
+
     func testIdenticalContentUnderDifferentNamesSharesOneSourceIdentity() throws {
         let first = try write("january/standup.flac", contents: "the same meeting")
         let second = try write("february/standup.flac", contents: "the same meeting")

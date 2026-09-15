@@ -151,6 +151,7 @@ public actor WorkerStageRunner: TranscriptionStageRunning {
                 sourceURL: job.sourceSnapshotURL,
                 runDirectoryURL: job.runDirectoryURL,
                 knownSpeakerCount: job.request.speakerCount.knownCount,
+                maximumSpeakerCount: job.request.speakerCount.maximumCount,
                 additionalOptions: additionalRunOptions
             ))
         } catch {
@@ -205,6 +206,11 @@ public actor WorkerStageRunner: TranscriptionStageRunning {
 }
 
 private extension TranscriptionSpeakerCount {
+    var maximumCount: Int? {
+        guard case let .upTo(count) = self else { return nil }
+        return count
+    }
+
     var knownCount: Int? {
         guard case let .known(count) = self else { return nil }
         return count

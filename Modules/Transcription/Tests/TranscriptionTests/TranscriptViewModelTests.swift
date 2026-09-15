@@ -5,6 +5,12 @@ import XCTest
 
 @MainActor
 final class TranscriptViewModelTests: XCTestCase {
+
+    func testSpeakerCeilingIsDescribedInReprocessConfirmation() {
+        let session = TranscriptReprocessSession(fileID: "test", displayName: "Meeting", speakerCount: .upTo(4))
+        XCTAssertEqual(session.speakerCountDescription, "up to 4 speakers")
+    }
+
     func testSelectingASegmentLoadsTheSnapshotAndSeeksToItsSourceTime() throws {
         let transcript = try fixture(named: "overlap")
         let snapshot = URL(fileURLWithPath: "/tmp/scribe-overlap-snapshot.flac")

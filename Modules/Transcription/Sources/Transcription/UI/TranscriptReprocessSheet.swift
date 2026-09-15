@@ -81,7 +81,7 @@ struct TranscriptReprocessSheet: View {
             )
             .font(.body)
             .fixedSize(horizontal: false, vertical: true)
-            Text("This transcript and its edits stay until the new run finishes. Exact counts can use FluidAudio\u{2019}s K-means fallback.")
+            Text("This transcript and its edits stay until the new run finishes. An “up to” limit lets Scribe detect fewer speakers.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

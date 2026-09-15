@@ -130,7 +130,7 @@ func offlineDiarizationContract() throws {
     #expect(result.embeddings.allSatisfy { abs($0.vector.reduce(0) { $1 * $1 + $0 }.squareRoot() - 1) < 0.0001 })
     #expect(result.embeddings.allSatisfy { $0.modelID == "wespeaker-embedding-coreml" })
     #expect(result.embeddings.allSatisfy { $0.preprocessingVersion == "fluidaudio-offline-fbank-16khz-mono-v0.15.6" })
-    #expect(result.engine.runtime == "FluidAudio 0.15.6")
+    #expect(result.engine.runtime == "FluidAudio 0.15.7")
     #expect(result.configuration.clusteringThreshold == 0.6)
     #expect(result.clusteringDiagnostics.separationAppearsCollapsed == false)
 }
@@ -292,5 +292,31 @@ private final class OutputCollector: @unchecked Sendable {
     func read() -> String {
         lock.lock(); defer { lock.unlock() }
         return String(decoding: data, as: UTF8.self)
+    }
+}
+
+@Test("offline diarization applies post-processing controls and a ceiling without forcing an exact count")
+func offlineDiarizationConfigurationControls() throws {
+    let manifest = try ModelManifest.load(from: URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .appending(path: "model_manifest.json"))
+    func adapter(_ configuration: OfflineDiarizationAdapter.Configuration) -> OfflineDiarizationAdapter {
+        .init(manifest: manifest, modelsDirectory: URL(fileURLWithPath: "/unused"), configuration: configuration)
+    }
+    let config = try adapter(.init(maximumSpeakerCount: 4, minimumGapDurationSeconds: 0.5,
+                                   minimumSegmentDurationSeconds: 1.2)).makeDiarizerConfiguration()
+    #expect(config.clustering.maxSpeakers == 4)
+    #expect(config.clustering.numSpeakers == nil)
+    #expect(config.clustering.threshold == 0.6)
+    #expect(config.postProcessing.minGapDurationSeconds == 0.5)
+    #expect(config.segmentation.minDurationOn == 1.2)
+    #expect(!config.postProcessing.exclusiveSegments)
+    for invalid in [
+        OfflineDiarizationAdapter.Configuration(maximumSpeakerCount: 0),
+        .init(knownSpeakerCount: 2, maximumSpeakerCount: 4),
+        .init(minimumGapDurationSeconds: -.infinity),
+        .init(minimumSegmentDurationSeconds: -1),
+    ] {
+        #expect(throws: OfflineDiarizationAdapter.Error.self) { try adapter(invalid).makeDiarizerConfiguration() }
     }
 }

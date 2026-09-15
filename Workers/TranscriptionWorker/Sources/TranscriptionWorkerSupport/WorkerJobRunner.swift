@@ -29,7 +29,7 @@ public struct WorkerJobRunner: Sendable {
             switch self {
             case let .missingValue(name): "Missing required job value \(name)."
             case let .invalidPath(message): message
-            case .invalidSpeakerCount: "knownSpeakerCount must be a positive integer."
+            case .invalidSpeakerCount: "Speaker count must be a positive integer; choose either exact or maximum."
             case .unsafeTestMode: "The deterministic test pipeline is disabled outside the worker test environment."
             }
         }
@@ -130,6 +130,9 @@ public struct WorkerJobRunner: Sendable {
                 engine: .init(runtime: "test", runtimeRevision: "test", modelRevision: "test"),
                 configuration: .init(
                     knownSpeakerCount: job.knownSpeakerCount,
+                    maximumSpeakerCount: job.maximumSpeakerCount,
+                    minimumGapDurationSeconds: 0.1,
+                    minimumSegmentDurationSeconds: 0,
                     clusteringThreshold: 0.6,
                     embeddingExcludeOverlap: true,
                     minimumEmbeddingDurationSeconds: 1,
@@ -155,7 +158,7 @@ public struct WorkerJobRunner: Sendable {
             result = try await OfflineDiarizationAdapter(
                 manifest: manifest,
                 modelsDirectory: configuration.modelsDirectory,
-                configuration: .init(knownSpeakerCount: job.knownSpeakerCount)
+                configuration: .init(knownSpeakerCount: job.knownSpeakerCount, maximumSpeakerCount: job.maximumSpeakerCount)
             ).diarize(fileURL: URL(fileURLWithPath: prepared.preparedAudioPath))
         }
         let checkpoint = DiarizationStage(
@@ -227,6 +230,7 @@ private struct Job {
     let sourceURL: URL
     let runDirectory: URL
     let knownSpeakerCount: Int?
+    let maximumSpeakerCount: Int?
     let testMode: Bool
     let testStageDelayMilliseconds: Int
     let testCrashDuringStage: String?
@@ -238,10 +242,15 @@ private struct Job {
         sourceURL = URL(fileURLWithPath: sourcePath)
         runDirectory = URL(fileURLWithPath: runPath, isDirectory: true)
         guard FileManager.default.fileExists(atPath: sourceURL.path) else { throw WorkerJobRunner.Error.invalidPath("Input audio does not exist at \(sourceURL.path).") }
-        if let value = payload["knownSpeakerCount"]?.numberValue {
-            guard value > 0, value.rounded() == value else { throw WorkerJobRunner.Error.invalidSpeakerCount }
-            knownSpeakerCount = Int(value)
-        } else { knownSpeakerCount = nil }
+        func count(_ key: String) throws -> Int? {
+            guard let raw = payload[key] else { return nil }
+            guard let value = raw.numberValue, value.isFinite, value > 0,
+                  value < Double(Int.max), value.rounded() == value else { throw WorkerJobRunner.Error.invalidSpeakerCount }
+            return Int(value)
+        }
+        knownSpeakerCount = try count("knownSpeakerCount")
+        maximumSpeakerCount = try count("maximumSpeakerCount")
+        guard knownSpeakerCount == nil || maximumSpeakerCount == nil else { throw WorkerJobRunner.Error.invalidSpeakerCount }
         testMode = payload["testMode"]?.boolValue == true
         testStageDelayMilliseconds = Int(payload["testStageDelayMilliseconds"]?.numberValue ?? 0)
         testCrashDuringStage = payload["testCrashDuringStage"]?.stringValue
