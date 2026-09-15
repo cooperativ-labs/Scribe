@@ -48,6 +48,7 @@ public struct SpeakerLibraryRow: Identifiable, Equatable, Sendable {
 @MainActor
 @Observable
 public final class SpeakerLibraryViewModel {
+    public private(set) var ownerProfileID: UUID?
     public private(set) var rows: [SpeakerLibraryRow] = []
     public private(set) var revision: SpeakerLibraryRevision?
     public private(set) var errorMessage: String?
@@ -68,6 +69,7 @@ public final class SpeakerLibraryViewModel {
         await perform(clearingError: false) {
             let snapshot = try await self.store.snapshot()
             self.revision = snapshot.revision
+            self.ownerProfileID = try await self.store.owner()?.profileID
             self.rows = snapshot.profiles
                 .map(SpeakerLibraryRow.init)
                 .sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
@@ -88,6 +90,10 @@ public final class SpeakerLibraryViewModel {
         await load()
         selectedProfileID = created?.profileID
         return created
+    }
+
+    public func setOwner(profileID: UUID?) async {
+        await reloading { try await self.store.setOwner(profileID: profileID) }
     }
 
     public func rename(profileID: UUID, to name: String) async {

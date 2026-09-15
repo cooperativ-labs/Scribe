@@ -16,6 +16,8 @@ def main():
     p.add_argument('run')
     p.add_argument('transcript')
     p.add_argument('diarization')
+    p.add_argument('--source-minimum-agreement', type=float, default=0.95, help='Calibration override (production: 0.95)')
+    p.add_argument('--source-energy', type=pathlib.Path, help='Opt in using an aligned source-energy.json')
     p.add_argument('--output', required=True, type=pathlib.Path)
     p.add_argument('--keep-executable', type=pathlib.Path, help='Copy the built host replay for further runs')
     a = p.parse_args()
@@ -38,18 +40,19 @@ def main():
         review = (host / 'UI/TranscriptReviewPresentation.swift').read_text()
         with records_path.open('a') as records:
             records.write('\npublic extension TranscriptSegment {' + review.split('public extension TranscriptSegment {', 1)[1])
-        names = ['CanonicalTranscriptValidator', 'UnknownFragmentReconciler', 'TranscriptParagraph', 'CanonicalTranscript', 'WorkerASRTranscript', 'TokenTimingReconciler',
+        names = ['SourceEnergyPrior', 'CanonicalTranscriptValidator', 'UnknownFragmentReconciler', 'TranscriptParagraph', 'CanonicalTranscript', 'WorkerASRTranscript', 'TokenTimingReconciler',
                  'SpeakerTurnBuilder', 'TranscriptDisplayGrouper']
         executable = temp / 'replay'
         subprocess.run(['swiftc', '-O', '-module-cache-path', str(temp / 'module-cache'),
                         *[str(host / f'Transcript/{n}.swift') for n in names],
+                        str(root / 'Scribe/App/Sources/ScribeAppCore/SourceEnergyTimeline.swift'),
                         str(mapping_path), str(bundle_path), str(records_path), str(root / 'Tools/DiarizationAnalysis/Replay.swift'),
                         '-o', str(executable)], check=True)
         if a.keep_executable:
             shutil.copy2(executable, a.keep_executable)
         with a.output.open('w') as output:
             transcript = '--saved-words' if a.transcript == 'saved' else a.transcript
-            subprocess.run([str(executable), a.run, transcript, a.diarization], stdout=output, check=True)
+            subprocess.run([str(executable), a.run, transcript, a.diarization] + ([str(a.source_energy), str(a.source_minimum_agreement)] if a.source_energy else []), stdout=output, check=True)
 
 
 if __name__ == '__main__':

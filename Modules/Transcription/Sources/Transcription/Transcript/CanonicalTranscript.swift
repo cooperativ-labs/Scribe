@@ -265,6 +265,7 @@ public struct TranscriptSpeakerInference: Codable, Sendable, Equatable {
 public enum TranscriptSpeakerInferenceEvidence: Codable, Sendable, Equatable {
     case diarizationCoverage
     case diarizationBoundaryGap
+    case sourceEnergy
     case nearestInterval(distanceMs: Int)
 
     private enum CodingKeys: String, CodingKey { case type; case distanceMs = "distance_ms" }
@@ -274,6 +275,7 @@ public enum TranscriptSpeakerInferenceEvidence: Codable, Sendable, Equatable {
             switch value {
             case "diarization_coverage": self = .diarizationCoverage
             case "diarization_boundary_gap": self = .diarizationBoundaryGap
+            case "source_energy": self = .sourceEnergy
             default: throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "Unknown inference evidence"))
             }
         } else {
@@ -289,6 +291,9 @@ public enum TranscriptSpeakerInferenceEvidence: Codable, Sendable, Equatable {
 
     public func encode(to encoder: Encoder) throws {
         switch self {
+        case .sourceEnergy:
+            var container = encoder.singleValueContainer()
+            try container.encode("source_energy")
         case .diarizationCoverage, .diarizationBoundaryGap:
             var container = encoder.singleValueContainer()
             try container.encode(self == .diarizationCoverage ? "diarization_coverage" : "diarization_boundary_gap")

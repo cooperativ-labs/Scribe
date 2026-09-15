@@ -45,6 +45,7 @@ public struct ImportConfiguration: Codable, Equatable, Sendable {
     public var languageMode: TranscriptionLanguageMode
     public var expectedLanguage: String?
     public var speakerCount: TranscriptionSpeakerCount
+    public var microphoneSpeakerPrior: Bool?
     public var speakerMatching: TranscriptionSpeakerMatching
     public var speakerLibraryRevision: String?
     /// The content hash of the custom vocabulary a run was given, or nil when
@@ -62,6 +63,7 @@ public struct ImportConfiguration: Codable, Equatable, Sendable {
         expectedLanguage: String? = nil,
         speakerCount: TranscriptionSpeakerCount = .automatic,
         speakerMatching: TranscriptionSpeakerMatching = .enabled,
+        microphoneSpeakerPrior: Bool = false,
         speakerLibraryRevision: String? = nil,
         vocabularyRevision: String? = nil,
         channelSelection: AudioChannelSelection = .downmix,
@@ -72,6 +74,7 @@ public struct ImportConfiguration: Codable, Equatable, Sendable {
         self.expectedLanguage = expectedLanguage
         self.speakerCount = speakerCount
         self.speakerMatching = speakerMatching
+        self.microphoneSpeakerPrior = microphoneSpeakerPrior ? true : nil
         self.speakerLibraryRevision = speakerLibraryRevision
         self.vocabularyRevision = vocabularyRevision
         self.channelSelection = channelSelection
@@ -105,6 +108,7 @@ public struct ImportConfiguration: Codable, Equatable, Sendable {
         if let vocabularyRevision, !vocabularyRevision.isEmpty {
             fields["vocabularyRevision"] = vocabularyRevision
         }
+        if microphoneSpeakerPrior == true { fields["microphoneSpeakerPrior"] = "source-energy-v1" }
         let body = fields.keys.sorted().map { "\($0)=\(fields[$0]!)" }.joined(separator: "\n")
         return "scribe.import.configuration.v1\n" + body
     }

@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(ScribeAppCore)
+import ScribeAppCore
+#endif
 
 /// A diarization interval on the source timeline, using canonical speaker IDs
 /// after mapping, or the diarizer's cluster IDs before mapping.
@@ -71,7 +74,8 @@ public struct UnknownFragmentReconciler: Sendable {
     public func reconcile(
         segments: [TranscriptSegment],
         speakers: [TranscriptSpeaker],
-        intervals: [AcousticSpeakerInterval]
+        intervals: [AcousticSpeakerInterval],
+        sourceEnergyPrior: SourceEnergyPrior? = nil
     ) -> [TranscriptSegment] {
         let labels = Dictionary(speakers.map { ($0.id, $0.labelSnapshot) }, uniquingKeysWith: { first, _ in first })
         let mapped = mappedIntervals(intervals)
@@ -87,7 +91,8 @@ public struct UnknownFragmentReconciler: Sendable {
                 at: index,
                 in: original,
                 intervals: mapped,
-                labels: labels
+                labels: labels,
+                sourceEnergyPrior: sourceEnergyPrior
             )
         }
         var byID = Dictionary(uniqueKeysWithValues: reconciled.map { ($0.id, $0) })
@@ -108,10 +113,15 @@ public struct UnknownFragmentReconciler: Sendable {
               let record = try? JSONDecoder().decode(DiarizationRecord.self, from: data)
         else { return transcript }
         let intervals = record.acousticIntervals(sourceDurationMs: transcript.source.durationMs)
+        let energyURL = runDirectoryURL.appendingPathComponent("source-energy.json")
+        let energy = transcript.processingOptions["microphone_speaker_prior_enabled"] == .boolean(true)
+            ? (try? JSONDecoder().decode(SourceEnergyTimeline.self, from: Data(contentsOf: energyURL))) : nil
+        let prior = energy.flatMap { SourceEnergyPrior(timeline: $0, intervals: intervals) }
         let segments = UnknownFragmentReconciler().reconcile(
             segments: transcript.segments,
             speakers: transcript.speakers,
-            intervals: intervals
+            intervals: intervals,
+            sourceEnergyPrior: prior
         )
         guard segments != transcript.segments else { return transcript }
         return transcript.replacingSegments(segments)
@@ -123,7 +133,8 @@ public struct UnknownFragmentReconciler: Sendable {
         at index: Int,
         in segments: [TranscriptSegment],
         intervals: [AcousticSpeakerInterval],
-        labels: [String: String]
+        labels: [String: String],
+        sourceEnergyPrior: SourceEnergyPrior?
     ) -> TranscriptSegment {
         let segment = segments[index]
         guard segment.speakerID == nil, segment.speakerInference == nil, segment.attributionSource != .manual else { return segment }
@@ -144,6 +155,18 @@ public struct UnknownFragmentReconciler: Sendable {
         let gap = (startMs: previous?.endMs ?? segment.startMs, endMs: next?.startMs ?? segment.endMs)
         guard gap.endMs >= gap.startMs, gap.endMs - gap.startMs <= configuration.maximumNeighborGapMs else {
             return segment.withUnresolvedEvidence(unresolved)
+        }
+
+        if let prior = sourceEnergyPrior, neighborID == prior.selection.speakerID,
+           prior.support(startMs: segment.startMs, endMs: segment.endMs) >= 0.9,
+           !competingSpeaker(in: (min(gap.startMs, segment.startMs), max(gap.endMs, segment.endMs)), otherThan: neighborID, intervals: intervals),
+           !intervals.contains(where: { $0.overlapsAnotherSpeaker && $0.startMs < segment.endMs && $0.endMs > segment.startMs }) {
+            switch acoustic {
+            case .noCoverage, .insufficientOverlap:
+                return inferred(segment, speakerID: neighborID, labels: labels, evidence: .sourceEnergy,
+                                overlapMs: nil, diarizationHoleMs: nil)
+            default: break
+            }
         }
 
         switch acoustic {
@@ -211,7 +234,7 @@ public struct UnknownFragmentReconciler: Sendable {
                 speakerID: speakerID,
                 speakerLabel: label,
                 evidence: evidence,
-                provenance: Self.provenance,
+                provenance: evidence == .sourceEnergy ? SourceEnergyPrior.provenance : Self.provenance,
                 diarizationHoleMs: diarizationHoleMs,
                 overlapMs: overlapMs
             )

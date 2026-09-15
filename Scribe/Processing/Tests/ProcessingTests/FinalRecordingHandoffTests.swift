@@ -21,6 +21,15 @@ import Testing
         #expect(request.speakerMatching == .enabled)
     }
 
+    @Test func microphonePriorIsOptInAndRetainsTheSessionDirectory() throws {
+        let session = try handoffSession(finalContents: "verified-final-mix")
+        let disabled = try FinalRecordingHandoff(checksumOfFile: fakeChecksum).request(forSessionAt: session.directory)
+        let enabled = try FinalRecordingHandoff(microphoneSpeakerPrior: true, checksumOfFile: fakeChecksum).request(forSessionAt: session.directory)
+        #expect(disabled.microphoneSpeakerPrior != true)
+        #expect(enabled.microphoneSpeakerPrior == true)
+        #expect(enabled.recorderSessionDirectory == session.directory)
+    }
+
     @Test func theMeetingTitleTravelsWithTheRequest() throws {
         let session = try handoffSession(finalContents: "verified-final-mix", title: "Weekly Sync")
         let request = try FinalRecordingHandoff(checksumOfFile: fakeChecksum)

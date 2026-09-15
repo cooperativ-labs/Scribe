@@ -41,9 +41,18 @@ public final class ScribeSettings: ObservableObject {
     @Published public var transcribeWhenFinalRecordingIsReady: Bool {
         didSet { defaults.set(transcribeWhenFinalRecordingIsReady, forKey: Key.transcribeWhenFinalRecordingIsReady) }
     }
+    /// Retains the recorder-owned session directory after its final mix has
+    /// been copied into the transcript store. Off by default so successful
+    /// transcription handoffs do not keep the raw component tracks forever.
+    @Published public var keepRecordingFilesForDebugging: Bool {
+        didSet { defaults.set(keepRecordingFilesForDebugging, forKey: Key.keepRecordingFilesForDebugging) }
+    }
     /// The diarization constraint used for new imports and recorder handoffs.
     /// Automatic remains the default because attendance is not evidence that
     /// every invited person spoke or was captured.
+    @Published public var microphoneSpeakerPrior: Bool {
+        didSet { defaults.set(microphoneSpeakerPrior, forKey: "scribe.settings.microphoneSpeakerPrior") }
+    }
     @Published public var transcriptionSpeakerCount: RecorderSpeakerCountPreference {
         didSet { defaults.set(transcriptionSpeakerCount.persistedValue, forKey: Key.transcriptionSpeakerCount) }
     }
@@ -120,6 +129,8 @@ public final class ScribeSettings: ObservableObject {
         stopShortcut = Self.loadShortcut(from: defaults, key: Key.stopShortcut) ?? .defaultStop
         copyTimestampShortcut = Self.loadShortcut(from: defaults, key: Key.copyTimestampShortcut) ?? .defaultCopyTimestamp
         transcribeWhenFinalRecordingIsReady = defaults.object(forKey: Key.transcribeWhenFinalRecordingIsReady) as? Bool ?? false
+        keepRecordingFilesForDebugging = defaults.object(forKey: Key.keepRecordingFilesForDebugging) as? Bool ?? false
+        microphoneSpeakerPrior = defaults.bool(forKey: "scribe.settings.microphoneSpeakerPrior")
         transcriptionSpeakerCount = RecorderSpeakerCountPreference(
             persistedValue: defaults.object(forKey: Key.transcriptionSpeakerCount)
         )
@@ -329,6 +340,7 @@ public final class ScribeSettings: ObservableObject {
         static let stopShortcut = "scribe.settings.stopShortcut"
         static let copyTimestampShortcut = "scribe.settings.copyTimestampShortcut"
         static let transcribeWhenFinalRecordingIsReady = "scribe.settings.transcribeWhenFinalRecordingIsReady"
+        static let keepRecordingFilesForDebugging = "scribe.settings.keepRecordingFilesForDebugging"
         static let transcriptionSpeakerCount = "scribe.settings.transcriptionSpeakerCount"
         static let meetingDetectionEnabled = "scribe.settings.meetingDetectionEnabled"
         static let stopRecordingWhenMeetingEnds = "scribe.settings.stopRecordingWhenMeetingEnds"

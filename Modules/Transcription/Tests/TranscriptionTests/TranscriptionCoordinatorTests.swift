@@ -121,6 +121,24 @@ final class TranscriptionCoordinatorTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: original.jobFileURL.path), "The prior run, including review edits, stays on disk.")
     }
 
+    func testSourceEvidenceSurvivesFreshRunAndCanBeEnabledAfterRecording() async throws {
+        let source = root.appendingPathComponent("meeting.flac")
+        try Data("audio bytes".utf8).write(to: source)
+        let coordinator = try TranscriptionCoordinator(configuration: .init(transcriptStoreURL: root.appendingPathComponent("store")), stageRunner: RecordingRunner())
+        let original = try await coordinator.enqueue(.init(sourceURL: source, modelProfileID: "default"))
+        let timeline = SourceEnergyTimeline(windows: [.init(startMs: 0, endMs: 100, microphonePower: 0.1, systemPower: 0)])
+        try AudioPreparationService.commitSourceEnergy(timeline, in: original.runDirectoryURL)
+        let revised = try await coordinator.reprocess(original, speakerCount: .automatic, microphoneSpeakerPrior: true)
+        XCTAssertEqual(revised.request.microphoneSpeakerPrior, true)
+        XCTAssertNotEqual(original.configurationFingerprint, revised.configurationFingerprint)
+        let data = try Data(contentsOf: revised.runDirectoryURL.appendingPathComponent("source-energy.json"))
+        XCTAssertEqual(try JSONDecoder().decode(SourceEnergyTimeline.self, from: data), timeline)
+        try FileManager.default.removeItem(at: source)
+        let disabled = try await coordinator.retranscribe(revised, modelProfileID: "new", speakerCount: .automatic, microphoneSpeakerPrior: false)
+        XCTAssertNotEqual(disabled.request.microphoneSpeakerPrior, true)
+        XCTAssertEqual(try Data(contentsOf: disabled.runDirectoryURL.appendingPathComponent("source-energy.json")), data)
+    }
+
     func testRetranscribeUsesCurrentModelProfileAndLeavesPriorRunIntact() async throws {
         let store = root.appendingPathComponent("Meeting Transcripts", isDirectory: true)
         let source = root.appendingPathComponent("meeting.flac")

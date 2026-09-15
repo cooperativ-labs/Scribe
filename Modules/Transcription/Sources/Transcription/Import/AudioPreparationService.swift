@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import ScribeAppCore
 
 /// The channel policy used when preparing a single-channel recognizer input.
 ///
@@ -124,6 +125,15 @@ extension AudioPreparationError: LocalizedError {
 
 /// Creates a stable playback snapshot and a 16 kHz mono recognizer stream using the pinned FFmpeg.
 public struct AudioPreparationService: Sendable {
+    /// Commit before the prepare checkpoint, so later stages/retries share one timeline.
+    public static func commitSourceEnergy(_ timeline: SourceEnergyTimeline, in runDirectory: URL) throws {
+        guard timeline.isValid else { throw AudioPreparationError.decodingFailed(details: "Invalid source energy timeline") }
+        try FileManager.default.createDirectory(at: runDirectory, withIntermediateDirectories: true)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        try AtomicReplaceFileWriter().write(try encoder.encode(timeline), to: runDirectory.appendingPathComponent("source-energy.json"))
+    }
+
     public static let workingSampleRate: Double = 16_000
 
     public let prober: MediaProber

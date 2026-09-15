@@ -14,6 +14,7 @@ Commands:
              canceller and mixdown over it, and write the cleaned microphone and
              the decoded final mix for Tools/AudioMetrics to score.
   session    Reconstruct a real recorder session directory and report its plan.
+  source-energy  Write a 100 ms source-energy timeline (--session DIRECTORY --json FILE).
 
 Options for `fixtures`:
   --fixtures DIRECTORY   Root holding the fixture case directories
@@ -69,6 +70,16 @@ enum Harness {
     }
 
     do {
+        if command == "source-energy" {
+            guard let session = option("--session"), let output = option("--json") else { fail("source-energy requires --session and --json") }
+            guard let timeline = try SourceEnergyPreparation.timeline(sessionDirectory: URL(fileURLWithPath: session)) else {
+                fail("Session does not retain both journaled tracks")
+            }
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys]
+            try encoder.encode(timeline).write(to: URL(fileURLWithPath: output), options: .atomic)
+            return
+        }
         switch command {
         case "fixtures":
             let root = URL(fileURLWithPath: option("--fixtures") ?? "Tests/Fixtures/Generated", isDirectory: true)

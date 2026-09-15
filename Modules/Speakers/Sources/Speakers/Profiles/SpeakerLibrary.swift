@@ -6,6 +6,7 @@ import Foundation
 /// same person IDs (`SpeakerPersonRef.profileID`) without importing SQLite
 /// details or voice embeddings.
 public protocol SpeakerLibrary: Sendable {
+    func owner() async throws -> SpeakerPersonRef?
     func revision() async throws -> SpeakerLibraryRevision
     func snapshot() async throws -> SpeakerLibrarySnapshot
     func people() async throws -> [SpeakerPersonRef]
@@ -13,4 +14,9 @@ public protocol SpeakerLibrary: Sendable {
     func profile(id: UUID) async throws -> SpeakerProfile?
     func profiles() async throws -> [SpeakerProfile]
     func matchingEligibleProfiles() async throws -> [SpeakerProfile]
+}
+
+public extension SpeakerLibrary {
+    /// Libraries predating explicit owner selection have no owner.
+    func owner() async throws -> SpeakerPersonRef? { nil }
 }

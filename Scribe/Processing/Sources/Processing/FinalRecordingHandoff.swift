@@ -95,6 +95,7 @@ public struct FinalRecordingHandoff: Sendable {
     public static let supportedSchemaVersions: Set<Int> = [RecorderSessionManifest.currentSchemaVersion]
 
     private let modelProfileID: String
+    private let microphoneSpeakerPrior: Bool
     private let speakerCount: TranscriptionSpeakerCount
     private let supportedSchemaVersions: Set<Int>
     private let exportDirectory: URL?
@@ -103,6 +104,7 @@ public struct FinalRecordingHandoff: Sendable {
     public init(
         modelProfileID: String = FinalRecordingHandoff.defaultModelProfileID,
         speakerCount: TranscriptionSpeakerCount = .automatic,
+        microphoneSpeakerPrior: Bool = false,
         supportedSchemaVersions: Set<Int> = FinalRecordingHandoff.supportedSchemaVersions,
         exportDirectory: URL? = nil,
         // Injected so a test can force a mismatch, and so the hash that verifies
@@ -111,6 +113,7 @@ public struct FinalRecordingHandoff: Sendable {
     ) {
         self.modelProfileID = modelProfileID
         self.speakerCount = speakerCount
+        self.microphoneSpeakerPrior = microphoneSpeakerPrior
         self.supportedSchemaVersions = supportedSchemaVersions
         self.exportDirectory = exportDirectory
         self.checksumOfFile = checksumOfFile
@@ -157,6 +160,8 @@ public struct FinalRecordingHandoff: Sendable {
         return TranscriptionRequest(
             sourceURL: finalURL,
             speakerCount: speakerCount,
+            microphoneSpeakerPrior: microphoneSpeakerPrior,
+            recorderSessionDirectory: sessionDirectory,
             modelProfileID: modelProfileID,
             exportDirectory: exportDirectory,
             provenance: TranscriptionProvenance(producerID: Self.producerID, sessionID: manifest.sessionID),

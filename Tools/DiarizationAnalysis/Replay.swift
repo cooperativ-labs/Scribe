@@ -41,20 +41,25 @@ struct Replay {
                 qualityScore: (t["qualityScore"] as? NSNumber)?.doubleValue ?? 1)
         }
         let result = try SpeakerTurnBuilder().build(words: words, diarizedTurns: turns)
+        let intervals = (document["intervals"] as! [[String: Any]]).map { t in
+            AcousticSpeakerInterval(speakerID: t["speakerID"] as! String,
+                startMs: Int(((t["startSeconds"] as! Double) * 1000).rounded()),
+                endMs: Int(((t["endSeconds"] as! Double) * 1000).rounded()),
+                overlapsAnotherSpeaker: t["overlapsAnotherSpeaker"] as? Bool ?? false,
+                qualityScore: (t["qualityScore"] as? NSNumber)?.doubleValue)
+        }
+        let energy = args.count > 4 ? try JSONDecoder().decode(SourceEnergyTimeline.self, from: Data(contentsOf: URL(fileURLWithPath: args[4]))) : nil
+        let minimumAgreement = args.count > 5 ? Double(args[5])! : 0.95
+        precondition((0...1).contains(minimumAgreement))
+        let prior = energy.flatMap { SourceEnergyPrior(timeline: $0, intervals: intervals, minimumAgreement: minimumAgreement) }
         let reconciled = UnknownFragmentReconciler().reconcile(
-            segments: result.segments, speakers: result.speakers,
-            intervals: (document["intervals"] as! [[String: Any]]).map { t in
-                AcousticSpeakerInterval(speakerID: t["speakerID"] as! String,
-                    startMs: Int(((t["startSeconds"] as! Double) * 1000).rounded()),
-                    endMs: Int(((t["endSeconds"] as! Double) * 1000).rounded()),
-                    overlapsAnotherSpeaker: t["overlapsAnotherSpeaker"] as? Bool ?? false,
-                    qualityScore: (t["qualityScore"] as? NSNumber)?.doubleValue)
-            })
+            segments: result.segments, speakers: result.speakers, intervals: intervals, sourceEnergyPrior: prior
+        ).map { prior?.confidenceAdjusted($0) ?? $0 }
         let effectiveBySegment = Dictionary(uniqueKeysWithValues: reconciled.map { ($0.id, $0.effectiveSpeakerID) })
         let paragraphs = TranscriptParagraphGrouper().paragraphs(from: reconciled)
         let encoder = JSONEncoder()
         let segments = try JSONSerialization.jsonObject(with: encoder.encode(result.segments))
-        let output: [String: Any] = ["words": words.map { w -> [String: Any] in
+        var output: [String: Any] = ["words": words.map { w -> [String: Any] in
             ["id": w.id, "text": w.text, "startMs": w.startMs as Any? ?? NSNull(),
              "endMs": w.endMs as Any? ?? NSNull(), "enclosingStartMs": w.enclosingStartMs,
              "enclosingEndMs": w.enclosingEndMs]
@@ -65,6 +70,11 @@ struct Replay {
                 ["word_count": $0.words?.count ?? $0.text.split(whereSeparator: \.isWhitespace).count,
                  "source_segment_count": $0.sourceSegmentCount]
             } ]
+        if let prior {
+            output["source_energy_prior"] = ["speaker_id": prior.selection.speakerID,
+                "agreement": prior.selection.agreement, "microphone_coverage": prior.selection.microphoneCoverage,
+                "evidence_ms": prior.selection.evidenceMs]
+        }
         FileHandle.standardOutput.write(try JSONSerialization.data(withJSONObject: output, options: [.sortedKeys]))
     }
 }

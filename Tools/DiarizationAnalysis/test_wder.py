@@ -71,12 +71,22 @@ class WDERContracts(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             executable = Path(temporary) / "host"
             executable.write_bytes(b"test executable")
-            args = SimpleNamespace(host_replay=executable, run=Path("run"), transcript="saved", diarization=Path("diarization.json"))
+            args = SimpleNamespace(host_replay=executable, run=Path("run"), transcript="saved", diarization=Path("diarization.json"), source_energy=None)
             with patch("wder.subprocess.check_output", return_value=json.dumps(self.replay(["a"] * 3)).encode()) as run:
                 result, digest = replay_run(args)
             self.assertEqual(run.call_args.args[0][2], "--saved-words")
             self.assertEqual(result["labels"], ["a"] * 3)
             self.assertEqual(len(digest), 64)
+
+    def test_source_energy_is_forwarded_to_reused_host(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            executable = Path(temporary) / "host"
+            executable.write_bytes(b"test executable")
+            args = SimpleNamespace(host_replay=executable, run=Path("run"), transcript="saved",
+                                   diarization=Path("diarization.json"), source_energy=Path("energy.json"), source_minimum_agreement=0.9)
+            with patch("wder.subprocess.check_output", return_value=b'{"labels": []}') as run:
+                replay_run(args)
+            self.assertEqual(run.call_args.args[0][-2:], ["energy.json", "0.9"])
 
     def test_engine_runtime_revision_is_recorded(self):
         self.assertEqual(engine_revision({"engine": {"runtimeRevision": "engine-pin"}}), "engine-pin")

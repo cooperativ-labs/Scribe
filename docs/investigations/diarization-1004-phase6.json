@@ -1,0 +1,917 @@
+{
+  "energy_generator_sha256": "82577431fb71e169fc00c8b6fde088dcf5b5eaa573173b16a7660dd5aadf66a8",
+  "limitations": [
+    "Only 19 and 17 manually labelled words have ground truth; whole-meeting attribution and local-user identity accuracy are not established.",
+    "Source agreement is a heuristic based on track activity; both-loud and missing-capture windows abstain.",
+    "Original saved ASR/diarization artifacts are held fixed; no worker model inference was rerun."
+  ],
+  "production_minimum_agreement_exclusive": 0.95,
+  "recordings": {
+    "ak": {
+      "both_loud_windows": 17429,
+      "both_tracks_present_windows": 42304,
+      "duration_ms": 4230580,
+      "energy_window_count": 42306,
+      "run_id": "837AEE5B-B010-45BE-8A5A-2FB04549D515",
+      "scores": {
+        "before": {
+          "agreement": {
+            "correct_pct": 47.368,
+            "correct_words": 9,
+            "optimal_one_to_one_mapping": {
+              "hypothesis_1": "reference_2"
+            },
+            "per_speaker_confusion": {
+              "hypothesis_1": {
+                "reference_1": 5,
+                "reference_2": 9
+              }
+            },
+            "scored_words": 19,
+            "unknown_pct": 26.316,
+            "unknown_words": 5,
+            "wder_pct": 52.632,
+            "wrong_pct": 26.316,
+            "wrong_words": 5
+          },
+          "alignment": {
+            "matched_reference_segments": 5,
+            "method": "time",
+            "reference_segment_coverage_pct": 100.0,
+            "reference_segments": 5,
+            "replay_word_coverage_pct": 0.14,
+            "replay_words": 13565,
+            "scored_words": 19
+          },
+          "attribution_view": "effective",
+          "display_asides": {
+            "aside_count": 0,
+            "source_segment_count": 0,
+            "word_count": 0
+          },
+          "display_paragraphs": {
+            "paragraph_count": 518,
+            "single_word_paragraph_count": 92
+          },
+          "ground_truth": {
+            "canonical_sha256": "8d6da0247d208b813ccc2c306700729c9838c4970587a0bfc69686060b4e601d",
+            "manual_segments": 5,
+            "source": "manual_canonical_segments"
+          },
+          "paragraphs": {
+            "paragraph_count": 1170,
+            "single_word_paragraph_count": 548
+          },
+          "provenance": {
+            "diarization_sha256": "b85ee72b4fd25e284010b7db4675eed5aad585e7ef9602f99934fe6d6c7a4d28",
+            "engine_revision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b",
+            "executable_sha256": "b39e754d700c073243dcf2a0687e71377367aac4fb90fd18e41f79ce2b0275e5",
+            "run_revision": 14
+          },
+          "schema_version": 1,
+          "source_energy_prior": null,
+          "source_energy_sha256": null,
+          "source_minimum_agreement": null,
+          "transcript_free": true
+        },
+        "canonical-false": {
+          "agreement": {
+            "correct_pct": 47.368,
+            "correct_words": 9,
+            "optimal_one_to_one_mapping": {
+              "hypothesis_1": "reference_2"
+            },
+            "per_speaker_confusion": {
+              "hypothesis_1": {
+                "reference_1": 5,
+                "reference_2": 9
+              }
+            },
+            "scored_words": 19,
+            "unknown_pct": 26.316,
+            "unknown_words": 5,
+            "wder_pct": 52.632,
+            "wrong_pct": 26.316,
+            "wrong_words": 5
+          },
+          "alignment": {
+            "matched_reference_segments": 5,
+            "method": "time",
+            "reference_segment_coverage_pct": 100.0,
+            "reference_segments": 5,
+            "replay_word_coverage_pct": 0.14,
+            "replay_words": 13565,
+            "scored_words": 19
+          },
+          "attribution_view": "canonical",
+          "display_asides": {
+            "aside_count": 0,
+            "source_segment_count": 0,
+            "word_count": 0
+          },
+          "display_paragraphs": {
+            "paragraph_count": 518,
+            "single_word_paragraph_count": 92
+          },
+          "ground_truth": {
+            "canonical_sha256": "8d6da0247d208b813ccc2c306700729c9838c4970587a0bfc69686060b4e601d",
+            "manual_segments": 5,
+            "source": "manual_canonical_segments"
+          },
+          "paragraphs": {
+            "paragraph_count": 1170,
+            "single_word_paragraph_count": 548
+          },
+          "provenance": {
+            "diarization_sha256": "b85ee72b4fd25e284010b7db4675eed5aad585e7ef9602f99934fe6d6c7a4d28",
+            "engine_revision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b",
+            "executable_sha256": "b39e754d700c073243dcf2a0687e71377367aac4fb90fd18e41f79ce2b0275e5",
+            "run_revision": 14
+          },
+          "schema_version": 1,
+          "source_energy_prior": null,
+          "source_energy_sha256": null,
+          "source_minimum_agreement": null,
+          "transcript_free": true
+        },
+        "canonical-true": {
+          "agreement": {
+            "correct_pct": 47.368,
+            "correct_words": 9,
+            "optimal_one_to_one_mapping": {
+              "hypothesis_1": "reference_2"
+            },
+            "per_speaker_confusion": {
+              "hypothesis_1": {
+                "reference_1": 5,
+                "reference_2": 9
+              }
+            },
+            "scored_words": 19,
+            "unknown_pct": 26.316,
+            "unknown_words": 5,
+            "wder_pct": 52.632,
+            "wrong_pct": 26.316,
+            "wrong_words": 5
+          },
+          "alignment": {
+            "matched_reference_segments": 5,
+            "method": "time",
+            "reference_segment_coverage_pct": 100.0,
+            "reference_segments": 5,
+            "replay_word_coverage_pct": 0.14,
+            "replay_words": 13565,
+            "scored_words": 19
+          },
+          "attribution_view": "canonical",
+          "display_asides": {
+            "aside_count": 0,
+            "source_segment_count": 0,
+            "word_count": 0
+          },
+          "display_paragraphs": {
+            "paragraph_count": 514,
+            "single_word_paragraph_count": 90
+          },
+          "ground_truth": {
+            "canonical_sha256": "8d6da0247d208b813ccc2c306700729c9838c4970587a0bfc69686060b4e601d",
+            "manual_segments": 5,
+            "source": "manual_canonical_segments"
+          },
+          "paragraphs": {
+            "paragraph_count": 1170,
+            "single_word_paragraph_count": 548
+          },
+          "provenance": {
+            "diarization_sha256": "b85ee72b4fd25e284010b7db4675eed5aad585e7ef9602f99934fe6d6c7a4d28",
+            "engine_revision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b",
+            "executable_sha256": "b39e754d700c073243dcf2a0687e71377367aac4fb90fd18e41f79ce2b0275e5",
+            "run_revision": 14
+          },
+          "schema_version": 1,
+          "source_energy_prior": {
+            "agreement": 0.9968573255941211,
+            "evidence_ms": 992837,
+            "microphone_coverage": 0.8971148459383753,
+            "speaker_id": "speaker_2"
+          },
+          "source_energy_sha256": "56400baa2b5b3d6b7f6a93818a4d9ca945f832ee81f81511e6ce14b60ecebf49",
+          "source_minimum_agreement": 0.95,
+          "transcript_free": true
+        },
+        "threshold-0.85": {
+          "agreement": {
+            "correct_pct": 47.368,
+            "correct_words": 9,
+            "optimal_one_to_one_mapping": {
+              "hypothesis_1": "reference_2"
+            },
+            "per_speaker_confusion": {
+              "hypothesis_1": {
+                "reference_1": 5,
+                "reference_2": 9
+              }
+            },
+            "scored_words": 19,
+            "unknown_pct": 26.316,
+            "unknown_words": 5,
+            "wder_pct": 52.632,
+            "wrong_pct": 26.316,
+            "wrong_words": 5
+          },
+          "alignment": {
+            "matched_reference_segments": 5,
+            "method": "time",
+            "reference_segment_coverage_pct": 100.0,
+            "reference_segments": 5,
+            "replay_word_coverage_pct": 0.14,
+            "replay_words": 13565,
+            "scored_words": 19
+          },
+          "attribution_view": "effective",
+          "display_asides": {
+            "aside_count": 0,
+            "source_segment_count": 0,
+            "word_count": 0
+          },
+          "display_paragraphs": {
+            "paragraph_count": 514,
+            "single_word_paragraph_count": 90
+          },
+          "ground_truth": {
+            "canonical_sha256": "8d6da0247d208b813ccc2c306700729c9838c4970587a0bfc69686060b4e601d",
+            "manual_segments": 5,
+            "source": "manual_canonical_segments"
+          },
+          "paragraphs": {
+            "paragraph_count": 1170,
+            "single_word_paragraph_count": 548
+          },
+          "provenance": {
+            "diarization_sha256": "b85ee72b4fd25e284010b7db4675eed5aad585e7ef9602f99934fe6d6c7a4d28",
+            "engine_revision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b",
+            "executable_sha256": "b39e754d700c073243dcf2a0687e71377367aac4fb90fd18e41f79ce2b0275e5",
+            "run_revision": 14
+          },
+          "schema_version": 1,
+          "source_energy_prior": {
+            "agreement": 0.9968573255941211,
+            "evidence_ms": 992837,
+            "microphone_coverage": 0.8971148459383753,
+            "speaker_id": "speaker_2"
+          },
+          "source_energy_sha256": "56400baa2b5b3d6b7f6a93818a4d9ca945f832ee81f81511e6ce14b60ecebf49",
+          "source_minimum_agreement": 0.85,
+          "transcript_free": true
+        },
+        "threshold-0.9": {
+          "agreement": {
+            "correct_pct": 47.368,
+            "correct_words": 9,
+            "optimal_one_to_one_mapping": {
+              "hypothesis_1": "reference_2"
+            },
+            "per_speaker_confusion": {
+              "hypothesis_1": {
+                "reference_1": 5,
+                "reference_2": 9
+              }
+            },
+            "scored_words": 19,
+            "unknown_pct": 26.316,
+            "unknown_words": 5,
+            "wder_pct": 52.632,
+            "wrong_pct": 26.316,
+            "wrong_words": 5
+          },
+          "alignment": {
+            "matched_reference_segments": 5,
+            "method": "time",
+            "reference_segment_coverage_pct": 100.0,
+            "reference_segments": 5,
+            "replay_word_coverage_pct": 0.14,
+            "replay_words": 13565,
+            "scored_words": 19
+          },
+          "attribution_view": "effective",
+          "display_asides": {
+            "aside_count": 0,
+            "source_segment_count": 0,
+            "word_count": 0
+          },
+          "display_paragraphs": {
+            "paragraph_count": 514,
+            "single_word_paragraph_count": 90
+          },
+          "ground_truth": {
+            "canonical_sha256": "8d6da0247d208b813ccc2c306700729c9838c4970587a0bfc69686060b4e601d",
+            "manual_segments": 5,
+            "source": "manual_canonical_segments"
+          },
+          "paragraphs": {
+            "paragraph_count": 1170,
+            "single_word_paragraph_count": 548
+          },
+          "provenance": {
+            "diarization_sha256": "b85ee72b4fd25e284010b7db4675eed5aad585e7ef9602f99934fe6d6c7a4d28",
+            "engine_revision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b",
+            "executable_sha256": "b39e754d700c073243dcf2a0687e71377367aac4fb90fd18e41f79ce2b0275e5",
+            "run_revision": 14
+          },
+          "schema_version": 1,
+          "source_energy_prior": {
+            "agreement": 0.9968573255941211,
+            "evidence_ms": 992837,
+            "microphone_coverage": 0.8971148459383753,
+            "speaker_id": "speaker_2"
+          },
+          "source_energy_sha256": "56400baa2b5b3d6b7f6a93818a4d9ca945f832ee81f81511e6ce14b60ecebf49",
+          "source_minimum_agreement": 0.9,
+          "transcript_free": true
+        },
+        "threshold-0.95": {
+          "agreement": {
+            "correct_pct": 47.368,
+            "correct_words": 9,
+            "optimal_one_to_one_mapping": {
+              "hypothesis_1": "reference_2"
+            },
+            "per_speaker_confusion": {
+              "hypothesis_1": {
+                "reference_1": 5,
+                "reference_2": 9
+              }
+            },
+            "scored_words": 19,
+            "unknown_pct": 26.316,
+            "unknown_words": 5,
+            "wder_pct": 52.632,
+            "wrong_pct": 26.316,
+            "wrong_words": 5
+          },
+          "alignment": {
+            "matched_reference_segments": 5,
+            "method": "time",
+            "reference_segment_coverage_pct": 100.0,
+            "reference_segments": 5,
+            "replay_word_coverage_pct": 0.14,
+            "replay_words": 13565,
+            "scored_words": 19
+          },
+          "attribution_view": "effective",
+          "display_asides": {
+            "aside_count": 0,
+            "source_segment_count": 0,
+            "word_count": 0
+          },
+          "display_paragraphs": {
+            "paragraph_count": 514,
+            "single_word_paragraph_count": 90
+          },
+          "ground_truth": {
+            "canonical_sha256": "8d6da0247d208b813ccc2c306700729c9838c4970587a0bfc69686060b4e601d",
+            "manual_segments": 5,
+            "source": "manual_canonical_segments"
+          },
+          "paragraphs": {
+            "paragraph_count": 1170,
+            "single_word_paragraph_count": 548
+          },
+          "provenance": {
+            "diarization_sha256": "b85ee72b4fd25e284010b7db4675eed5aad585e7ef9602f99934fe6d6c7a4d28",
+            "engine_revision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b",
+            "executable_sha256": "b39e754d700c073243dcf2a0687e71377367aac4fb90fd18e41f79ce2b0275e5",
+            "run_revision": 14
+          },
+          "schema_version": 1,
+          "source_energy_prior": {
+            "agreement": 0.9968573255941211,
+            "evidence_ms": 992837,
+            "microphone_coverage": 0.8971148459383753,
+            "speaker_id": "speaker_2"
+          },
+          "source_energy_sha256": "56400baa2b5b3d6b7f6a93818a4d9ca945f832ee81f81511e6ce14b60ecebf49",
+          "source_minimum_agreement": 0.95,
+          "transcript_free": true
+        },
+        "threshold-0.999": {
+          "agreement": {
+            "correct_pct": 47.368,
+            "correct_words": 9,
+            "optimal_one_to_one_mapping": {
+              "hypothesis_1": "reference_2"
+            },
+            "per_speaker_confusion": {
+              "hypothesis_1": {
+                "reference_1": 5,
+                "reference_2": 9
+              }
+            },
+            "scored_words": 19,
+            "unknown_pct": 26.316,
+            "unknown_words": 5,
+            "wder_pct": 52.632,
+            "wrong_pct": 26.316,
+            "wrong_words": 5
+          },
+          "alignment": {
+            "matched_reference_segments": 5,
+            "method": "time",
+            "reference_segment_coverage_pct": 100.0,
+            "reference_segments": 5,
+            "replay_word_coverage_pct": 0.14,
+            "replay_words": 13565,
+            "scored_words": 19
+          },
+          "attribution_view": "effective",
+          "display_asides": {
+            "aside_count": 0,
+            "source_segment_count": 0,
+            "word_count": 0
+          },
+          "display_paragraphs": {
+            "paragraph_count": 518,
+            "single_word_paragraph_count": 92
+          },
+          "ground_truth": {
+            "canonical_sha256": "8d6da0247d208b813ccc2c306700729c9838c4970587a0bfc69686060b4e601d",
+            "manual_segments": 5,
+            "source": "manual_canonical_segments"
+          },
+          "paragraphs": {
+            "paragraph_count": 1170,
+            "single_word_paragraph_count": 548
+          },
+          "provenance": {
+            "diarization_sha256": "b85ee72b4fd25e284010b7db4675eed5aad585e7ef9602f99934fe6d6c7a4d28",
+            "engine_revision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b",
+            "executable_sha256": "b39e754d700c073243dcf2a0687e71377367aac4fb90fd18e41f79ce2b0275e5",
+            "run_revision": 14
+          },
+          "schema_version": 1,
+          "source_energy_prior": null,
+          "source_energy_sha256": "56400baa2b5b3d6b7f6a93818a4d9ca945f832ee81f81511e6ce14b60ecebf49",
+          "source_minimum_agreement": 0.999,
+          "transcript_free": true
+        }
+      }
+    },
+    "connor": {
+      "both_loud_windows": 8371,
+      "both_tracks_present_windows": 22806,
+      "duration_ms": 2280762,
+      "energy_window_count": 22808,
+      "run_id": "013BED54-9350-4CEE-B2D0-FAF49752F5B7",
+      "scores": {
+        "before": {
+          "agreement": {
+            "correct_pct": 23.529,
+            "correct_words": 4,
+            "optimal_one_to_one_mapping": {
+              "hypothesis_1": "reference_1",
+              "hypothesis_2": "reference_2"
+            },
+            "per_speaker_confusion": {
+              "hypothesis_1": {
+                "reference_1": 2
+              },
+              "hypothesis_2": {
+                "reference_2": 2
+              }
+            },
+            "scored_words": 17,
+            "unknown_pct": 76.471,
+            "unknown_words": 13,
+            "wder_pct": 76.471,
+            "wrong_pct": 0.0,
+            "wrong_words": 0
+          },
+          "alignment": {
+            "matched_reference_segments": 9,
+            "method": "time",
+            "reference_segment_coverage_pct": 100.0,
+            "reference_segments": 9,
+            "replay_word_coverage_pct": 0.266,
+            "replay_words": 6394,
+            "scored_words": 17
+          },
+          "attribution_view": "effective",
+          "display_asides": {
+            "aside_count": 0,
+            "source_segment_count": 0,
+            "word_count": 0
+          },
+          "display_paragraphs": {
+            "paragraph_count": 227,
+            "single_word_paragraph_count": 52
+          },
+          "ground_truth": {
+            "canonical_sha256": "6434c6843b588a0edb3e367968cc6c2ddef2d23f84743ef075fac4d07d40ff58",
+            "manual_segments": 9,
+            "source": "manual_canonical_segments"
+          },
+          "paragraphs": {
+            "paragraph_count": 665,
+            "single_word_paragraph_count": 319
+          },
+          "provenance": {
+            "diarization_sha256": "ff503e09d277438218665bb2764dd236303e0af05ff5092e85742c173c78cb36",
+            "engine_revision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b",
+            "executable_sha256": "b39e754d700c073243dcf2a0687e71377367aac4fb90fd18e41f79ce2b0275e5",
+            "run_revision": 12
+          },
+          "schema_version": 1,
+          "source_energy_prior": null,
+          "source_energy_sha256": null,
+          "source_minimum_agreement": null,
+          "transcript_free": true
+        },
+        "canonical-false": {
+          "agreement": {
+            "correct_pct": 0.0,
+            "correct_words": 0,
+            "optimal_one_to_one_mapping": {},
+            "per_speaker_confusion": {},
+            "scored_words": 17,
+            "unknown_pct": 100.0,
+            "unknown_words": 17,
+            "wder_pct": 100.0,
+            "wrong_pct": 0.0,
+            "wrong_words": 0
+          },
+          "alignment": {
+            "matched_reference_segments": 9,
+            "method": "time",
+            "reference_segment_coverage_pct": 100.0,
+            "reference_segments": 9,
+            "replay_word_coverage_pct": 0.266,
+            "replay_words": 6394,
+            "scored_words": 17
+          },
+          "attribution_view": "canonical",
+          "display_asides": {
+            "aside_count": 0,
+            "source_segment_count": 0,
+            "word_count": 0
+          },
+          "display_paragraphs": {
+            "paragraph_count": 227,
+            "single_word_paragraph_count": 52
+          },
+          "ground_truth": {
+            "canonical_sha256": "6434c6843b588a0edb3e367968cc6c2ddef2d23f84743ef075fac4d07d40ff58",
+            "manual_segments": 9,
+            "source": "manual_canonical_segments"
+          },
+          "paragraphs": {
+            "paragraph_count": 665,
+            "single_word_paragraph_count": 319
+          },
+          "provenance": {
+            "diarization_sha256": "ff503e09d277438218665bb2764dd236303e0af05ff5092e85742c173c78cb36",
+            "engine_revision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b",
+            "executable_sha256": "b39e754d700c073243dcf2a0687e71377367aac4fb90fd18e41f79ce2b0275e5",
+            "run_revision": 12
+          },
+          "schema_version": 1,
+          "source_energy_prior": null,
+          "source_energy_sha256": null,
+          "source_minimum_agreement": null,
+          "transcript_free": true
+        },
+        "canonical-true": {
+          "agreement": {
+            "correct_pct": 0.0,
+            "correct_words": 0,
+            "optimal_one_to_one_mapping": {},
+            "per_speaker_confusion": {},
+            "scored_words": 17,
+            "unknown_pct": 100.0,
+            "unknown_words": 17,
+            "wder_pct": 100.0,
+            "wrong_pct": 0.0,
+            "wrong_words": 0
+          },
+          "alignment": {
+            "matched_reference_segments": 9,
+            "method": "time",
+            "reference_segment_coverage_pct": 100.0,
+            "reference_segments": 9,
+            "replay_word_coverage_pct": 0.266,
+            "replay_words": 6394,
+            "scored_words": 17
+          },
+          "attribution_view": "canonical",
+          "display_asides": {
+            "aside_count": 0,
+            "source_segment_count": 0,
+            "word_count": 0
+          },
+          "display_paragraphs": {
+            "paragraph_count": 224,
+            "single_word_paragraph_count": 50
+          },
+          "ground_truth": {
+            "canonical_sha256": "6434c6843b588a0edb3e367968cc6c2ddef2d23f84743ef075fac4d07d40ff58",
+            "manual_segments": 9,
+            "source": "manual_canonical_segments"
+          },
+          "paragraphs": {
+            "paragraph_count": 665,
+            "single_word_paragraph_count": 319
+          },
+          "provenance": {
+            "diarization_sha256": "ff503e09d277438218665bb2764dd236303e0af05ff5092e85742c173c78cb36",
+            "engine_revision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b",
+            "executable_sha256": "b39e754d700c073243dcf2a0687e71377367aac4fb90fd18e41f79ce2b0275e5",
+            "run_revision": 12
+          },
+          "schema_version": 1,
+          "source_energy_prior": {
+            "agreement": 0.9995367626878952,
+            "evidence_ms": 571796,
+            "microphone_coverage": 0.9264355152300713,
+            "speaker_id": "speaker_2"
+          },
+          "source_energy_sha256": "bc771b55b8b7d46990a594b95a2e047742748e045ec3e2d66e9069866bfd410a",
+          "source_minimum_agreement": 0.95,
+          "transcript_free": true
+        },
+        "threshold-0.85": {
+          "agreement": {
+            "correct_pct": 23.529,
+            "correct_words": 4,
+            "optimal_one_to_one_mapping": {
+              "hypothesis_1": "reference_1",
+              "hypothesis_2": "reference_2"
+            },
+            "per_speaker_confusion": {
+              "hypothesis_1": {
+                "reference_1": 2
+              },
+              "hypothesis_2": {
+                "reference_2": 2
+              }
+            },
+            "scored_words": 17,
+            "unknown_pct": 76.471,
+            "unknown_words": 13,
+            "wder_pct": 76.471,
+            "wrong_pct": 0.0,
+            "wrong_words": 0
+          },
+          "alignment": {
+            "matched_reference_segments": 9,
+            "method": "time",
+            "reference_segment_coverage_pct": 100.0,
+            "reference_segments": 9,
+            "replay_word_coverage_pct": 0.266,
+            "replay_words": 6394,
+            "scored_words": 17
+          },
+          "attribution_view": "effective",
+          "display_asides": {
+            "aside_count": 0,
+            "source_segment_count": 0,
+            "word_count": 0
+          },
+          "display_paragraphs": {
+            "paragraph_count": 224,
+            "single_word_paragraph_count": 50
+          },
+          "ground_truth": {
+            "canonical_sha256": "6434c6843b588a0edb3e367968cc6c2ddef2d23f84743ef075fac4d07d40ff58",
+            "manual_segments": 9,
+            "source": "manual_canonical_segments"
+          },
+          "paragraphs": {
+            "paragraph_count": 665,
+            "single_word_paragraph_count": 319
+          },
+          "provenance": {
+            "diarization_sha256": "ff503e09d277438218665bb2764dd236303e0af05ff5092e85742c173c78cb36",
+            "engine_revision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b",
+            "executable_sha256": "b39e754d700c073243dcf2a0687e71377367aac4fb90fd18e41f79ce2b0275e5",
+            "run_revision": 12
+          },
+          "schema_version": 1,
+          "source_energy_prior": {
+            "agreement": 0.9995367626878952,
+            "evidence_ms": 571796,
+            "microphone_coverage": 0.9264355152300713,
+            "speaker_id": "speaker_2"
+          },
+          "source_energy_sha256": "bc771b55b8b7d46990a594b95a2e047742748e045ec3e2d66e9069866bfd410a",
+          "source_minimum_agreement": 0.85,
+          "transcript_free": true
+        },
+        "threshold-0.9": {
+          "agreement": {
+            "correct_pct": 23.529,
+            "correct_words": 4,
+            "optimal_one_to_one_mapping": {
+              "hypothesis_1": "reference_1",
+              "hypothesis_2": "reference_2"
+            },
+            "per_speaker_confusion": {
+              "hypothesis_1": {
+                "reference_1": 2
+              },
+              "hypothesis_2": {
+                "reference_2": 2
+              }
+            },
+            "scored_words": 17,
+            "unknown_pct": 76.471,
+            "unknown_words": 13,
+            "wder_pct": 76.471,
+            "wrong_pct": 0.0,
+            "wrong_words": 0
+          },
+          "alignment": {
+            "matched_reference_segments": 9,
+            "method": "time",
+            "reference_segment_coverage_pct": 100.0,
+            "reference_segments": 9,
+            "replay_word_coverage_pct": 0.266,
+            "replay_words": 6394,
+            "scored_words": 17
+          },
+          "attribution_view": "effective",
+          "display_asides": {
+            "aside_count": 0,
+            "source_segment_count": 0,
+            "word_count": 0
+          },
+          "display_paragraphs": {
+            "paragraph_count": 224,
+            "single_word_paragraph_count": 50
+          },
+          "ground_truth": {
+            "canonical_sha256": "6434c6843b588a0edb3e367968cc6c2ddef2d23f84743ef075fac4d07d40ff58",
+            "manual_segments": 9,
+            "source": "manual_canonical_segments"
+          },
+          "paragraphs": {
+            "paragraph_count": 665,
+            "single_word_paragraph_count": 319
+          },
+          "provenance": {
+            "diarization_sha256": "ff503e09d277438218665bb2764dd236303e0af05ff5092e85742c173c78cb36",
+            "engine_revision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b",
+            "executable_sha256": "b39e754d700c073243dcf2a0687e71377367aac4fb90fd18e41f79ce2b0275e5",
+            "run_revision": 12
+          },
+          "schema_version": 1,
+          "source_energy_prior": {
+            "agreement": 0.9995367626878952,
+            "evidence_ms": 571796,
+            "microphone_coverage": 0.9264355152300713,
+            "speaker_id": "speaker_2"
+          },
+          "source_energy_sha256": "bc771b55b8b7d46990a594b95a2e047742748e045ec3e2d66e9069866bfd410a",
+          "source_minimum_agreement": 0.9,
+          "transcript_free": true
+        },
+        "threshold-0.95": {
+          "agreement": {
+            "correct_pct": 23.529,
+            "correct_words": 4,
+            "optimal_one_to_one_mapping": {
+              "hypothesis_1": "reference_1",
+              "hypothesis_2": "reference_2"
+            },
+            "per_speaker_confusion": {
+              "hypothesis_1": {
+                "reference_1": 2
+              },
+              "hypothesis_2": {
+                "reference_2": 2
+              }
+            },
+            "scored_words": 17,
+            "unknown_pct": 76.471,
+            "unknown_words": 13,
+            "wder_pct": 76.471,
+            "wrong_pct": 0.0,
+            "wrong_words": 0
+          },
+          "alignment": {
+            "matched_reference_segments": 9,
+            "method": "time",
+            "reference_segment_coverage_pct": 100.0,
+            "reference_segments": 9,
+            "replay_word_coverage_pct": 0.266,
+            "replay_words": 6394,
+            "scored_words": 17
+          },
+          "attribution_view": "effective",
+          "display_asides": {
+            "aside_count": 0,
+            "source_segment_count": 0,
+            "word_count": 0
+          },
+          "display_paragraphs": {
+            "paragraph_count": 224,
+            "single_word_paragraph_count": 50
+          },
+          "ground_truth": {
+            "canonical_sha256": "6434c6843b588a0edb3e367968cc6c2ddef2d23f84743ef075fac4d07d40ff58",
+            "manual_segments": 9,
+            "source": "manual_canonical_segments"
+          },
+          "paragraphs": {
+            "paragraph_count": 665,
+            "single_word_paragraph_count": 319
+          },
+          "provenance": {
+            "diarization_sha256": "ff503e09d277438218665bb2764dd236303e0af05ff5092e85742c173c78cb36",
+            "engine_revision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b",
+            "executable_sha256": "b39e754d700c073243dcf2a0687e71377367aac4fb90fd18e41f79ce2b0275e5",
+            "run_revision": 12
+          },
+          "schema_version": 1,
+          "source_energy_prior": {
+            "agreement": 0.9995367626878952,
+            "evidence_ms": 571796,
+            "microphone_coverage": 0.9264355152300713,
+            "speaker_id": "speaker_2"
+          },
+          "source_energy_sha256": "bc771b55b8b7d46990a594b95a2e047742748e045ec3e2d66e9069866bfd410a",
+          "source_minimum_agreement": 0.95,
+          "transcript_free": true
+        },
+        "threshold-0.999": {
+          "agreement": {
+            "correct_pct": 23.529,
+            "correct_words": 4,
+            "optimal_one_to_one_mapping": {
+              "hypothesis_1": "reference_1",
+              "hypothesis_2": "reference_2"
+            },
+            "per_speaker_confusion": {
+              "hypothesis_1": {
+                "reference_1": 2
+              },
+              "hypothesis_2": {
+                "reference_2": 2
+              }
+            },
+            "scored_words": 17,
+            "unknown_pct": 76.471,
+            "unknown_words": 13,
+            "wder_pct": 76.471,
+            "wrong_pct": 0.0,
+            "wrong_words": 0
+          },
+          "alignment": {
+            "matched_reference_segments": 9,
+            "method": "time",
+            "reference_segment_coverage_pct": 100.0,
+            "reference_segments": 9,
+            "replay_word_coverage_pct": 0.266,
+            "replay_words": 6394,
+            "scored_words": 17
+          },
+          "attribution_view": "effective",
+          "display_asides": {
+            "aside_count": 0,
+            "source_segment_count": 0,
+            "word_count": 0
+          },
+          "display_paragraphs": {
+            "paragraph_count": 224,
+            "single_word_paragraph_count": 50
+          },
+          "ground_truth": {
+            "canonical_sha256": "6434c6843b588a0edb3e367968cc6c2ddef2d23f84743ef075fac4d07d40ff58",
+            "manual_segments": 9,
+            "source": "manual_canonical_segments"
+          },
+          "paragraphs": {
+            "paragraph_count": 665,
+            "single_word_paragraph_count": 319
+          },
+          "provenance": {
+            "diarization_sha256": "ff503e09d277438218665bb2764dd236303e0af05ff5092e85742c173c78cb36",
+            "engine_revision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b",
+            "executable_sha256": "b39e754d700c073243dcf2a0687e71377367aac4fb90fd18e41f79ce2b0275e5",
+            "run_revision": 12
+          },
+          "schema_version": 1,
+          "source_energy_prior": {
+            "agreement": 0.9995367626878952,
+            "evidence_ms": 571796,
+            "microphone_coverage": 0.9264355152300713,
+            "speaker_id": "speaker_2"
+          },
+          "source_energy_sha256": "bc771b55b8b7d46990a594b95a2e047742748e045ec3e2d66e9069866bfd410a",
+          "source_minimum_agreement": 0.999,
+          "transcript_free": true
+        }
+      }
+    }
+  },
+  "schema_version": 1,
+  "transcript_free": true
+}

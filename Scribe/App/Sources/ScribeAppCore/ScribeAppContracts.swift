@@ -42,6 +42,9 @@ public struct TranscriptionRequest: Codable, Sendable, Equatable, Identifiable {
     public let expectedLanguage: String?
     public let speakerCount: TranscriptionSpeakerCount
     public let speakerMatching: TranscriptionSpeakerMatching
+    /// Missing in historical requests means disabled.
+    public let microphoneSpeakerPrior: Bool?
+    public let recorderSessionDirectory: URL?
     public let speakerLibraryRevision: String?
     /// The content hash of the custom vocabulary in force when the request was
     /// made. Part of the run's configuration, so editing a glossary makes a
@@ -65,6 +68,8 @@ public struct TranscriptionRequest: Codable, Sendable, Equatable, Identifiable {
         expectedLanguage: String? = nil,
         speakerCount: TranscriptionSpeakerCount = .automatic,
         speakerMatching: TranscriptionSpeakerMatching = .enabled,
+        microphoneSpeakerPrior: Bool = false,
+        recorderSessionDirectory: URL? = nil,
         speakerLibraryRevision: String? = nil,
         vocabularyRevision: String? = nil,
         modelProfileID: String,
@@ -78,6 +83,8 @@ public struct TranscriptionRequest: Codable, Sendable, Equatable, Identifiable {
         self.expectedLanguage = expectedLanguage
         self.speakerCount = speakerCount
         self.speakerMatching = speakerMatching
+        self.microphoneSpeakerPrior = microphoneSpeakerPrior ? true : nil
+        self.recorderSessionDirectory = recorderSessionDirectory
         self.speakerLibraryRevision = speakerLibraryRevision
         self.vocabularyRevision = vocabularyRevision
         self.modelProfileID = modelProfileID

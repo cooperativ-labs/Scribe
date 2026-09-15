@@ -275,11 +275,16 @@ public struct TranscriptAssemblyStageRunner: TranscriptionStageRunning {
             build = try turnBuilder.build(words: words, diarizedTurns: turns)
         }
         let acousticIntervals = diarization.acousticIntervals(sourceDurationMs: sourceDurationMs)
+        let energyURL = job.runDirectoryURL.appendingPathComponent("source-energy.json")
+        let energy = job.request.microphoneSpeakerPrior == true
+            ? (try? JSONDecoder().decode(SourceEnergyTimeline.self, from: Data(contentsOf: energyURL))) : nil
+        let sourcePrior = energy.flatMap { SourceEnergyPrior(timeline: $0, intervals: acousticIntervals) }
         let reconciledSegments = UnknownFragmentReconciler().reconcile(
             segments: build.segments,
             speakers: build.speakers,
-            intervals: acousticIntervals
-        )
+            intervals: acousticIntervals,
+            sourceEnergyPrior: sourcePrior
+        ).map { sourcePrior?.confidenceAdjusted($0) ?? $0 }
         for diagnostic in build.diagnostics {
             guard case let .untranscribedSpeech(startMs, endMs) = diagnostic else { continue }
             warnings.append(TranscriptWarning(
@@ -338,6 +343,22 @@ public struct TranscriptAssemblyStageRunner: TranscriptionStageRunning {
                 ]
             }()),
         ]
+        processingOptions["microphone_speaker_prior_enabled"] = .boolean(job.request.microphoneSpeakerPrior == true)
+        processingOptions["source_energy_prior_status"] = .string(job.request.microphoneSpeakerPrior != true ? "disabled"
+            : energy == nil ? "unavailable" : sourcePrior == nil ? "no_confident_cluster" : "selected")
+        if let sourcePrior {
+            processingOptions["source_energy_prior"] = .object([
+                "provenance": .string(SourceEnergyPrior.provenance),
+                "timeline_provenance": .string(SourceEnergyTimeline.provenance),
+                "speaker_id": .string(sourcePrior.selection.speakerID),
+                "agreement": .number(sourcePrior.selection.agreement),
+                "microphone_coverage": .number(sourcePrior.selection.microphoneCoverage),
+                "evidence_ms": .number(Double(sourcePrior.selection.evidenceMs)),
+                "minimum_agreement_exclusive": .number(0.95),
+                "minimum_evidence_ms": .number(5_000),
+                "confidence": .string("minimum_word(base+0.25*source_agreement*(1-base)-0.5*source_conflict*base)"),
+            ])
+        }
         if let configuration = diarization.configuration {
             processingOptions["diarization_configuration"] = .object([
                 "maximum_speaker_count": configuration.maximumSpeakerCount.map { .number(Double($0)) } ?? .null,
@@ -406,6 +427,7 @@ public struct TranscriptAssemblyStageRunner: TranscriptionStageRunning {
     private func matchSpeakers(for job: TranscriptionJob) async throws -> TranscriptionStageOutput {
         let transcriptURL = job.runDirectoryURL.appending(path: TranscriptRunArtifact.canonicalTranscript)
         guard job.request.speakerMatching == .enabled, let speakerLibrary else {
+            try await applySourceIdentity(for: job)
             let record = SpeakerRecognitionRecord(libraryRevision: nil, suggestions: [])
             return TranscriptionStageOutput(artifactURL: try write(record, named: TranscriptRunArtifact.speakerRecognition, in: job))
         }
@@ -476,6 +498,7 @@ public struct TranscriptAssemblyStageRunner: TranscriptionStageRunning {
                 schemaVersion: transcript.schemaVersion,
                 transcriptID: transcript.transcriptID,
                 revision: transcript.revision,
+                title: transcript.title,
                 status: transcript.status,
                 createdAt: transcript.createdAt,
                 source: transcript.source,
@@ -496,8 +519,45 @@ public struct TranscriptAssemblyStageRunner: TranscriptionStageRunning {
             try writer.write(try CanonicalTranscriptCodec.encode(recognized), to: transcriptURL)
         }
 
+        try await applySourceIdentity(for: job)
         let record = SpeakerRecognitionRecord(libraryRevision: library.revision, suggestions: suggestions)
         return TranscriptionStageOutput(artifactURL: try write(record, named: TranscriptRunArtifact.speakerRecognition, in: job))
+    }
+
+    private func applySourceIdentity(for job: TranscriptionJob) async throws {
+        guard job.request.microphoneSpeakerPrior == true else { return }
+        let transcript: CanonicalTranscript = try read(TranscriptRunArtifact.canonicalTranscript, in: job)
+        guard case let .object(prior)? = transcript.processingOptions["source_energy_prior"],
+              case let .string(id)? = prior["speaker_id"] else { return }
+        let owner = try await speakerLibrary?.owner()
+        if let owner, transcript.speakers.contains(where: { $0.id != id && $0.profileID == owner.profileID.uuidString }) { return }
+        // Existing human/voiceprint identities win over the source prior.
+        let speakers = transcript.speakers.map { speaker -> TranscriptSpeaker in
+            guard speaker.id == id, speaker.profileID == nil, speaker.identityAssignment != .manual else { return speaker }
+            return TranscriptSpeaker(id: id, profileID: owner?.profileID.uuidString,
+                                     identityAssignment: .automatic, labelSnapshot: owner?.displayName ?? "Me")
+        }
+        let labels = Dictionary(speakers.map { ($0.id, $0.labelSnapshot) }, uniquingKeysWith: { first, _ in first })
+        let segments = transcript.segments.map { segment in
+            let inference = segment.speakerInference.map {
+                TranscriptSpeakerInference(speakerID: $0.speakerID, speakerLabel: labels[$0.speakerID] ?? $0.speakerLabel,
+                                           evidence: $0.evidence, provenance: $0.provenance,
+                                           diarizationHoleMs: $0.diarizationHoleMs, overlapMs: $0.overlapMs)
+            }
+            return TranscriptSegment(id: segment.id, speakerID: segment.speakerID,
+                                     speakerLabel: segment.speakerID.flatMap { labels[$0] } ?? segment.speakerLabel,
+                                     startMs: segment.startMs, endMs: segment.endMs, text: segment.text, overlap: segment.overlap,
+                                     timingQuality: segment.timingQuality, speakerConfidence: segment.speakerConfidence, words: segment.words,
+                                     attributionSource: segment.attributionSource, speakerInference: inference,
+                                     unresolvedSpeakerEvidence: segment.unresolvedSpeakerEvidence)
+        }
+        let updated = CanonicalTranscript(schemaVersion: transcript.schemaVersion, transcriptID: transcript.transcriptID,
+            revision: transcript.revision, title: transcript.title, status: transcript.status, createdAt: transcript.createdAt,
+            source: transcript.source, language: transcript.language, languageSource: transcript.languageSource,
+            timestampUnit: transcript.timestampUnit, timestampOrigin: transcript.timestampOrigin, speakers: speakers,
+            segments: segments, subtitleCueMappings: transcript.subtitleCueMappings, processingOptions: transcript.processingOptions,
+            engineRevisions: transcript.engineRevisions, warnings: transcript.warnings)
+        _ = try write(updated, named: TranscriptRunArtifact.canonicalTranscript, in: job)
     }
 
     // MARK: - Artifacts

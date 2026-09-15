@@ -174,3 +174,45 @@ swift test --package-path Modules/Transcription \
 ```
 
 Excerpt selection is tailored to the investigation meeting. It creates signed-16 listening copies and RMS bins; original float audio remains unchanged and is used for all benchmarks. A person must listen and fill `human-review.tsv`; generated candidate fields deliberately remain null. Silence energy, ASR text, and model overlap flags are not human annotations.
+
+## Microphone source prior (phase 6)
+
+The app's **Identify me from my microphone** setting is off by default. It applies
+only when a recorder session retains both tracks in its capture journal, or a
+previous run already contains `source-energy.json`. New runs and reprocessing
+snapshot the setting; existing transcripts are not relabelled by changing it.
+Choose **This is me** in the speaker library to use an owner profile; otherwise
+a confident local cluster is labelled **Me**. Keep the setting off for in-room
+meetings, where the microphone may contain several people.
+
+Generate the exact production timeline without writing into a saved session/run:
+
+```sh
+swift build --package-path Tools/TimelineHarness --scratch-path "$EVAL/timeline-build" \
+  -c release --product timeline-harness
+"$EVAL/timeline-build/out/Products/Release/timeline-harness" source-energy \
+  --session "/path/to/retained/recorder/session" --json "$EVAL/source-energy.json"
+python3 Tools/DiarizationAnalysis/wder.py "$RUN" --effective-speakers \
+  --output "$EVAL/source-off.json"
+python3 Tools/DiarizationAnalysis/wder.py "$RUN" --effective-speakers \
+  --source-energy "$EVAL/source-energy.json" --output "$EVAL/source-on.json"
+```
+
+Use `--reference` for a full reference; without it, only manually labelled
+canonical segments are scored. The energy timeline uses 100 ms mean channel
+power on the journal-reconstructed recording timeline. Offsets, gaps and drift
+come from the same `TimelineBuilder` as mixdown; stereo channels do not cancel.
+Missing capture, silence, and windows where both sources exceed -40 dBFS do not
+vote. A microphone window needs at least 10 dB dominance and a quiet system
+track. Cluster source agreement must exceed **0.95**, with at least 5 s of
+microphone evidence, over 60% microphone-window coverage and a 0.20 lead over
+another cluster. These are heuristic evidence scores, not probability estimates.
+
+For threshold sensitivity, pass `--source-minimum-agreement 0.85` (or 0.90,
+0.95, 0.999) together with `--source-energy`. This is a benchmark override;
+the production default is 0.95. Rebuild cached host executables after source
+changes. WDER output records the energy SHA-256, threshold, selected anonymous
+cluster and its aggregate support. Optimal speaker mapping measures attribution
+agreement, **not** the correctness of the visible “Me”/owner name. Raw energy,
+replay text and original audio stay outside tracked source. See the phase plan
+for the calibration's limited ground-truth coverage.

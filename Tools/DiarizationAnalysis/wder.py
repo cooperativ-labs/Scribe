@@ -311,13 +311,13 @@ def score_replay(replay, reference, source, metadata):
 
 def replay_run(args):
     if args.host_replay:
-        output = subprocess.check_output([str(args.host_replay), str(args.run), "--saved-words" if args.transcript == "saved" else str(args.transcript), str(args.diarization)])
+        output = subprocess.check_output([str(args.host_replay), str(args.run), "--saved-words" if args.transcript == "saved" else str(args.transcript), str(args.diarization)] + ([str(args.source_energy), str(args.source_minimum_agreement)] if args.source_energy else []))
         return json.loads(output), sha256(args.host_replay)
     with tempfile.TemporaryDirectory(prefix="scribe-wder-") as temporary:
         temporary = pathlib.Path(temporary)
         output, executable = temporary / "replay.json", temporary / "host-replay"
         subprocess.run([sys.executable, str(args.replay_script), str(args.run), str(args.transcript),
-                        str(args.diarization), "--output", str(output), "--keep-executable", str(executable)], check=True)
+                        str(args.diarization), "--output", str(output), "--keep-executable", str(executable)] + (["--source-energy", str(args.source_energy), "--source-minimum-agreement", str(args.source_minimum_agreement)] if args.source_energy else []), check=True)
         return json.loads(output.read_text()), sha256(executable)
 
 
@@ -329,6 +329,8 @@ def main():
     parser.add_argument("--reference", type=pathlib.Path, help="MacWhisper JSON, SRT/VTT, or Speaker: text reference")
     parser.add_argument("--host-replay", type=pathlib.Path, help="Previously compiled replay.py host executable")
     parser.add_argument("--replay-script", type=pathlib.Path, default=pathlib.Path(__file__).with_name("replay.py"))
+    parser.add_argument("--source-minimum-agreement", type=float, default=0.95, help="Calibration override (production: 0.95)")
+    parser.add_argument("--source-energy", type=pathlib.Path, help="Opt in using an aligned source-energy.json")
     parser.add_argument("--output", type=pathlib.Path, required=True)
     parser.add_argument("--effective-speakers", action="store_true", help="Score presentation labels including bounded inferences; canonical labels remain the default")
     args = parser.parse_args()
@@ -350,6 +352,9 @@ def main():
         replay["labels"] = replay["effective_labels"]
     diarization = json.loads(args.diarization.read_text())
     result = score_replay(replay, reference, source, metadata)
+    result["source_minimum_agreement"] = args.source_minimum_agreement if args.source_energy else None
+    result["source_energy_prior"] = replay.get("source_energy_prior")
+    result["source_energy_sha256"] = sha256(args.source_energy) if args.source_energy else None
     result["attribution_view"] = "effective" if args.effective_speakers else "canonical"
     if "display_paragraphs" in replay:
         result["display_paragraphs"] = paragraph_metrics(replay["display_paragraphs"])

@@ -332,7 +332,7 @@ final class ScribeAppEnvironment: ObservableObject {
     private func handOffForTranscription(_ job: ProcessingQueue.QueuedJob) async {
         guard settings.transcribeWhenFinalRecordingIsReady else { return }
         do {
-            let handoff = FinalRecordingHandoff(speakerCount: Self.transcriptionSpeakerCount(settings.transcriptionSpeakerCount))
+            let handoff = FinalRecordingHandoff(speakerCount: Self.transcriptionSpeakerCount(settings.transcriptionSpeakerCount), microphoneSpeakerPrior: settings.microphoneSpeakerPrior)
             let request = try handoff.request(forSessionAt: job.sessionDirectory)
             try await outbox.submit(request)
             // The request is durable now, so transcription can be told to pick it

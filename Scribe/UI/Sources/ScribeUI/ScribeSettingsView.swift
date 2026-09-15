@@ -100,6 +100,14 @@ public struct ScribeSettingsView: View {
 
             Section("Processing") {
                 Toggle("Transcribe when the final recording is ready", isOn: $settings.transcribeWhenFinalRecordingIsReady)
+                Toggle("Keep recording files for debugging", isOn: $settings.keepRecordingFilesForDebugging)
+                Text("By default, Scribe deletes the meeting folder and its component audio after the final recording has been safely copied into Transcriptions. Turn this on to retain those files for debugging and reprocessing.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                Toggle("Identify me from my microphone", isOn: $settings.microphoneSpeakerPrior)
+                Text("For remote calls with separate microphone and system tracks. Keep this off for in-room meetings: your microphone may capture other people. Labels are applied only when source evidence is clear.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
                 Picker("Speakers", selection: $settings.transcriptionSpeakerCount) {
                     Text("Automatic").tag(RecorderSpeakerCountPreference.automatic)
                     ForEach(1...8, id: \.self) { count in

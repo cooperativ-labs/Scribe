@@ -115,6 +115,7 @@ public actor TranscriptionCoordinator {
             expectedLanguage: request.expectedLanguage,
             speakerCount: request.speakerCount,
             speakerMatching: request.speakerMatching,
+            microphoneSpeakerPrior: request.microphoneSpeakerPrior == true,
             speakerLibraryRevision: request.speakerLibraryRevision,
             vocabularyRevision: request.vocabularyRevision ?? vocabularyRevision()
         )
@@ -220,6 +221,7 @@ public actor TranscriptionCoordinator {
             retryOfRunID: previous.runID
         )
         try write(job)
+        try copySourceEnergy(from: previous, to: job)
         jobs[job.id] = job
         queue.append(job.id)
         try persistQueueIndex()
@@ -233,13 +235,14 @@ public actor TranscriptionCoordinator {
     /// ASR or diarization artifact could mix incompatible output. The prior run
     /// directory, including any review revisions, is never touched.
     @discardableResult
-    public func reprocess(_ previous: TranscriptionJob, speakerCount: TranscriptionSpeakerCount) throws -> TranscriptionJob {
+    public func reprocess(_ previous: TranscriptionJob, speakerCount: TranscriptionSpeakerCount, microphoneSpeakerPrior: Bool? = nil) throws -> TranscriptionJob {
         let request = retainedSourceRequest(
             from: previous,
             speakerCount: speakerCount,
             speakerLibraryRevision: previous.request.speakerLibraryRevision,
             vocabularyRevision: previous.request.vocabularyRevision,
-            modelProfileID: previous.request.modelProfileID
+            modelProfileID: previous.request.modelProfileID,
+            microphoneSpeakerPrior: microphoneSpeakerPrior
         )
         return try enqueueDerivedRun(from: previous, request: request)
     }
@@ -253,14 +256,16 @@ public actor TranscriptionCoordinator {
     public func retranscribe(
         _ previous: TranscriptionJob,
         modelProfileID: String,
-        speakerCount: TranscriptionSpeakerCount
+        speakerCount: TranscriptionSpeakerCount,
+        microphoneSpeakerPrior: Bool? = nil
     ) throws -> TranscriptionJob {
         let request = retainedSourceRequest(
             from: previous,
             speakerCount: speakerCount,
             speakerLibraryRevision: nil,
             vocabularyRevision: nil,
-            modelProfileID: modelProfileID
+            modelProfileID: modelProfileID,
+            microphoneSpeakerPrior: microphoneSpeakerPrior
         )
         return try enqueueDerivedRun(from: previous, request: request)
     }
@@ -270,7 +275,8 @@ public actor TranscriptionCoordinator {
         speakerCount: TranscriptionSpeakerCount,
         speakerLibraryRevision: String?,
         vocabularyRevision: String?,
-        modelProfileID: String
+        modelProfileID: String,
+        microphoneSpeakerPrior: Bool?
     ) -> TranscriptionRequest {
         TranscriptionRequest(
             sourceURL: previous.sourceSnapshotURL,
@@ -278,6 +284,9 @@ public actor TranscriptionCoordinator {
             expectedLanguage: previous.request.expectedLanguage,
             speakerCount: speakerCount,
             speakerMatching: previous.request.speakerMatching,
+            microphoneSpeakerPrior: microphoneSpeakerPrior ?? (previous.request.microphoneSpeakerPrior == true),
+            recorderSessionDirectory: previous.request.recorderSessionDirectory
+                ?? (previous.request.provenance != nil ? previous.request.sourceURL.deletingLastPathComponent() : nil),
             speakerLibraryRevision: speakerLibraryRevision,
             vocabularyRevision: vocabularyRevision,
             modelProfileID: modelProfileID,
@@ -293,9 +302,19 @@ public actor TranscriptionCoordinator {
     ) throws -> TranscriptionJob {
         var job = try enqueue(request)
         job.retryOfRunID = previous.runID
+        try copySourceEnergy(from: previous, to: job)
         try write(job)
         jobs[job.id] = job
         return job
+    }
+
+    private func copySourceEnergy(from previous: TranscriptionJob, to job: TranscriptionJob) throws {
+        guard previous.sourceFingerprint == job.sourceFingerprint else { return }
+        let source = previous.runDirectoryURL.appendingPathComponent("source-energy.json")
+        let target = job.runDirectoryURL.appendingPathComponent("source-energy.json")
+        guard fileManager.fileExists(atPath: source.path), !fileManager.fileExists(atPath: target.path) else { return }
+        // An immutable source artifact survives recorder cleanup and fresh model runs.
+        try fileManager.copyItem(at: source, to: target)
     }
 
     /// Drives at most one worker run at a time.  Starts are deferred while

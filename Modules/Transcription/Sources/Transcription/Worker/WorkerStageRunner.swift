@@ -54,6 +54,7 @@ public actor WorkerStageRunner: TranscriptionStageRunning {
     private let eventHandler: (@Sendable (TranscriptionEvent) -> Void)?
     /// Extra `run` payload values; the integration test uses the helper's
     /// guarded deterministic mode through this.
+    private let sourceEnergyPreparation: (@Sendable (TranscriptionJob) async throws -> Void)?
     private let additionalRunOptions: [String: WorkerJSONValue]
     private var sessions: [UUID: Session] = [:]
 
@@ -61,10 +62,12 @@ public actor WorkerStageRunner: TranscriptionStageRunning {
         configuration: Configuration,
         hostStageRunner: (any TranscriptionStageRunning)? = nil,
         installationProvider: (@Sendable () async throws -> WorkerInstallation)? = nil,
+        sourceEnergyPreparation: (@Sendable (TranscriptionJob) async throws -> Void)? = nil,
         additionalRunOptions: [String: WorkerJSONValue] = [:],
         eventHandler: (@Sendable (TranscriptionEvent) -> Void)? = nil
     ) {
         self.configuration = configuration
+        self.sourceEnergyPreparation = sourceEnergyPreparation
         self.installationProvider = installationProvider
         self.hostStageRunner = hostStageRunner
         self.eventHandler = eventHandler
@@ -78,6 +81,7 @@ public actor WorkerStageRunner: TranscriptionStageRunning {
             return try await hostStageRunner.run(stage: stage, job: job)
         }
         do {
+            if stage == .preparing { try await sourceEnergyPreparation?(job) }
             let result = try await stageResult(named: workerStage, for: job)
             if workerStage == Self.workerStageNames[.matchingSpeakers] {
                 try await finish(job)

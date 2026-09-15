@@ -32,6 +32,25 @@ public actor SpeakerProfileStore: SpeakerLibrary {
         try SpeakerProfileStore(directoryURL: SpeakersModule.applicationSupportDirectory())
     }
 
+    public func owner() async throws -> SpeakerPersonRef? {
+        let statement = try database.prepare("SELECT profile_id FROM library_owner WHERE id = 1;")
+        guard try statement.step(), let id = UUID(uuidString: statement.string(at: 0)) else { return nil }
+        return try person(id: id)
+    }
+
+    public func setOwner(profileID: UUID?) throws {
+        if let profileID { _ = try requiredProfile(profileID) }
+        try database.transaction {
+            try database.execute("DELETE FROM library_owner;")
+            if let profileID {
+                let statement = try database.prepare("INSERT INTO library_owner (id, profile_id) VALUES (1, ?);")
+                try statement.bind(index: 1, text: profileID.uuidString)
+                try statement.step()
+            }
+            try bumpRevision()
+        }
+    }
+
     public func revision() throws -> SpeakerLibraryRevision {
         try loadRevision()
     }
@@ -507,6 +526,11 @@ public actor SpeakerProfileStore: SpeakerLibrary {
             automatic_matching_enabled INTEGER NOT NULL,
             created_at REAL NOT NULL,
             updated_at REAL NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS library_owner (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            profile_id TEXT NOT NULL REFERENCES profiles(profile_id) ON DELETE CASCADE
         );
 
         CREATE TABLE IF NOT EXISTS signatures (

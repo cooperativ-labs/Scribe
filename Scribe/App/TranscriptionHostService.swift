@@ -101,6 +101,18 @@ final class TranscriptionHostService {
                         manifestURL: located.manifestURL,
                         modelsDirectoryURL: settings.modelsFolderURL
                     )
+                },
+                sourceEnergyPreparation: { job in
+                    let destination = job.runDirectoryURL.appendingPathComponent("source-energy.json")
+                    guard !FileManager.default.fileExists(atPath: destination.path),
+                          let session = job.request.recorderSessionDirectory else { return }
+                    let manifestURL = session.appendingPathComponent("metadata.json")
+                    guard let data = try? Data(contentsOf: manifestURL),
+                          let manifest = try? RecorderSessionManifestCodec.decode(data),
+                          manifest.tracks.finalTrack?.checksum == job.sourceFingerprint else { return }
+                    if let timeline = try SourceEnergyPreparation.timeline(sessionDirectory: session) {
+                        try AudioPreparationService.commitSourceEnergy(timeline, in: job.runDirectoryURL)
+                    }
                 }
             )
             workerUnavailableReason = nil
@@ -167,7 +179,10 @@ final class TranscriptionHostService {
     /// the fingerprint identifies it as a repeat import.
     func consumeHandoffRequests() async {
         do {
-            let outcome = try await TranscriptionHandoffConsumer(source: outbox).drain(into: coordinator)
+            let consumer = TranscriptionHandoffConsumer(source: outbox) { @MainActor [weak self] request, job in
+                self?.retireRecorderSession(afterQueuing: request, job: job)
+            }
+            let outcome = try await consumer.drain(into: coordinator)
             guard !outcome.isEmpty else { return }
             if let first = outcome.failures.first {
                 report(failure: "A finished recording could not be queued for transcription: \(first.message)")
@@ -175,6 +190,30 @@ final class TranscriptionHostService {
             await refreshReview()
         } catch {
             report(failure: "The transcription handoff could not be read: \(error.localizedDescription)")
+        }
+    }
+
+    /// Removes the recorder's raw workspace only after `enqueue` has copied the
+    /// final mix into the transcription store. Source-energy evidence is also
+    /// committed beside the job first because producing it needs the raw tracks.
+    private func retireRecorderSession(afterQueuing request: TranscriptionRequest, job: TranscriptionJob) {
+        guard !settings.keepRecordingFilesForDebugging,
+              let sessionDirectory = request.recorderSessionDirectory
+        else { return }
+
+        do {
+            let energyURL = job.runDirectoryURL.appendingPathComponent("source-energy.json")
+            if request.microphoneSpeakerPrior == true,
+               !FileManager.default.fileExists(atPath: energyURL.path),
+               let timeline = try SourceEnergyPreparation.timeline(sessionDirectory: sessionDirectory) {
+                try AudioPreparationService.commitSourceEnergy(timeline, in: job.runDirectoryURL)
+            }
+            try RecorderSessionCleanup.removeSession(
+                at: sessionDirectory,
+                from: settings.recordingsFolderURL
+            )
+        } catch {
+            report(failure: "The recording was queued for transcription, but its component files could not be removed: \(error.localizedDescription)")
         }
     }
 
@@ -202,7 +241,7 @@ final class TranscriptionHostService {
             report(failure: "The bundled media prober is unavailable, so folders cannot be imported.")
             return nil
         }
-        let configuration = ImportConfiguration(modelProfileID: modelProfileID, speakerCount: speakerCount)
+        let configuration = ImportConfiguration(modelProfileID: modelProfileID, speakerCount: speakerCount, microphoneSpeakerPrior: settings.microphoneSpeakerPrior)
         let options = FolderImportOptions(
             configuration: configuration,
             includeSubfolders: includeSubfolders,
@@ -234,6 +273,8 @@ final class TranscriptionHostService {
                 _ = try await coordinator.enqueue(TranscriptionRequest(
                     sourceURL: file.url,
                     speakerCount: speakerCount,
+                    microphoneSpeakerPrior: settings.microphoneSpeakerPrior,
+                    recorderSessionDirectory: file.recorderSessionDirectoryURL,
                     modelProfileID: modelProfileID,
                     provenance: sessionID.map { TranscriptionProvenance(producerID: "scribe.recorder", sessionID: $0) }
                 ))
@@ -402,7 +443,7 @@ final class TranscriptionHostService {
             return TranscriptReprocessingOutcome(message: "The original transcription run could not be found.", isFailure: true)
         }
         do {
-            let job = try await coordinator.reprocess(previous.job, speakerCount: speakerCount)
+            let job = try await coordinator.reprocess(previous.job, speakerCount: speakerCount, microphoneSpeakerPrior: settings.microphoneSpeakerPrior)
             await refreshAndRunPending()
             let description = switch speakerCount {
             case .automatic: "automatic speaker count"
@@ -429,7 +470,8 @@ final class TranscriptionHostService {
             _ = try await coordinator.retranscribe(
                 previous.job,
                 modelProfileID: modelProfileID,
-                speakerCount: speakerCount
+                speakerCount: speakerCount,
+                microphoneSpeakerPrior: settings.microphoneSpeakerPrior
             )
             await refreshAndRunPending()
             return TranscriptReprocessingOutcome(

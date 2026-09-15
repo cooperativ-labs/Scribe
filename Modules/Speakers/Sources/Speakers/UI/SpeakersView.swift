@@ -103,6 +103,15 @@ private struct SpeakerProfileDetail: View {
                     .disabled(editedName.trimmingCharacters(in: .whitespacesAndNewlines) == row.displayName)
             }
 
+            Section("My profile") {
+                Toggle("This is me", isOn: Binding(
+                    get: { viewModel.ownerProfileID == row.id },
+                    set: { enabled in Task { await viewModel.setOwner(profileID: enabled ? row.id : nil) } }
+                ))
+                Text("Used by the optional microphone identification setting for remote calls. Only one profile can be yours.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+
             Section("Automatic matching") {
                 Toggle(
                     "Match this voice in new recordings",

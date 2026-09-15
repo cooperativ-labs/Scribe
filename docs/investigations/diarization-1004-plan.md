@@ -285,6 +285,92 @@ identity matching.
   reconciliation; never override cluster identity when both tracks are loud.
 - Setting default off; explain the in-room-meeting caveat in the UI.
 
+### Phase 6 implementation and calibration (2026-09-15)
+
+Implemented the default-off **Identify me from my microphone** setting, including
+an in-room meeting caveat. Recorder handoffs and folder imports retain the session
+location. During preparation, the host streams the recorder's original microphone
+and system tracks through the existing journal `TimelineBuilder`, preserving
+start offsets, gaps and drift on the final mix's timeline. Mean channel power
+avoids stereo phase cancellation. `AudioPreparationService` atomically commits
+100 ms windows, powers, microphone ratios and capture availability as
+`source-energy.json`; retries and fresh runs retain this source artifact after
+recorder files are removed. The current setting is snapshotted for new imports,
+reprocess and retranscribe requests, and participates in the configuration hash.
+Missing legacy request fields mean off. Final-track checksum matching guards the
+host's association of a retained session with the requested audio.
+
+Source identity requires a unique highest-agreement cluster. A source-exclusive
+window has one track at or above **-40 dBFS**, the other below that floor, and at
+least **10 dB power dominance**. Both-loud windows, missing capture, diarization
+overlap and silence abstain. Cluster agreement is microphone-exclusive covered
+time divided by microphone- plus system-exclusive covered time. The selected
+cluster must exceed **95% agreement**, have at least **5 seconds** microphone
+support, cover over **60%** of all microphone-exclusive windows, and beat the
+runner-up agreement by **20 percentage points**. Intervals retain their original
+cluster IDs and overlap flags.
+
+The speaker library now has an explicit, persistent **This is me** designation.
+The prior uses that owner's profile/name, or **Me** when unset. It preserves
+existing manual or voiceprint identities and abstains if another cluster already
+owns that profile. No owner is guessed from names or profile order.
+
+Confidence receives bounded positive/negative source evidence, with a minimum
+across each segment's word ranges. Source-assisted unknown fragments require
+90% microphone coverage, the selected local cluster as a consistent neighbor,
+the existing short-duration/word/gap bounds, and no competing interval. They
+remain suggestions (`speaker_id` stays null), with additive `source_energy`
+inference evidence. Manual attributions and known word IDs are unchanged.
+Versioned selection, confidence formula, threshold and availability are recorded
+in processing options. Both-loud source windows cannot supply identity or
+confidence evidence.
+
+#### Remote-call measurements
+
+Saved ASR words and diarization were held fixed; the production Swift replay was
+rebuilt and evaluated with `wder.py`. Both recordings retain original journaled
+tracks. Full supplied ground truth is unavailable for these retained-track runs,
+so these WDER figures cover **only sparse manual edits**, not the whole meeting:
+
+| Recording | Scored words | Wrong, off → on | Unknown, off → on | WDER, off → on | Reading rows | Single-word rows |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Jake + AK | 19 | 5 → 5 | 5 → 5 | 52.632% → 52.632% | 518 → 514 | 92 → 90 |
+| Connor Jake | 17 | 0 → 0 | 13 → 13 | 76.471% → 76.471% | 227 → 224 | 52 → 50 |
+
+Those selectively corrected words cover only **0.140% (AK)** and **0.266%
+(Connor)** of the replay, and intentionally concentrate difficult cases.
+**No whole-meeting WDER improvement or “Me” naming accuracy is established.**
+Canonical-label scores and canonical row counts are also unchanged; the new
+source inferences improve reading grouping outside the tiny scored subsets.
+
+The selected local cluster has **99.686%** source agreement / **89.711%**
+microphone coverage on AK (992.837 s support), and **99.954%** / **92.644%** on
+Connor (571.796 s). A production-host sensitivity sweep at 0.85, 0.90 and 0.95
+produces the same selections and WDER on both calls. At 0.999, AK abstains and
+returns to its baseline paragraph counts; Connor still qualifies. **Choose 0.95**
+as the strictest tested cutoff that retains both calls, with the independent
+support/coverage/runner-up guards. This is provisional source-evidence calibration,
+not validation of a general false-identification rate. The setting remains off
+by default. In-room microphones, unusually loud noise or different gain setups
+can invalidate source identity assumptions; two remote calls cannot calibrate
+those conditions.
+
+Transcript-free scores, energy/executable hashes and the complete threshold sweep
+are in [phase-6 evidence](diarization-1004-phase6.json). Production identity tests
+cover default-off behavior, Me fallback, owner profiles and preserving existing
+identity. Tests also cover double-talk despite a large ratio, missing capture,
+overlaps, insufficient support, threshold boundaries, ambiguous clusters,
+source-assisted holes, competing intervals, confidence, old requests, journal
+alignment, stereo power and source evidence surviving reprocessing.
+
+Validation: the full Transcription suite passed **314 tests with two existing
+fixture skips**; **13 final focused attribution/coordinator tests** then passed.
+All **32 speaker-library tests**, **12 focused recorder preparation/handoff tests**,
+and **13 Python analysis tests** pass. The real Scribe macOS scheme builds with
+code signing disabled. The UI additions use standard native toggles; no visual
+screenshot was captured. Original recordings and saved transcripts were not
+modified by the evaluation.
+
 ## Phase 7 — Optional follow-ups
 
 - Silero VAD timeline for acoustic pauses feeding both groupers and the

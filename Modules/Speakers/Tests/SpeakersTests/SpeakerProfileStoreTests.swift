@@ -210,3 +210,20 @@ func exportIdentityOmitsVectorsAndClips() async throws {
     #expect(support.lastPathComponent == "Speakers")
     #expect(!support.path.contains("Meeting Transcripts"))
 }
+
+@Test func ownerIsExplicitUniquePersistentAndClearedOnDeletion() async throws {
+    let workspace = try Workspace("owner")
+    let store = try SpeakerProfileStore(directoryURL: workspace.url)
+    #expect(try await store.owner() == nil)
+    let first = try await store.createProfile(.init(displayName: "First"))
+    let second = try await store.createProfile(.init(displayName: "Second"))
+    try await store.setOwner(profileID: first.id)
+    try await store.setOwner(profileID: second.id)
+    let reopened = try SpeakerProfileStore(directoryURL: workspace.url)
+    #expect(try await reopened.owner()?.profileID == second.id)
+    try await store.setOwner(profileID: nil)
+    #expect(try await reopened.owner() == nil)
+    try await store.setOwner(profileID: second.id)
+    try await store.deleteProfile(profileID: second.id)
+    #expect(try await reopened.owner() == nil)
+}

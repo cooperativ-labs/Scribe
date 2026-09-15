@@ -25,9 +25,14 @@ public struct TranscriptionHandoffOutcome: Sendable, Equatable {
 /// as a repeat.
 public struct TranscriptionHandoffConsumer: Sendable {
     private let source: any TranscriptionHandoffSource
+    private let didQueue: @Sendable (TranscriptionRequest, TranscriptionJob) async -> Void
 
-    public init(source: any TranscriptionHandoffSource) {
+    public init(
+        source: any TranscriptionHandoffSource,
+        didQueue: @escaping @Sendable (TranscriptionRequest, TranscriptionJob) async -> Void = { _, _ in }
+    ) {
         self.source = source
+        self.didQueue = didQueue
     }
 
     @discardableResult
@@ -35,16 +40,28 @@ public struct TranscriptionHandoffConsumer: Sendable {
         var queued: [UUID] = []
         var failures: [(requestID: UUID, message: String)] = []
         for request in try await source.pendingRequests() {
+            let job: TranscriptionJob
             do {
-                _ = try await coordinator.enqueue(request)
+                job = try await coordinator.enqueue(request)
             } catch {
                 // Left in the outbox on purpose. A source that is momentarily
                 // unreadable is a reason to try again, not to drop a meeting.
                 failures.append((request.requestID, error.localizedDescription))
                 continue
             }
-            try? await source.claim(request.requestID)
             queued.append(request.requestID)
+            do {
+                try await source.claim(request.requestID)
+            } catch {
+                // The job is durable, but leave producer-owned files in place
+                // while the outbox may still retry this request.
+                failures.append((request.requestID, error.localizedDescription))
+                continue
+            }
+            // The private source snapshot is durable and the handoff record is
+            // retired. Producer-owned files can now be cleaned up without
+            // turning a failed claim into an unreadable request on relaunch.
+            await didQueue(request, job)
         }
         return TranscriptionHandoffOutcome(queued: queued, failures: failures)
     }

@@ -132,6 +132,26 @@ final class CaptureCoexistenceContractTests: XCTestCase {
         XCTAssertEqual(finalState, .complete)
     }
 
+    func testPostQueueWorkRunsAfterTheSourceSnapshotAndClaim() async throws {
+        let coordinator = try TranscriptionCoordinator(
+            configuration: .init(transcriptStoreURL: root.appending(path: "store", directoryHint: .isDirectory)),
+            stageRunner: ScriptedWorkerStageRunner(hostStageRunner: TranscriptAssemblyStageRunner())
+        )
+        let final = try writeSource(named: "final-to-retire.flac")
+        let request = TranscriptionRequest(sourceURL: final, modelProfileID: "parakeet-v3")
+        let outbox = RecordingHandoffSource(requests: [request])
+
+        let consumer = TranscriptionHandoffConsumer(source: outbox) { _, job in
+            XCTAssertTrue(FileManager.default.fileExists(atPath: job.sourceSnapshotURL.path))
+            let claimed = await outbox.claimed
+            XCTAssertEqual(claimed, [request.requestID])
+        }
+        _ = try await consumer.drain(into: coordinator)
+
+        let claimed = await outbox.claimed
+        XCTAssertEqual(claimed, [request.requestID])
+    }
+
     /// A request that cannot be queued stays in the outbox. Losing a finished
     /// meeting silently is worse than queueing it twice.
     func testARequestThatCannotBeQueuedIsNotClaimed() async throws {
