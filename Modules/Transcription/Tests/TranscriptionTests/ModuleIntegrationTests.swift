@@ -111,7 +111,7 @@ final class ModuleIntegrationTests: XCTestCase {
             JSONSerialization.jsonObject(with: Data(contentsOf: exports.appending(path: "team sync.kb.json"))) as? [String: Any]
         )
         XCTAssertEqual(knowledgebase["schema"] as? String, KnowledgebaseTranscriptExporter.schema)
-        XCTAssertEqual((knowledgebase["turns"] as? [Any])?.count, transcript.segments.count)
+        XCTAssertEqual((knowledgebase["segments"] as? [Any])?.count, transcript.segments.count)
     }
 
     func testCollapsedAutomaticDiarizationIsReviewableAndKeepsEngineEvidence() async throws {

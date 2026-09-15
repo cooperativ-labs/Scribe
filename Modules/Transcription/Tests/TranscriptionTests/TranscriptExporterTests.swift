@@ -36,46 +36,59 @@ final class TranscriptExporterTests: XCTestCase {
         }
     }
 
-    func testKnowledgebaseExportMatchesMeetingTranscriptContract() throws {
+    func testKnowledgebaseExportMatchesUploadContract() throws {
         let exported = try object(from: TranscriptExporter.export(transcript(named: "one-speaker"), as: .knowledgebase))
 
-        XCTAssertEqual(exported["schema"] as? String, "kb.meeting-transcript/1")
-        let source = try XCTUnwrap(exported["source"] as? [String: Any])
-        XCTAssertEqual(source["ref"] as? String, "sha256:one")
-        XCTAssertEqual(source["recorded_at"] as? String, "2026-09-03T12:00:00Z")
-        XCTAssertEqual(source["duration_ms"] as? Int, 12_000)
-        XCTAssertEqual(exported["language"] as? String, "en")
+        XCTAssertEqual(exported["schema"] as? String, "kb.transcript-upload/1")
+        let recording = try XCTUnwrap(exported["recording"] as? [String: Any])
+        XCTAssertEqual(recording["duration_ms"] as? Int, 12_000)
+        XCTAssertNil(recording["recorded_at"], "Transcript creation time is not recording start time")
+        let transcript = try XCTUnwrap(exported["transcript"] as? [String: Any])
+        XCTAssertEqual(transcript["processed_at"] as? String, "2026-09-03T12:00:00Z")
+        XCTAssertEqual(transcript["language"] as? String, "en")
 
-        let speakers = try XCTUnwrap(exported["speakers"] as? [[String: Any]])
-        XCTAssertEqual(speakers.count, 1)
-        XCTAssertEqual(speakers[0]["id"] as? String, "speaker_1")
-        XCTAssertEqual(speakers[0]["label"] as? String, "Speaker 1")
-        XCTAssertNil(speakers[0]["profile_id"], "Scribe profile ids are not Knowledgebase person node ids")
-
-        let turns = try XCTUnwrap(exported["turns"] as? [[String: Any]])
-        XCTAssertEqual(turns.count, 1)
-        XCTAssertEqual(turns[0]["speaker_id"] as? String, "speaker_1")
-        XCTAssertEqual(turns[0]["start_ms"] as? Int, 1_000)
-        XCTAssertEqual(turns[0]["end_ms"] as? Int, 4_200)
-        XCTAssertEqual((turns[0]["words"] as? [[String: Any]])?.count, 4)
+        let segments = try XCTUnwrap(exported["segments"] as? [[String: Any]])
+        XCTAssertEqual(segments.count, 1)
+        XCTAssertEqual(segments[0]["speaker"] as? String, "Speaker 1")
+        XCTAssertEqual(segments[0]["start_ms"] as? Int, 1_000)
+        XCTAssertEqual(segments[0]["end_ms"] as? Int, 4_200)
+        XCTAssertNil(segments[0]["words"], "The upload schema does not accept word timings")
 
         let pipeline = try XCTUnwrap(exported["pipeline"] as? [String: Any])
-        let scribe = try XCTUnwrap(pipeline["scribe"] as? [String: Any])
+        XCTAssertEqual((pipeline["producer"] as? [String: Any])?["name"] as? String, "scribe")
+        let extensions = try XCTUnwrap(pipeline["extensions"] as? [String: Any])
+        let scribe = try XCTUnwrap(extensions["ai.scribe"] as? [String: Any])
         XCTAssertEqual(scribe["transcript_id"] as? String, "one-speaker")
         XCTAssertEqual(scribe["revision"] as? Int, 1)
-        XCTAssertEqual(scribe["recorded_at_basis"] as? String, "transcript_created_at")
+        XCTAssertEqual(scribe["source_checksum"] as? String, "sha256:one")
     }
 
-    func testKnowledgebaseExportAddsAStableUnknownSpeakerForUnassignedAndSilentTranscripts() throws {
+    func testKnowledgebaseExportsValidateAgainstTheUploadSchema() throws {
+        let schemaURL = try XCTUnwrap(
+            Bundle.module.url(forResource: "scribe-transcript-upload.schema", withExtension: "json")
+        )
+        let schema = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: Data(contentsOf: schemaURL)) as? [String: Any]
+        )
+        let validator = JSONSchemaFixtureValidator(rootSchema: schema)
+
+        for name in goldenFixtures {
+            let exported = try TranscriptExporter.export(transcript(named: name), as: .knowledgebase)
+            try validator.validate(try JSONSerialization.jsonObject(with: exported))
+        }
+    }
+
+    func testKnowledgebaseExportUsesNullForUnknownSpeakersAndASilenceSegmentForNoSpeech() throws {
         let unassigned = try object(from: TranscriptExporter.export(transcript(named: "unknown-speaker"), as: .knowledgebase))
-        let unassignedSpeakers = try XCTUnwrap(unassigned["speakers"] as? [[String: Any]])
-        let unassignedTurns = try XCTUnwrap(unassigned["turns"] as? [[String: Any]])
-        XCTAssertTrue(unassignedSpeakers.contains { $0["id"] as? String == KnowledgebaseTranscriptExporter.unknownSpeakerID })
-        XCTAssertEqual(unassignedTurns[0]["speaker_id"] as? String, KnowledgebaseTranscriptExporter.unknownSpeakerID)
+        let unassignedSegments = try XCTUnwrap(unassigned["segments"] as? [[String: Any]])
+        XCTAssertTrue(unassignedSegments[0]["speaker"] is NSNull)
 
         let silent = try object(from: TranscriptExporter.export(transcript(named: "no-speech"), as: .knowledgebase))
-        XCTAssertEqual((silent["speakers"] as? [[String: Any]])?.count, 1, "Knowledgebase v1 currently requires a non-empty speaker table")
-        XCTAssertEqual((silent["turns"] as? [Any])?.count, 0)
+        let silence = try XCTUnwrap((silent["segments"] as? [[String: Any]])?.first)
+        XCTAssertTrue(silence["speaker"] is NSNull)
+        XCTAssertEqual(silence["text"] as? String, "[silence]")
+        XCTAssertEqual(silence["start_ms"] as? Int, 0)
+        XCTAssertEqual(silence["end_ms"] as? Int, 9_000)
     }
 
     func testKnowledgebaseExportUsesDistinctCompoundExtension() {
