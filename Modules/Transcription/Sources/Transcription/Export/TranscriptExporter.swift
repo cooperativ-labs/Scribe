@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 public enum TranscriptExportFormat: String, CaseIterable, Sendable, Hashable {
     case plainText = "txt"
     case json
+    case knowledgebase = "kb.json"
     case subtitles = "srt"
 
     public var fileExtension: String { rawValue }
@@ -13,8 +14,17 @@ public enum TranscriptExportFormat: String, CaseIterable, Sendable, Hashable {
     public var contentType: UTType {
         switch self {
         case .plainText: .plainText
-        case .json: .json
+        case .json, .knowledgebase: .json
         case .subtitles: UTType(filenameExtension: fileExtension) ?? .plainText
+        }
+    }
+
+    public var displayName: String {
+        switch self {
+        case .plainText: "TXT"
+        case .json: "JSON"
+        case .knowledgebase: "Knowledgebase JSON"
+        case .subtitles: "SRT"
         }
     }
 }
@@ -46,6 +56,7 @@ public enum TranscriptExporter {
         switch format {
         case .plainText: return try TranscriptTextExporter.data(transcript)
         case .json: return try TranscriptJSONExporter.data(transcript)
+        case .knowledgebase: return try KnowledgebaseTranscriptExporter.data(transcript)
         case .subtitles: return try TranscriptSRTExporter.data(transcript)
         }
     }
@@ -56,6 +67,10 @@ public enum TranscriptExporter {
 
     public static func json(_ transcript: CanonicalTranscript) throws -> String {
         try TranscriptJSONExporter.export(transcript)
+    }
+
+    public static func knowledgebaseJSON(_ transcript: CanonicalTranscript) throws -> String {
+        try KnowledgebaseTranscriptExporter.export(transcript)
     }
 
     public static func srt(_ transcript: CanonicalTranscript) throws -> String {

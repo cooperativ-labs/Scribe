@@ -73,6 +73,23 @@ the diarization artifact and FluidAudio revision were unchanged from the
 baseline. No serialization golden changed: the existing fixtures are canonical
 transcript inputs rather than `SpeakerTurnBuilder` outputs.
 
+### CAB Call benchmark (2026-09-14)
+
+The current phase-3 implementation was evaluated against the supplied 1,493-row
+`BENCHMARK CALL.json` for **CAB Call 09-01-2026**. Thirteen rows without a
+ground-truth speaker were excluded, leaving 1,480 timestamped speaker segments.
+The production replay scored 19,248 of 19,853 words (96.953% time coverage).
+
+Canonical assignments scored **4.094% WDER-style error**: 0.509% wrong speaker
+and 3.585% unknown. Effective reading labels scored **1.808%**: 0.577% wrong and
+1.231% unknown. All nine benchmark speakers received distinct one-to-one
+cluster mappings; a tenth Scribe cluster contributed only three scored words.
+An untimed exact-token alignment cross-check produced similar results (4.162%
+canonical / 1.721% effective) while matching 94.510% of Scribe lexical tokens
+and 95.837% of reference tokens. Those lexical coverage figures are not a
+conventional ASR WER. Full transcript-free evidence and hashes are in
+[`diarization-1004-wder-cab-2026-09-01.json`](diarization-1004-wder-cab-2026-09-01.json).
+
 ## Phase 3 — Phrase-level attribution and bounded nearest fallback
 
 **Files:** `SpeakerTurnBuilder.swift`, `UnknownFragmentReconciler.swift`,
@@ -107,6 +124,55 @@ transcript inputs rather than `SpeakerTurnBuilder` outputs.
 - Render asides in the transcript window as a compact inline marker or
   sub-row; TXT/SRT/JSON exports are unchanged.
 - Harness reports paragraph and single-word counts before/after.
+
+### Phase 4 implementation and measurement (2026-09-14)
+
+Implemented presentation-only backchannel asides. The grouper requires a known
+(or inferred effective) interjecting speaker and the same other known speaker
+on both sides; the row is at most three words and 1,200 ms, with lexicon or
+overlap evidence. Adjacent gaps and the returning speaker's gap must remain
+below `hardPauseMs`. Bridging suppresses soft sentence boundaries, retaining
+hard word/duration caps and main-speaker overlap boundaries. Main text, words,
+and edit targets exclude aside sources; each aside retains its own speaker,
+timing, confidence, overlap flag and source IDs. Canonical rows are untouched.
+
+The window renders a compact timestamped aside sub-row with playback and
+“Show turn” for canonical edits. Search, speaker/review filters and parent-row
+selection/playback mapping include asides. The main speaker menu continues to
+act only on the main speaker's source turns.
+
+Production-host replay with saved words, measured by `wder.py`:
+
+| Recording / view | Before paragraphs | After paragraphs | Before single-word | After single-word |
+| --- | ---: | ---: | ---: | ---: |
+| CAB reading paragraphs | 630 | 630 | 94 | 94 |
+| CAB canonical rows | 1,329 | 1,329 | 559 | 559 |
+| Jake + AK reading paragraphs (saved-word replay) | 518 | 518 | 92 | 92 |
+| Supplied CAB paragraph ground truth | 441 | 441 | 5 | 5 |
+
+**No measured count improvement on these recordings:** neither saved-word
+replay yields an eligible backchannel bridge under the requested bounds.
+The supplied paragraph reference therefore still exposes a 189-paragraph and
+89-single-word-paragraph gap; these count differences are not boundary accuracy
+scores. The detector was not widened to absorb unknown fragments or substantive
+speaker turns to chase the benchmark. Synthetic grouper contracts do exercise
+successful bridges, including repeated asides, plus all threshold boundaries.
+
+CAB was scored against both repository benchmark files (timestamp alignment for
+segments; text alignment for paragraphs). Before/after canonical segments,
+word timings, canonical/effective labels and WDER scores are identical. The
+new replay reports aside counts separately so interjection words cannot quietly
+disappear from evaluation. Aggregate results, input hashes and executable hashes
+are in [phase-4 evidence](diarization-1004-phase4.json). The AK row above uses the
+saved-word replay and `wder.py` paragraph metrics only, not the earlier fixed-ASR
+reference scoring setup.
+
+Validation: all 299 Transcription tests pass (two unavailable-fixture skips),
+including grouper/view-model tests and unchanged TXT/JSON/SRT export goldens;
+12 Python analysis tests pass. The Scribe Xcode scheme builds. An isolated
+SwiftUI screenshot harness with synthetic data and stub playback verified the
+aside sub-row without launching another Scribe instance; an opaque white
+background was needed because offscreen capture omits materials.
 
 ## Phase 5 — FluidAudio 0.15.7 and post-processing sweep
 

@@ -10,17 +10,17 @@ enum TranscriptExportSavePanel {
     @MainActor
     static func pickFile(format: TranscriptExportFormat, suggestedBasename: String) -> URL? {
         run(
-            message: "Save a \(format.rawValue.uppercased()) copy of this transcript. The recordings folder in Settings is unchanged.",
-            suggestedBasename: suggestedBasename,
+            message: "Save a \(format.displayName) copy of this transcript. The recordings folder in Settings is unchanged.",
+            suggestedBasename: suggestedBasename + "." + format.fileExtension,
             contentTypes: [format.contentType]
         )
     }
 
-    /// Asks for a name and folder; TXT, JSON, and SRT files are written beside each other.
+    /// Asks for a name and folder; every supported export is written beside the others.
     @MainActor
     static func pickSharedName(suggestedBasename: String) -> URL? {
         run(
-            message: "TXT, JSON, and SRT copies will be saved using this name. The recordings folder in Settings is unchanged.",
+            message: "TXT, JSON, Knowledgebase JSON, and SRT copies will be saved using this name. The recordings folder in Settings is unchanged.",
             suggestedBasename: suggestedBasename,
             contentTypes: []
         )

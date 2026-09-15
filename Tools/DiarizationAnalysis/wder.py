@@ -34,6 +34,10 @@ TIMESTAMP_RE = re.compile(
     r"(?P<start>\d{1,2}:\d{2}:\d{2}[,.]\d{3})\s*-->\s*"
     r"(?P<end>\d{1,2}:\d{2}:\d{2}[,.]\d{3})"
 )
+JSON_TIMESTAMP_RANGE_RE = re.compile(
+    r"^\s*(?P<start>(?:\d{1,2}:)?\d{1,2}:\d{2}(?:[,.]\d{1,3})?)\s*-\s*"
+    r"(?P<end>(?:\d{1,2}:)?\d{1,2}:\d{2}(?:[,.]\d{1,3})?)\s*$"
+)
 
 
 def lexical(text):
@@ -57,8 +61,21 @@ def milliseconds(value, key=""):
 
 
 def parse_srt_timestamp(value):
-    hours, minutes, seconds = value.replace(",", ".").split(":")
+    parts = value.replace(",", ".").split(":")
+    if len(parts) == 2:
+        hours, minutes, seconds = 0, parts[0], parts[1]
+    elif len(parts) == 3:
+        hours, minutes, seconds = parts
+    else:
+        raise ValueError(f"Unrecognised timestamp: {value!r}")
     return round((int(hours) * 3600 + int(minutes) * 60 + float(seconds)) * 1000)
+
+
+def parse_json_timestamp_range(value):
+    match = JSON_TIMESTAMP_RANGE_RE.match(str(value))
+    if not match:
+        raise ValueError(f"Unrecognised JSON timestamp range: {value!r}")
+    return parse_srt_timestamp(match.group("start")), parse_srt_timestamp(match.group("end"))
 
 
 def speaker_and_text(lines):
@@ -103,12 +120,18 @@ def parse_json_reference(document):
             raise ValueError("Reference JSON entries must be objects.")
         speaker = next((entry.get(key) for key in ("speaker", "speakerName", "speaker_name", "speaker_id") if entry.get(key) is not None), None)
         text = next((entry.get(key) for key in ("text", "transcript", "content") if entry.get(key) is not None), None)
-        if speaker is None or text is None:
-            raise ValueError("Reference JSON entries require speaker and text fields.")
+        if text is None:
+            raise ValueError("Reference JSON entries require a text field.")
+        # Reviewed benchmark exports may retain transcript rows whose speaker was
+        # intentionally left unset. They cannot provide speaker ground truth.
+        if speaker is None:
+            continue
         start_key = next((key for key in ("start_ms", "startMs", "start", "startTime") if key in entry), None)
         end_key = next((key for key in ("end_ms", "endMs", "end", "endTime") if key in entry), None)
         segment = dict(speaker=str(speaker), text=str(text))
-        if start_key is not None or end_key is not None:
+        if "timestamp" in entry:
+            segment["start_ms"], segment["end_ms"] = parse_json_timestamp_range(entry["timestamp"])
+        elif start_key is not None or end_key is not None:
             if start_key is None or end_key is None:
                 raise ValueError("Timestamped reference entries need both start and end.")
             segment["start_ms"] = milliseconds(entry[start_key], start_key)
@@ -330,6 +353,11 @@ def main():
     result["attribution_view"] = "effective" if args.effective_speakers else "canonical"
     if "display_paragraphs" in replay:
         result["display_paragraphs"] = paragraph_metrics(replay["display_paragraphs"])
+    if "display_asides" in replay:
+        asides = replay["display_asides"]
+        result["display_asides"] = dict(aside_count=len(asides),
+                                        word_count=sum(aside["word_count"] for aside in asides),
+                                        source_segment_count=sum(aside["source_segment_count"] for aside in asides))
     result["provenance"] = dict(run_revision=canonical.get("revision"), executable_sha256=executable_sha256,
                                 engine_revision=engine_revision(diarization), diarization_sha256=sha256(args.diarization))
     args.output.parent.mkdir(parents=True, exist_ok=True)

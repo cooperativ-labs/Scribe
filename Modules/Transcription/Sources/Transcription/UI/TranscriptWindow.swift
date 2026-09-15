@@ -588,12 +588,13 @@ public struct TranscriptWindow: View {
             Menu("Export", systemImage: "square.and.arrow.up") {
                 Button("Export TXT") { exportTranscript(formats: [.plainText]) }
                 Button("Export JSON") { exportTranscript(formats: [.json]) }
+                Button("Export for Knowledgebase") { exportTranscript(formats: [.knowledgebase]) }
                 Button("Export SRT") { exportTranscript(formats: [.subtitles]) }
                 Divider()
                 Button("Export All") { exportTranscript(formats: Set(TranscriptExportFormat.allCases)) }
             }
             .disabled(viewModel.selectedTranscript == nil)
-            .help("Save a copy of this transcript as TXT, JSON, or SRT. This does not change the recordings folder in Settings.")
+            .help("Save a copy of this transcript as TXT, Scribe JSON, Knowledgebase JSON, or SRT. This does not change the recordings folder in Settings.")
             Button("Keyboard Shortcuts", systemImage: "keyboard") { isShowingShortcuts.toggle() }
                 .popover(isPresented: $isShowingShortcuts, arrowEdge: .bottom) { TranscriptShortcutsHelp() }
                 .help("Keyboard shortcuts")
@@ -1192,6 +1193,59 @@ private struct TranscriptParagraphRow: View {
                 .font(.body)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .textSelection(.enabled)
+            ForEach(paragraph.asides) { aside in
+                HStack(alignment: .firstTextBaseline, spacing: 7) {
+                    Button {
+                        viewModel.play(paragraph: aside)
+                    } label: {
+                        Image(systemName: viewModel.isPlaying && aside.sourceSegmentIDs.contains(viewModel.playingSegmentID ?? "")
+                            ? "speaker.wave.2.fill" : "play.circle")
+                    }
+                    .buttonStyle(.plain)
+                    .help("Play this interjection")
+                    .accessibilityLabel("Play \(aside.speakerLabel)'s interjection at \(TranscriptTimecode.string(fromMilliseconds: aside.startMs))")
+                    Text(TranscriptTimecode.string(fromMilliseconds: aside.startMs))
+                        .monospacedDigit()
+                    Text(TranscriptSearchHighlighter.highlight(aside.speakerLabel, query: viewModel.searchText))
+                        .fontWeight(.semibold)
+                    Text(TranscriptSearchHighlighter.highlight(aside.text, query: viewModel.searchText))
+                        .textSelection(.enabled)
+                    if aside.overlap {
+                        Image(systemName: "person.2")
+                            .help("Overlapping speech")
+                            .accessibilityLabel("Overlapping speech")
+                    }
+                    if aside.needsReview {
+                        Image(systemName: "questionmark.circle")
+                            .foregroundStyle(.orange)
+                            .help("This interjection needs review")
+                    }
+                    Spacer(minLength: 0)
+                    Button("Show turn") {
+                        if let source = viewModel.primarySegment(for: aside) {
+                            viewModel.select(segment: source)
+                            viewModel.reviewLayout = .segments
+                        }
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Select the original turn for speaker and text edits")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.leading, 10)
+                .padding(.vertical, 4)
+                .background(aside.sourceSegmentIDs.contains(viewModel.selectedSegmentID ?? "") ? Color.accentColor.opacity(0.1) : .clear)
+                .overlay(alignment: .leading) {
+                    Rectangle().fill(Color.secondary.opacity(0.3)).frame(width: 2)
+                }
+                .contentShape(Rectangle())
+                .onTapGesture(count: 2) { viewModel.play(paragraph: aside) }
+                .onTapGesture {
+                    if let source = viewModel.primarySegment(for: aside) { viewModel.select(segment: source) }
+                }
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Interjection by \(aside.speakerLabel): \(aside.text)")
+            }
         }
         .padding(12)
         .background(background, in: RoundedRectangle(cornerRadius: 8))

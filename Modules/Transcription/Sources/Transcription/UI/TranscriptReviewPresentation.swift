@@ -116,7 +116,8 @@ public enum TranscriptReviewFilter: String, CaseIterable, Identifiable, Sendable
     }
 
     public func matches(_ paragraph: TranscriptParagraph) -> Bool {
-        switch self {
+        if paragraph.asides.contains(where: { matches($0) }) { return true }
+        return switch self {
         case .all: true
         case .needsReview: paragraph.needsReview
         case .unknownSpeaker: paragraph.speakerID == nil

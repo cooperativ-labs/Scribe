@@ -27,7 +27,7 @@ final class ModuleIntegrationTests: XCTestCase {
 
     override func tearDownWithError() throws { try? FileManager.default.removeItem(at: root) }
 
-    func testAChosenFolderReachesAThreeFormatExportThroughReview() async throws {
+    func testAChosenFolderReachesEveryExportFormatThroughReview() async throws {
         let ffprobe = try findExecutable(named: "ffprobe")
         let folder = root.appending(path: "Recordings", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -95,7 +95,7 @@ final class ModuleIntegrationTests: XCTestCase {
         await MainActor.run { model.export(Set(TranscriptExportFormat.allCases), to: exports) }
 
         let outcomes = await model.exportOutcomes
-        XCTAssertEqual(outcomes.count, 3)
+        XCTAssertEqual(outcomes.count, TranscriptExportFormat.allCases.count)
         for outcome in outcomes {
             XCTAssertTrue(outcome.succeeded, "\(outcome.format) failed: \(outcome.errorMessage ?? "")")
             let url = try XCTUnwrap(outcome.destinationURL)
@@ -107,6 +107,11 @@ final class ModuleIntegrationTests: XCTestCase {
         XCTAssertTrue(srt.contains("-->"), "SRT export was:\n\(srt)")
         let json = try CanonicalTranscriptCodec.decode(Data(contentsOf: exports.appending(path: "team sync.json")))
         XCTAssertEqual(json.segments.count, transcript.segments.count)
+        let knowledgebase = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(contentsOf: exports.appending(path: "team sync.kb.json"))) as? [String: Any]
+        )
+        XCTAssertEqual(knowledgebase["schema"] as? String, KnowledgebaseTranscriptExporter.schema)
+        XCTAssertEqual((knowledgebase["turns"] as? [Any])?.count, transcript.segments.count)
     }
 
     func testCollapsedAutomaticDiarizationIsReviewableAndKeepsEngineEvidence() async throws {

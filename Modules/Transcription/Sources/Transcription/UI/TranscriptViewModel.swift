@@ -191,11 +191,16 @@ public final class TranscriptViewModel {
     public var visibleParagraphs: [TranscriptParagraph] {
         let query = Self.normalizedSearch(searchText)
         return chronologicalParagraphs.filter { paragraph in
-            if let speakerFilterID, paragraph.speakerID != speakerFilterID { return false }
+            if let speakerFilterID, paragraph.speakerID != speakerFilterID,
+               !paragraph.asides.contains(where: { $0.speakerID == speakerFilterID }) { return false }
             guard reviewFilter.matches(paragraph) else { return false }
             guard !query.isEmpty else { return true }
             return Self.normalizedSearch(paragraph.text).contains(query)
                 || Self.normalizedSearch(paragraph.speakerLabel).contains(query)
+                || paragraph.asides.contains { aside in
+                    Self.normalizedSearch(aside.text).contains(query)
+                        || Self.normalizedSearch(aside.speakerLabel).contains(query)
+                }
         }
     }
 
@@ -304,7 +309,7 @@ public final class TranscriptViewModel {
 
     public func paragraph(containingSegmentID segmentID: TranscriptSegment.ID?) -> TranscriptParagraph? {
         guard let segmentID else { return nil }
-        return chronologicalParagraphs.first { $0.sourceSegmentIDs.contains(segmentID) }
+        return chronologicalParagraphs.first { $0.allSourceSegmentIDs.contains(segmentID) }
     }
 
     /// The canonical segment a paragraph row should act on: the selected source

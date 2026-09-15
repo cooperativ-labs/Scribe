@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "transcript_free": true,
+  "benchmark": {
+    "filename": "BENCHMARK CALL.json",
+    "sha256": "cf9664ca8970c228360ae374870659826db4d4a0262bea702495a06166677eb5",
+    "segments": 1493,
+    "scoreable_speaker_segments": 1480,
+    "unlabelled_segments_excluded": 13,
+    "named_speakers": 9,
+    "timestamp_range": "00:00-01:56:59"
+  },
+  "run": {
+    "meeting": "meeting--cecb678e89d2e0bc89c9687e1c980d5b",
+    "run": "01D75E08-6B5B-4C90-935D-7786C61BABA3",
+    "canonical_revision": 14,
+    "replay_words": 19853,
+    "canonical_paragraphs": 1329,
+    "canonical_single_word_paragraphs": 559,
+    "display_paragraphs": 630,
+    "display_single_word_paragraphs": 94
+  },
+  "timestamp_alignment": {
+    "scored_words": 19248,
+    "replay_word_coverage_pct": 96.953,
+    "matched_reference_segments": 1399,
+    "reference_segment_coverage_pct": 94.527,
+    "canonical": {
+      "correct_words": 18460,
+      "correct_pct": 95.906,
+      "wrong_words": 98,
+      "wrong_pct": 0.509,
+      "unknown_words": 690,
+      "unknown_pct": 3.585,
+      "wder_pct": 4.094
+    },
+    "effective": {
+      "correct_words": 18900,
+      "correct_pct": 98.192,
+      "wrong_words": 111,
+      "wrong_pct": 0.577,
+      "unknown_words": 237,
+      "unknown_pct": 1.231,
+      "wder_pct": 1.808
+    }
+  },
+  "text_alignment_cross_check": {
+    "matched_lexical_tokens": 18763,
+    "replay_lexical_tokens": 19853,
+    "reference_lexical_tokens": 19578,
+    "replay_lexical_coverage_pct": 94.51,
+    "reference_lexical_coverage_pct": 95.837,
+    "canonical_wder_pct": 4.162,
+    "effective_wder_pct": 1.721,
+    "note": "Exact-token SequenceMatcher coverage is a robustness cross-check, not conventional ASR WER."
+  },
+  "speaker_mapping": {
+    "reference_speakers": 9,
+    "mapped_hypothesis_speakers": 9,
+    "extra_hypothesis_speakers": 1,
+    "note": "All nine benchmark speakers received distinct optimal one-to-one hypothesis mappings. The extra cluster contributed three scored words, all wrong."
+  },
+  "provenance": {
+    "diarization_runtime_revision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b",
+    "diarization_sha256": "2465dd7f543f4799a0131626a4e67e845b1061d8f84de309f16ba11f36cffcaa",
+    "replay_executable_sha256": "cc199a2abadd05cf794054d1bd0a19175078e2fb958d647357d2853540579ca6"
+  }
+}

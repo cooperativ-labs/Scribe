@@ -75,15 +75,19 @@ final class TranscriptViewModelTests: XCTestCase {
 
         let outcomes = FileTranscriptExportWriter().write(transcript, formats: Set(TranscriptExportFormat.allCases), to: directory)
 
-        XCTAssertEqual(outcomes.count, 3)
+        XCTAssertEqual(outcomes.count, TranscriptExportFormat.allCases.count)
         XCTAssertTrue(outcomes.allSatisfy(\.succeeded))
         for format in TranscriptExportFormat.allCases {
-            let expectedURL = try XCTUnwrap(
-                Bundle.module.url(forResource: "expected-two-speakers", withExtension: format.fileExtension)
-                    ?? Bundle.module.url(forResource: "expected-two-speakers", withExtension: format.fileExtension, subdirectory: "Goldens")
-            )
             let destination = directory.appendingPathComponent("interview").appendingPathExtension(format.fileExtension)
-            XCTAssertEqual(try Data(contentsOf: destination), try Data(contentsOf: expectedURL), "\(format.rawValue) export drifted")
+            if format == .knowledgebase {
+                XCTAssertEqual(try Data(contentsOf: destination), try KnowledgebaseTranscriptExporter.data(transcript))
+            } else {
+                let expectedURL = try XCTUnwrap(
+                    Bundle.module.url(forResource: "expected-two-speakers", withExtension: format.fileExtension)
+                        ?? Bundle.module.url(forResource: "expected-two-speakers", withExtension: format.fileExtension, subdirectory: "Goldens")
+                )
+                XCTAssertEqual(try Data(contentsOf: destination), try Data(contentsOf: expectedURL), "\(format.rawValue) export drifted")
+            }
         }
     }
 
@@ -130,7 +134,7 @@ final class TranscriptViewModelTests: XCTestCase {
             basename: "weekly notes"
         )
 
-        XCTAssertEqual(outcomes.count, 3)
+        XCTAssertEqual(outcomes.count, TranscriptExportFormat.allCases.count)
         XCTAssertTrue(outcomes.allSatisfy(\.succeeded))
         for format in TranscriptExportFormat.allCases {
             let url = directory.appendingPathComponent("weekly notes").appendingPathExtension(format.fileExtension)
@@ -176,6 +180,15 @@ final class TranscriptViewModelTests: XCTestCase {
 
         let dotted = TranscriptExportDestination.fromSaveURL(URL(fileURLWithPath: "/tmp/my.meeting.notes"))
         XCTAssertEqual(dotted.basename, "my.meeting.notes")
+    }
+
+    func testSavePanelStripsTheCompoundKnowledgebaseExtensionFromASharedBasename() {
+        let destination = TranscriptExportDestination.fromSaveURL(
+            URL(fileURLWithPath: "/tmp/Weekly sync.kb.json")
+        )
+
+        XCTAssertEqual(destination.directoryURL.path, "/tmp")
+        XCTAssertEqual(destination.basename, "Weekly sync")
     }
 
     func testPlayingASegmentStartsThereAndFollowsTheTurnsUntilTheLastOneEnds() throws {
@@ -391,9 +404,11 @@ final class TranscriptViewModelTests: XCTestCase {
         )
         let original = try XCTUnwrap(viewModel.selectedTranscript)
 
+        let exports = try TranscriptExportFormat.allCases.map { try TranscriptExporter.export(original, as: $0) }
+
         XCTAssertEqual(viewModel.reviewLayout, .segments)
         XCTAssertEqual(viewModel.chronologicalSegments.map(\.id), ["seg_a", "seg_b", "seg_ack", "seg_c"])
-        XCTAssertEqual(viewModel.chronologicalParagraphs.map(\.sourceSegmentIDs), [["seg_a", "seg_b"], ["seg_ack"], ["seg_c"]])
+        XCTAssertEqual(viewModel.chronologicalParagraphs.map(\.sourceSegmentIDs), [["seg_a", "seg_b", "seg_c"]])
 
         let second = try XCTUnwrap(viewModel.chronologicalSegments.first { $0.id == "seg_b" })
         viewModel.select(segment: second)
@@ -412,6 +427,9 @@ final class TranscriptViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.playheadMilliseconds, 700)
         XCTAssertEqual(viewModel.selectedTranscript?.segments, original.segments)
         XCTAssertEqual(viewModel.selectedTranscript?.speakers, original.speakers)
+        let after = try XCTUnwrap(viewModel.selectedTranscript)
+        XCTAssertEqual(try TranscriptExportFormat.allCases.map { try TranscriptExporter.export(after, as: $0) }, exports)
+        XCTAssertEqual(after.subtitleCueMappings, original.subtitleCueMappings)
     }
 
     func testParagraphPlaybackAndNeighbourNavigationKeepSourceMappings() throws {
@@ -434,10 +452,15 @@ final class TranscriptViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.playheadMilliseconds, 0)
         XCTAssertEqual(playback.transport, [.play])
 
-        viewModel.selectNeighbouringSegment(offset: 1)
+        let aside = try XCTUnwrap(firstParagraph.asides.first)
+        viewModel.play(paragraph: aside)
+        XCTAssertEqual(viewModel.playheadMilliseconds, 1_050)
         XCTAssertEqual(viewModel.playingSegmentID, "seg_ack")
         XCTAssertEqual(viewModel.selectedSegmentID, "seg_ack")
-        XCTAssertEqual(viewModel.playingParagraphID, viewModel.chronologicalParagraphs[1].id)
+        XCTAssertEqual(viewModel.playingParagraphID, firstParagraph.id)
+        XCTAssertEqual(viewModel.primarySegment(for: firstParagraph)?.id, "seg_b", "main speaker actions never target the aside")
+        viewModel.selectNeighbouringSegment(offset: 1)
+        XCTAssertEqual(viewModel.selectedSegmentID, "seg_ack", "the only paragraph has no next neighbour")
 
         playback.emit(.timeChanged(milliseconds: 1_100))
         viewModel.reviewLayout = .segments
@@ -446,7 +469,38 @@ final class TranscriptViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.isPlaying)
     }
 
-    private func groupingTranscript() -> CanonicalTranscript {
+    func testAsidesRemainSearchableFilterableAndSelectTheirCanonicalTurn() throws {
+        let transcript = groupingTranscript(asideOverlap: true)
+        let viewModel = TranscriptViewModel(files: [TranscriptReviewFile(
+            sourceSnapshotURL: URL(fileURLWithPath: "/tmp/asides.flac"),
+            transcript: transcript, jobState: .complete
+        )], playback: PlaybackSpy())
+        viewModel.reviewLayout = .paragraphs
+        let paragraph = try XCTUnwrap(viewModel.chronologicalParagraphs.first)
+        XCTAssertEqual(paragraph.asides.count, 1)
+        XCTAssertTrue(paragraph.needsReview)
+        viewModel.searchText = "Mm-hm"
+        XCTAssertEqual(viewModel.visibleParagraphs.count, 1)
+        viewModel.searchText = "Speaker 2"
+        XCTAssertEqual(viewModel.visibleParagraphs.count, 1)
+        viewModel.searchText = ""
+        viewModel.speakerFilterID = "speaker_2"
+        XCTAssertEqual(viewModel.visibleParagraphs.count, 1)
+        viewModel.reviewFilter = .overlap
+        XCTAssertEqual(viewModel.visibleParagraphs.count, 1)
+        viewModel.reviewFilter = .needsReview
+        XCTAssertEqual(viewModel.visibleParagraphs.count, 1)
+        let aside = paragraph.asides[0]
+        let source = try XCTUnwrap(viewModel.primarySegment(for: aside))
+        viewModel.select(segment: source)
+        XCTAssertEqual(viewModel.selectedSegmentID, "seg_ack")
+        XCTAssertEqual(viewModel.selectedParagraphID, paragraph.id)
+        viewModel.reviewLayout = .segments
+        XCTAssertEqual(viewModel.visibleSegments.map(\.id), ["seg_ack"])
+        XCTAssertEqual(viewModel.selectedTranscript, transcript)
+    }
+
+    private func groupingTranscript(asideOverlap: Bool = false) -> CanonicalTranscript {
         CanonicalTranscript(
             transcriptID: "paragraph-views",
             revision: 1,
@@ -496,7 +550,7 @@ final class TranscriptViewModelTests: XCTestCase {
                     startMs: 1_050,
                     endMs: 1_300,
                     text: "Mm-hm.",
-                    overlap: false,
+                    overlap: asideOverlap,
                     timingQuality: .asrWord,
                     words: [TimedWord(text: "Mm-hm.", startMs: 1_050, endMs: 1_300)]
                 ),

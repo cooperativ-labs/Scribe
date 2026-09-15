@@ -262,17 +262,15 @@ public struct TranscriptExportDestination: Equatable, Sendable {
     }
 
     /// Treats a Save panel URL as a destination folder plus a name. A known export
-    /// extension is stripped so TXT, JSON, and SRT copies can share that name.
+    /// extension is stripped so every exported copy can share that name.
     public static func fromSaveURL(_ url: URL) -> TranscriptExportDestination {
         let filename = url.lastPathComponent
-        let knownExtensions = Set(TranscriptExportFormat.allCases.map(\.fileExtension))
-        let basename: String
-        if knownExtensions.contains(url.pathExtension.lowercased()) {
-            let stripped = url.deletingPathExtension().lastPathComponent
-            basename = stripped.isEmpty ? filename : stripped
-        } else {
-            basename = filename
-        }
+        let matchedExtension = TranscriptExportFormat.allCases
+            .map(\.fileExtension)
+            .sorted { $0.count > $1.count }
+            .first { filename.lowercased().hasSuffix("." + $0) }
+        let stripped = matchedExtension.map { String(filename.dropLast($0.count + 1)) }
+        let basename = stripped.flatMap { $0.isEmpty ? nil : $0 } ?? filename
         return TranscriptExportDestination(directoryURL: url.deletingLastPathComponent(), basename: basename)
     }
 }

@@ -87,6 +87,9 @@ MacWhisper-style JSON `[{"speaker", "text", "start"?, "end"?}]`, SRT/VTT
 captions whose text starts with `Speaker:`, and plain text consisting of one
 `Speaker: utterance` per line. JSON `start`/`end` are seconds (use
 `start_ms`/`end_ms` for milliseconds); caption timestamps are standard SRT/VTT.
+Reviewed JSON exports may instead use a `timestamp` range such as
+`MM:SS-MM:SS` or `HH:MM:SS-HH:MM:SS`. Rows with a null speaker are retained in
+the source benchmark but excluded from speaker scoring.
 Timestamped references align replay words by greatest time overlap. Untimed
 references align normalized lexical tokens with `SequenceMatcher(autojunk=False)`.
 Both report coverage, and the scorer finds a globally optimal one-to-one mapping
@@ -122,6 +125,15 @@ retains the historical canonical-row count; `display_paragraphs` counts actual
 reading paragraphs after reconciliation. Inferred labels remain suggestions:
 canonical `speaker_id` stays null and canonical exports retain that uncertainty.
 Rebuild old cached host executables before using `--effective-speakers`.
+
+Backchannel asides are presentation-only: `display_paragraphs` counts the main
+reading rows and their main-speaker words; `display_asides` reports the separate
+aside, word, and source-segment counts. Asides are excluded from the main row's
+single-word count, but their canonical words remain in speaker scoring and the
+historical `paragraphs` metrics. Rebuild the host to include aside metrics.
+The supplied `benchmark-files/BENCHMARK CALL - Paragraphs.json` can also be passed
+as `--reference` for untimed text alignment. Its row counts provide a readability
+comparison, not a paragraph-boundary precision/recall score.
 
 ## Excerpt review and checks
 

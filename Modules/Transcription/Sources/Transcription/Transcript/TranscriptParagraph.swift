@@ -19,6 +19,14 @@ public struct TranscriptParagraph: Identifiable, Equatable, Sendable {
     public let words: [TimedWord]?
     public let sourceSegmentIDs: [TranscriptSegment.ID]
     public let containsInferredAttribution: Bool
+    /// Brief interjections by another speaker. Their text and source IDs remain
+    /// separate from the main speaker's text, words, and editing targets.
+    /// The grouper emits leaf paragraphs here (never nested asides).
+    public let asides: [TranscriptParagraph]
+
+    public var allSourceSegmentIDs: [TranscriptSegment.ID] {
+        sourceSegmentIDs + asides.flatMap(\.allSourceSegmentIDs)
+    }
 
     public var sourceSegmentCount: Int { sourceSegmentIDs.count }
 
@@ -29,6 +37,7 @@ public struct TranscriptParagraph: Identifiable, Equatable, Sendable {
 
     public var needsReview: Bool {
         speakerID == nil || containsInferredAttribution || hasLowSpeakerConfidence || overlap || timingQuality == .segmentOnly
+            || asides.contains(where: \.needsReview)
     }
 
     public init(
@@ -43,7 +52,8 @@ public struct TranscriptParagraph: Identifiable, Equatable, Sendable {
         speakerConfidence: Double?,
         words: [TimedWord]?,
         sourceSegmentIDs: [TranscriptSegment.ID],
-        containsInferredAttribution: Bool = false
+        containsInferredAttribution: Bool = false,
+        asides: [TranscriptParagraph] = []
     ) {
         self.id = id
         self.speakerID = speakerID
@@ -57,6 +67,7 @@ public struct TranscriptParagraph: Identifiable, Equatable, Sendable {
         self.words = words
         self.sourceSegmentIDs = sourceSegmentIDs
         self.containsInferredAttribution = containsInferredAttribution
+        self.asides = asides
     }
 }
 
@@ -67,8 +78,8 @@ public struct TranscriptParagraph: Identifiable, Equatable, Sendable {
 /// timing; this type only chooses where a reader wants a break inside one
 /// continuous speaker turn.
 ///
-/// Speaker identity is an input: a speaker change, including a known/unknown
-/// transition, always starts a new paragraph. Unknown spans are not treated as
+/// Speaker identity is an input: speaker changes start a new paragraph except
+/// for bounded backchannels, retained as separate-speaker asides. Unknown spans are not treated as
 /// one speaker — `nil == nil` is not evidence of identity, so an unknown
 /// sentence boundary still splits, and unknown fragments keep the tighter pause
 /// limit. An overlap transition also splits, so overlapping speech stays
@@ -134,15 +145,61 @@ public struct TranscriptParagraphGrouper: Sendable {
     public func paragraphs(from segments: [TranscriptSegment]) -> [TranscriptParagraph] {
         let chronological = segments.sorted { ($0.startMs, $0.endMs, $0.id) < ($1.startMs, $1.endMs, $1.id) }
         var drafts: [Draft] = []
-        for segment in chronological {
+        var index = 0
+        while index < chronological.count {
+            let segment = chronological[index]
+            // Consume the aside and the returning row together: an alternating
+            // run cannot accidentally classify the same row twice.
+            if index > 0, index + 1 < chronological.count,
+               isBackchannel(segment, between: chronological[index - 1], and: chronological[index + 1]),
+               var current = drafts.last,
+               segment.endMs - current.startMs <= configuration.maximumDurationMs,
+               canBridge(chronological[index + 1], to: current) {
+                current.asides.append(Draft(segment: segment).paragraph())
+                current.append(chronological[index + 1])
+                drafts[drafts.count - 1] = current
+                index += 2
+                continue
+            }
             if var current = drafts.last, canAppend(segment, to: current) {
                 current.append(segment)
                 drafts[drafts.count - 1] = current
             } else {
                 drafts.append(Draft(segment: segment))
             }
+            index += 1
         }
         return drafts.map { $0.paragraph() }
+    }
+
+    private static let backchannels: Set<String> = [
+        "yeah", "yes", "yep", "yup", "right", "okay", "ok", "mmhmm", "mmhm",
+        "mhm", "uhhuh", "sure", "got it", "exactly", "absolutely", "alright", "all right",
+    ]
+
+    private func isBackchannel(_ row: TranscriptSegment, between previous: TranscriptSegment, and next: TranscriptSegment) -> Bool {
+        guard let speaker = row.effectiveSpeakerID,
+              let surroundingSpeaker = previous.effectiveSpeakerID,
+              next.effectiveSpeakerID == surroundingSpeaker, speaker != surroundingSpeaker,
+              (1...3).contains(row.storedWordCount),
+              (0...1_200).contains(row.endMs - row.startMs),
+              row.startMs - previous.endMs < configuration.hardPauseMs,
+              next.startMs - row.endMs < configuration.hardPauseMs,
+              next.startMs - previous.endMs < configuration.hardPauseMs else { return false }
+        let normalized = row.text.lowercased().unicodeScalars.filter {
+            CharacterSet.alphanumerics.contains($0) || CharacterSet.whitespacesAndNewlines.contains($0)
+        }
+        let key = String(String.UnicodeScalarView(normalized)).split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        return row.overlap || Self.backchannels.contains(key)
+    }
+
+    /// A backchannel suppresses a soft sentence break, but never a hard cap or
+    /// overlap transition in the main speaker's speech.
+    private func canBridge(_ next: TranscriptSegment, to current: Draft) -> Bool {
+        current.groupingSpeakerID == next.effectiveSpeakerID
+            && current.overlap == next.overlap
+            && current.wordCount + next.storedWordCount <= configuration.maximumWordCount
+            && next.endMs - current.startMs <= configuration.maximumDurationMs
     }
 
     /// Whether `next` may continue the open paragraph.
@@ -181,6 +238,7 @@ public struct TranscriptParagraphGrouper: Sendable {
         var lastText: String
         var overlap: Bool
         var sources: [TranscriptSegment]
+        var asides: [TranscriptParagraph] = []
 
         init(segment: TranscriptSegment) {
             groupingSpeakerID = segment.effectiveSpeakerID
@@ -211,7 +269,7 @@ public struct TranscriptParagraphGrouper: Sendable {
                 speakerID: confirmed?.speakerID ?? inferred?.speakerID,
                 speakerLabel: confirmed?.speakerLabel ?? inferred?.speakerLabel ?? sources[0].speakerLabel,
                 startMs: startMs,
-                endMs: endMs,
+                endMs: max(endMs, asides.map(\.endMs).max() ?? endMs),
                 text: sources.map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
                     .filter { !$0.isEmpty }
                     .joined(separator: " "),
@@ -220,7 +278,8 @@ public struct TranscriptParagraphGrouper: Sendable {
                 speakerConfidence: confidences.min(),
                 words: Self.joinedWords(from: sources),
                 sourceSegmentIDs: sourceIDs,
-                containsInferredAttribution: containsInferred
+                containsInferredAttribution: containsInferred,
+                asides: asides
             )
         }
 

@@ -2,7 +2,7 @@ import Foundation
 import XCTest
 @testable import Transcription
 
-/// Golden-file coverage for the TXT and JSON exports.
+/// Golden-file and interchange-contract coverage for transcript exports.
 ///
 /// Set `SCRIBE_REGENERATE_GOLDENS=1` to rewrite `Tests/Fixtures/Goldens` from the current
 /// exporters; review the diff before committing it.
@@ -34,6 +34,53 @@ final class TranscriptExporterTests: XCTestCase {
             let exported = try TranscriptExporter.srt(transcript(named: name))
             try assertMatchesGolden(exported, named: name, extension: "srt")
         }
+    }
+
+    func testKnowledgebaseExportMatchesMeetingTranscriptContract() throws {
+        let exported = try object(from: TranscriptExporter.export(transcript(named: "one-speaker"), as: .knowledgebase))
+
+        XCTAssertEqual(exported["schema"] as? String, "kb.meeting-transcript/1")
+        let source = try XCTUnwrap(exported["source"] as? [String: Any])
+        XCTAssertEqual(source["ref"] as? String, "sha256:one")
+        XCTAssertEqual(source["recorded_at"] as? String, "2026-09-03T12:00:00Z")
+        XCTAssertEqual(source["duration_ms"] as? Int, 12_000)
+        XCTAssertEqual(exported["language"] as? String, "en")
+
+        let speakers = try XCTUnwrap(exported["speakers"] as? [[String: Any]])
+        XCTAssertEqual(speakers.count, 1)
+        XCTAssertEqual(speakers[0]["id"] as? String, "speaker_1")
+        XCTAssertEqual(speakers[0]["label"] as? String, "Speaker 1")
+        XCTAssertNil(speakers[0]["profile_id"], "Scribe profile ids are not Knowledgebase person node ids")
+
+        let turns = try XCTUnwrap(exported["turns"] as? [[String: Any]])
+        XCTAssertEqual(turns.count, 1)
+        XCTAssertEqual(turns[0]["speaker_id"] as? String, "speaker_1")
+        XCTAssertEqual(turns[0]["start_ms"] as? Int, 1_000)
+        XCTAssertEqual(turns[0]["end_ms"] as? Int, 4_200)
+        XCTAssertEqual((turns[0]["words"] as? [[String: Any]])?.count, 4)
+
+        let pipeline = try XCTUnwrap(exported["pipeline"] as? [String: Any])
+        let scribe = try XCTUnwrap(pipeline["scribe"] as? [String: Any])
+        XCTAssertEqual(scribe["transcript_id"] as? String, "one-speaker")
+        XCTAssertEqual(scribe["revision"] as? Int, 1)
+        XCTAssertEqual(scribe["recorded_at_basis"] as? String, "transcript_created_at")
+    }
+
+    func testKnowledgebaseExportAddsAStableUnknownSpeakerForUnassignedAndSilentTranscripts() throws {
+        let unassigned = try object(from: TranscriptExporter.export(transcript(named: "unknown-speaker"), as: .knowledgebase))
+        let unassignedSpeakers = try XCTUnwrap(unassigned["speakers"] as? [[String: Any]])
+        let unassignedTurns = try XCTUnwrap(unassigned["turns"] as? [[String: Any]])
+        XCTAssertTrue(unassignedSpeakers.contains { $0["id"] as? String == KnowledgebaseTranscriptExporter.unknownSpeakerID })
+        XCTAssertEqual(unassignedTurns[0]["speaker_id"] as? String, KnowledgebaseTranscriptExporter.unknownSpeakerID)
+
+        let silent = try object(from: TranscriptExporter.export(transcript(named: "no-speech"), as: .knowledgebase))
+        XCTAssertEqual((silent["speakers"] as? [[String: Any]])?.count, 1, "Knowledgebase v1 currently requires a non-empty speaker table")
+        XCTAssertEqual((silent["turns"] as? [Any])?.count, 0)
+    }
+
+    func testKnowledgebaseExportUsesDistinctCompoundExtension() {
+        XCTAssertEqual(TranscriptExportFormat.knowledgebase.fileExtension, "kb.json")
+        XCTAssertEqual(TranscriptExportFormat.knowledgebase.contentType, .json)
     }
 
     // MARK: - Determinism and encoding

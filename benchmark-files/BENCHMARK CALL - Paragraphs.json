@@ -1,0 +1,1756 @@
+[
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Good afternoon or morning everyone depending on where you are. Hello, hello. All right Well, we're all here."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Um thank you for joining the first um uh customer advisory board meeting uh for Tough Leaf. It's a pleasure to have uh all of you here. So thanks again for your time and your efforts."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Um I'm gonna start uh the meeting with a round of intros. Some of you know each other, uh others uh it's the first time you meet So we'll kick it off with the Tough Leaf team internally and then we'll hand it over to you. Akira, you want to start us off?"
+  },
+  {
+    "speaker" : "Akira Nesfield",
+    "text" : "Sure. Good afternoon, everyone. Hi, my name is Akira Nesfield."
+  },
+  {
+    "speaker" : "Akira Nesfield",
+    "text" : "I am the director of compliance at Tufleaf. I've been working in this space for 10 to 15 years, but who's counting? Um and I now help translate what compliance teams deal with on the floor and help Jason turn it into technology."
+  },
+  {
+    "speaker" : "Akira Nesfield",
+    "text" : "And I think it's really cool. So nice to meet you all. Jason?"
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "All right. Hey everyone, I'm Jason Garcia, Director of Product here at Tufleaf. So I'm responsible for the things that we build, the product strategy. that we have and I'm very very excited for for all of you to be here and to tell us your thoughts because this is the the best way that that we learn is is from hearing from folks like like you all. And then I will hand it over to what may be the newest tough leaf employee, Jake."
+  },
+  {
+    "speaker" : "Jacob Chase-Lubitz",
+    "text" : "Hi, um I'm Jake. Um and I've been I guess working I've family visiting so I've been working on and off for about a week and a half um and starting to kind of move over the prototype version that we have of of Clare Comply, which works quite well, um, and trying to kind of give it a deeper foundation and then And then we'll add a lot more features in eventually. It will automate all compliance all over the world. And we can all know watch movies and stuff. So yeah, that's what I'm working on."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "All right. Um now in no particular order. I'm just gonna start with how you appear on my screen. Um over to you folks, Caleb."
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "Yeah, I'm Caleb Bradford. I'm our director of sales operations for John Miller. We're a mechanical contractor based out of the Pacific Northwest."
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "We've got five different divisions and we're currently using Tough Leaf right now in like selective pockets trying to figure out what that onboarding into compliance look like. So yeah, super excited to kind of unpack. Nicole, I'm going to hand it off to you."
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "Nice to see you again."
+  },
+  {
+    "speaker" : "Nicole Duption (Structural Group)",
+    "text" : "Nicole, good to see you. Similar to Caleb's role, director of sales ops and marketing. for a structural group."
+  },
+  {
+    "speaker" : "Nicole Duption (Structural Group)",
+    "text" : "We have several companies that roll up a structural group. But at our core we're a contracting company. And we use tough leaf."
+  },
+  {
+    "speaker" : "Nicole Duption (Structural Group)",
+    "text" : "In several different ways, um, from pre-construction compliance um all the way to you know finding and matching us with subcontractors that meet contract qualifications. So yeah, nice to meet everyone."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "John? Hi everybody, I'm John Rooney. I'm with uh Gilvane Building Company, a large CM."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "Hi, Chris. Good to see you on here. Um And uh I've been in the business for like 16 years."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "Half of that was with the city of New York, uh working on the the equity side holding the builders of New York City accountable. And then the last half of that has been with Gilbain in an implementation role. So I have a lot of experience with compliance."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "We do not currently use Tuffleaf, we use B2G. So um which uh you know I'll be able to bring that experience here and uh hopefully make sure that Toughleaf comes up with uh a better product. Chris?"
+  },
+  {
+    "speaker" : "Kris Harrison (Turner)",
+    "text" : "Hi everyone, I'm Chris Harrison. I'm with Turner Construction Company. I am their director of supplier diversity. I've been with the company and in this space for about 27 years now. It's really nice to meet all of you."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Latoya?"
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "Hi everyone, I'm Latoya with LNM Foodman Partners. I'm the workforce and contractor diversity manager. I've been in an LM for about four years now."
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "I've been in the compliance space to 15 years, but doing more so of affordable housing fees. Um and then I transitioned recently to this side. Um I we I worked with Tufley on another project before um comply became a thing."
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "So the learning to see how we navigated from then to now is pretty amazing. We also use Axi and normal spreadsheets. So it's really nice to see where we could come from now and change how we do compliance and for"
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Amazing. All right, well, great. We got everyone introduced."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "So, you know, kick things off, I just want to thank you again for making the time. Uh some quick housekeeping. We are recording this uh so Jacob doesn't have to type every word."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Um uh but as we've mentioned and you all sign the uh CAP agreements, you know, nothing gets attributed to you outside of this group without asking you for it first and we'll make sure that everything stays uh confidential. Um I wanna talk about like why we picked um this group. Um other than being you know awesome people that we've spoken to over you know the past uh four years of being in business, you know, you have a wealth of experience in different parts of the industry."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "And between you you cover different types of companies, company sizes, positions in the company, and use cases for us at Tufleaf. So again, thank you all for agreeing to be here and for giving us your time. And as I mentioned, this is our first meeting, and I want to talk about what today is about."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Today, you know, we want to talk to you about how we run compliance. Um, today is that we run it as a service and we're building a clear comply as a product. we'll talk more uh about what that means but it's basically to become a software uh that your team runs."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Uh not exactly you know has to be used by everyone uh on the school or every general contractor, right? Some um GCs um you know like Turner and LM um and Gobain will have their own internal compliance team. So in these cases it makes more sense to have a product for them that they can use."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Others like McDonald Mirror and Structural, you don't have your own internal compliance team, so Tough Leaf Acts is your own internal compliance team. um you're getting a service, but also what that service does, what that product shows you is also a very important type. And again talks about like Why we have the five of you is because it's going to be like different opinions, different ways that you want it work."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "We want to make sure that we capture everyone's voice and have the right um um content uh and context to build something that works uh for all of you. Um So, three ground rules of uh you know of how we're gonna run this session and all um other sessions. Um you know, feel free to disagree with us and with each other."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "uh you know being polite just to agree is you know not super useful um to any of us here on the call. Um and even if you tell us like something that we've already built doesn't matter That's still great feedback, right? That's exactly what we came here to hear."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Um, if to us it doesn't make sense, that's amazing. You know, so feel free to be as um you know straightforward as possible. Um we have very thick skin and and and we can handle it."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Two, you know, we're not here to pitch you or sell you on anything. So if I you know, stray because of uh my upbringing uh over the past four years. Um you know feel free to remind me or any of my team uh you know send me a slide be like hey you're being too salesy Um and three, you know, within a week we we uh we're gonna get your written summary of what we've heard today and what we're gonna do about it just so you can see our um you know first We understood exactly what you told us to a certain point and how we're going to be using that information to move our product forward."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "All right, so now that we have the intros out of the way, I want to just uh share my screen quickly and um talk about uh the agenda uh for today. Here we go, so we did the um Cool. Welcome and charter."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Um we we did the round the room and uh and now I'm gonna ask you how uh you know compliance works. um at at your different companies. We're then gonna talk about like what we're building um and the three buckets we want to put uh the different products in And then Jason's going to take us through a live demo of the Clear Comply workflow and how it works today."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Then we're going to take a quick break and then we're going to come back and talk about the priorities. what the version one of their compliance a product needs to have and and must nail. And then we're going to talk about adoption, you know, who runs it at your different companies, what it what has to be true for it to actually makes sense to you, then we're gonna talk about uh pricing and buying."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Um not talking about like what the price needs to be, but like what the structure needs to be. what the price anchors, how you think about it, what approvals um at different companies might be like, whether it's your company or other companies that you've worked on previously. We're then gonna wrap up with like uh talking about things that nobody currently solves in the market um and then what we heard in the next steps uh of taking it from there Um before I proceed, questions, comments, concerns?"
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "All right, let's get into it then. Um uh first we're gonna start with the survey questions uh that I sent over. I know I sent it late on Sunday, so We've got responses uh from Chris and Lotoya."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "We didn't get responses from uh Nicole, Caleb, and John, but uh you know we'll we'll go through that uh right now. Um So we'll just take you five questions basically. I'm gonna read them again."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Who owns uh subcontract contractor compliance at your company? Right. Day to day, right?"
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "How many people touch it The second question is what tools do we use for it today? You know, we've some people mentioned uh B2G now, but things like LCB tracker, Alation, Spreadsheet, Axie, Consultants, others Roughly how many active projects you have right now that carry participation, certified payroll requirements, compliance performance in general. We don't need the exact number, but just, you know, arranged would be great."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "There's a question of if your team runs compliance in-house, outsource it to consultants, or do both. And then the last question is in one sentence, what's the part of compliance uh you'd most like to never do again? my personal favorite."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Um so uh I'm gonna start with the answers we've got uh from Chris. Um You said uh from a company level, uh the director of supplier diversity uh owns uh subcontractor compliance. and that you have consultants and in-house people who handle um uh this on a project-by-project basis."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Um so um the question is uh who runs it from a project level, right? Um at a company level it's uh the uh director of supply diversity, but who on the project owns uh compliance usually, Chris"
+  },
+  {
+    "speaker" : "Kris Harrison (Turner)",
+    "text" : "Um so we have a a department within Turner called our community and citizenship department. So every office has um one or many community and citizenship professionals. So a piece of it might fall on that department, but when it's a large and or complex project, we generally sub that out to consultants."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "So that like really what determines if you sub it out or do it in house is usually the the size and complexity."
+  },
+  {
+    "speaker" : "Kris Harrison (Turner)",
+    "text" : "Yep, exactly. If it's a small project, it's easily done in-house. But if it's it's something that's It's like would take up their day job on these and air quotes, then it would be it would be consulted out."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "That makes sense. And and and what do you think of as being like things There are uh compliance functions, right? Uh certified payroll, participation requirements, anything else"
+  },
+  {
+    "speaker" : "Kris Harrison (Turner)",
+    "text" : "Um for us that's that covers like the majority of what we do. Um Yeah, dealing with contractual obligations, clients goals, local municipality goals, right? Um, it's really hard. when you're a national company because like every single individual pocket runs differently. So yeah, that's why we rely on a lot of consultants andor our local professionals."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Nice. And then the uh second question was like what tools do you use for it today? You mentioned use consultants, B2G, supplier I. O. uh when they're mandated by uh the clients, use spreadsheets and and and tough leaf."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Um and those client-specific software you're using them where the client mandates them, right? Like if the client says you have to use BTG, that's when you use it. Yeah."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "All right, great. Um you mentioned that you have around sixty projects and as we mentioned, use both in-house and outsource uh to consultants. And I think m again to my favorite question, your answer was in one sentence, all of it."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "The complexities surrounding compliance would best be addressed using a single source solution from both a corporate and a project basis and that's exactly what we're we're trying to put make make tough sleep uh you know to comply as a product to be um so that's uh on on your end um Anything that you want to add on these five questions?"
+  },
+  {
+    "speaker" : "Kris Harrison (Turner)",
+    "text" : "Please fix number five for us, please."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "That's why we're here."
+  },
+  {
+    "speaker" : "Kris Harrison (Turner)",
+    "text" : "I mean a full transparency, we have engaged with Tuffleaf at Turner Construction. We're in like a little test phase where I have them about pulling out their hair right now because I'm very particular. But they're they've been wonderful. Um, so you know there's a lot of hope on the future that this kind of gets off my plate."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Jason had long hair when we started with Alright, moving on to LaToya. So your answer to subcontractor compliance is that it's uh owned by uh your group, the workforce and contractor diversity group. And it's a WCD manager with support from the team."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "And you have about three to five people directly involved in the day-to-day process. with additional involvement from construction, development, project managers as needed. Are these three to five people um on each job or is it three to five people for like the office that you're in?"
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "So each work, each WCN member has projects. So there's specific projects that has a designator um manager that works in that project. So with that manager you'll have your your development team that you're working with."
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "You'll have your construction team. Who you're working with because they'll have the executive, the project manager, and then you'll have their assistants So and an all-one has a different function because most of the procurement comes out of the construction piece and the development side. So in collaboration with that, once that's happened I'm sourcing, I'm looking, and I'm making sure that they're housing everything appropriately in our system so that we're documenting good faith efforts at every part of the process."
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "So that's how that comes to that approximate number"
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Right, makes sense. Um to the second question. Um you mentioned you use Axi for XR projects uh along with spreadsheets for tracking and reporting. What does Axie do that makes your life easier for HCR projects"
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "Um transparency with ACR projects, we have to use Axie because that's the new um system that they put in place Prior to that, where good faith efforts was concerned, it was at their discretion. But now that they have access to their in place actually basically create has the directory somewhere to the faca. It has a directory inside of it, but it also creates a document of your good faith efforts and it automatically does it with the information that you input or even just you updating about what happened. So with that being said, whenever we have to do waivers or all those things, it's in that hub And that's what HDR is using now to kind of, I guess, um reinvent their backlog or just have a more centralized place of where they keep certain things. So one, because we have to, and two, um, it made our life easier in terms of having that central place to house that information."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "All right, that makes sense. Um and you said you have about 30 plus active projects with participation or certified payroll. requirements and you manage an in-house and uh for for the last question what's the part you'd like to never do again is manually chasing subcontractors for missing compliant documentation and then reconciling that information across multiple parts and systems. Again, what we're trying to accomplish here today Great. Anything that you want to add?"
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "No, I think I summed it up. Perfect."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "All right. I'm gonna go to uh John I'm gonna go through these questions. You can answer them in in lifetime. And then you know, as we're recording, we'll capture it. So who owns uh subcontractor compliance at your company day to day Um from like the company perspective and the project perspective."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "So it's pretty similar to Chris' response. I oversee the compliance at the corporate level. And the product teams have their specific um and they they approach it differently actually depending on what the product team capabilities are."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "Um whether we have a consultant. A lot of times we have a consultant because The client expects us to have a consultant as well. So we just we get them."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "I would say just as a side note, there's a lot of variation. Actually, there's a lot of disappointment with the consultants that we engage for this purpose. Um and so that often leads to a lot of headaches and uh missed opportunities."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "Um, but we have BCG across the board, which means we require it on every project. So even if the client's not asking for it. Um that said, there's a lot less rigor that's applied to tracking closely on projects that don't have client goals."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "So um that's something that I intend to push harder on is like when we have our internal goal, we have a twenty percent across the board. aspirational goal on our projects. Um so one of the things that I want to do is focus more on making sure um that we're doing a good job of carry capturing sub tiers because the way that we have B2G setup is it it talks directly to our financial systems."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "So all of our prime as a CM we we hire a lot of primes on our projects. We tend to do larger, more complex projects. And so all those primes are automatically, the awards and change orders automatically go into B2G. So that relieves a lot of our compliance headache."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "There's still you know sub tiers are very important as well, especially on those larger projects. So there's work around that. But when we're using B2G to its fullest capacity in the way that we would like to be doing it, is we have the primes adding that information up there on their subs and reporting payments on their subs."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "It doesn't always happen. And not on every project do we require that. We try to size the Expectation to basically the project itself and the likelihood of sub-tier participation."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "But that's in a in a nutshell. I I'm in the process of bringing on someone who's gonna help me clean up a lot of the data that's in B2G because B B2G has a lot of quirks. And a lot of yeah, as as much as we've tried to automate it, there is still quirks in the system that are just like brute force."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "You need someone who you're not paying a lot. Because it doesn't take a lot of brain energy, it just takes a lot of time um to go through and clean up this stuff in the system that can compromise the data if it's not done regularly. Um so that that's That's my answer to one."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "And but can you remind me of this second? Or do you have any questions?"
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Other than B2G, do you use anything else?"
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "Depends on the project. Um but I would say BCG is the main one. I can't even name like when I went to the um what was it I went to a conference recently."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "ACCACA. ACCA, thank you. And I I heard of Axie for the first time then and Prism. So I didn't even know about these things."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "But um I'm sure we use them on some project. I mean, we're a national company. We have hundreds of active projects."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "And I'm sure like I would say 30% of those projects have some kind of requirements on them. in some form. Um and oftentimes it's it's B2G. Uh even when we use B2G though, even though we have B2G, we have to link those accounts in order to have that automation transfer over."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "Um but uh I can't name another. Outside of LCB tracker, which I don't know a ton about, but I got a call today saying I gotta figure out why it's not working in some states. So um to be continued on that one."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "And and how many um active projects have requirements uh that Goldbain is working on right now, you think?"
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "I think what If we talk about active products, we probably have we have over a hundred active products easily. And that doesn't mean they're like that at their most active, but they're not close. And I would say it's been waning a little bit in terms of just looking at our top 25 projects, which make up most of the award activity in any given year."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "Used to be sort of like um 50-50 um requirements, no requirements. Now I would say we have a little bit more no requirements, but it's still probably a third of our products have external requirements. So we'll say thirty to forty maybe."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "And in one sentence what's the part of compliance you never want to do again?"
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "I mean I agree. I I I would say I I you know my thing, Song. Like I I believe this work is It should be mostly about strategy and anything that you can do to take the compliance, you know, the the brute force compliance stuff off of our plate."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "It's it's critical, right? It's like we need it. We need to know where we are in real time so that we can do the right things um to drive performance."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "But it yeah, I think it the heavy load of compliance does a lot of bad things in this space, including, you know. you know, come up with data that's just wrong, but also just makes this work is perceived as sort of um administrative paper pushing, things like that. When it really should be so much more than that if we're gonna have an impact."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "So I agree with all of it."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Perfect. Love it. Alright. Uh over to Nicole."
+  },
+  {
+    "speaker" : "Nicole Duption (Structural Group)",
+    "text" : "Yeah, sorry that I didn't respond via email. So for the first question, who owns subcontractor compliance I would say it's a mixed bag. Once a job is awarded, it's heavy from our risk department, risk management department, and our PMs."
+  },
+  {
+    "speaker" : "Nicole Duption (Structural Group)",
+    "text" : "Um obviously you're supporting us on the pre-construction side, but it's definitely different departments and different groups, not one person uh solely focused on it or one department solely focused on it today. Tools that we use today, uh heavy spreadsheets. Um, I wouldn't say that we have an outside tool that we're consistently using."
+  },
+  {
+    "speaker" : "Nicole Duption (Structural Group)",
+    "text" : "I know our risk team manages a ridiculous spreadsheet for subcontractor compliance. And then our PMs are engaged in their own way through spreadsheets. So messy."
+  },
+  {
+    "speaker" : "Nicole Duption (Structural Group)",
+    "text" : "Um roughly how many active projects do we have? Um I would say between ten and fifteen right now. Um, and those are team run compliance in-house outsource or both um in-house again from the mixed bag of teams that I mentioned."
+  },
+  {
+    "speaker" : "Nicole Duption (Structural Group)",
+    "text" : "And then what part of compliance would you most likely never want to do again? I would agree heavy on eliminating as many what we would consider administrative tasks as possible. Um so that we can use our brain power for bigger and better things."
+  },
+  {
+    "speaker" : "Nicole Duption (Structural Group)",
+    "text" : "Um and then reporting, any other reporting that we can automate instead of manipulating spreadsheets and trying to, you know uh report on data that we don't that's not even accurate. So yeah, those are the two big things for me."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Perfect. Thank you, Nicole. Caleb?"
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "Yeah, from an ownership perspective, um right now it's it's a mixed bag. Like Nicole's like I'm kind of reiterating from that perspective. Payroll plays its portion."
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "of it, knowing that we're a union contractor, we also have all these wild requirements around where people live that are actually working on projects too. And so there's like an HR element to that as well that isn't firmly living in project accounting. Um and then project accounting is working in conjunction with the project manager to kind of work for through like what does that delivery look like?"
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "And God bless them if they've determined like we have Power BIs, we have Excel sheets, we have pivot tables. It's kind of all over the place and we're kind of letting our customers drive. what they think that they want um that actually wasn't dictated anywhere."
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "So like that's something that I would love for us to kind of unpack is like how do we go and show a visual representation that's consistent that we can get market buy off on? Um because I think that people know in theory what they want, but they haven't seen enough iterations to say I hate that, but I love elements of these things. And so we're just kind of like treating everything as first of kind as we're kind of moving through projects."
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "Um I think the second question was what else are we what else do I need to hit?"
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "What tools do you currently use? I think you hit that with like some of it too."
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "We have um BTG Now is being used. We do a lot of work with ES for Department of Enterprise Services, and so they use BTG Now. We're in an interesting spot as a subcontractor where we get access to whatever payment portal or access portal they have."
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "And so our version of BTG Now is from like 1990s because DES hasn't paid for anything in forever. And so we're not even using the most current version of BTG now that's being talked about in all these seminars. We have a truncated and bastardized version of it that it only gives us certain optics to go and feed step into."
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "And so we're supplementing that with a ton of Excel sheets that actually capture the breadth that they're looking for us to report because their tool doesn't allow us to even give them the level of information that they're requesting."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Sounds like fun. Um active projects that have got participation requirements right now?"
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "Yeah, so I think on our energy team, all of their projects have compliance. And so they're running through about like thirty projects a year. Um and then from the other business units, we'd say probably about ten that are active."
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "Um but compliance is sticky because people are saying that they really care about compliance, but they don't really want to see the reporting if it doesn't match where um what the funding stipulation should be. And so we're being told to kind of walk back through contract amendments that we actually just want to see good faith efforts. going back to the pre-con agreement rather than what we're actually doing in construction."
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "So I think that there's a little bit of market messiness that kind of is like play at play there as far as I can't really tell you how many projects have like true compliance expectations because it's a moving target of what does that really mean um versus what are we being asked to deliver against."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Makes sense. Um and uh do you currently run it in-house, um, outsource it or both?"
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "Well we're about to start using you guys for a project in the next week, so yay so we're safe. Um but I think that inter internally we have one person who's been kind of like operating as a primary hub and they've been ineffective. And it's cause it's too much administrative labor to put on one individual to go and capture for the entirety of the company."
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "So um and there's no real because they're so focused on just pushing out requests for updated license information in all of this minutiae that isn't really It's important work, but it isn't like driving any strategy at all. We're just in a reactive space. And so I think that that's what we would really love to kind of get it from a solutioning perspective is How do we automate a lot of the passive asks for just like maintaining like baseline information so we can be thinking more so how do we share it or determine whether or not we can even like address some of these high-level needs?"
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "All right, that makes total sense Um all right, let's keep it moving. Then we have uh the answers for for these um initial five questions And the next step, next stop, we're going to be talking about what we're building right now and the three buckets we we want to try to put. the information or the workflows in or um so in the next step we're gonna go through and and and talk about um different steps in compliance like project setup and goals, sub-onboarding, search verification, payment verification, certified payroll review, participation reporting, good faith effort documentation, audit files."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "And we're going to ask you to rank where do you think these steps need to belong? Do they belong in V1, as in my team, my internal team would run this in the software And the product must nail it at launch. The other one is specialist, so I would like to keep tough leaks people doing this at least for now."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "or automate, which is no human should touch this at all, uh whether they're you know a consultant or or not. So what Clear Comply is today is is a service, right? So you sign one agreement, uh, master service agreement, and for each project our team does uh the construction phase uh compliance."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "So we onboard your subs, we verify the certification, we verify the payments to certified firms, we review certified payroll, we trace the paperwork, we build the participation report and we keep the audit file. So you get a specialist, that's a Kier's team. That's how you know we're running compliance as a consultant."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "And you get a product or a that more accurately actually a dashboard, not a product. But it's basically a dashboard that gives you a view of alright what's the compliance team actually doing. Where does everything sit Um and what's green, what's yellow, what's red."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Um basically a step over like what your typical uh consultant would do uh because we're providing all of this transparency. You get to see, you know, log in, see the documents, do all of that stuff. So that's what it is today."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "And we have a lot of uh clients that are currently using it as a service. Caleb McDonald Miller uh being uh you know starting in in a week or so. Um so we have uh That's the current status basically."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Where we want it to go is you know that's gonna continue to exist, but we're adding um clear comply as a product, which is you know if you have your own internal team um you know like uh John and and Latoya um you know have uh uh Clavain and L and M giving them uh a software that they can use instead of you know B2G or X or any of those in order to run compliance in the best way possible. So basically solve um the things that you know all of you have been uh talking about is like these manual um admin things. Um and in order to build it correctly um we want to ask you you know what are the priorities What do you think is important?"
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "What do you think is not important to start with? Because we can't like build everything from day one. We cannot ship everything at once."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "And what our specialists or or or you your specialists do today do not belong in a software, right? Like we spoke about like things that are strategic, right? The software can never can like you know can never capture that."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "And you know, we're trying to use this session to kind of decide which is which. Right? So we're gonna be running a demo."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "We're gonna go through the dashboard and the different steps that we have right now. Um and uh they're gonna be six steps. So at each step, I want you to sort it in one of these three pockets that I discussed."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Right? V1 means My team, your team, would run this in uh in software, and the product that we're building must nail it at launch. So that's what V1 is."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "um is that you know your team is using the software to to get this done. Um if you are um if you don't think um that me makes sense you you put specialist Specialist means I would keep, you know, toughly for a different consultant doing this at least for now. And then the third thing is automate, meaning no human should ever touch this at all."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Whether they're a consultant or not, or internal, this should be uh definitely automated. Um so while we're going through the six steps, either you know write it on your computer, on a note, put it in the chat, whatever you feel like. And we're gonna go through the demo, we're gonna go through the six steps."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "You're gonna like write them down uh what where you think each step belongs and Then we're going to go through the demo of Jason and we're going to do a break and then we're going to come back and talk about these six steps. I know I just said a lot of words, so any questions? All right."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Um we're a little um We're about 15 minutes or running behind scheduling, but that's fine. We're getting great info from you guys. So I'm going to turn it over to Jason and we're going to go through uh the demo on the demo path um when I get to drip some water."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Jason, over to you."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "Thank you so much. Let me go ahead and share screen. Alright, everyone able to see what I'm looking at looking at?"
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "Yes. Perfect. Alright, so some of you have seen the Clear Comply dashboard, some of you haven't. Uh this As Wasam stated, right, Clear Comply to Us right now is a service."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "The first product piece that we built of this was the dashboard. And the the main goal of having a dashboard is just to to tackle the transparency aspect of what we're doing, right? Through conversations we've come to recognize that you know many people work with consultants, many folks have have in-house teams."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "But one of the the biggest challenges is always the communication with whoever is doing compliance and those who may be sitting outside that need to look in from time to time often struggle to get what they're looking for. So that's that's where this initiated. Kind of the first the first place to check out Here we've got project settings."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "This is the initial adding of information about your project. What is it? What's the current project budget?"
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "What phase is it in the timeline? And then we get into some of the compliance pieces here. So we've got that MWB Eagle, though this could be you know, any type of goal doesn't have to be MWBE, whatever sort of certifications are required."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "Workforce goals. So looking at the actual makeup of of the workforce on the project and if there are any goals around those. And then quarterly utilization targets."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "So you know trying to achieve that 25% here broken up into quarterly goals to see how you're tracking against where you where you want to be where you think you should be. All of this stuff today entered manually at the beginning. And will reflect you know what actually is stated in the project uh in the in the contract moving forward We've got the MWBE plan."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "Oh, yeah, was our hand comment question?"
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "Yeah, yeah. Can you just talk about the quarterly goals a little bit?"
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "Yeah, so The way that this was set up for this demo project was we took that $30 million budget, figured out what 25% of that is, and then um broke it up into um these different quarterly targets something that we've come to realize is you know our our first Instinct was just to set it even all the way across the board. So break that up into, right? We've got one, two, three, four, five, six, seven quarters based on the timeline."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "Um it could be spread evenly across, but that's not how construction actually works. There is, you know, some work that goes on in the beginning, some work that goes on the end, and a whole lot of work that goes on in the middle. middle."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "So here's an opportunity for in this case it'll be Akira working with our our client to figure out kind of what is the rough breakdown of of where they think the payments are going to be going out and when um to just to be able to try to track where where you're at in terms of meeting your total target. Very much a manual thing right now where you will decide, well, we will decide what goes in each quarter. Um so you can then track it."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "And and the and the thought behind this, John, is like w we don't want to be like, okay, five percent of the project Time has passed, but only one percent of uh payments have happened. So we're behind schedule. Because that's typically not true, right?"
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Like at the beginning you're you're not you know, you you might be doing GC or prime type stuff that you're not using the small or minority women-owned businesses for. So we're trying to break it up that way just so it we can be more intelligent about like how are we tracking against the plan uh based on quarters as opposed to like just the entire um amount of the project. It's just our thought."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "I don't know if it makes sense. Please be feel free to tell us like this is stupid"
+  },
+  {
+    "speaker" : "Akira Nesfield",
+    "text" : "Before you tell us it was stupid, it it might be stupid. Um the way that we use it on a on two current contracts that I have is that we use it based against the the client's hard costs, right? And so where they know the money is gonna be spent and to me knowing minority work that we know across the board and where that falls into the project lifeline is where we expect to see these numbers."
+  },
+  {
+    "speaker" : "Akira Nesfield",
+    "text" : "And I think it's also an alarming note to to see it when you open up your screen where you are as far as payments and where you are as far as progress on the job. to where your money is not being filled into. And that also helps us learn trends and and risks."
+  },
+  {
+    "speaker" : "Akira Nesfield",
+    "text" : "And so I I I actually do love this part."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "So it ties very seamlessly. into this quarterly utilization page, which is seeing those targets as these gray bars and then the um the actual being to the left of them. So this is a demo project."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "We didn't log anything for for Q1, but Q2 and Q3 we are able to show that we've actually exceeded the the target for the quarter. If we haven't, it shows up as an orangey color. Also just kind of highlight the the breakdown of where is that spend going?"
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "Is it MBEs or WBEs in this project's case? And then very explicitly who are those that are getting that money. So this this down here is showing total vendor utilization over the quarter and this is showing the certified spend up here."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "So here you can actually you know filter by the certifications just to get down to that those numbers specifically. All right. Moving on to the MWBE plane."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "So here we've got kind of a a page dedicated to understanding, you know, where do you stand as far as your your contracting actually goes. So we've got the stated goal up here at 25% and we're showing that we've contracted 22% across the different sort of So this is our signal here that we haven't contracted enough to meet our requirements. So that tells us, you know, we need to go out there and figure out."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "How we're going to do that. And then below we get to see a breakdown of who are the subcontractors that have been hired on this project, what are the certifications that they have. How much have they been contracted for?"
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "How much of that participation actually gets counted? So let me see here. I don't have an example on this."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "this demo but there would be a little s next to one of these uh which designates that they are a supplier only so actually I can do that real quick let me edit this one So in this case, the supplier only gets counted at 60% participation. So here you can see, you know, the contractors was 1. 4 mil."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "And the participation that can be counted from that is uh 840K. Um and it looks like, you know, how much have they been paid to date so far from that contract? We're also showing the the difference between tier ones and tier twos is another thing to call out. Um, you know, we we recognize that just because um You know, a tier one is not certified, they may be operating as a pass-through, and that tier two spend can be really important."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "So here we've got a little bit of math going on that makes sure that you know our tier two two is tied to a tier one and that their contracted and spend amount can't exceed their tier one since they are just a subset and that both of these numbers don't actually get counted counted towards um the total. So if you were to actually add up all these numbers, this tier two number that's showing here, it captured for participation but would not affect the total contracted amount because they're just getting paid from the money that's going to their tier one Again, today very manual process for adding subcontractors in. But we've got that that here as well."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "And then if there's any sort of uh additional documentation you want to make sure that you're capturing, in this case we've got the certification document, but this something that's highly configurable to make sure that you know we're able to capture whatever documentation is needed about each of the vendors on the project. Alright, I'll pause here for any questions, comments."
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "Okay This might just be the subcontractor in me, but looking at like utilization on a quarterly basis is ineffective in our world. We would need to see it like monthly, because by the time that we get to quarters, we're so far down the path of drift that we can't go in course correct. My PMs aren't looking to go and forecast from a quarterly perspective either."
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "They're looking month over month, what does my schedule look like for engagement? And so from like a one-to-one perspective. It would be really helpful to have the same like nomenclature of you're building month-to-month schedules over the course of a year or years for a project."
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "Can we then backfill that or feed that into this? um plan that then would go and inform what are our monthly spend budgets based off of the scopes of work that we're looking to go and have performed and if there's schedule slides which inherently will happen, then we can actually see that in the changes and what that spend looks like. And we can attribute that to choices that were made upstream."
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "But that would be like one of my comments. I don't know if that as reticent with anybody else on the call, but my team doesn't operate in quarters when we're going and building building work. Like on a finance level, yeah, we talk on a quarterly basis, but projects are driven by months."
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "I agree with Caleb. On a monthly basis, I literally have a team. I have a team meeting where we go across the utilization plan."
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "from when we created it to send it to the agency and we go up for that plan to kind of see where we are, what's landing. our whole bidding process. So that's another living document that kind of shows us where we have an opportunity to catch it."
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "By the time we reach a quarter it's already one already too late or we already forecasted in another spreadsheet so it would be helpful to look like Kayla's point having the quarterly but what is a way that you could implement a utilization plan monthly that we could update here that we could all see because that's what we typically that's what I use. I have a plan that we go through each and every month, line by line um based on what we reported and if that's still true and if we're changing it. And then we'll kind of know where's the opportunity because that's where we play."
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "We take some out and say if we take this out Where do we land? If we put this in instead, where do we land? That's where we start to play with the numbers, just to kind of figure out where's opportunities where we could still drive the plan, where it is or if there's some missed opportunities because we're utilizing other um you know vendors other places or they're bidding for other opportunities."
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "If we do not make that goal or we don't get or we don't win that bid Would we miss the goal? Because that's how we know way before we get to the portal if we're missing the goal or not. And then we start making good faith efforts because now we know based on the bidding process where we need to participate if we're missing in the M or we're missing in the W, then we know that we make a targeted outreach based on that."
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "By the time we get here in that first four quarter, that's four months of information that we did not capture."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "Makes complete sense. Yeah, thank you for sharing this. This is incredible feedback. Like if we get nothing else out of this entire session, this is this has just made it worth it."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "Um Can I ask what what is the overview tab show again?"
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "Yeah. So we've got some of the you know the the basic project information um again that quarterly utilization here is highlighted so we're in this quarter so we want to see where we're at. Um but I do I I I hear the fact that you know a quarter might be a little too late of the information we're operating on monthly plans um and so breaking this out into month also makes sense um and then that how much have we contracted and and what is the actual spend the I think the contract had actually just changed with some of those numbers that I updated."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "Um this is com contracted to MWBE firms. Yes. Do we have a number that says how much the project is bought out overall? That is what I would want to see."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "That is over here in subcontract. payments."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "Um, you know, I think the I mean like awarded, con contracted, like you have twenty percent"
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "I don't I don't think we have it. I I think what j John is is mentioning is that okay, so if we've um awarded fifty percent of the project um only and and and you know we gave half of that to uh MWBEs. Then we actually gave them f you know, twenty-five percent of the total job, but we gave them fifty percent of what's been awarded."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "There's more opportunities in the remainder that hasn't been awarded, I think. would be very important for us to capture is actually on our current project on on a current project that we're working on in in New York a Kier and I have to kind of do that manually in Excel. Uh we should have thought about it."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "But thank you, John."
+  },
+  {
+    "speaker" : "Akira Nesfield",
+    "text" : "No, we we definitely do. We do that on the side and again still trying to build in these features in here by dealing with those pain points until it's right to your point. Yes, that part is being worked in."
+  },
+  {
+    "speaker" : "Akira Nesfield",
+    "text" : "So there is a tab, I think, on the MWE plan that says quarterly utilization. And so I do the same thing. It may not be here."
+  },
+  {
+    "speaker" : "Akira Nesfield",
+    "text" : "I'm sorry, I may be confusing my tabs, but you can actually print out in the subcontractor payments. What money has been sent. Why don't I know which tab it is?"
+  },
+  {
+    "speaker" : "Akira Nesfield",
+    "text" : "I use this thing all the time. And so you kind of have that breakdown. You know the sub that you have awarded, what payments they have, and you can see where you can fall short so that you can Do your monthly utilizations because it's it's my job to report to them where we've fallen short, where the money hasn't gone, or where what what firms haven't been awarded yet, what still needs to be awarded, and what numbers are not being reflected in the system right now."
+  },
+  {
+    "speaker" : "Akira Nesfield",
+    "text" : "So it's still a manual part of it, but it should be a part of the automation part that you get to see in the portal utilization."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "And I just want to make sure that I I understood this concept correctly right so it's right the project budget is is thirty million but as as the GC on this we've only actually awarded awarded fifty percent of that so fifteen million Of that, you know, fifty percent of that or twenty-five percent of the whole goal has has been uh contracted with MWBEs, but we still have a whole other 50% where we need to figure out how we're going to fill that and what the makeup of MWBE versus uncertified firms should be to help us make sure that we're hitting our goals. Is that is that the the concept here?"
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "Yeah that's that's what I'm thinking as people are talking about monthly or quarterly, for me, I'm I'm looking, I would I just want to look at it at any time and see how we're doing. Right. So quarterly review is great."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "Uh monthly is fine too, but I want to be able to go to the main dashboard and see how far into the product are we, how much have we contracted out, how much has gone to MWBEs, how much of that is paid. Like Um, I think how how we're trending in terms of participation, contracted participation, how we're trending and how much is locked in, meaning You know, we have the goal in terms of dollar value and this is how much we've actually contracted. Like that's locked in versus um First is trending, which is the based on the contracting we've done to date."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "That's really the two most important numbers in my view that that I would want to see anytime I go into the system so that I can tell if we're falling short, and I appreciate the quarterly targets if you have enough information to make those targets meaningful, but often we we really don't have that level of detail. Um But you should know, you know, if you know that a lot of the participation is gonna happen in the finish trades, we get it like there may be room to that's something I would want to confirm if we're falling behind on the numbers. But I think as long as I I have those metrics Um at least I know where to to focus my attention and whether to be worried."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "Makes complete sense."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "And uh one idea I also have this is something that you know Akira had to do on one of the compliance as a service price we just ran is like Scenario analysis, right? So okay, I've awarded 80% of the job, I only have 20% left, and I need to find these $10 million Or like the different scenarios I can do them. I can I g do like electrical and flooring and that makes me hit my target."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Or I can select, you know, uh painting and and and glass windows and I can hit my target. Like some way to kind of Do like what if analysis to figure out like alright how am I gonna get to that percentage? I think could be helpful."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "And I see a couple of people nodding, so I'm guessing the answer is you agree."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "And I guess that for that to work out, I'm just mapping this out in my head, it's like we would need to know of the work that's left, what is the actual work that needs to get done because that will tell us, you know, what kind of subcontractors are we still looking to hire. So we know that we need some electrical work, we know we need some windows, and we know we need a roof. I need to spend 10 million on MWBEs."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "How can I do that with with what's left of the actual project work itself? Not just the the dollar amount at the end of the day. Cool."
+  },
+  {
+    "text" : "I actually have a quick question about that. Or that's associated an association between those two things."
+  },
+  {
+    "text" : "Um Latoya was saying earlier that you you want to see monthly because you kind of as the project proceeds you move you kind of move stuff around to make things work."
+  },
+  {
+    "text" : "I'm wondering like what what's the process for recording that?"
+  },
+  {
+    "text" : "Is there like a particular software?"
+  },
+  {
+    "text" : "I mean I'm assuming it's like an accounting software, but given the fact that we'd be trying to enter that information here"
+  },
+  {
+    "text" : "I'm kind of trying to think of ways where we can have you not enter information in well, have it have you entered in as few places as possible."
+  },
+  {
+    "text" : "But also, does any of that information come with Jason's question, which is like"
+  },
+  {
+    "text" : "When you're making that decision, do you have any information about what you're going to be spending that on at that time?"
+  },
+  {
+    "text" : "Because if there is a process by which you kind of update this information, maybe we could kind of"
+  },
+  {
+    "text" : "get that extra piece of of like what you're gonna spend it on as a part of the process."
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "Okay, so that was a lot of stacking of questions. So I'm gonna go with um first one that I remember. Um the first one that I remember was um am I is it in separate places?"
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "So yes, so the utilization plan that we normally send to the agency, we put it in Salesforce, and Salesforce could then make an Excel spreadsheet So then I use that Excel spreadsheet a part of my monthly meetings to kind of talk about where we are, what's the high probability, and then make necessary adjustments based on that. So it will show if we meet or not based on that spreadsheet. So when I was making the comments, um, because a lot of this to me um is is great, but even to the point or everything that's going around the room, um We don't have a like Excel is not is gonna give you a snapshot in that time, but we will want a central place we can have a snapshot of all the projects that we have, you know, kind of so we can have a snapshot in time And I think that's really the echo of what we're saying."
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "Whether it's quarterly, quarterly is nice, monthly is nice, but that snapshot in time as well just to kinda like give a quick summary of where you are. I'm not the the the monthly piece is more so that's our conversation, that's where you do we're using the plan. But if you're trying to also work it into the dashboard or work it into a tab That was just a another fruitful thought in terms of how could that help to convey or to make things a little easier."
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "That was really"
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "Okay. But I don't remember the other questions you asked."
+  },
+  {
+    "speaker" : "Jacob Chase-Lubitz",
+    "text" : "Um so I'll I'll I'll leave it quickly and then if people have thoughts about it, I'm just trying to think about how we could get this information. that Jason was talking about, about how about what the opportunity is for the remaining amount that we want to spend, what the opportunity is for finding um MWBEs for those Jason was suggesting that we might need to know what kind of work, like what subcont what types of subcontractors those would be. And I'm wondering if in the process of adjusting your planning based on each month Does does that information come up? Like is there kind of a a monthly process by which we could collect that information into the system?"
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "So to rephrase, it's more of like is there a place where You are selecting, okay, I've awarded these seven packages, and these three packages are still outstanding. Yeah. And then next month you're like, okay, I awarded this additional package."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "I know that you can do that in Building Connected. I just don't know anyone that uses that function. Or does it that information live in Excel somewhere like with a project manager?"
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Because that's what like most people do, I think. It's in Excel. We do it in Excel."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "We don't do it in P2G. So if we create a place for that where you can do it in tough leaf, that would be a good idea."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "It's a critical, it's it's a critical, critical, critical piece of the process that we do not do. B2G is once things are awarded. We call it roadmap, right? Roadmap is everything happens during buyout."
+  },
+  {
+    "speaker" : "Akira Nesfield",
+    "text" : "So how are you doing this out"
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "you know, if you're not doing it at the earliest stages. So for us, we we use a very I mean it's a ro it's a it's an Excel spreadsheet that we've developed over years Um and I wish there was a better tool for it. So it's all about we get the estimate from the the project team."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "And we copy and paste it. And that's how we know what the scopes are. Bid packages change over time."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "We have ways of of compensating for that. And but we do a projection and starts to gut level. You know, what we what do we think we could do on this package given its size and scope?"
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "What about this package, that package? My team sets the initial based on size, scope, and what we know about availability, and then we do a a um a reality check with the project team who knows more about construction obviously. And then we'll come up with an overall projection."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "Based on those individual scope projections. And then we figure out from there, because then we know, like, okay, we're not going to get probably any participation on this package or this package. Then we see where really what the effective goal."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "that we have to shoot for on that product, on the rest of the packages, right? Um and then whether a particular package is like we we think we could hit it at the prime level with our direct bid lists, you know, using outreach to build them up as necessary. And, you know, how how much can we expect at the sub tier level?"
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "in the normal course of business uh sub cap subcontracting we we take a blend of that and and that's our projection for each of the of the packages."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "Does anyone actually have like Gantt charts that they create for for tracking like the project over time and and what what work is supposed to be getting done when and how long it's supposed to take? Or is that just a An archaic thing of the past."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "Well project teams do with the construction people use scan charts. Yeah."
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "Yeah, that's what I was kind of trying to index on from like that monthly utilization, because I want to go and reference either what they're building in primavera or with MS schedule against at what time are all of these activities supposed to be taking place and what dollar amount of rebudgeting. for that to like actually happen, whether it's insulation or fire stop or each of those independent traits that we would be subbing out, when would they actually get brought on? So that way we're not pre-forecasting for work to happen in the slot where it wouldn't actually hit."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "Yep. Yeah, I'm just I'm taking some notes here on the kind of the the project management side, right? So being able to see the entire project and the project time and and what's supposed to be going on when helps us under again of course helps us understand where we are."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "Are we behind? Are we ahead? Are we right in a good spot That makes complete sense."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "Alright, and um go ahead."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Sorry, Jason, one final question. If Uh I guess quite question to like John and Latoya and and and and everyone that that this but if we can build something similar to the Excel spreadsheet, obviously that is easier to use inside of Tuftsleep and then you can use that to track throughout the project lifecycle and solves your problem. That is something, you know You think people would be willing to move from Excel into or you think they're like, oh no, Excel works, I don't want to change anything."
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "I don't think anybody loves our current process on my team right now. I think that the challenge just has to be showing what is the value and what are we taking off of their plate rather than having them re put information into yet another space that doesn't talk to anything else."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "And I also think that you have other products that could be built into that process in terms of All the certified firms, the your directory you have like finding bidders with the additional capacity factors and things that you collect. So if if if they are using your to Caleb's point system for this now, then there is the added benefit of you can also say, hey, your bid list is looking kind of light for this, we have these firms that are certified. that you might want to check out, you know, to meet the requirements of the package. So I do think that we would be more than happy to move out of Excel."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "Chris, I thought you could did you wanna chime in?"
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Oh we can't hear you. We can't hear you."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "It sound it sounds like your microphone is really far away. Do you have some like headphones?"
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "No, we're not hearing you at all."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "We were hearing you fine at the beginning. Take care then we'll we'll come back to you once you figure that out. Um okay great so for reference this was step one was project setup on goals And step to a sub-onboarding and search verification. That's what we've gone through so far, right, uh Jason? Yeah."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "And on the the the sub-onboarding side, uh verification like this is a mix of manual effort and just you know plugging things in here um we're running these certification checks through tough leaf Like the normal the core product at least um and then bringing that information in here but they're not tied together at this point in time. Uh what was step three on that list, Wasan?"
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Uh step three is payment verification. Perfect."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "Alright. Is that certified our certified payroll cup talk?"
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "No subcontractor payments. Right."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "Yep. Here again, manually bringing in the payments. Uh this is the type of thing where I would love for this to be connected to accounting software."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "software, anywhere where you're already tracking the payments that go out or issuing those payments, I would love to be bringing that information in here so it doesn't actually have To be done by anybody. What we're showing off today, how much spend has gone out. Um If there are tier two payments, what those are, how that breakdown is looking by certification or non-certified, that utilization."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "how much has been paid out so far versus the total budget, which I now understand being separate from how much has been contracted against the total budget being another uh piece of information. That is of value and then that certified spend against the actual goal. So there's that 7."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "5 mil. We've spent three so far Down here we've got those those individual payments so you can see the full history of what's gone out. Um and then we have the trend version of this which is rather than showing each payment as a line item showing each vendor as a line item in their payments or Vertic uh horizontally across over time."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "And and there's a lot of ways obviously we can we can take this right uh we can integrate your payment platform so we can get this automatically um we can integrate to b2g now so we can push the information directly to b2g now so you don't have to double record it Report it, we can do payment verification, cancel checks, and that sort of stuff. But that's kind of the stuff is like subcontractor payments, capturing them, verifying them, integrating with other software too."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "And then something that I I you know have have learned about this right is it's not just you know we've we've said we've paid you um there's the vendor on the other side confirming the fact that they have also received payment So something that is that we haven't even touched at all through this is what is the the subcontractor experience going to look like. Um right now there is no place for them to log in to confirm anything to upload their own information. All of that is still happening as the service, you know, through through emails and phone calls."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "But that is sort of kind of the direction that we're headed is trying to make sure that this becomes more of a two-way communication channel, not just a single reporting place. Alright, I saw heads nodding, so I think that's I think we're on the right track. Uh before I move on to the next tab."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "Any questions, comments on the subcontract or payment side of things, things that you think we should be doing or capturing here?"
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "I think that before before rollout, or at least for my team, there is no desire for adoption if they have to manually upload something. I think that like from a delivery perspective it has to be an automatic integration. Or else we're asking people to double upload everything."
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "And track it and then do verification. So I think out of the box, this has to be a direct plugin with the ERP or accounting software. But asking for people to be their self-lecked in, I think, is a huge non-starter."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "Do folks on this call know what accounting software you're you all are using today for this? Do you mind sharing?"
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "Right now we're using um GP or Great Plains, but we're going through a new ERP. Um Fright now and so we'll be going to D three six five in the next sixteen months."
+  },
+  {
+    "speaker" : "Nicole Duption (Structural Group)",
+    "text" : "Um, this is Nicole. I this is one of my questions I wrote down as you were doing this demo. Um currently using coins, but transferring um ERP changes happening here too, transferring to workday. Um and so that was one of my questions is integration with workday."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "Uh the the answer to that That question is this thing doesn't integrate with anything yet, but we need uh I had Procore too."
+  },
+  {
+    "speaker" : "Nicole Duption (Structural Group)",
+    "text" : "And I heard you mention Salesforce, but those are our three main systems: Workday, Procore, and Salesforce. And ultimately our PMs are are using Procore and Workday to manage their jobs and their subs today. So outside of their spreadsheets. So More baby steps in getting Procore, you know, onboarded, but Yeah."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "What about you, Latoya? You're on mute if you're talking."
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "Yep, we're trying to click it off. Um Okay, so um ask me again."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "Asking about what what software system is your team using today to track payments to subcontractors. So if we were to want to integrate to make sure nobody had to do any double rework or moving data from one place to another."
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "manually who would we be connecting to to make your life better right now in terms of payments we're using stage and tech"
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Alright, let's see who finally one that I know."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "Chris, how's your audio doing? Let's see if it's working Any gear me now? Yeah."
+  },
+  {
+    "speaker" : "Kris Harrison (Turner)",
+    "text" : "Um we so we use uh a combination of SAP and Textura. So and and multiple reports out of those systems, as you all know. So a little bit of a nightmare from a connection standpoint."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "Yeah, very familiar. And John, how about you?"
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "Probably the same as Chris. I know we use Textora, but I'm sure we don't use it for everything. So um yeah All right. And we use B2G for um but uh through CMIC. So CMIC I believe aggregates information for Textura and stuff, so but uh don't quote me on that."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "Got it. Alright. Bassam, what's the next stop on our tour?"
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Certified payroll. All right."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "Akira, do you mind if I actually hand this one over to you to talk about? Because I feel like uh you can do a much better job talking about what we've got going on with certified payroll than I can right now."
+  },
+  {
+    "speaker" : "Akira Nesfield",
+    "text" : "Sure, thank you. Um so again, the the the love would be for integration, right? But right now, when we get certified payrolls, I'm working on a couple of projects I have Alation is the system of record that's supposed to be used."
+  },
+  {
+    "speaker" : "Akira Nesfield",
+    "text" : "And so for me to uh see everything in one place, we pulled the certified payroll file and imported it into here. Um and so it just tells me who's worked, um, how much hours they've worked. Who's on on who's on site and if they have submitted, not submitted, um, or deficient in in performing contract requirements."
+  },
+  {
+    "speaker" : "Akira Nesfield",
+    "text" : "So we know how to do outreach, we know how to follow up on things. Usually we can tell, we we try to connect, or most likely everybody does. If I see certified payrolls and I don't see payments, then there's a problem for me."
+  },
+  {
+    "speaker" : "Akira Nesfield",
+    "text" : "So we use that as a trend or risk detector. Um but right now everything is done in another system and we pull the information in, have the subs added, um, obviously on a monthly basis. Um for a federal projects is sometime weekly um and then log it in here and it tells us who needs attention I'm sorry Um I'm sorry."
+  },
+  {
+    "speaker" : "Akira Nesfield",
+    "text" : "So yes, we pull this information in, fill out the the boxes that Jason showed, and then we're able to see who's performed within the month and who's not. Um I like the 92 percentage rate. At least it tells us who the action required is my favorite part because it tells me what subs are not doing what they're supposed to be doing."
+  },
+  {
+    "speaker" : "Akira Nesfield",
+    "text" : "Usually we get the report from the sub or from the client telling us who's working on site. And so when I don't see submissions coming through, which we request on a monthly, on a monthly basis, I use this to say that they are falling deficient in I. screenshot them so they feel bad and give me my information what I do."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "Thank you, Akira."
+  },
+  {
+    "speaker" : "Akira Nesfield",
+    "text" : "You're welcome."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "Questions, thoughts? On our certified payroll situation. All right. Wasama is the next one. Workforce reports, close out, readiness, or good faith."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Workforce the next one is workforce. Alright."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "Pretty simplistic. We saw in that project settings the ability to set the targets. So you can see our our targets here. This is just taking in workforce data from each of the different vendors to be able to display where we're where we're currently sitting. Yeah, not a whole lot to talk about on this page."
+  },
+  {
+    "speaker" : "Akira Nesfield",
+    "text" : "So for me, I love workforce, right? I I don't know a lot I worked in a lot of city jobs or government agencies where they have EEO requirements where they have set goals for females, local minority, depending on trades, comprehensive, stuff like that. So being able to pull this information from the payroll report."
+  },
+  {
+    "speaker" : "Akira Nesfield",
+    "text" : "People who who are using LCD tracker, you have your payroll, but then you have to go into a separate part to pull a utilization form. Most people don't know how to fill that information in because you have to go through all the certified payrolls, track the hours, track the gender, track the ethnicity. Um and so having this pull the information out for us and give it to us in a graphic is great because it's what I used to have to make myself."
+  },
+  {
+    "speaker" : "Akira Nesfield",
+    "text" : "um by pulling the the payroll report. So again, if you have any EEO or workforce requirements, getting to see what subs is is per providing that information to you and seeing where you're deficient is is is a nice thing to have. So I I do also appreciate this time."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "And Caleb, I I recall you mentioning the whole HR side of things and and needing to know like where people are actually living today. Definitely not something that we have considered tackling in here, but I can see how that sort of works its way into this concept here of a workforce summary and understanding, you know, not just the demographics of who you're working with, but where in fact are those people living today."
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "Yeah, and think that that's we can just reprodify local to whatever that Means for a project, right? Which I think is like the beauty of having something kind of overarching so we don't get so NATS-ass with all the solutioning. Um, but yeah, I think that there's definitely value um out of this right now and the the pain of pulling together this report is very real. Um so I think there's a huge value in this"
+  },
+  {
+    "speaker" : "Kris Harrison (Turner)",
+    "text" : "You already have the data point with being the zip code, right? So if you if you could filter, if you could just filter by zip code or have like a heat map that shows Because you know, sometimes it's only like three or four zip codes that they want. So just being able to go in there and and you know finagle the data which is already there."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "Yeah."
+  },
+  {
+    "speaker" : "Kris Harrison (Turner)",
+    "text" : "Yeah."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "Yeah. I think a big part of what this product needs to do over time is just extracting the information that's already in other systems or is in you know the good old physical paper that gets scanned and uploaded um because then once it's it's in our s in in our system in in that sort of way we can we can cut things in in all sorts of different slices Cool. Thank you for that. Alright. Um did we talk about tough leaf effort in here with some or are we skipping over to close out readiness since this is just our go use tough leaf Sign."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Good Sfaith Effort is is the last one. It's like the audit file and good faith effort record. The one before that is participation reporting and it's basically you don't see it here because you know we don't we don't have it yet, but it's basically generating your monthly utilization report."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "in the agency's format, right? So if you're submitting a report to DDC or EDC or whatever it is, you can from this software, right, you're getting all of the data from all our places You click export, it exports it in the format that they actually need it in, which is I don't know, Form 15A for New York State, for example. So that's that's number six."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Um and then number seven is the you know the good faith effort uh documentation, an audit file that shows everything that has happened um so far. And it's like good faith effort documentation from pre-construction all fuel closeout, right? If a subcontractor changes."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "If you you know you've awarded half, you haven't awarded the other half. It basically captures all of the outreach and good faith effort and documents it in the way, shape, or form that uh works for you. So those are the now seven things."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "I know I said six, but now there's seven. And um unfortunately we don't have time for a break. Unless we really need one."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Everyone okay to keep going? Oh man. Yeah uh no cigarette break for me."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "So w I'm gonna share my screen here. Um And we we're basically these are the seven steps if I shared the oh oops I shared it all Okay. Um so these are this I'm gonna zoom in to oh I'm gonna zoom in now please."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "So these are the seven steps that that we discussed. One is the product setup and goals. What the software would do is load the owner's participation goals, certification types accepted, the reporting calendar."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "And what the specialist does today is we they read the contract compliance exhibit and configure the project right manually. The second step is sub-onboarding and certification verification, right? So it's checking each sub against the certification database, flagging expert aspiration."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Um that's what the self-source already does, right? That's what CERTC does. Um and what Akira and her team or your internal compliance team do right now is you know you chase the self-for documents."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "You resolve mismatches with certifications, you decide who accounts. We spoke about the payment verification, certified payroll review, workforce reporting, participation reporting, and audit fund. Right, so these are the seven things."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Again what we need from you is to tell us um which ones of these are um V1 or specialist, the meaning the specialist will do them, or automate, meaning you should be automating them, and no one needs to ever be doing that. Um so I'm gonna go around and and um and ask you what your thoughts are if everyone's okay with that And then our um recorder will capture what you said and also Jake will be capturing it on the uh on the back end Um gonna start with Latoya."
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "Um I would say VA, because this is like the most important piece. I think this is where we're being strategic, we're being partners, and I think this is where the human effect is most needed and necessary. Because this is where expertise come in, collaboration comes in, um, I would say female."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Alright, so you want it to be in the software? Um great. Um the sub-onboarding and certification uh verification."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "So the ability to send you know emails, reminders to subs, hey, upload this, uh remove that, uh, you know, upload your documents, um, give me your um Uh certification document. Yeah. An area there that you can um Jason?"
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "Well I just can I I want to add another uh dimension to to the the question that we're asking which is um how much time do you think your team spends on on this part of the the or on this step specifically"
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "Is that still me?"
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "And it's gonna go to everyone now, thanks to Jason"
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "Um yeah, I didn't think that far in terms of time because that's a layered question, to be honest. And you're that's a very layered question."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "Sounds like it's a lot."
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "It is. And especially if you have multiple projects, since one project could be more complex than another, um have multiple A so la very layered question. And a lot of variables to consider."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "Makes sense. So we can we can skip that for next. I assume with all the nodding that I saw that everyone's like, yeah, it's wildly different depending on the project. Good to know."
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "But to the question that was asked originally, I think that is definitely automation. For sure. Um item two is our automation because that's re that's repetitive. It doesn't, you know, as long as you have your templates in place of what is needed, it just needs is a basically our call to action. I think that's automated. I think"
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Perfect. Three payment verification."
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "Still me? Okay. Um Hmm. So when you say specialist, right, it says consultant But not all of us are consultants."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "So how do we how do we Yeah, I mean uh specialist could be a consultant, could be in-house team"
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "I would say specialist."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Got it. Uh and certified payroll review"
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "Is there a way that it it could be mixed like a V1 and a specialist kind of thing?"
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Yeah. Yeah, basically V1 is you know the the the product does the is a place where you can do it, but a specialist has to review it at that of the day."
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "Mm-hmm. Just just as yeah, um it definitely you need a I'm thinking from an AI perspective, right? Like you put it in and then it has a specific prompt and then you need a a human to actually to make sure that it's accurate and correct based on what you flagged it to identify."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Mm-hmm."
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "Oh, reporting, a thousand percent automation. Um, that's something that could be automated. The template is what it is."
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "It sends out based on the timeframe of when it's needed, based on the agency requirements Um participation reporting. Um, I would say specialists. Um and audit that's a specialist."
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "Well well that could be a mixture of the product and the specialist to be honest because the product warehouse was needed and necessary and you're just making sure and looking for loops"
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "That makes sense. Alright, thank you Latella. Chris, over to you."
+  },
+  {
+    "speaker" : "Kris Harrison (Turner)",
+    "text" : "This thing hates me today. Um I'm I'm in a lot of agreement. I'm just over here thinking like how much of this can be automated further, like where it's sending you alerts."
+  },
+  {
+    "speaker" : "Kris Harrison (Turner)",
+    "text" : "It's like, so you're not actually going into the program, but like It's sending you alerts when things change. It's sending you like automated, like that's the best case scenario, right? So you're I can't get I can't get people to set up the jobs in Textura correctly And then I would end up having like another platform that they might have to set up a project in again, right?"
+  },
+  {
+    "speaker" : "Kris Harrison (Turner)",
+    "text" : "So it's like a like it's a multi-layer cake. But uh I'm almost a hundred percent in a in agreement with Latoya where where this this lies, but"
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "That's that's great. That's great. So integration is a big part uh from what you're saying, Chris."
+  },
+  {
+    "speaker" : "Kris Harrison (Turner)",
+    "text" : "Yeah, because we're we're at like we're at a point now, right, where everybody's like into the little like I call her my faster yet not smarter assistant, like the you know, the chat G And doing all of that stuff and like as much of this as could be automated and integrated, it just makes it so much easier. So like I'm I'm going to my desk on Monday morning. I'm opening up an email from Toughleaf and there's a snapshot of my dashboard."
+  },
+  {
+    "speaker" : "Kris Harrison (Turner)",
+    "text" : "There's everything. I don't have to access it. system unless it's given me danger will robinson signs and then I'm in."
+  },
+  {
+    "speaker" : "Kris Harrison (Turner)",
+    "text" : "Otherwise I'm just I'm mosing along with my week, right? Um I don't think we'll be able to solve that for everybody, but just something to keep in mind when I'm sure you already have it in at the top of your mind with this, but I can hear it internally, right? Like, oh, another system."
+  },
+  {
+    "speaker" : "Kris Harrison (Turner)",
+    "text" : "Yeah, you you hear it in the back of your head and you just try to avoid that. Like, no, no, the system's gonna do it all for you."
+  },
+  {
+    "speaker" : "Nicole Duption (Structural Group)",
+    "text" : "I think that's where the integration piece comes in. Like if this could be we have the exact same issue, like another system, especially as we're going through an ERP change. So I as much as this could be integrated with existing systems and even if like those proactive reports or dashboards came up and it Maybe it's even looks like it's coming from workday, but it's really tough leave integrated with workday. Like it lessens that other system heaviness."
+  },
+  {
+    "speaker" : "Kris Harrison (Turner)",
+    "text" : "The problem from your end is the endless systems that there are. And then the VIG that they're going to charge you to attach to their system might make it just completely not an option for the foreseeable future, right? Like that's just they don't let you hook, they don't let everybody just hook up."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "There's definitely a lot of I mean on the scroll it seems like ever everyone's using a different system, right? So it's on us to kind of figure out what is the easiest way to to to get this integration working. Um and if it makes sense to like to be able to integrate to multiple systems."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "I'll say like the integrating to building connected at the beginning was very challenging. Now you know Pro Core is a little easier If we had to do iceperfold be a little easier. So we I mean we'll see."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "We just need your unfiltered thoughts and then we we'll come back and tell you no we can't do it. You gotta change your thoughts. right if if we technically cannot but I I mean especially now with like the MCP and everything AI uh going in it's it's becoming easier to integrate so we'll see."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Um John what do you think"
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "So based like I'm not sure I understand fully, but what I'm thinking is anything that is V1 is like we need to be a part of uh you know at the enterprise level. And then the consultant is my way of thinking, just how we do things. If there is some level of human touch needed, but it probably exceeds the level that we would do in-house or be comfortable taking on in-house and we can we can have a a a a consultant do that."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "And then the third thing, automation is what I would think we, you know, I think I think that's a lot of these are a mix of automation and Consultant maybe giving it an I over kind of thing. So the first one definitely is V1. Isn't that what the is that the option?"
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "Um Sub on boarding insert verification that is automated in BTG pretty much. I think that needs to be automated. Um payment verification."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "So the Payment verification itself in B2G is uh for us we don't need verification from tier ones because it comes over from our primary payment system so we know we've paid them. Um we need it for sub tiers. Your description of uh checking sub against agency certified I'm sorry tracking committed versus paid to certified firms."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "Now that's a different Take on payment, that's almost like payment according to what they've committed to. Um I would want to see that very clearly. So I don't know if you call that automated in the system."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "Like I would want that called out to me. Like if I go into the dashboard, I would go into the dashboard regularly, but I would want to see which are my subs or primes. And I would probably want specialist help on that because corralling um subs is can be a a time consuming thing."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "Um Certified payroll review is probably something that needs their exceptions, so they probably need human review. Um again, I would rather specialists do that because I don't want to do that. Um uh workforce reporting usually I think can be pretty automated."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "Uh participation reporting for agencies, that depends on the module that you're gonna create because All agencies want something different. And so I almost think that there would be that's the client, right? So for a lot of us, so it's it's care has to go into that."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "So I don't think that I think there should be a level of automation, but there's always going to be, I think, a level of human touch just being realistic. Uh and we definitely want to make sure we're reviewing that reporting before it goes off to clients. Uh and then the audit and g file GFE record to me um I know it's not always the case, but it's most important when you're not doing what you should be doing."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "Um you know, it comes into play when you're falling short. I I think that should be an automating thing and depending on how much we're doing within the system, it can be an automated thing, right? Like if we're not doing that much in the system, then it's gonna have to be a manual thing, unfortunately, because we're gonna have to If we're going to be using the system for GFV recording, we're going to have to upload and things like that."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "So I think again that also depends on the functionality in the system. I know you're developing that piece. So yeah, the jury's out on that one for me."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Right. Caleb."
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "I agree with Chris and Latoya as far as what they're saying. um breakouts and steps were. I think my only differing portion was on step two."
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "I think there needs to be a human in the loop on that component for sub-on boarding and certain verification just because I've haven't seen any efficacy And having auto pushes to subs for them to fill shit out. It just doesn't happen. There has to be some sort of human engagement to say, hey, we need your documents or you're no longer going to be on the project in like a phone call or a meeting."
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "Um that no amount of email follow-ups or automated messaging will get across that there is a drop-depth deadline and they will no longer be on the project if they can't figure out how to go and submit a paper. But everything else I think kind of falls in line with what we've talked about before. It really comes down to the plugins and how much of this can truly be automated with an audit."
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "Component um to make sure that what's being corded over actually is grounded in reality and isn't a hallucination."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Yep. Uh uh on number two what we have thought is that there's automation. It sends them the email, second email, third email."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "If they don't respond by a certain date, let's call it like three days or or five days before the deadline. We'll work the kings with you guys. But like then it sends an email to the person responsible and be like, hey, you gotta call ABC electrical construction and Tell them they're gonna be off the job if they don't send this, right?"
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "So so that could be uh the way we we could do this. Like they uh as Chris Chris said, like they'll get a notification like, hey, now I gotta do this because they haven't done the automated way."
+  },
+  {
+    "speaker" : "Jason Garcia",
+    "text" : "Yeah, our emails can only get so strongly worded before we cap out."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Nic Nicole, what do you think?"
+  },
+  {
+    "speaker" : "Nicole Duption (Structural Group)",
+    "text" : "Oh, I am off the media. Um yeah, so not to be repetitive, but the integration piece would be huge for the first um step in the process. One question that came to mind, if we're using like we've been working with NIA on pre-construction compliance and having um engaging early on in the process."
+  },
+  {
+    "speaker" : "Nicole Duption (Structural Group)",
+    "text" : "Um having that project already set up and the goals established if we're using, you know, if we're using you guys for pre-construction compliance and making sure one big gap that we have and we've lost a couple of big projects because of it, is our pre-construction team not understanding or being able to interpret the contracts. to what needs to be done. So getting the project set up before we're even ready or know that we've been awarded the project, that would be huge."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Um and I guess that's specialist for you."
+  },
+  {
+    "speaker" : "Nicole Duption (Structural Group)",
+    "text" : "Sorry?"
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Basically specialist for number one."
+  },
+  {
+    "speaker" : "Nicole Duption (Structural Group)",
+    "text" : "Okay. Yeah. Um Sub onboarding insert verification."
+  },
+  {
+    "speaker" : "Nicole Duption (Structural Group)",
+    "text" : "Yeah, I mean I I'm supposed to be answering like, would a specialist do this or is this something that could be automated? And it's and I I mean I guess anything can be automated at some level today, but I would say a specialist a combination of both. Um Yeah, I would say to me all of them are kind of a combination of both."
+  },
+  {
+    "speaker" : "Nicole Duption (Structural Group)",
+    "text" : "A specialist and software. In a future, I'm sure it can all be automated and software can do it all."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Alright, perfect. Love that we have varying viewpoints. That's very helpful for us."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Um so that's We we're supposed to be done with this part about um thirty minutes ago. So we're not gonna be able to go through our our full agenda, but this has been immensely helpful uh so far Um so right now we understand where where you all see all of this. Um and and we know what uh you know from a different viewpoints what v1 must like really um nail um and and what the scope needs to be."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Um now um What we want to do if you had to pick one out of um you know these things that like the software must have for it to launch, right? Um in in built in in the software already. Um which one would you uh would you pick?"
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Um And then then we're gonna ask you the converse question. It's like if you had to pick one that like it doesn't really matter for you, which one would you pick? And we'll start with we'll start it the other way around this time, Nicole."
+  },
+  {
+    "speaker" : "Nicole Duption (Structural Group)",
+    "text" : "Number I would say number two, six, and seven are my top three."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Um you don't care about at all."
+  },
+  {
+    "speaker" : "Nicole Duption (Structural Group)",
+    "text" : "I'm being selfish in these answers because some of them are just completely out of my world right now. I mean I'm just I'm so far removed from the financial end of it. So payment verification, certified payroll review, I know how important they are. I get it, but I'm just so far out of touch with them that to me that's not the big ones, but I'm sure our finance department and our PMs would say something different. So"
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Yeah that that's great. Um all right, no, I forgot how it went the first time, but um actually no I do Kalet."
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "Yeah, so subcontractor onboarding servication as well as the participation audit filing are like my top three My team already has like certified payroll is something that we always do on almost all of our projects, and so they kind of have a cadence down, so that wouldn't be an immediate value add. For us, um and same thing with payment verification, that's like fairly locked in because we're a subcontractor, we're usually the last ones to get paid, and so our subs are screaming. to get paid. And so they were pretty damn quick as far as acknowledging when it's happening. And so that's less of a starter for us as well."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "All right. John?"
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "I would say the thing that Bt doesn't currently do very well for us. I mean a lot of this we have through B Two G Um is the participation reporting. Their reports are really not not great."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "Um And there are little things like being able to change the denominator. That's so that's not just based on total subcontract. If it's based on our contract value with the owner, it's not something we can do in the system as a CN."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "Uh so that would be the thing that would at least um uh give it a a leg up on on what we're currently using."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "And and what d what from here you think doesn't really matter to you?"
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "For me. Mm-hmm. Um right now for me, uh the audit GFE record doesn't matter."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "And and and why? Because you y you want to hit your goals without even having to worry about it? What w what where does it not matter"
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "To me that is something that whether we like it or not is gonna be a big file of paper, like uh lots of documents saved there. I don't see how outside of providing a a place where you just a file where you you centralize where you add those things. I don't see how you maybe I just need to be educated on how you add how you streamline that process because to me that is just a messy process in general."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "And I don't know other than you know, like in BTG you can upload documents. But all that means is it's accessible to whoever goes to that product in BTG they can download the document. If it's just going to be a doc share situation, then I don't really see how if it's if it's integrated in other ways."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "Um I'm sure there's maybe some uh automation you could do from the other functions that speak to exercising good faith efforts. Uh I'm sure that that could be used to support the file, right? But there's just the m matter of fact it's gonna have to probably include things beyond that as well."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "So that's just you know my my perception could change if I knew more about what you were thinking for that function. Um but that's what I would say for now."
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "I would say. And my my first thought was workforce replaying. That was my first thought."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Nice. And least important?"
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "Wait, we we I thought we were doing it for I said least important. Sorry."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Oh, so what's the most important?"
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "No most important I would say um I would say one, two, three."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "One, two, three. Got it. All right, press over to you."
+  },
+  {
+    "speaker" : "Kris Harrison (Turner)",
+    "text" : "So I look at this as one, two, and three are independent. They interdepend on each other. So you can't have one without having two and three."
+  },
+  {
+    "speaker" : "Kris Harrison (Turner)",
+    "text" : "So like that's so I would say one, two, and three most important. Um The workforce reporting, I mean it's it's a nice to have, but not a need to have. We all have a system that we're using currently."
+  },
+  {
+    "speaker" : "Kris Harrison (Turner)",
+    "text" : "Um, so I would say probably my two would be like the certified payroll and the workforce. Because you but you could also have a project that doesn't have certain certified payroll but does have workforce participation. So like there's Again, they're really nice to have, but I think we all have something that we're using currently."
+  },
+  {
+    "speaker" : "Kris Harrison (Turner)",
+    "text" : "Um, that could get us by"
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Understood, understood. Alright, that's that's great. Um so that's um That covers a couple of the things we wanted to go through today."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Um one last thing I want to talk about is um really um Pricing? Just how we think about pricing structure, not like a dollar amount or any of that stuff. To just understand what you think from your standpoint what makes sense."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Right? Would we uh price it wise for a software, do you think it makes more sense is like an annual subscription? Um uh and then it becomes like an overhead cost for for for the company?"
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Or do you think it makes more sense as like a per project cost? And then it becomes a cost uh for the project itself. Um obviously our preference is uh is this is a UV subscription."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Um but want to understand from your side if you think it even matters, right? Because like not right now if you're using a consultant, those get prized to the job. But you know uh So I guess I'll I'll start with uh Chris this time."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Wha w what do you think, Chris? What where does where do you think this belongs from like a pricing perspective for your for your company?"
+  },
+  {
+    "speaker" : "Kris Harrison (Turner)",
+    "text" : "Um, I don't think it it matters for Turner because what we what we send on a on a headquarters level gets filtered down to each business unit to pick up the expense anyway, right? Like including my salary. So like they all have to pay for us."
+  },
+  {
+    "speaker" : "Kris Harrison (Turner)",
+    "text" : "So if if we were to institute this as a company wide thing, it would just get dispersed amongst business units. Um but I can see where I mean but I'll take off like because you know I like to do this. If I were in your shoes, I would want I would want to maximize my like my profit, right?"
+  },
+  {
+    "speaker" : "Kris Harrison (Turner)",
+    "text" : "So, you know, that might be a per project kind of model because you might be able to recover more costs that way than just looking at it from an overall company because then you'd have to get into like how many users have access to it and are are you going by like a license model then a subscription with like a license model so like what does that look like Because I'm sure there's costs on your end, you know, for all the single sign-ons and all the all of that stuff, right? So you're gonna with large companies, potentially 5,000 people up in your program. So how do you maximize your revenue from that."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Yeah, we we could make it, you know, enterprise per user or also per you know dollar value of the project is what we're thinking, right? If you're putting a hundred million dollars uh of uh of product cost through toughly f clear comply. This is your price. If it's 500 to a billion, this is what your price would be. But I don't think it's a it's a problem to be like charged at an enterprise level"
+  },
+  {
+    "speaker" : "Kris Harrison (Turner)",
+    "text" : "I will tell you we do not like the the project volume one at Turner Construction."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Yeah, well because you have the biggest one. All right. Understood, understood. Would you prefer like user or do you prefer just like, hey, here's a here's a cost, do with it, whatever you want?"
+  },
+  {
+    "speaker" : "Kris Harrison (Turner)",
+    "text" : "I think like having the option to look at like the c the like the overall cost and then like okay if we were gonna have like this many licenses because like that's like the majority of our software is licensed. space, right? We're paying for users into SIP, into Texture, into everything that we use. So I think that's the model that we're used to seeing. That doesn't mean it works for everybody, but that's the model that we're generally used to seeing."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Yeah. Yeah, the question here, I guess, is like to your frame is like what's the easiest way? Like what are people used to seeing that won't get like any friction in order to implement um on the company's perspective. And it seems like for Terran it's like the per license works the best."
+  },
+  {
+    "speaker" : "Kris Harrison (Turner)",
+    "text" : "It's it's easily it's easily chargeable to the where it needs to be charged that way."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Got it, got it. Uh John, how about you guys?"
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "much as BQG has to improve, we actually, you know, the the cost is not terrible. Um We don't do it by project because part of our logic is we want we don't want to discourage any one project from not buying into it. So it's across the board we use we use it."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "And I don't we have like they gave us a number of users and a like an amount of volume that's we just don't even meet and we're we could do a lot of work. So um it's pretty reasonable. So because we're used to that It would we probably would um we probably wouldn't uh be open to like a per project thing or and if the license thing I mean Well part of the logic with BCRG is we wanted everybody to be in touch with how their products were doing rather than just the compliance people, right?"
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "We wanted it to make like a fact of project life. We also wanted the project people to be able to reality check what they see in the B2G system. Does this look like what's on site?"
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "Like so another way of like um you know, quality assurance to make sure data is is is so the number of uh licenses is is interesting because you like we have to be careful with that too because that's that can't be a reality if we're paying for license Uh one price, yeah. I mean my they have it based on module and it's an annual thing. Um some of those modules we don't even really use."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "But I would say that It's pretty cheap like we could probably pay more than what we pay if we like if there was the corresponding value there. Um 'Cause right now we're paying not much for not much value. Um so yeah."
+  },
+  {
+    "speaker" : "John Rooney (Gilbane)",
+    "text" : "Got it, got it, Nicole?"
+  },
+  {
+    "speaker" : "Nicole Duption (Structural Group)",
+    "text" : "Yeah, I um I'm pro subscription based and potentially having different tiers based on, you know, access needs. Also, I think If we can push information out of it, provide dashboards and reports to non-users, that could accomplish a lot without having to buy more licenses or more subscriptions."
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "Okay, so I think that there's a couple of different ways to skin it. I my team would want to be able to charge it by project. Because we have to go and substantiate costs and using a third party, especially in our space right now, is a huge added value because it shows that we're not just self-reporting that we're failing."
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "Um so having it charged directly to a project, I think, would be a huge boon. It also like enables and empowers the project manager that they need to account for what this additional costing is because we have some like co-education. Happening in the market that compliance isn't just another line item of things to execute."
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "There's money and time that's associated with actually doing the work So I think that there's like a huge added value that kind of is passive from that perspective of having it get charged out for projects. So that way we're capturing in our estimates as well as other upstream capture modules as we're kind of working through our process. For kind of like the larger umbrella, I know that with Sam we're working through what it could look like on an enterprise level for us to get more optics into what our spend rates are, which is a little bit different than fair compliment, but there's Similar elements that were kind of pulling forward and I think that that makes sense from like a baseline annual description perspective of how do we take all of these independent projects and roll them up into something to see capital spend on an enterprise level and where are we pouring our money and what does that look like for building capacity within the markets and in other sections or sectors that we're doing work within."
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "So I think that it's a yes and of I would love to see it price out per project. I think the dollar value to project like project dollar value should be correlated to what the compliance cost is. Because I think there's a one-to-one that we can have from an upstream perspective of communicating value."
+  },
+  {
+    "speaker" : "Caleb Bradford (MacMiller)",
+    "text" : "Um, and then having an enterprise level like subscription base of how does all that information roll up to something that we can have some decision making over."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Perfect. Alright. Lithoya, last answer of the day."
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "It's gonna echo a lot that's went around the room, um, but to make it a little bit and to close it out. Um, I think it's a little bit of what everyone has said. Um I'm how my company normally does things um project based, so a lot of it is based on the specific projects, but we also have a hoverhead for specific things and software that we use again with the licensing."
+  },
+  {
+    "speaker" : "LaToya (L&M)",
+    "text" : "I think for this case Um because needs are so different across different agencies and companies. I think playing it all out makes sense so we could make a decision based on what we need, what the services it provides, and how it would factor into our day-to-day operations. I think that would be the best way to to s you know to to spice it, to be honest."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Different options. That's that's what we currently do. Um all right, makes sense."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Um we have one minute left. Uh I guess a couple of learnings f from my side, don't be too optimistic with the agenda. I had uh an agenda that needed uh uh six hours."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Um so w we'll be more cognizant next time. This is the first one, so it's a lot of questions. In the future, we'll have more to show and ask you about what you see."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "So it'll be more dynamic. Next steps I'm here you'll get a doctorate from us in a week. And then over the next month or so Uh we're gonna be reaching out to schedule one-on-ones."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Um so you know an hour uh that we're gonna spend with the with each of you and ask you further questions about what what the discussion happened today. Um and then our next meeting will be um in December. um on on Christmas Eve now."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "But it'll be in December and we'll uh we'll we'll catch up then. But thank you so much for your time. This has been immensely helpful for us and um we'll we'll chat soon."
+  },
+  {
+    "speaker" : "Wissam Akra",
+    "text" : "Thank you."
+  },
+  {
+    "speaker" : "Kris Harrison (Turner)",
+    "text" : "Thanks, it was nice seeing everyone. Thank you all."
+  }
+]

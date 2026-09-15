@@ -60,7 +60,11 @@ struct Replay {
              "enclosingEndMs": w.enclosingEndMs]
         }, "labels": result.wordAssignments.map { $0.speakerID as Any? ?? NSNull() }, "segments": segments,
             "effective_labels": result.wordAssignments.map { (effectiveBySegment[$0.segmentID] ?? nil) as Any? ?? NSNull() },
-            "display_paragraphs": paragraphs.map { ["word_count": $0.words?.count ?? $0.text.split(whereSeparator: \.isWhitespace).count] } ]
+            "display_paragraphs": paragraphs.map { ["word_count": $0.words?.count ?? $0.text.split(whereSeparator: \.isWhitespace).count] },
+            "display_asides": paragraphs.flatMap(\.asides).map {
+                ["word_count": $0.words?.count ?? $0.text.split(whereSeparator: \.isWhitespace).count,
+                 "source_segment_count": $0.sourceSegmentCount]
+            } ]
         FileHandle.standardOutput.write(try JSONSerialization.data(withJSONObject: output, options: [.sortedKeys]))
     }
 }

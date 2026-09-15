@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import json
 from pathlib import Path
 
-from wder import (engine_revision, manual_reference, parse_reference, score_replay,
+from wder import (engine_revision, manual_reference, parse_json_reference, parse_reference, score_replay,
                   text_pairs, timed_pairs, paragraph_metrics, replay_run)
 
 
@@ -49,6 +49,17 @@ class WDERContracts(unittest.TestCase):
             plain = Path(temporary) / "reference.txt"
             plain.write_text("A: hello\nB: goodbye\n")
             self.assertEqual([row["speaker"] for row in parse_reference(plain)], ["A", "B"])
+
+    def test_json_timestamp_ranges_and_unlabelled_rows(self):
+        reference = parse_json_reference([
+            {"speaker": "A", "text": "Short form", "timestamp": "59:56-01:00:03"},
+            {"speaker": "B", "text": "Long form", "timestamp": "01:00:03-01:00:09"},
+            {"speaker": None, "text": "No ground-truth speaker", "timestamp": "01:00:09-01:00:10"},
+        ])
+        self.assertEqual(reference, [
+            dict(speaker="A", text="Short form", start_ms=3_596_000, end_ms=3_603_000),
+            dict(speaker="B", text="Long form", start_ms=3_603_000, end_ms=3_609_000),
+        ])
 
     def test_display_paragraph_counts_and_segment_only_text(self):
         self.assertEqual(paragraph_metrics([dict(word_count=1), dict(word_count=6)]),
