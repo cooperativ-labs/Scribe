@@ -1,0 +1,38 @@
+{
+  "membership": {
+    "development": [
+      "latest",
+      "cab"
+    ],
+    "validation": [],
+    "limitations": "Both recordings have already informed tuning. Cross-recording results are sensitivity evidence, not a pristine holdout. MacWhisper exports are machine references. Sparse manual edits from other recordings are not whole-meeting validation."
+  },
+  "recordings": [
+    {
+      "id": "latest",
+      "run": "/Users/jake/Meeting Transcripts/meeting--68b03b5a278897e877fc4ec8b2f12784/runs/487F2364-3579-4814-B06A-C4B3967DA074",
+      "canonical_sha256": "61fa4b95ef8cd9106e8450d81b8a865a851d3671c3d46c1ec5f4240e801074ff",
+      "references": {
+        "segments": "benchmark-files/Jake <> Neah/GroundTruth - Segements.json",
+        "paragraphs": "benchmark-files/Jake <> Neah/GroundTruth - paragraph.json"
+      },
+      "reference_sha256": {
+        "segments": "02798ac0ba922bd0b12de0bde286291bfda783d27a3c06a706d86f4d0a33c532",
+        "paragraphs": "46d0c8f7d307baf0f9be1318eb89b59452755991f310a1f928cf3c6dacbd0d74"
+      }
+    },
+    {
+      "id": "cab",
+      "run": "/Users/jake/Meeting Transcripts/meeting--cecb678e89d2e0bc89c9687e1c980d5b/runs/01D75E08-6B5B-4C90-935D-7786C61BABA3",
+      "canonical_sha256": "e8096e5fe0709cc8d9e44c76f116bbfff709d9b0670f9ad6522abbfc071c2dac",
+      "references": {
+        "segments": "benchmark-files/CAB/BENCHMARK CALL - Transcrpt segments.json",
+        "paragraphs": "benchmark-files/CAB/BENCHMARK CALL - Paragraphs.json"
+      },
+      "reference_sha256": {
+        "segments": "cf9664ca8970c228360ae374870659826db4d4a0262bea702495a06166677eb5",
+        "paragraphs": "5d7c8d081e35769ff43810d8b3fe533092abfd15d0f40e28df770fcf49a6cd78"
+      }
+    }
+  ]
+}

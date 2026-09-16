@@ -1,5 +1,21 @@
 import Foundation
 
+/// Lossless, transient evidence for one source range in a display row. The
+/// source snapshot retains canonical/effective identities, manual attribution,
+/// confidence, uncertainty, inference provenance and exact timing together.
+/// Never persist this as a replacement canonical segment or an editing target.
+public struct TranscriptAttributionRange: Equatable, Sendable {
+    public let source: TranscriptSegment
+    /// Indices in the paragraph's timed-word array; nil means this source has
+    /// no word timings (for example after a text edit). No timings are invented.
+    public let wordRange: Range<Int>?
+
+    public init(source: TranscriptSegment, wordRange: Range<Int>?) {
+        self.source = source
+        self.wordRange = wordRange
+    }
+}
+
 /// A reading-oriented paragraph derived from canonical segments.
 ///
 /// Paragraphs are a presentation grouping only. They do not replace, rewrite, or
@@ -19,6 +35,8 @@ public struct TranscriptParagraph: Identifiable, Equatable, Sendable {
     public let words: [TimedWord]?
     public let sourceSegmentIDs: [TranscriptSegment.ID]
     public let containsInferredAttribution: Bool
+    /// Main-speaker ranges only. Asides own their own independent ranges.
+    public let attributionRanges: [TranscriptAttributionRange]
     /// Brief interjections by another speaker. Their text and source IDs remain
     /// separate from the main speaker's text, words, and editing targets.
     /// The grouper emits leaf paragraphs here (never nested asides).
@@ -53,6 +71,7 @@ public struct TranscriptParagraph: Identifiable, Equatable, Sendable {
         words: [TimedWord]?,
         sourceSegmentIDs: [TranscriptSegment.ID],
         containsInferredAttribution: Bool = false,
+        attributionRanges: [TranscriptAttributionRange] = [],
         asides: [TranscriptParagraph] = []
     ) {
         self.id = id
@@ -67,6 +86,7 @@ public struct TranscriptParagraph: Identifiable, Equatable, Sendable {
         self.words = words
         self.sourceSegmentIDs = sourceSegmentIDs
         self.containsInferredAttribution = containsInferredAttribution
+        self.attributionRanges = attributionRanges
         self.asides = asides
     }
 }
@@ -93,6 +113,16 @@ public struct TranscriptParagraphGrouper: Sendable {
     /// sentence ending past it, so paragraphs normally land in the 40-80 word
     /// reading range.
     public struct Configuration: Sendable, Equatable {
+        /// Experimental sentence/turn presentation, selectable independently of
+        /// the existing reading view. Only joins whole source segments: neither
+        /// source IDs nor the builder's per-segment evidence guard are changed.
+        /// Caps are enforced at source boundaries, not by splitting long sources.
+        public static var sentenceTurns: Self {
+            Self(sentencePauseMs: 1_000, hardPauseMs: 1_000,
+                 unknownPauseMs: 1_000, minimumWordCount: 1,
+                 maximumWordCount: 80, maximumDurationMs: 30_000)
+        }
+
         /// A pause at a sentence ending that closes the paragraph.
         public var sentencePauseMs: Int
         /// Any gap this long closes the paragraph, even mid-sentence.
@@ -264,6 +294,15 @@ public struct TranscriptParagraphGrouper: Sendable {
             let confirmed = sources.first { $0.speakerID != nil }
             let inferred = sources.first { $0.hasInferredSpeaker }?.speakerInference
             let containsInferred = sources.contains { $0.hasInferredSpeaker }
+            var wordOffset = 0
+            let ranges = sources.map { source in
+                let count = source.words?.count ?? 0
+                defer { wordOffset += count }
+                return TranscriptAttributionRange(
+                    source: source,
+                    wordRange: count > 0 ? wordOffset..<(wordOffset + count) : nil
+                )
+            }
             return TranscriptParagraph(
                 id: "paragraph:" + sourceIDs.joined(separator: "+"),
                 speakerID: confirmed?.speakerID ?? inferred?.speakerID,
@@ -279,6 +318,7 @@ public struct TranscriptParagraphGrouper: Sendable {
                 words: Self.joinedWords(from: sources),
                 sourceSegmentIDs: sourceIDs,
                 containsInferredAttribution: containsInferred,
+                attributionRanges: ranges,
                 asides: asides
             )
         }

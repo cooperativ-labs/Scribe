@@ -7,6 +7,79 @@ final class TokenTimingReconcilerTests: XCTestCase {
     private let identityMapping = AudioTimeMapping(sourceSampleRate: 16_000)
     private let targetSuffix = ["The", "weather", "today", "is", "fine."]
 
+    private func apostropheWords(_ pieces: [String], enabled: Bool = true) throws -> TokenTimingReconciliationResult {
+        let tokens = pieces.enumerated().map { index, text in
+            WorkerTimedToken(text: text, tokenID: index + 100,
+                             startSeconds: Double(index) * 0.1, endSeconds: Double(index + 1) * 0.1)
+        }
+        return try TokenTimingReconciler(configuration: .init(joinIntrawordApostrophes: enabled)).reconcile(.init(
+            workerTranscript: WorkerASRTranscript(text: "", tokens: tokens, sourceDurationSeconds: 10),
+            timeMapping: identityMapping, sourceDurationMs: 10_000))
+    }
+
+    func testIntrawordApostrophesContractionsPossessivesAndNames() throws {
+        for mark in ["'", "’"] {
+            for (stem, suffix) in [("don", "t"), ("I", "m"), ("we", "re"), ("they", "ve"),
+                                   ("she", "ll"), ("I", "d"), ("Alex", "s"), ("O", "Brien"), ("D", "Angelo")] {
+                let result = try apostropheWords(["▁" + stem, mark, suffix, "."])
+                XCTAssertEqual(result.texts, [stem + mark + suffix + "."])
+                XCTAssertEqual(result.words[0].startMs, 0)
+                XCTAssertEqual(result.words[0].endMs, 300)
+            }
+        }
+        XCTAssertEqual(try apostropheWords([" I", "'", "d", "'", "ve"]).texts, ["I'd've"])
+        XCTAssertEqual(try apostropheWords([" don't", " stop"]).texts, ["don't", "stop"])
+    }
+
+    func testQuotesExplicitBoundariesAndHyphensRetainLegacyBehavior() throws {
+        for pieces in [["'", " hello", "'", " world"], ["‘", "hello", "’", "▁world"],
+                       [" dogs", "'", " tails"], [" a", "▁'", "b"],
+                       [" a", "'", "▁b"], [" a", "'", " b"],
+                       [" word", "'", "!", "next"], [" well", "-", "known"],
+                       [" hello", ",", "world"], [" a", "’", "’", "b"]] {
+            XCTAssertEqual(try apostropheWords(pieces), try apostropheWords(pieces, enabled: false))
+        }
+    }
+
+    func testApostropheTimingIsTextOnlyIncludingInvalidAndLatePunctuation() throws {
+        let tokens = [WorkerTimedToken(text: " can", tokenID: 1, startSeconds: 0.1, endSeconds: 0.2),
+                      WorkerTimedToken(text: "'", tokenID: 2, startSeconds: .nan, endSeconds: 8),
+                      WorkerTimedToken(text: "t", tokenID: 3, startSeconds: 0.3, endSeconds: 0.4),
+                      WorkerTimedToken(text: ".", tokenID: 7883, startSeconds: 8, endSeconds: 9)]
+        let result = try TokenTimingReconciler(configuration: .init(joinIntrawordApostrophes: true)).reconcile(.init(
+            workerTranscript: WorkerASRTranscript(text: "", tokens: tokens, sourceDurationSeconds: 10),
+            timeMapping: identityMapping, sourceDurationMs: 10_000))
+        XCTAssertEqual(result.texts, ["can't."])
+        XCTAssertEqual(result.words[0].startMs, 100)
+        XCTAssertEqual(result.words[0].endMs, 400)
+        XCTAssertTrue(result.warnings.isEmpty)
+    }
+
+    func testVocabularyResolvedApostropheAndDefaultOff() throws {
+        let tokens = (1...3).map { WorkerTimedToken(text: "token_\($0)", tokenID: $0,
+                                                 startSeconds: Double($0) * 0.1, endSeconds: Double($0 + 1) * 0.1) }
+        let request = TokenTimingReconciliationRequest(
+            workerTranscript: WorkerASRTranscript(text: "", tokens: tokens, sourceDurationSeconds: 10),
+            timeMapping: identityMapping, sourceDurationMs: 10_000,
+            vocabulary: [1: "▁Alex", 2: "'", 3: "s"])
+        XCTAssertEqual(try reconciler.reconcile(request).texts, ["Alex'", "s"])
+        XCTAssertEqual(try TokenTimingReconciler(configuration: .init(joinIntrawordApostrophes: true)).reconcile(request).texts, ["Alex's"])
+    }
+
+    func testSuffixCrossingSpeakerBoundaryUsesOneWholeWordWithoutLosingSuffix() throws {
+        let baseline = try apostropheWords([" don", "'", "t", " yes"], enabled: false)
+        let candidate = try apostropheWords([" don", "'", "t", " yes"])
+        let turns = [DiarizedSpeakerTurn(speakerID: "A", startMs: 0, endMs: 200),
+                     DiarizedSpeakerTurn(speakerID: "B", startMs: 200, endMs: 400)]
+        let before = try SpeakerTurnBuilder().build(words: baseline.words, diarizedTurns: turns)
+        let after = try SpeakerTurnBuilder().build(words: candidate.words, diarizedTurns: turns)
+        XCTAssertEqual(before.segments.map(\.text), ["don'", "t yes"])
+        XCTAssertEqual(after.segments.map(\.text), ["don't", "yes"])
+        XCTAssertEqual(after.segments.map(\.speakerID), ["speaker_1", "speaker_2"])
+        XCTAssertEqual(after.wordAssignments.count, 2)
+        XCTAssertEqual(candidate.words[0].endMs, 300)
+    }
+
     func testPunctuationAttachesWithoutCreatingEmptyWords() throws {
         let result = try reconcile(fixture: "worker-punctuation", durationMs: 2_000)
 

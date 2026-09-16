@@ -216,3 +216,241 @@ cluster and its aggregate support. Optimal speaker mapping measures attribution
 agreement, **not** the correctness of the visible “Me”/owner name. Raw energy,
 replay text and original audio stay outside tracked source. See the phase plan
 for the calibration's limited ground-truth coverage.
+
+## Immutable quality baseline and independent experiments (coo:1016)
+
+Use `quality.py` for the controlled optimization series. It uses the actual Swift
+host via `replay.py`, with a single lexical alignment method for both canonical
+and effective speaker scores. The older `wder.py` remains available for historical
+reports; its automatic timestamp selection and omission of unlabelled reference
+rows are **not** the new experiment contract.
+
+The named baseline is **scribe-quality-v1**. Its private, read-only bundle is at
+`~/Library/Application Support/Scribe/QualityEvaluation/scribe-quality-v1`.
+The published lock and aggregate evidence are
+[`transcript-quality-baseline-v1.json`](../../docs/investigations/transcript-quality-baseline-v1.json).
+It includes source/input/config/binary hashes, installed model tree hash and file
+count, engine revisions, corpus membership, mappings and aggregates. Individual
+model-file hashes, frozen source copies, raw ASR, saved JSON inputs, replay output
+and review packs stay in the private bundle. No model inference is performed;
+installed asset hashes do not prove which bytes a historical process loaded.
+Original source audio and every saved run file are hashed in place and never
+modified. The original audio paths remain the listening sources.
+
+```sh
+BASE="$HOME/Library/Application Support/Scribe/QualityEvaluation/scribe-quality-v1"
+python3 Tools/DiarizationAnalysis/quality.py verify --bundle "$BASE"
+
+# Self-comparison: each candidate starts from the frozen inputs, never the prior candidate.
+python3 Tools/DiarizationAnalysis/quality.py compare --bundle "$BASE" \
+  --config Tools/DiarizationAnalysis/experiments/baseline.json \
+  --private-output /private/tmp/scribe-quality-self-check \
+  --output /private/tmp/scribe-quality-self-check-aggregate.json
+
+# Independently select raw-token word reconstruction with all other behavior fixed.
+python3 Tools/DiarizationAnalysis/quality.py compare --bundle "$BASE" \
+  --config Tools/DiarizationAnalysis/experiments/raw-reconstruction.json \
+  --private-output /private/tmp/scribe-quality-raw-check \
+  --output /private/tmp/scribe-quality-raw-check-aggregate.json
+
+python3 -m unittest discover -s Tools/DiarizationAnalysis -p 'test_*.py'
+```
+
+Output directories must be new and outside the checkout and frozen bundle.
+The baseline is never overwritten. The CLI verifies the manifest against the
+published lock, then verifies every frozen file before candidate execution.
+To rebuild the **frozen** Swift executable (rather than current production):
+
+```sh
+python3 "$BASE/source/Tools/DiarizationAnalysis/replay.py" "$BASE/latest" saved \
+  "$BASE/latest/diarization.json" --output /private/tmp/frozen-rebuilt-replay.json \
+  --keep-executable /private/tmp/frozen-rebuilt-host
+```
+
+Compiler/path differences may change the rebuilt binary hash. Record that new
+hash and check semantic outputs against the frozen replay; do not replace the
+locked executable. To create a new separately named bundle from the current
+sources, the original freeze command was:
+
+```sh
+python3 Tools/DiarizationAnalysis/quality.py freeze \
+  --corpus Tools/DiarizationAnalysis/experiments/corpus-v1.json \
+  --models "$HOME/Library/Application Support/Scribe/Models" \
+  --bundle "$BASE" --output docs/investigations/transcript-quality-baseline-v1.json
+```
+
+That command intentionally fails now because the bundle already exists. Preserve
+it through later objectives; `/private/tmp` trial files are not dependencies.
+
+### Candidate configuration contract
+
+`experiments/baseline.json` and `experiments/raw-reconstruction.json` are executable
+controls, not unimplemented feature switches. Each later objective supplies one
+JSON configuration with a unique `id`, `baseline: "scribe-quality-v1"`, and
+`word_input: "saved"` or `"raw"`. Unknown configuration keys are rejected.
+Saved mode enforces byte-equivalent decoded word objects. Raw mode compares common
+lexical tokens and reports added/removed alignment units explicitly.
+
+For a host-code candidate, supply `host_replay`, `binary_sha256`, `source_root`
+and `source_tree_sha256`. Build the candidate using `replay.py` from its source
+root first; this must be the actual Swift implementation or an explicitly labelled
+experimental source variant. The source root must contain all relative files in
+the baseline's `provenance.source_hashes`. Compute its digest with:
+
+```python
+# Run with Tools/DiarizationAnalysis on PYTHONPATH.
+from pathlib import Path
+from quality import read, digest, sha256
+lock = read('docs/investigations/transcript-quality-baseline-v1.json')
+root = Path('/path/to/candidate-source-root')
+print(digest({p: sha256(root/p) for p in lock['provenance']['source_hashes']}))
+```
+
+For an independent diarization candidate, use
+`recordings: {"latest": {"diarization": "/private/path/latest.json",
+"diarization_sha256": "..."}, "cab": {...}}`. Omitted recordings use their
+baseline intervals. Record the worker config, model hashes and worker executable
+hash alongside each inference artifact; inference must be serial for meaningful
+runtime comparisons. This harness hashes the supplied artifact and performs only
+host replay. It does not run or attest to a worker build.
+
+Speaker mappings are fitted **once**, on baseline effective labels, and reused for
+canonical, effective, time sensitivity and every candidate. The Swift builder
+numbers speakers by first interval appearance. If a candidate changes cluster
+identity/order, specify each recording's one-to-one `speaker_correspondence`
+(candidate host ID → baseline host ID), justified from acoustic/cluster evidence.
+Unmapped extra clusters remain disagreements; do not refit mappings separately to
+make a candidate look better. Speaker confusion includes unknown assignments.
+
+### Alignment, boundaries and review
+
+Lexical normalization is Unicode `casefold` plus `\w+` runs, then deterministic
+`SequenceMatcher(autojunk=False)`. Apostrophes/punctuation are separators, allowing
+`don't` and `don' t` to share two lexical units. This is exact-token reference
+agreement, not ASR WER or human accuracy. Repeated phrases can align ambiguously;
+coverage is reported and unmatched tokens are never counted correct. Null-speaker
+reference rows stay in text alignment but are excluded from attribution scoring.
+CAB therefore has 18,963 matched tokens, of which 200 are unscoreable. Time
+sensitivity uses saved words, greatest positive overlap, and the same mapping;
+zero-duration rows have no positive time overlap. Latest has 41 such reference
+rows; CAB has 60. Time and lexical scores have different units/denominators.
+
+Paragraph boundaries are row starts in reference lexical-token coordinates,
+excluding the first row, with deterministic, chronological, nearest-available one-to-one matches at
+tolerances 0, 1 and 3 tokens (a greedy diagnostic, not global boundary optimization).
+An unaligned first token stays ambiguous, even if a nearby later token matches.
+Main paragraphs and asides are separate rows. Unmatched hypothesis/reference
+boundaries, precision and recall are reported. These are agreement diagnostics,
+not proof of desirable segmentation. `saved_boundary_changes` reconstructs the
+pinned v3 builder predicates for explanation only; Python does not generate any
+host transcript. Update/version those predicates when a later candidate changes
+the construction algorithm.
+
+Conservation checks fail on missing/duplicated source word IDs, changed word
+text/timing, or missing/duplicated source segments, including main rows **plus
+asides**. A candidate's own conservation and its word sequence versus baseline
+are separate checks. `*-review.json` contains changed assignments and all aligned
+wrong/unknown cases, context, original audio path, and padded clip offsets.
+Canonical and effective cases are separate. `human_speaker`, `human_boundary`,
+`reviewer` and `notes` remain null until someone actually listens. No listening or
+adjudication has been fabricated, and no private review pack should be committed.
+
+Both latest and CAB are development/sensitivity recordings. Validation membership
+is empty. Sparse manual corrections elsewhere do not establish whole-meeting
+validation. Future optimization settings stay independently selectable until the
+mission's promotion objective; this harness changes no production behavior.
+
+### Isolated apostrophe reconstruction candidate (objective 2)
+
+`TokenTimingReconciler.Configuration.joinIntrawordApostrophes` is default-off.
+The standalone host accepts `--intraword-apostrophes`; candidate JSON accepts
+`"intraword_apostrophes": true` only with raw words and an explicitly hashed host.
+The option joins unmarked ASCII/right-curly apostrophes between letter pieces,
+without absorbing punctuation timing or changing hyphens/explicit word markers.
+
+Build one host, snapshot its sources, and evaluate both off/on against the frozen
+baseline with a new private destination:
+
+```sh
+python3 Tools/DiarizationAnalysis/apostrophe_experiment.py \
+  --bundle "$HOME/Library/Application Support/Scribe/QualityEvaluation/scribe-quality-v1" \
+  --private-output /private/tmp/scribe-apostrophes-reproduction \
+  --output /private/tmp/scribe-apostrophes-reproduction-aggregate.json
+```
+
+The recipe emits independently reusable hashed configuration files and private
+review packs, requires complete off-control replay parity, and checks character,
+lexical-token and merged timing-span conservation. See
+[acceptance evidence](../../docs/investigations/transcript-quality-apostrophes-v1.md).
+Latest common-suffix splits fall 203→0; CAB introduces one new speaker disagreement.
+Keep this candidate opt-in pending the later validation/promotion objectives.
+
+### Independent short-turn retention (objective 3)
+
+`ShortTurnBenchmark` is an explicit experiment executable; production
+`OfflineDiarizationAdapter.diarize(fileURL:)` remains unchanged. It prepares at
+the baseline 1.0 s embedding floor, then calls the pinned SDK's public
+`cluster(_:)` on that same prepared value at output floors 1.0/0.75/0.5/0.25/0 s.
+An independent preparation at 0.5 s measures the old **coupled** candidate.
+Each output-only variant must retain exactly the same serialized chunk vectors,
+PLDA vectors, chunk indices and cluster assignments or the benchmark fails.
+Re-embedding, exclusive output and nonzero segmentation duration are rejected
+because they invalidate this isolation contract.
+
+```sh
+python3 Tools/DiarizationAnalysis/short_turn_experiment.py \
+  --bundle "$HOME/Library/Application Support/Scribe/QualityEvaluation/scribe-quality-v1" \
+  --private-output /private/tmp/scribe-short-turn-reproduction \
+  --models "$HOME/Library/Application Support/Scribe/Models" \
+  --output /private/tmp/scribe-short-turn-reproduction-aggregate.json
+
+swift test --package-path Workers/TranscriptionWorker --build-system swiftbuild \
+  --filter 'shortTurn|offlineDiarization'
+python3 -m unittest discover -s Tools/DiarizationAnalysis -p 'test_*.py'
+```
+
+The recipe snapshots worker sources, builds and verifies the exact SDK revision,
+hashes models and binary, runs inference serially, then compares every candidate
+against the frozen host with **saved words** (apostrophe candidate disabled).
+Private per-recording files contain raw cluster correspondence and embeddings.
+Aggregate reports contain only hashes, counts and anonymous correspondence
+evidence. Fresh baseline cluster IDs map to historical IDs by interval overlap;
+output-only variants reuse raw cluster identity, and the coupled preparation maps
+by centroid cosine similarity. Reference labels never fit these correspondences.
+Inspect weak/ambiguous correspondence evidence before interpreting a score.
+
+The variant wrapper records `preparationEmbeddingFloorSeconds` and
+`outputFloorSeconds` separately. Its nested `result.configuration` describes
+**preparation**, not the modified reconstruction-manager configuration. The
+generated comparison JSON refers to this artifact by hash and preserves both
+floor values in the aggregate evidence. Do not pass a reconstruction manager's
+configuration off as the configuration used to extract its prepared embeddings.
+
+See [audit and acceptance evidence](../../docs/investigations/transcript-quality-short-turns-v1.md).
+
+### Lossless attribution ranges and sentence/turn display (objective 4)
+
+`TranscriptParagraph.attributionRanges` retains each complete canonical source
+segment and its range in the display row's timed words, including exact inference
+and uncertainty. It is transient; canonical schema, edit IDs and exports do not
+change. Untimed sources have nil word ranges. Asides own separate ranges.
+
+`TranscriptParagraphGrouper.Configuration.sentenceTurns` is an opt-in display
+policy. `Replay.swift` / `replay.py` accept `--sentence-turns`; hashed candidate
+JSON accepts `"sentence_turns": true` with an explicit host executable. All other
+candidate switches remain independent. The app's grouping defaults stay unchanged.
+
+```sh
+python3 Tools/DiarizationAnalysis/grouping_experiment.py \
+  --bundle "$HOME/Library/Application Support/Scribe/QualityEvaluation/scribe-quality-v1" \
+  --private-output /private/tmp/scribe-grouping-reproduction \
+  --output /private/tmp/scribe-grouping-reproduction-aggregate.json
+```
+
+The recipe requires exact off-control replay equality, unchanged canonical and
+reconciled segments/labels, complete source evidence and exact word-range slices.
+It emits private unreviewed changed-boundary packs and aggregate-only results.
+Latest has 333 candidate display turns versus 610 saved segments and 240 existing
+reading paragraphs; CAB 770 versus 1,329 and 630. This is presentation-only:
+no saved row or attribution improvement. Boundary precision falls while recall
+rises. See [design and acceptance evidence](../../docs/investigations/transcript-quality-grouping-v1.md).

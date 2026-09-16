@@ -9,6 +9,7 @@ let package = Package(
         .executable(name: "TranscriptionWorker", targets: ["TranscriptionWorker"]),
         .executable(name: "ASRBenchmark", targets: ["ASRBenchmark"]),
         .executable(name: "DiarizationBenchmark", targets: ["DiarizationBenchmark"]),
+        .executable(name: "ShortTurnBenchmark", targets: ["ShortTurnBenchmark"]),
         .executable(name: "SpeakerEnrollmentCalibration", targets: ["SpeakerEnrollmentCalibration"]),
     ],
     dependencies: [
@@ -33,6 +34,7 @@ let package = Package(
         .executableTarget(name: "TranscriptionWorker", dependencies: ["TranscriptionWorkerSupport"]),
         .executableTarget(name: "ASRBenchmark", dependencies: ["TranscriptionWorkerSupport"]),
         .executableTarget(name: "DiarizationBenchmark", dependencies: ["TranscriptionWorkerSupport"]),
+        .executableTarget(name: "ShortTurnBenchmark", dependencies: ["TranscriptionWorkerSupport"]),
         .executableTarget(
             name: "SpeakerEnrollmentCalibration",
             dependencies: [

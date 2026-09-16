@@ -27,6 +27,8 @@ public struct TokenTimingReconciler: Sendable {
         public var punctuationTokenIDs: Set<Int>
         public var specialTokenTexts: Set<String>
         public var sentencePieceWordBoundary: String
+        /// Experimental reconstruction candidate; promotion requires corpus validation.
+        public var joinIntrawordApostrophes: Bool
 
         public init(
             modelWindowSeconds: TimeInterval = 14.88,
@@ -35,7 +37,8 @@ public struct TokenTimingReconciler: Sendable {
             encoderFrameSeconds: TimeInterval = 0.08,
             punctuationTokenIDs: Set<Int> = [7883, 7952, 7948],
             specialTokenTexts: Set<String> = ["<blank>", "<pad>"],
-            sentencePieceWordBoundary: String = "\u{2581}"
+            sentencePieceWordBoundary: String = "\u{2581}",
+            joinIntrawordApostrophes: Bool = false
         ) {
             self.modelWindowSeconds = modelWindowSeconds
             self.overlapSeconds = overlapSeconds
@@ -44,6 +47,7 @@ public struct TokenTimingReconciler: Sendable {
             self.punctuationTokenIDs = punctuationTokenIDs
             self.specialTokenTexts = specialTokenTexts
             self.sentencePieceWordBoundary = sentencePieceWordBoundary
+            self.joinIntrawordApostrophes = joinIntrawordApostrophes
         }
 
         /// FluidAudio matches seam tokens inside half of the overlap window.
@@ -225,17 +229,29 @@ public struct TokenTimingReconciler: Sendable {
             current = DraftWord()
         }
 
-        for token in tokens {
+        for (index, token) in tokens.enumerated() {
             if isPunctuation(token) {
                 let mark = stripWordBoundary(token.text)
                 guard !mark.isEmpty else { continue }
+                // A standalone apostrophe between lexical continuations is part
+                // of the word. Explicit word markers still win; quotes, plural
+                // possessive endings and hyphens retain the legacy boundary.
+                let intraword = configuration.joinIntrawordApostrophes
+                    && (mark == "'" || mark == "’")
+                    && !isWordBoundary(token.text)
+                    && !lastWasPunctuation
+                    && current.text.last?.isLetter == true
+                    && index + 1 < tokens.count
+                    && !isWordBoundary(tokens[index + 1].text)
+                    && !isPunctuation(tokens[index + 1])
+                    && tokens[index + 1].text.first?.isLetter == true
                 if current.text.isEmpty {
                     heldPunctuation += mark
                 } else {
                     // Text only: see the type comment on punctuation timing.
                     current.appendTextOnly(mark)
                 }
-                lastWasPunctuation = true
+                lastWasPunctuation = !intraword
                 continue
             }
 

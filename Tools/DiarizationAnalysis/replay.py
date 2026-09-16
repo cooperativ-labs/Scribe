@@ -18,6 +18,8 @@ def main():
     p.add_argument('diarization')
     p.add_argument('--source-minimum-agreement', type=float, default=0.95, help='Calibration override (production: 0.95)')
     p.add_argument('--source-energy', type=pathlib.Path, help='Opt in using an aligned source-energy.json')
+    p.add_argument('--intraword-apostrophes', action='store_true', help='Opt in to the isolated word reconstruction candidate')
+    p.add_argument('--sentence-turns', action='store_true', help='Opt in to evidence-preserving sentence/turn presentation')
     p.add_argument('--output', required=True, type=pathlib.Path)
     p.add_argument('--keep-executable', type=pathlib.Path, help='Copy the built host replay for further runs')
     a = p.parse_args()
@@ -52,7 +54,7 @@ def main():
             shutil.copy2(executable, a.keep_executable)
         with a.output.open('w') as output:
             transcript = '--saved-words' if a.transcript == 'saved' else a.transcript
-            subprocess.run([str(executable), a.run, transcript, a.diarization] + ([str(a.source_energy), str(a.source_minimum_agreement)] if a.source_energy else []), stdout=output, check=True)
+            subprocess.run([str(executable), a.run, transcript, a.diarization] + ([str(a.source_energy), str(a.source_minimum_agreement)] if a.source_energy else []) + (['--intraword-apostrophes'] if a.intraword_apostrophes else []) + (['--sentence-turns'] if a.sentence_turns else []), stdout=output, check=True)
 
 
 if __name__ == '__main__':

@@ -1,0 +1,78 @@
+{
+  "baseline": "scribe-quality-v1",
+  "controls": [
+    {
+      "id": "baseline",
+      "config": "baseline.json",
+      "purpose": "Fixed saved words and saved diarization through frozen host"
+    },
+    {
+      "id": "raw-reconstruction-control",
+      "config": "raw-reconstruction.json",
+      "purpose": "Same host and diarization; reconstruct words from identical raw ASR tokens"
+    }
+  ],
+  "future_axes": [
+    {
+      "objective": "coo:1016.7t0t",
+      "axis": "attribution evidence and visible grouping",
+      "word_input": "saved",
+      "implementation": "separate host binary",
+      "status": "not implemented here"
+    },
+    {
+      "objective": "coo:1016.x9ze",
+      "axis": "phrase context",
+      "word_input": "saved",
+      "implementation": "separate host binary",
+      "status": "not implemented here"
+    },
+    {
+      "objective": "coo:1016.q8bg",
+      "axis": "gap",
+      "values_seconds": [
+        0.1,
+        0.25,
+        0.5,
+        0.75
+      ],
+      "word_input": "saved",
+      "implementation": "separate diarization artifacts",
+      "status": "not implemented here"
+    },
+    {
+      "objective": "coo:1016.q8bg",
+      "axis": "fragment reconciliation",
+      "word_input": "saved",
+      "implementation": "separate host binary for each rule",
+      "status": "not implemented here"
+    }
+  ],
+  "policy": "Each config runs independently from frozen baseline inputs. Separate single-axis configurations precede explicit combination and leave-one-out configurations. No candidate is enabled in production by this registry.",
+  "candidates": [
+    {
+      "objective": "coo:1016.rjyd",
+      "axis": "apostrophe reconstruction",
+      "word_input": "raw",
+      "implementation": "apostrophe_experiment.py builds one host and writes hashed off/on configurations",
+      "status": "implemented, opt-in; promotion needs attribution review",
+      "flag": "intraword_apostrophes"
+    },
+    {
+      "objective": "coo:1016.x1nn",
+      "axis": "independent output duration versus coupled embedding floor",
+      "word_input": "saved",
+      "implementation": "short_turn_experiment.py; pinned public prepare/cluster adapter",
+      "status": "implemented; all lower floors experimental, baseline defaults retained",
+      "output_floors_seconds": [
+        1,
+        0.75,
+        0.5,
+        0.25,
+        0
+      ],
+      "preparation_embedding_floor_seconds": 1,
+      "coupled_control_seconds": 0.5
+    }
+  ]
+}

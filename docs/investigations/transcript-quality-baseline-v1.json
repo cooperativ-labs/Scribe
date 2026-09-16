@@ -1,0 +1,1338 @@
+{
+  "baseline_manifest_sha256": "7bd63d637472785145e841c67325d952e0c0f398eba4e703ad5dbc57c7ede75e",
+  "membership": {
+    "development": [
+      "latest",
+      "cab"
+    ],
+    "limitations": "Both recordings have already informed tuning. Cross-recording results are sensitivity evidence, not a pristine holdout. MacWhisper exports are machine references. Sparse manual edits from other recordings are not whole-meeting validation.",
+    "validation": []
+  },
+  "name": "scribe-quality-v1",
+  "provenance": {
+    "binary_sha256": "fd72291b489fe64be4d7d79223d01726ae21d726e39e0e9fd1766e6249a68bbf",
+    "bundle_hashes": {
+      "aggregate.json": "194077ee9f5849493265190d1a51bbd42c446f392bc2cd83d34decb363873926",
+      "cab/canonical-transcript.json": "e8096e5fe0709cc8d9e44c76f116bbfff709d9b0670f9ad6522abbfc071c2dac",
+      "cab/diarization.json": "2465dd7f543f4799a0131626a4e67e845b1061d8f84de309f16ba11f36cffcaa",
+      "cab/embeddings.json": "510e5941605b4939330de3658a33e27994944045298e9c591a5e5bbc3d8bed70",
+      "cab/job.json": "85c3dc656636cec2a68fc4b9ed0b3b0dbfad8e5a428cadb09bfa701495d25ef5",
+      "cab/mapping.json": "2672174058e9459e1c938b8d230c3e1429c59f7f44ae544c1eabe3fb9e14b267",
+      "cab/paragraphs.json": "5d7c8d081e35769ff43810d8b3fe533092abfd15d0f40e28df770fcf49a6cd78",
+      "cab/prepare.json": "1b5473385cfc971529d2f1c122f0222af2f48e723e2d45c83338dd2221397f31",
+      "cab/raw-replay.json": "551b1941134f0efb9ca1b89c28581f6a02f9dde8825ca05421e135bbb913657f",
+      "cab/replay.json": "551b1941134f0efb9ca1b89c28581f6a02f9dde8825ca05421e135bbb913657f",
+      "cab/review.json": "4c8f961e21c3e4285e6aec59fd91c5b9ff9c2398054e79ac2d6443db96032551",
+      "cab/segments.json": "cf9664ca8970c228360ae374870659826db4d4a0262bea702495a06166677eb5",
+      "cab/speaker-recognition.json": "6c594afd74df017d4568541411cca80ff687087095ed280bf934f025da8249b3",
+      "cab/transcript.json": "463e5c9be978252d206fa26d69e7fd0bf0486f170b6c2910cf085dd46e9e453e",
+      "cab/words.json": "261c4c792c6ce0fb2d302758446f3cb2ecaef06514bbd912116d966e69dacc59",
+      "host-replay": "fd72291b489fe64be4d7d79223d01726ae21d726e39e0e9fd1766e6249a68bbf",
+      "latest/canonical-transcript.json": "61fa4b95ef8cd9106e8450d81b8a865a851d3671c3d46c1ec5f4240e801074ff",
+      "latest/diarization.json": "3c2c5f6b8cc12446b90c58eb024fcd9c3b81af1213ca31ce4749700bf9382ba1",
+      "latest/embeddings.json": "54ffbe8bbc70044ee92df18b94fed8827dbb31f6b8b74c4e95d6e54f9df70659",
+      "latest/job.json": "8003afcb4e4649a5308f8332c6257a9c381c9b6c8481e6eab5d82db969a4231e",
+      "latest/mapping.json": "3cd5ebf5704bd254eb043913524676de24ef1c136f7f5edfd9e2de90e4d2066e",
+      "latest/paragraphs.json": "46d0c8f7d307baf0f9be1318eb89b59452755991f310a1f928cf3c6dacbd0d74",
+      "latest/prepare.json": "99ba6f32dbf57d711add75f9159f59f74dd05df78e13f75b6a25cc07def6a272",
+      "latest/raw-replay.json": "87e6103eef100a9fe11145604570355a5d367a1dcdeaef7049d4a790400ba4df",
+      "latest/replay.json": "87e6103eef100a9fe11145604570355a5d367a1dcdeaef7049d4a790400ba4df",
+      "latest/review.json": "af54d30579cf9a7c874d6e32c8aa3d800be2a25a6bb68db666977ba3375370d4",
+      "latest/segments.json": "02798ac0ba922bd0b12de0bde286291bfda783d27a3c06a706d86f4d0a33c532",
+      "latest/speaker-recognition.json": "dd7d8e12d5c9627fa28888d7d469da32511c491009507ee1eff72576b6aecb5b",
+      "latest/transcript.json": "5b26e3f8719f654a99175d2d601b5a7debfee04f8f207795f9954101e4ba40f3",
+      "latest/words.json": "8454dc88d0eb3bf55381e55ab517b81fb6fcf0a93263de01e29f148b890ef7dd",
+      "model-hashes.json": "c0183bec58da96eb6ca4a42039a79ccc979bd57eb15b708a1f3421f99432885a",
+      "source/Modules/Transcription/Sources/Transcription/Import/AudioPreparationService.swift": "0e7473c0c4df28118f0693f6556c044086d98c19728ad974e11eec297371e311",
+      "source/Modules/Transcription/Sources/Transcription/Jobs/TranscriptAssemblyStageRunner.swift": "401ee257b8fca13e74ca89cd4f009a55930ea5c46714577596d61a19f22ae7c0",
+      "source/Modules/Transcription/Sources/Transcription/Transcript/CanonicalTranscript.swift": "b7b9f979e8e12b7edb1a63af61e1b1948535adf7cac7c43da69d4ed846cc7859",
+      "source/Modules/Transcription/Sources/Transcription/Transcript/CanonicalTranscriptValidator.swift": "ddc25dafe80ee362cc4376b9d3e3c50b8531b9dc07b262179fe624860aa16aa6",
+      "source/Modules/Transcription/Sources/Transcription/Transcript/SourceEnergyPrior.swift": "06b922eb585e261a9ed3189269d9c9b82697ab6cb3ce9d467238536c67dd8c5c",
+      "source/Modules/Transcription/Sources/Transcription/Transcript/SpeakerTurnBuilder.swift": "6825f9b2086254061588a10f5ca5dfbfa7125ff5fc0e5232cd122262da659db7",
+      "source/Modules/Transcription/Sources/Transcription/Transcript/TokenTimingReconciler.swift": "f4b74afc703e3203493710b45966f277ec92cff20167fa9439356cb339a04601",
+      "source/Modules/Transcription/Sources/Transcription/Transcript/TranscriptDisplayGrouper.swift": "c010eebb3c8b7746394c8ad5cff89088cd08cbe5f13bc75fe71d925ed3f8329e",
+      "source/Modules/Transcription/Sources/Transcription/Transcript/TranscriptParagraph.swift": "fba9c18275cd4b17568abf947e7e7faacd6496db3a768ed7dd930af2647d26b8",
+      "source/Modules/Transcription/Sources/Transcription/Transcript/UnknownFragmentReconciler.swift": "b6fccd2f42ac559a8d2f51873d4a5732da43d2aea5bba9a834fd71f02f704aa4",
+      "source/Modules/Transcription/Sources/Transcription/Transcript/WorkerASRTranscript.swift": "c7a9497b01f46a5c42a72b14fb281b87fff6c97209b1887039bac5ba6158b6b8",
+      "source/Modules/Transcription/Sources/Transcription/UI/TranscriptReviewPresentation.swift": "c5552858aae296cfae9640acbac2f1350db6d63486167a81b2b7f07c7ce30f9f",
+      "source/Scribe/App/Sources/ScribeAppCore/SourceEnergyTimeline.swift": "497a848ec8996c4fc899166cfc027df747047e2539ac373f78c0aa83ea746d29",
+      "source/Tools/DiarizationAnalysis/Replay.swift": "e80e065063f22ac53fa40be7c94f1f1029c8a42bf14265ede5883bee1c7015ee",
+      "source/Tools/DiarizationAnalysis/benchmark.py": "636b30f90f48cb067a796592bd161f952748f03038ff2194234d5f9d5e4d4b5a",
+      "source/Tools/DiarizationAnalysis/compare.py": "b472e34b0beac5686746e140aceac8f317c2e0d761c6d6859793e58d02634be8",
+      "source/Tools/DiarizationAnalysis/quality.py": "93308fecc9c1eac5c644fe5750e88b0ac1c6c7e61877f5ca37c2ab18f6ccfddf",
+      "source/Tools/DiarizationAnalysis/replay.py": "8234efff3af3e4c15e210dba1f83352168703b382f013e0ecfadcd7440e13cb2",
+      "source/Tools/DiarizationAnalysis/review_excerpts.py": "64107f5a8f6e818140448b4bb6eb88e56fcff89c5d662825c22b0a5a0fc3414a",
+      "source/Tools/DiarizationAnalysis/summarize.py": "d068e8468005d9e1f7efbf70b99a46d44a5f2635d2ef8c5b9dc931ba7d35cf5c",
+      "source/Tools/DiarizationAnalysis/test_analysis.py": "f6ee5909515324d64286b8f803fce4c867ae1a42230a9de5cbd3c995a900c1c1",
+      "source/Tools/DiarizationAnalysis/test_quality.py": "60c3fd29c37524acc36a71526cccca582ca2cb0f063e82e5dd300470a3e71962",
+      "source/Tools/DiarizationAnalysis/test_wder.py": "5e0a72917209d3035c1ef5b175ac68dd7c731dd9f6cd005391a00d9d15e30c52",
+      "source/Tools/DiarizationAnalysis/wder.py": "03c7bf8a4b66c517cea20051fcbd73e745e0ca2dd05156daacab30e4fac326dc",
+      "source/Workers/TranscriptionWorker/Package.resolved": "78a4138907a3456753ad36cf46df162dfd90483b2f329548c53670394c89c952",
+      "source/Workers/TranscriptionWorker/model_manifest.json": "fefc6b59f2392a34ad58f94099d80af9d75e1e0413da9b61fb750bed6926e024"
+    },
+    "corpus": {
+      "membership": {
+        "development": [
+          "latest",
+          "cab"
+        ],
+        "limitations": "Both recordings have already informed tuning. Cross-recording results are sensitivity evidence, not a pristine holdout. MacWhisper exports are machine references. Sparse manual edits from other recordings are not whole-meeting validation.",
+        "validation": []
+      },
+      "recordings": [
+        {
+          "canonical_sha256": "61fa4b95ef8cd9106e8450d81b8a865a851d3671c3d46c1ec5f4240e801074ff",
+          "id": "latest",
+          "reference_sha256": {
+            "paragraphs": "46d0c8f7d307baf0f9be1318eb89b59452755991f310a1f928cf3c6dacbd0d74",
+            "segments": "02798ac0ba922bd0b12de0bde286291bfda783d27a3c06a706d86f4d0a33c532"
+          },
+          "references": {
+            "paragraphs": "benchmark-files/Jake <> Neah/GroundTruth - paragraph.json",
+            "segments": "benchmark-files/Jake <> Neah/GroundTruth - Segements.json"
+          },
+          "run": "/Users/jake/Meeting Transcripts/meeting--68b03b5a278897e877fc4ec8b2f12784/runs/487F2364-3579-4814-B06A-C4B3967DA074"
+        },
+        {
+          "canonical_sha256": "e8096e5fe0709cc8d9e44c76f116bbfff709d9b0670f9ad6522abbfc071c2dac",
+          "id": "cab",
+          "reference_sha256": {
+            "paragraphs": "5d7c8d081e35769ff43810d8b3fe533092abfd15d0f40e28df770fcf49a6cd78",
+            "segments": "cf9664ca8970c228360ae374870659826db4d4a0262bea702495a06166677eb5"
+          },
+          "references": {
+            "paragraphs": "benchmark-files/CAB/BENCHMARK CALL - Paragraphs.json",
+            "segments": "benchmark-files/CAB/BENCHMARK CALL - Transcrpt segments.json"
+          },
+          "run": "/Users/jake/Meeting Transcripts/meeting--cecb678e89d2e0bc89c9687e1c980d5b/runs/01D75E08-6B5B-4C90-935D-7786C61BABA3"
+        }
+      ]
+    },
+    "git_revision": "bdce779f3943d9138888510068c3555e9f9b9b28",
+    "models": {
+      "file_count": 35,
+      "role": "installed assets; saved-artifact replay performs no model inference",
+      "tree_sha256": "73c32918305057f80c3b53e82f5ad055980005bf0392f666fc140213ba93f1e2"
+    },
+    "name": "scribe-quality-v1",
+    "platform": "macOS-27.0-arm64-arm-64bit-Mach-O",
+    "recordings": {
+      "cab": {
+        "config_sha256": "a2c9b67c611968216447a98f0c4e33a3bcfc816cb607c0da1b4b60ff09b9ece5",
+        "engine": {
+          "modelRevision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594",
+          "runtime": "FluidAudio 0.15.6",
+          "runtimeRevision": "4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b"
+        },
+        "inputs": {
+          "canonical-transcript.json": "e8096e5fe0709cc8d9e44c76f116bbfff709d9b0670f9ad6522abbfc071c2dac",
+          "diarization.json": "2465dd7f543f4799a0131626a4e67e845b1061d8f84de309f16ba11f36cffcaa",
+          "embeddings.json": "510e5941605b4939330de3658a33e27994944045298e9c591a5e5bbc3d8bed70",
+          "job.json": "85c3dc656636cec2a68fc4b9ed0b3b0dbfad8e5a428cadb09bfa701495d25ef5",
+          "original_source_audio": "cecb678e89d2e0bc89c9687e1c980d5b385bd6047623e93b18a35468baa4c514",
+          "prepare.json": "1b5473385cfc971529d2f1c122f0222af2f48e723e2d45c83338dd2221397f31",
+          "prepared.wav": "26a4d005f6ff7666f375b3677bc5c7d8f2c794b9ac6753eb6c82caa32e1ffae6",
+          "reference_paragraphs": "5d7c8d081e35769ff43810d8b3fe533092abfd15d0f40e28df770fcf49a6cd78",
+          "reference_segments": "cf9664ca8970c228360ae374870659826db4d4a0262bea702495a06166677eb5",
+          "speaker-recognition.json": "6c594afd74df017d4568541411cca80ff687087095ed280bf934f025da8249b3",
+          "transcript.json": "463e5c9be978252d206fa26d69e7fd0bf0486f170b6c2910cf085dd46e9e453e",
+          "words.json": "261c4c792c6ce0fb2d302758446f3cb2ecaef06514bbd912116d966e69dacc59"
+        },
+        "mapping_sha256": "2672174058e9459e1c938b8d230c3e1429c59f7f44ae544c1eabe3fb9e14b267",
+        "processing_options": {
+          "configuration_fingerprint": "d4b4943d505242187c01501104b742313fd4ca3168b1987835e164cecdb0c81d",
+          "diarization_configuration": {
+            "clustering_threshold": 0.6,
+            "constrained_assignment": true,
+            "embedding_exclude_overlap": true,
+            "maximum_vbx_iterations": 20,
+            "minimum_embedding_duration_seconds": 1,
+            "preserve_overlapping_intervals": true,
+            "segmentation_step_ratio": 0.2,
+            "warm_start_fa": 0.07,
+            "warm_start_fb": 0.8
+          },
+          "diarization_diagnostics": {
+            "dominant_embedding_fraction": 0.30021197668256494,
+            "dominant_interval_fraction": 0.31648413396817143,
+            "embedding_count": 3774,
+            "heuristic_version": "dominant-occupancy-v1",
+            "interval_count": 779,
+            "occupancies": [
+              {
+                "cluster_id": "speaker_1",
+                "embedding_count": 1133,
+                "interval_count": 144,
+                "interval_seconds": 1889.1695131659508
+              },
+              {
+                "cluster_id": "speaker_10",
+                "embedding_count": 6,
+                "interval_count": 1,
+                "interval_seconds": 1.71484375
+              },
+              {
+                "cluster_id": "speaker_2",
+                "embedding_count": 160,
+                "interval_count": 32,
+                "interval_seconds": 260.5092468261719
+              },
+              {
+                "cluster_id": "speaker_3",
+                "embedding_count": 606,
+                "interval_count": 142,
+                "interval_seconds": 915.4837951660156
+              },
+              {
+                "cluster_id": "speaker_4",
+                "embedding_count": 76,
+                "interval_count": 25,
+                "interval_seconds": 118.96426391601562
+              },
+              {
+                "cluster_id": "speaker_5",
+                "embedding_count": 368,
+                "interval_count": 79,
+                "interval_seconds": 595.9278717041016
+              },
+              {
+                "cluster_id": "speaker_6",
+                "embedding_count": 211,
+                "interval_count": 52,
+                "interval_seconds": 293.37744140625
+              },
+              {
+                "cluster_id": "speaker_7",
+                "embedding_count": 610,
+                "interval_count": 146,
+                "interval_seconds": 1007.7936401367188
+              },
+              {
+                "cluster_id": "speaker_8",
+                "embedding_count": 261,
+                "interval_count": 81,
+                "interval_seconds": 361.52671813964844
+              },
+              {
+                "cluster_id": "speaker_9",
+                "embedding_count": 343,
+                "interval_count": 77,
+                "interval_seconds": 524.7719116210938
+              }
+            ],
+            "overlap_interval_count": 34,
+            "separation_appears_collapsed": false
+          },
+          "display_grouping": {
+            "maximum_duration_ms": 30000,
+            "maximum_word_count": 80,
+            "pause_split_ms": 1000,
+            "preferred_duration_ms": 12000,
+            "preferred_word_count": 40
+          },
+          "model_profile_id": "parakeet-v3",
+          "speaker_attribution": {
+            "confidence": {
+              "formula": "(strongest_overlap_ms-runner_up_overlap_ms)/word_duration_ms",
+              "provenance": "word-overlap-margin-v1",
+              "segment_aggregation": "minimum_word_confidence"
+            },
+            "nearest_interval": {
+              "attribution_source": "inferred",
+              "maximum_distance_ms": 250,
+              "rejects_competing_intervals": true
+            },
+            "phrase": {
+              "mode": "same_asr_span_pause_bounded_overlap_sum",
+              "override_minimum_lead_ratio": 0.2
+            },
+            "provenance": "speaker-turn-attribution-v3",
+            "timeline": {
+              "mode": "exclusive_for_attribution_only",
+              "preserves_canonical_intervals": true,
+              "provenance": "interval-extension-quality-v1"
+            }
+          },
+          "speaker_count": "automatic",
+          "speaker_matching": "enabled",
+          "unknown_fragment_reconciliation": {
+            "maximum_diarization_hole_ms": 1500,
+            "maximum_neighbor_gap_ms": 1500,
+            "maximum_unknown_duration_ms": 1000,
+            "maximum_word_count": 6,
+            "provenance": "unknown-fragment-reconciliation-v2"
+          }
+        }
+      },
+      "latest": {
+        "config_sha256": "53b29b308529aac12c17b8ec59e1235b0f76fcb312ea6bdcf521603293c69fb1",
+        "engine": {
+          "modelRevision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594",
+          "runtime": "FluidAudio 0.15.7",
+          "runtimeRevision": "41540ea237350afe5117a082b5c28eda642d0612"
+        },
+        "inputs": {
+          "canonical-transcript.json": "61fa4b95ef8cd9106e8450d81b8a865a851d3671c3d46c1ec5f4240e801074ff",
+          "diarization.json": "3c2c5f6b8cc12446b90c58eb024fcd9c3b81af1213ca31ce4749700bf9382ba1",
+          "embeddings.json": "54ffbe8bbc70044ee92df18b94fed8827dbb31f6b8b74c4e95d6e54f9df70659",
+          "job.json": "8003afcb4e4649a5308f8332c6257a9c381c9b6c8481e6eab5d82db969a4231e",
+          "original_source_audio": "68b03b5a278897e877fc4ec8b2f12784fa67d46dd23e7c9425f0a05c4889945b",
+          "prepare.json": "99ba6f32dbf57d711add75f9159f59f74dd05df78e13f75b6a25cc07def6a272",
+          "prepared.wav": "c27027d6964ad5a50bfd6afc54cc83dea174a1a4b0c72700a45bc8cabbe0691f",
+          "reference_paragraphs": "46d0c8f7d307baf0f9be1318eb89b59452755991f310a1f928cf3c6dacbd0d74",
+          "reference_segments": "02798ac0ba922bd0b12de0bde286291bfda783d27a3c06a706d86f4d0a33c532",
+          "speaker-recognition.json": "dd7d8e12d5c9627fa28888d7d469da32511c491009507ee1eff72576b6aecb5b",
+          "transcript.json": "5b26e3f8719f654a99175d2d601b5a7debfee04f8f207795f9954101e4ba40f3",
+          "words.json": "8454dc88d0eb3bf55381e55ab517b81fb6fcf0a93263de01e29f148b890ef7dd"
+        },
+        "mapping_sha256": "3cd5ebf5704bd254eb043913524676de24ef1c136f7f5edfd9e2de90e4d2066e",
+        "processing_options": {
+          "configuration_fingerprint": "54b1cb9177007e94aebed8c9e04968fe9f27e6f503e9aa737bdabd6809d08a00",
+          "diarization_configuration": {
+            "clustering_threshold": 0.6,
+            "constrained_assignment": true,
+            "embedding_exclude_overlap": true,
+            "maximum_speaker_count": null,
+            "maximum_vbx_iterations": 20,
+            "minimum_embedding_duration_seconds": 1,
+            "minimum_gap_duration_seconds": 0.1,
+            "minimum_segment_duration_seconds": 0,
+            "preserve_overlapping_intervals": true,
+            "segmentation_step_ratio": 0.2,
+            "warm_start_fa": 0.07,
+            "warm_start_fb": 0.8
+          },
+          "diarization_diagnostics": {
+            "dominant_embedding_fraction": 0.6826003824091779,
+            "dominant_interval_fraction": 0.715100471131612,
+            "embedding_count": 1046,
+            "heuristic_version": "dominant-occupancy-v1",
+            "interval_count": 341,
+            "occupancies": [
+              {
+                "cluster_id": "speaker_1",
+                "embedding_count": 332,
+                "interval_count": 106,
+                "interval_seconds": 421.40956139564514
+              },
+              {
+                "cluster_id": "speaker_2",
+                "embedding_count": 714,
+                "interval_count": 235,
+                "interval_seconds": 1057.7419242858887
+              }
+            ],
+            "overlap_interval_count": 29,
+            "separation_appears_collapsed": false
+          },
+          "display_grouping": {
+            "maximum_duration_ms": 30000,
+            "maximum_word_count": 80,
+            "pause_split_ms": 1000,
+            "preferred_duration_ms": 12000,
+            "preferred_word_count": 40
+          },
+          "model_profile_id": "default",
+          "speaker_attribution": {
+            "confidence": {
+              "formula": "(strongest_overlap_ms-runner_up_overlap_ms)/word_duration_ms",
+              "provenance": "word-overlap-margin-v1",
+              "segment_aggregation": "minimum_word_confidence"
+            },
+            "nearest_interval": {
+              "attribution_source": "inferred",
+              "maximum_distance_ms": 250,
+              "rejects_competing_intervals": true
+            },
+            "phrase": {
+              "mode": "same_asr_span_pause_bounded_overlap_sum",
+              "override_minimum_lead_ratio": 0.2
+            },
+            "provenance": "speaker-turn-attribution-v3",
+            "timeline": {
+              "mode": "exclusive_for_attribution_only",
+              "preserves_canonical_intervals": true,
+              "provenance": "interval-extension-quality-v1"
+            }
+          },
+          "speaker_count": "automatic",
+          "speaker_matching": "enabled",
+          "unknown_fragment_reconciliation": {
+            "maximum_diarization_hole_ms": 1500,
+            "maximum_neighbor_gap_ms": 1500,
+            "maximum_unknown_duration_ms": 1000,
+            "maximum_word_count": 6,
+            "provenance": "unknown-fragment-reconciliation-v2"
+          }
+        }
+      }
+    },
+    "source_hashes": {
+      "Modules/Transcription/Sources/Transcription/Import/AudioPreparationService.swift": "0e7473c0c4df28118f0693f6556c044086d98c19728ad974e11eec297371e311",
+      "Modules/Transcription/Sources/Transcription/Jobs/TranscriptAssemblyStageRunner.swift": "401ee257b8fca13e74ca89cd4f009a55930ea5c46714577596d61a19f22ae7c0",
+      "Modules/Transcription/Sources/Transcription/Transcript/CanonicalTranscript.swift": "b7b9f979e8e12b7edb1a63af61e1b1948535adf7cac7c43da69d4ed846cc7859",
+      "Modules/Transcription/Sources/Transcription/Transcript/CanonicalTranscriptValidator.swift": "ddc25dafe80ee362cc4376b9d3e3c50b8531b9dc07b262179fe624860aa16aa6",
+      "Modules/Transcription/Sources/Transcription/Transcript/SourceEnergyPrior.swift": "06b922eb585e261a9ed3189269d9c9b82697ab6cb3ce9d467238536c67dd8c5c",
+      "Modules/Transcription/Sources/Transcription/Transcript/SpeakerTurnBuilder.swift": "6825f9b2086254061588a10f5ca5dfbfa7125ff5fc0e5232cd122262da659db7",
+      "Modules/Transcription/Sources/Transcription/Transcript/TokenTimingReconciler.swift": "f4b74afc703e3203493710b45966f277ec92cff20167fa9439356cb339a04601",
+      "Modules/Transcription/Sources/Transcription/Transcript/TranscriptDisplayGrouper.swift": "c010eebb3c8b7746394c8ad5cff89088cd08cbe5f13bc75fe71d925ed3f8329e",
+      "Modules/Transcription/Sources/Transcription/Transcript/TranscriptParagraph.swift": "fba9c18275cd4b17568abf947e7e7faacd6496db3a768ed7dd930af2647d26b8",
+      "Modules/Transcription/Sources/Transcription/Transcript/UnknownFragmentReconciler.swift": "b6fccd2f42ac559a8d2f51873d4a5732da43d2aea5bba9a834fd71f02f704aa4",
+      "Modules/Transcription/Sources/Transcription/Transcript/WorkerASRTranscript.swift": "c7a9497b01f46a5c42a72b14fb281b87fff6c97209b1887039bac5ba6158b6b8",
+      "Modules/Transcription/Sources/Transcription/UI/TranscriptReviewPresentation.swift": "c5552858aae296cfae9640acbac2f1350db6d63486167a81b2b7f07c7ce30f9f",
+      "Scribe/App/Sources/ScribeAppCore/SourceEnergyTimeline.swift": "497a848ec8996c4fc899166cfc027df747047e2539ac373f78c0aa83ea746d29",
+      "Tools/DiarizationAnalysis/Replay.swift": "e80e065063f22ac53fa40be7c94f1f1029c8a42bf14265ede5883bee1c7015ee",
+      "Tools/DiarizationAnalysis/benchmark.py": "636b30f90f48cb067a796592bd161f952748f03038ff2194234d5f9d5e4d4b5a",
+      "Tools/DiarizationAnalysis/compare.py": "b472e34b0beac5686746e140aceac8f317c2e0d761c6d6859793e58d02634be8",
+      "Tools/DiarizationAnalysis/quality.py": "93308fecc9c1eac5c644fe5750e88b0ac1c6c7e61877f5ca37c2ab18f6ccfddf",
+      "Tools/DiarizationAnalysis/replay.py": "8234efff3af3e4c15e210dba1f83352168703b382f013e0ecfadcd7440e13cb2",
+      "Tools/DiarizationAnalysis/review_excerpts.py": "64107f5a8f6e818140448b4bb6eb88e56fcff89c5d662825c22b0a5a0fc3414a",
+      "Tools/DiarizationAnalysis/summarize.py": "d068e8468005d9e1f7efbf70b99a46d44a5f2635d2ef8c5b9dc931ba7d35cf5c",
+      "Tools/DiarizationAnalysis/test_analysis.py": "f6ee5909515324d64286b8f803fce4c867ae1a42230a9de5cbd3c995a900c1c1",
+      "Tools/DiarizationAnalysis/test_quality.py": "60c3fd29c37524acc36a71526cccca582ca2cb0f063e82e5dd300470a3e71962",
+      "Tools/DiarizationAnalysis/test_wder.py": "5e0a72917209d3035c1ef5b175ac68dd7c731dd9f6cd005391a00d9d15e30c52",
+      "Tools/DiarizationAnalysis/wder.py": "03c7bf8a4b66c517cea20051fcbd73e745e0ca2dd05156daacab30e4fac326dc",
+      "Workers/TranscriptionWorker/Package.resolved": "78a4138907a3456753ad36cf46df162dfd90483b2f329548c53670394c89c952",
+      "Workers/TranscriptionWorker/model_manifest.json": "fefc6b59f2392a34ad58f94099d80af9d75e1e0413da9b61fb750bed6926e024"
+    },
+    "source_tree_sha256": "741daafd7fc778893026a0c38b027c3ceb24a51325bb39591f528244586273c8",
+    "timing_policy": "No latency or memory claims; host replay only, no fresh inference.",
+    "toolchain": "Apple Swift version 6.4 (swiftlang-6.4.0.27.1 clang-2100.3.27.1)\nTarget: arm64-apple-macosx27.0.0"
+  },
+  "recordings": {
+    "cab": {
+      "alignment": {
+        "hypothesis_coverage": 0.955170503198509,
+        "hypothesis_tokens": 19853,
+        "matched_tokens": 18963,
+        "method": "unicode casefold + Unicode word runs; SequenceMatcher autojunk=False",
+        "reference_coverage": 0.9586471866943026,
+        "reference_tokens": 19781
+      },
+      "asides": {
+        "one_word": 0,
+        "rows": 0,
+        "up_to_three_words": 0,
+        "words": 0
+      },
+      "attribution": {
+        "canonical": {
+          "confusion": [
+            {
+              "count": 5346,
+              "hypothesis": "speaker_1",
+              "reference": "reference_1"
+            },
+            {
+              "count": 2,
+              "hypothesis": "speaker_1",
+              "reference": "reference_3"
+            },
+            {
+              "count": 1,
+              "hypothesis": "speaker_1",
+              "reference": "reference_7"
+            },
+            {
+              "count": 4,
+              "hypothesis": "speaker_1",
+              "reference": "reference_9"
+            },
+            {
+              "count": 3,
+              "hypothesis": "speaker_10",
+              "reference": "reference_8"
+            },
+            {
+              "count": 922,
+              "hypothesis": "speaker_2",
+              "reference": "reference_2"
+            },
+            {
+              "count": 2639,
+              "hypothesis": "speaker_3",
+              "reference": "reference_3"
+            },
+            {
+              "count": 15,
+              "hypothesis": "speaker_3",
+              "reference": "reference_7"
+            },
+            {
+              "count": 11,
+              "hypothesis": "speaker_3",
+              "reference": "reference_9"
+            },
+            {
+              "count": 1,
+              "hypothesis": "speaker_4",
+              "reference": "reference_1"
+            },
+            {
+              "count": 216,
+              "hypothesis": "speaker_4",
+              "reference": "reference_4"
+            },
+            {
+              "count": 2114,
+              "hypothesis": "speaker_5",
+              "reference": "reference_5"
+            },
+            {
+              "count": 6,
+              "hypothesis": "speaker_5",
+              "reference": "reference_7"
+            },
+            {
+              "count": 4,
+              "hypothesis": "speaker_6",
+              "reference": "reference_1"
+            },
+            {
+              "count": 3,
+              "hypothesis": "speaker_6",
+              "reference": "reference_3"
+            },
+            {
+              "count": 853,
+              "hypothesis": "speaker_6",
+              "reference": "reference_6"
+            },
+            {
+              "count": 13,
+              "hypothesis": "speaker_7",
+              "reference": "reference_1"
+            },
+            {
+              "count": 7,
+              "hypothesis": "speaker_7",
+              "reference": "reference_2"
+            },
+            {
+              "count": 3108,
+              "hypothesis": "speaker_7",
+              "reference": "reference_7"
+            },
+            {
+              "count": 1189,
+              "hypothesis": "speaker_8",
+              "reference": "reference_8"
+            },
+            {
+              "count": 6,
+              "hypothesis": "speaker_9",
+              "reference": "reference_1"
+            },
+            {
+              "count": 2,
+              "hypothesis": "speaker_9",
+              "reference": "reference_4"
+            },
+            {
+              "count": 1595,
+              "hypothesis": "speaker_9",
+              "reference": "reference_9"
+            },
+            {
+              "count": 124,
+              "hypothesis": "unknown",
+              "reference": "reference_1"
+            },
+            {
+              "count": 28,
+              "hypothesis": "unknown",
+              "reference": "reference_2"
+            },
+            {
+              "count": 164,
+              "hypothesis": "unknown",
+              "reference": "reference_3"
+            },
+            {
+              "count": 9,
+              "hypothesis": "unknown",
+              "reference": "reference_4"
+            },
+            {
+              "count": 58,
+              "hypothesis": "unknown",
+              "reference": "reference_5"
+            },
+            {
+              "count": 49,
+              "hypothesis": "unknown",
+              "reference": "reference_6"
+            },
+            {
+              "count": 127,
+              "hypothesis": "unknown",
+              "reference": "reference_7"
+            },
+            {
+              "count": 86,
+              "hypothesis": "unknown",
+              "reference": "reference_8"
+            },
+            {
+              "count": 58,
+              "hypothesis": "unknown",
+              "reference": "reference_9"
+            }
+          ],
+          "correct": 17982,
+          "scored_tokens": 18763,
+          "unknown": 703,
+          "unknown_pct": 3.7467,
+          "unscoreable": 200,
+          "wrong": 78,
+          "wrong_pct": 0.4157
+        },
+        "effective": {
+          "confusion": [
+            {
+              "count": 5426,
+              "hypothesis": "speaker_1",
+              "reference": "reference_1"
+            },
+            {
+              "count": 2,
+              "hypothesis": "speaker_1",
+              "reference": "reference_3"
+            },
+            {
+              "count": 1,
+              "hypothesis": "speaker_1",
+              "reference": "reference_7"
+            },
+            {
+              "count": 7,
+              "hypothesis": "speaker_1",
+              "reference": "reference_9"
+            },
+            {
+              "count": 3,
+              "hypothesis": "speaker_10",
+              "reference": "reference_8"
+            },
+            {
+              "count": 941,
+              "hypothesis": "speaker_2",
+              "reference": "reference_2"
+            },
+            {
+              "count": 2727,
+              "hypothesis": "speaker_3",
+              "reference": "reference_3"
+            },
+            {
+              "count": 15,
+              "hypothesis": "speaker_3",
+              "reference": "reference_7"
+            },
+            {
+              "count": 13,
+              "hypothesis": "speaker_3",
+              "reference": "reference_9"
+            },
+            {
+              "count": 1,
+              "hypothesis": "speaker_4",
+              "reference": "reference_1"
+            },
+            {
+              "count": 224,
+              "hypothesis": "speaker_4",
+              "reference": "reference_4"
+            },
+            {
+              "count": 2165,
+              "hypothesis": "speaker_5",
+              "reference": "reference_5"
+            },
+            {
+              "count": 6,
+              "hypothesis": "speaker_5",
+              "reference": "reference_7"
+            },
+            {
+              "count": 4,
+              "hypothesis": "speaker_6",
+              "reference": "reference_1"
+            },
+            {
+              "count": 3,
+              "hypothesis": "speaker_6",
+              "reference": "reference_3"
+            },
+            {
+              "count": 888,
+              "hypothesis": "speaker_6",
+              "reference": "reference_6"
+            },
+            {
+              "count": 13,
+              "hypothesis": "speaker_7",
+              "reference": "reference_1"
+            },
+            {
+              "count": 7,
+              "hypothesis": "speaker_7",
+              "reference": "reference_2"
+            },
+            {
+              "count": 3188,
+              "hypothesis": "speaker_7",
+              "reference": "reference_7"
+            },
+            {
+              "count": 1,
+              "hypothesis": "speaker_8",
+              "reference": "reference_3"
+            },
+            {
+              "count": 1248,
+              "hypothesis": "speaker_8",
+              "reference": "reference_8"
+            },
+            {
+              "count": 7,
+              "hypothesis": "speaker_9",
+              "reference": "reference_1"
+            },
+            {
+              "count": 2,
+              "hypothesis": "speaker_9",
+              "reference": "reference_3"
+            },
+            {
+              "count": 2,
+              "hypothesis": "speaker_9",
+              "reference": "reference_4"
+            },
+            {
+              "count": 1633,
+              "hypothesis": "speaker_9",
+              "reference": "reference_9"
+            },
+            {
+              "count": 43,
+              "hypothesis": "unknown",
+              "reference": "reference_1"
+            },
+            {
+              "count": 9,
+              "hypothesis": "unknown",
+              "reference": "reference_2"
+            },
+            {
+              "count": 73,
+              "hypothesis": "unknown",
+              "reference": "reference_3"
+            },
+            {
+              "count": 1,
+              "hypothesis": "unknown",
+              "reference": "reference_4"
+            },
+            {
+              "count": 7,
+              "hypothesis": "unknown",
+              "reference": "reference_5"
+            },
+            {
+              "count": 14,
+              "hypothesis": "unknown",
+              "reference": "reference_6"
+            },
+            {
+              "count": 47,
+              "hypothesis": "unknown",
+              "reference": "reference_7"
+            },
+            {
+              "count": 27,
+              "hypothesis": "unknown",
+              "reference": "reference_8"
+            },
+            {
+              "count": 15,
+              "hypothesis": "unknown",
+              "reference": "reference_9"
+            }
+          ],
+          "correct": 18440,
+          "scored_tokens": 18763,
+          "unknown": 236,
+          "unknown_pct": 1.2578,
+          "unscoreable": 200,
+          "wrong": 87,
+          "wrong_pct": 0.4637
+        }
+      },
+      "boundaries": [
+        {
+          "ambiguous_unaligned_starts": 66,
+          "hypothesis_boundaries": 629,
+          "matched": 217,
+          "precision": 0.3449920508744038,
+          "recall": 0.49318181818181817,
+          "reference_boundaries": 440,
+          "tolerance_lexical_tokens": 0,
+          "unmatched_hypothesis": 412,
+          "unmatched_reference": 223
+        },
+        {
+          "ambiguous_unaligned_starts": 66,
+          "hypothesis_boundaries": 629,
+          "matched": 231,
+          "precision": 0.3672496025437202,
+          "recall": 0.525,
+          "reference_boundaries": 440,
+          "tolerance_lexical_tokens": 1,
+          "unmatched_hypothesis": 398,
+          "unmatched_reference": 209
+        },
+        {
+          "ambiguous_unaligned_starts": 66,
+          "hypothesis_boundaries": 629,
+          "matched": 246,
+          "precision": 0.39109697933227344,
+          "recall": 0.5590909090909091,
+          "reference_boundaries": 440,
+          "tolerance_lexical_tokens": 3,
+          "unmatched_hypothesis": 383,
+          "unmatched_reference": 194
+        }
+      ],
+      "conservation": {
+        "display_content_equal": true,
+        "duplicated_display_words": 0,
+        "main_plus_aside_words_equal": true,
+        "missing_display_words": 0,
+        "saved_words_equal": true,
+        "source_segments_equal": true,
+        "unique_input_word_ids": true
+      },
+      "mapping": {
+        "speaker_1": "reference_1",
+        "speaker_2": "reference_2",
+        "speaker_3": "reference_3",
+        "speaker_4": "reference_4",
+        "speaker_5": "reference_5",
+        "speaker_6": "reference_6",
+        "speaker_7": "reference_7",
+        "speaker_8": "reference_8",
+        "speaker_9": "reference_9"
+      },
+      "raw_asr_reproduction": {
+        "segments_equal": true,
+        "words_equal": true
+      },
+      "reading": {
+        "one_word": 94,
+        "rows": 630,
+        "up_to_three_words": 145,
+        "words": 19853
+      },
+      "reference": {
+        "kind": "machine reference, not human ground truth",
+        "rows": 1493,
+        "zero_duration_rows": 60
+      },
+      "reference_grouping_comparison": {
+        "normalized_text_equal": true,
+        "paragraph_one_word_rows": 4,
+        "paragraph_rows": 441,
+        "segment_rows": 1493
+      },
+      "saved": {
+        "one_word": 559,
+        "rows": 1329,
+        "up_to_three_words": 652,
+        "words": 19853
+      },
+      "saved_boundary_changes": {
+        "combinations": {
+          "builder_speaker_change": 119,
+          "builder_speaker_change+pause_1s": 43,
+          "builder_speaker_change+pause_1s+sentence_break": 17,
+          "builder_speaker_change+sentence_break": 23,
+          "nearest_evidence_change": 647,
+          "nearest_evidence_change+builder_speaker_change": 77,
+          "nearest_evidence_change+builder_speaker_change+pause_1s": 71,
+          "nearest_evidence_change+builder_speaker_change+pause_1s+sentence_break": 12,
+          "nearest_evidence_change+builder_speaker_change+sentence_break": 14,
+          "nearest_evidence_change+pause_1s": 47,
+          "nearest_evidence_change+pause_1s+sentence_break": 2,
+          "nearest_evidence_change+sentence_break": 6,
+          "pause_1s": 65,
+          "pause_1s+sentence_break": 6,
+          "sentence_break": 167,
+          "word_cap": 11,
+          "word_cap+sentence_break": 1
+        },
+        "predicate_version": "speaker-turn-attribution-v3",
+        "same_speaker_inferred_distance_changes": 44
+      },
+      "saved_reproduction": {
+        "saved_segment_count": 1329,
+        "segments_semantically_equal": true
+      },
+      "self_comparison": {
+        "canonical": {
+          "baseline_only": 0,
+          "candidate_only": 0,
+          "common_tokens": 18963,
+          "corrected_wrong": 0,
+          "newly_wrong": 0,
+          "transitions": {
+            "correct->correct": 17982,
+            "unknown->unknown": 703,
+            "unscoreable->unscoreable": 200,
+            "wrong->wrong": 78
+          }
+        },
+        "effective": {
+          "baseline_only": 0,
+          "candidate_only": 0,
+          "common_tokens": 18963,
+          "corrected_wrong": 0,
+          "newly_wrong": 0,
+          "transitions": {
+            "correct->correct": 18440,
+            "unknown->unknown": 236,
+            "unscoreable->unscoreable": 200,
+            "wrong->wrong": 87
+          }
+        }
+      },
+      "time_sensitivity": {
+        "canonical": {
+          "correct": 18460,
+          "unknown": 690,
+          "unscoreable": 201,
+          "wrong": 98
+        },
+        "effective": {
+          "correct": 18900,
+          "unknown": 237,
+          "unscoreable": 201,
+          "wrong": 111
+        },
+        "unit": "saved words, greatest positive time overlap; fixed lexical mapping"
+      }
+    },
+    "latest": {
+      "alignment": {
+        "hypothesis_coverage": 0.9688686408504176,
+        "hypothesis_tokens": 5268,
+        "matched_tokens": 5104,
+        "method": "unicode casefold + Unicode word runs; SequenceMatcher autojunk=False",
+        "reference_coverage": 0.9705267161057235,
+        "reference_tokens": 5259
+      },
+      "asides": {
+        "one_word": 0,
+        "rows": 0,
+        "up_to_three_words": 0,
+        "words": 0
+      },
+      "attribution": {
+        "canonical": {
+          "confusion": [
+            {
+              "count": 1405,
+              "hypothesis": "speaker_1",
+              "reference": "reference_1"
+            },
+            {
+              "count": 31,
+              "hypothesis": "speaker_1",
+              "reference": "reference_2"
+            },
+            {
+              "count": 22,
+              "hypothesis": "speaker_2",
+              "reference": "reference_1"
+            },
+            {
+              "count": 3271,
+              "hypothesis": "speaker_2",
+              "reference": "reference_2"
+            },
+            {
+              "count": 156,
+              "hypothesis": "unknown",
+              "reference": "reference_1"
+            },
+            {
+              "count": 219,
+              "hypothesis": "unknown",
+              "reference": "reference_2"
+            }
+          ],
+          "correct": 4676,
+          "scored_tokens": 5104,
+          "unknown": 375,
+          "unknown_pct": 7.3472,
+          "unscoreable": 0,
+          "wrong": 53,
+          "wrong_pct": 1.0384
+        },
+        "effective": {
+          "confusion": [
+            {
+              "count": 1493,
+              "hypothesis": "speaker_1",
+              "reference": "reference_1"
+            },
+            {
+              "count": 37,
+              "hypothesis": "speaker_1",
+              "reference": "reference_2"
+            },
+            {
+              "count": 39,
+              "hypothesis": "speaker_2",
+              "reference": "reference_1"
+            },
+            {
+              "count": 3423,
+              "hypothesis": "speaker_2",
+              "reference": "reference_2"
+            },
+            {
+              "count": 51,
+              "hypothesis": "unknown",
+              "reference": "reference_1"
+            },
+            {
+              "count": 61,
+              "hypothesis": "unknown",
+              "reference": "reference_2"
+            }
+          ],
+          "correct": 4916,
+          "scored_tokens": 5104,
+          "unknown": 112,
+          "unknown_pct": 2.1944,
+          "unscoreable": 0,
+          "wrong": 76,
+          "wrong_pct": 1.489
+        }
+      },
+      "boundaries": [
+        {
+          "ambiguous_unaligned_starts": 17,
+          "hypothesis_boundaries": 239,
+          "matched": 99,
+          "precision": 0.41422594142259417,
+          "recall": 0.5210526315789473,
+          "reference_boundaries": 190,
+          "tolerance_lexical_tokens": 0,
+          "unmatched_hypothesis": 140,
+          "unmatched_reference": 91
+        },
+        {
+          "ambiguous_unaligned_starts": 17,
+          "hypothesis_boundaries": 239,
+          "matched": 107,
+          "precision": 0.4476987447698745,
+          "recall": 0.5631578947368421,
+          "reference_boundaries": 190,
+          "tolerance_lexical_tokens": 1,
+          "unmatched_hypothesis": 132,
+          "unmatched_reference": 83
+        },
+        {
+          "ambiguous_unaligned_starts": 17,
+          "hypothesis_boundaries": 239,
+          "matched": 116,
+          "precision": 0.48535564853556484,
+          "recall": 0.6105263157894737,
+          "reference_boundaries": 190,
+          "tolerance_lexical_tokens": 3,
+          "unmatched_hypothesis": 123,
+          "unmatched_reference": 74
+        }
+      ],
+      "conservation": {
+        "display_content_equal": true,
+        "duplicated_display_words": 0,
+        "main_plus_aside_words_equal": true,
+        "missing_display_words": 0,
+        "saved_words_equal": true,
+        "source_segments_equal": true,
+        "unique_input_word_ids": true
+      },
+      "mapping": {
+        "speaker_1": "reference_1",
+        "speaker_2": "reference_2"
+      },
+      "raw_asr_reproduction": {
+        "segments_equal": true,
+        "words_equal": true
+      },
+      "reading": {
+        "one_word": 62,
+        "rows": 240,
+        "up_to_three_words": 87,
+        "words": 5268
+      },
+      "reference": {
+        "kind": "machine reference, not human ground truth",
+        "rows": 534,
+        "zero_duration_rows": 41
+      },
+      "reference_grouping_comparison": {
+        "normalized_text_equal": true,
+        "paragraph_one_word_rows": 29,
+        "paragraph_rows": 191,
+        "segment_rows": 534
+      },
+      "saved": {
+        "one_word": 301,
+        "rows": 610,
+        "up_to_three_words": 354,
+        "words": 5268
+      },
+      "saved_boundary_changes": {
+        "combinations": {
+          "builder_speaker_change": 73,
+          "builder_speaker_change+pause_1s": 11,
+          "builder_speaker_change+sentence_break": 11,
+          "nearest_evidence_change": 359,
+          "nearest_evidence_change+builder_speaker_change": 60,
+          "nearest_evidence_change+builder_speaker_change+pause_1s": 9,
+          "nearest_evidence_change+builder_speaker_change+pause_1s+sentence_break": 4,
+          "nearest_evidence_change+builder_speaker_change+sentence_break": 14,
+          "nearest_evidence_change+pause_1s": 16,
+          "nearest_evidence_change+sentence_break": 12,
+          "pause_1s": 16,
+          "pause_1s+sentence_break": 3,
+          "sentence_break": 21
+        },
+        "predicate_version": "speaker-turn-attribution-v3",
+        "same_speaker_inferred_distance_changes": 30
+      },
+      "saved_reproduction": {
+        "saved_segment_count": 610,
+        "segments_semantically_equal": true
+      },
+      "self_comparison": {
+        "canonical": {
+          "baseline_only": 0,
+          "candidate_only": 0,
+          "common_tokens": 5104,
+          "corrected_wrong": 0,
+          "newly_wrong": 0,
+          "transitions": {
+            "correct->correct": 4676,
+            "unknown->unknown": 375,
+            "wrong->wrong": 53
+          }
+        },
+        "effective": {
+          "baseline_only": 0,
+          "candidate_only": 0,
+          "common_tokens": 5104,
+          "corrected_wrong": 0,
+          "newly_wrong": 0,
+          "transitions": {
+            "correct->correct": 4916,
+            "unknown->unknown": 112,
+            "wrong->wrong": 76
+          }
+        }
+      },
+      "time_sensitivity": {
+        "canonical": {
+          "correct": 4706,
+          "unknown": 379,
+          "wrong": 107
+        },
+        "effective": {
+          "correct": 4945,
+          "unknown": 116,
+          "wrong": 131
+        },
+        "unit": "saved words, greatest positive time overlap; fixed lexical mapping"
+      }
+    }
+  },
+  "verification": {
+    "controls": {
+      "raw": {
+        "aggregate_sha256": "6ba8f3219ca4c5bb8de1fde81e89248440770b3ce095751f7dc4cb7ea19fed23",
+        "recordings": {
+          "cab": {
+            "change": {
+              "canonical": {
+                "baseline_only": 0,
+                "candidate_only": 0,
+                "common_tokens": 18963,
+                "corrected_wrong": 0,
+                "newly_wrong": 0,
+                "transitions": {
+                  "correct->correct": 17982,
+                  "unknown->unknown": 703,
+                  "unscoreable->unscoreable": 200,
+                  "wrong->wrong": 78
+                }
+              },
+              "effective": {
+                "baseline_only": 0,
+                "candidate_only": 0,
+                "common_tokens": 18963,
+                "corrected_wrong": 0,
+                "newly_wrong": 0,
+                "transitions": {
+                  "correct->correct": 18440,
+                  "unknown->unknown": 236,
+                  "unscoreable->unscoreable": 200,
+                  "wrong->wrong": 87
+                }
+              }
+            },
+            "word_comparison": {
+              "baseline_unmatched_tokens": 0,
+              "baseline_words": 19853,
+              "candidate_unmatched_tokens": 0,
+              "candidate_words": 19853,
+              "common_lexical_tokens": 19853,
+              "normalized_lexical_sequence_equal": true,
+              "saved_word_objects_equal": true
+            }
+          },
+          "latest": {
+            "change": {
+              "canonical": {
+                "baseline_only": 0,
+                "candidate_only": 0,
+                "common_tokens": 5104,
+                "corrected_wrong": 0,
+                "newly_wrong": 0,
+                "transitions": {
+                  "correct->correct": 4676,
+                  "unknown->unknown": 375,
+                  "wrong->wrong": 53
+                }
+              },
+              "effective": {
+                "baseline_only": 0,
+                "candidate_only": 0,
+                "common_tokens": 5104,
+                "corrected_wrong": 0,
+                "newly_wrong": 0,
+                "transitions": {
+                  "correct->correct": 4916,
+                  "unknown->unknown": 112,
+                  "wrong->wrong": 76
+                }
+              }
+            },
+            "word_comparison": {
+              "baseline_unmatched_tokens": 0,
+              "baseline_words": 5268,
+              "candidate_unmatched_tokens": 0,
+              "candidate_words": 5268,
+              "common_lexical_tokens": 5268,
+              "normalized_lexical_sequence_equal": true,
+              "saved_word_objects_equal": true
+            }
+          }
+        }
+      },
+      "self": {
+        "aggregate_sha256": "ad49f8ab569ad3412b52e2eb2139eb6735c74b9db0e3a04a78ed697658877cb1",
+        "recordings": {
+          "cab": {
+            "change": {
+              "canonical": {
+                "baseline_only": 0,
+                "candidate_only": 0,
+                "common_tokens": 18963,
+                "corrected_wrong": 0,
+                "newly_wrong": 0,
+                "transitions": {
+                  "correct->correct": 17982,
+                  "unknown->unknown": 703,
+                  "unscoreable->unscoreable": 200,
+                  "wrong->wrong": 78
+                }
+              },
+              "effective": {
+                "baseline_only": 0,
+                "candidate_only": 0,
+                "common_tokens": 18963,
+                "corrected_wrong": 0,
+                "newly_wrong": 0,
+                "transitions": {
+                  "correct->correct": 18440,
+                  "unknown->unknown": 236,
+                  "unscoreable->unscoreable": 200,
+                  "wrong->wrong": 87
+                }
+              }
+            },
+            "word_comparison": {
+              "baseline_unmatched_tokens": 0,
+              "baseline_words": 19853,
+              "candidate_unmatched_tokens": 0,
+              "candidate_words": 19853,
+              "common_lexical_tokens": 19853,
+              "normalized_lexical_sequence_equal": true,
+              "saved_word_objects_equal": true
+            }
+          },
+          "latest": {
+            "change": {
+              "canonical": {
+                "baseline_only": 0,
+                "candidate_only": 0,
+                "common_tokens": 5104,
+                "corrected_wrong": 0,
+                "newly_wrong": 0,
+                "transitions": {
+                  "correct->correct": 4676,
+                  "unknown->unknown": 375,
+                  "wrong->wrong": 53
+                }
+              },
+              "effective": {
+                "baseline_only": 0,
+                "candidate_only": 0,
+                "common_tokens": 5104,
+                "corrected_wrong": 0,
+                "newly_wrong": 0,
+                "transitions": {
+                  "correct->correct": 4916,
+                  "unknown->unknown": 112,
+                  "wrong->wrong": 76
+                }
+              }
+            },
+            "word_comparison": {
+              "baseline_unmatched_tokens": 0,
+              "baseline_words": 5268,
+              "candidate_unmatched_tokens": 0,
+              "candidate_words": 5268,
+              "common_lexical_tokens": 5268,
+              "normalized_lexical_sequence_equal": true,
+              "saved_word_objects_equal": true
+            }
+          }
+        }
+      }
+    },
+    "experiment_file_hashes": {
+      "Tools/DiarizationAnalysis/experiments/baseline.json": "a37fb8b715aa66523b50fabd708340a4bd9053871fc68e0f2ac1292545a731f2",
+      "Tools/DiarizationAnalysis/experiments/corpus-v1.json": "9ddb3d6f638a4f32008173441d02ec46671f6dd9c4f97429d917738fd2b2f9f4",
+      "Tools/DiarizationAnalysis/experiments/raw-reconstruction.json": "d9b23a0755f8b99f61390858e75d1a118c317a996df610ba8c28497cf7a4987e",
+      "Tools/DiarizationAnalysis/experiments/registry.json": "16f3e8c84aad954385b1b8977f8c7fd86bbc9d274ccc46d236db02abe9e78cf7"
+    },
+    "new_fixture_tests": 10,
+    "original_inputs_unchanged": true,
+    "python_tests_passed": 23
+  }
+}
