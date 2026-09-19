@@ -32,10 +32,14 @@ final class ScribeMenuBarControllerTests: XCTestCase {
         controller.menuNeedsUpdate(controller.menu)
         let built = controller.menu.items
 
+        XCTAssertTrue(built[1].isHidden)
+
         coordinator.submit(.start)
         await coordinator.waitUntilIdle()
         now = start.addingTimeInterval(83)
         model.refreshPresentation()
+
+        XCTAssertFalse(controller.menu.items[1].isHidden)
 
         // The elapsed time is edited into the row that is already there. Adding
         // or removing an item here is what closed an open submenu.

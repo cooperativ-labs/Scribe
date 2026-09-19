@@ -17,15 +17,6 @@ public struct GlobalShortcut: Codable, Hashable, Sendable, Identifiable {
     public static let defaultStop = GlobalShortcut(keyCode: UInt32(kVK_ANSI_S), modifiers: UInt32(cmdKey | shiftKey))
     public static let defaultCopyTimestamp = GlobalShortcut(keyCode: UInt32(kVK_ANSI_T), modifiers: UInt32(cmdKey | shiftKey))
 
-    public static let commonChoices: [GlobalShortcut] = [
-        .defaultStart,
-        .defaultStop,
-        .defaultCopyTimestamp,
-        GlobalShortcut(keyCode: UInt32(kVK_ANSI_C), modifiers: UInt32(cmdKey | shiftKey)),
-        GlobalShortcut(keyCode: UInt32(kVK_ANSI_1), modifiers: UInt32(cmdKey | shiftKey)),
-        GlobalShortcut(keyCode: UInt32(kVK_ANSI_2), modifiers: UInt32(cmdKey | shiftKey))
-    ]
-
     public var displayName: String {
         let modifierText = [
             modifiers & UInt32(controlKey) != 0 ? "⌃" : nil,
@@ -33,33 +24,100 @@ public struct GlobalShortcut: Codable, Hashable, Sendable, Identifiable {
             modifiers & UInt32(shiftKey) != 0 ? "⇧" : nil,
             modifiers & UInt32(cmdKey) != 0 ? "⌘" : nil
         ].compactMap { $0 }.joined()
-        return modifierText + Self.keyName(for: keyCode)
-    }
-
-    private static func keyName(for keyCode: UInt32) -> String {
-        switch keyCode {
-        case UInt32(kVK_ANSI_R): "R"
-        case UInt32(kVK_ANSI_S): "S"
-        case UInt32(kVK_ANSI_T): "T"
-        case UInt32(kVK_ANSI_C): "C"
-        case UInt32(kVK_ANSI_1): "1"
-        case UInt32(kVK_ANSI_2): "2"
-        default: "Key \(keyCode)"
-        }
+        return modifierText + (Self.keys[keyCode]?.name ?? "Key \(keyCode)")
     }
 
     /// Character AppKit menus use for `NSMenuItem.keyEquivalent`. Empty when the
-    /// key is not one of the shortcuts Scribe offers.
+    /// key has no menu equivalent, in which case the menu shows no shortcut.
     public var keyEquivalentCharacter: String {
-        switch keyCode {
-        case UInt32(kVK_ANSI_R): "r"
-        case UInt32(kVK_ANSI_S): "s"
-        case UInt32(kVK_ANSI_T): "t"
-        case UInt32(kVK_ANSI_C): "c"
-        case UInt32(kVK_ANSI_1): "1"
-        case UInt32(kVK_ANSI_2): "2"
-        default: ""
+        Self.keys[keyCode]?.equivalent ?? ""
+    }
+
+    /// Whether the key is one of the function keys, which may stand alone as a
+    /// global shortcut because typing never produces them.
+    public var isFunctionKey: Bool {
+        Self.functionKeyCodes.contains(keyCode)
+    }
+
+    /// Whether this combination can be claimed globally without stealing
+    /// ordinary typing: it needs ⌘, ⌃, or ⌥, unless the key is a function key.
+    /// Shift alone is not enough, since ⇧A is just a capital A.
+    public var isAcceptableGlobalShortcut: Bool {
+        guard Self.keys[keyCode] != nil, !Self.modifierKeyCodes.contains(keyCode) else { return false }
+        let hasCommandModifier = modifiers & UInt32(cmdKey | controlKey | optionKey) != 0
+        return hasCommandModifier || isFunctionKey
+    }
+
+    private struct KeyDescription {
+        let name: String
+        let equivalent: String
+    }
+
+    private static let functionKeyCodes: Set<UInt32> = Set([
+        kVK_F1, kVK_F2, kVK_F3, kVK_F4, kVK_F5, kVK_F6, kVK_F7, kVK_F8, kVK_F9, kVK_F10,
+        kVK_F11, kVK_F12, kVK_F13, kVK_F14, kVK_F15, kVK_F16, kVK_F17, kVK_F18, kVK_F19, kVK_F20
+    ].map(UInt32.init))
+
+    private static let modifierKeyCodes: Set<UInt32> = Set([
+        kVK_Command, kVK_RightCommand, kVK_Shift, kVK_RightShift, kVK_Option, kVK_RightOption,
+        kVK_Control, kVK_RightControl, kVK_CapsLock, kVK_Function
+    ].map(UInt32.init))
+
+    /// Names and menu equivalents by Carbon virtual key. The codes are physical
+    /// positions on an ANSI keyboard, so the names are the US labels.
+    private static let keys: [UInt32: KeyDescription] = {
+        var table: [UInt32: KeyDescription] = [:]
+        func add(_ code: Int, _ name: String, _ equivalent: String) {
+            table[UInt32(code)] = KeyDescription(name: name, equivalent: equivalent)
         }
+        let letters: [(Int, String)] = [
+            (kVK_ANSI_A, "A"), (kVK_ANSI_B, "B"), (kVK_ANSI_C, "C"), (kVK_ANSI_D, "D"),
+            (kVK_ANSI_E, "E"), (kVK_ANSI_F, "F"), (kVK_ANSI_G, "G"), (kVK_ANSI_H, "H"),
+            (kVK_ANSI_I, "I"), (kVK_ANSI_J, "J"), (kVK_ANSI_K, "K"), (kVK_ANSI_L, "L"),
+            (kVK_ANSI_M, "M"), (kVK_ANSI_N, "N"), (kVK_ANSI_O, "O"), (kVK_ANSI_P, "P"),
+            (kVK_ANSI_Q, "Q"), (kVK_ANSI_R, "R"), (kVK_ANSI_S, "S"), (kVK_ANSI_T, "T"),
+            (kVK_ANSI_U, "U"), (kVK_ANSI_V, "V"), (kVK_ANSI_W, "W"), (kVK_ANSI_X, "X"),
+            (kVK_ANSI_Y, "Y"), (kVK_ANSI_Z, "Z")
+        ]
+        for (code, name) in letters { add(code, name, name.lowercased()) }
+        let symbols: [(Int, String)] = [
+            (kVK_ANSI_0, "0"), (kVK_ANSI_1, "1"), (kVK_ANSI_2, "2"), (kVK_ANSI_3, "3"),
+            (kVK_ANSI_4, "4"), (kVK_ANSI_5, "5"), (kVK_ANSI_6, "6"), (kVK_ANSI_7, "7"),
+            (kVK_ANSI_8, "8"), (kVK_ANSI_9, "9"),
+            (kVK_ANSI_Minus, "-"), (kVK_ANSI_Equal, "="), (kVK_ANSI_LeftBracket, "["),
+            (kVK_ANSI_RightBracket, "]"), (kVK_ANSI_Backslash, "\\"), (kVK_ANSI_Semicolon, ";"),
+            (kVK_ANSI_Quote, "'"), (kVK_ANSI_Comma, ","), (kVK_ANSI_Period, "."),
+            (kVK_ANSI_Slash, "/"), (kVK_ANSI_Grave, "`")
+        ]
+        for (code, name) in symbols { add(code, name, name) }
+        // Menu equivalents for the non-printing keys are the private-use
+        // characters AppKit defines (NSF1FunctionKey and friends).
+        let functionKeys = [
+            kVK_F1, kVK_F2, kVK_F3, kVK_F4, kVK_F5, kVK_F6, kVK_F7, kVK_F8, kVK_F9, kVK_F10,
+            kVK_F11, kVK_F12, kVK_F13, kVK_F14, kVK_F15, kVK_F16, kVK_F17, kVK_F18, kVK_F19, kVK_F20
+        ]
+        for (index, code) in functionKeys.enumerated() {
+            add(code, "F\(index + 1)", unicode(0xF704 + index))
+        }
+        add(kVK_Space, "Space", " ")
+        add(kVK_Return, "↩", "\r")
+        add(kVK_Tab, "⇥", "\t")
+        add(kVK_Delete, "⌫", unicode(0x08))
+        add(kVK_ForwardDelete, "⌦", unicode(0xF728))
+        add(kVK_Escape, "⎋", unicode(0x1B))
+        add(kVK_LeftArrow, "←", unicode(0xF702))
+        add(kVK_RightArrow, "→", unicode(0xF703))
+        add(kVK_UpArrow, "↑", unicode(0xF700))
+        add(kVK_DownArrow, "↓", unicode(0xF701))
+        add(kVK_Home, "↖", unicode(0xF729))
+        add(kVK_End, "↘", unicode(0xF72B))
+        add(kVK_PageUp, "⇞", unicode(0xF72C))
+        add(kVK_PageDown, "⇟", unicode(0xF72D))
+        return table
+    }()
+
+    private static func unicode(_ value: Int) -> String {
+        String(Character(Unicode.Scalar(UInt32(value))!))
     }
 
     public var usesControl: Bool { modifiers & UInt32(controlKey) != 0 }

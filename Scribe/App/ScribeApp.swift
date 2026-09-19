@@ -20,7 +20,8 @@ struct ScribeApp: App {
                 sources: appDelegate.environment.menuModel,
                 meetingDetector: appDelegate.environment.meetingDetector,
                 vocabulary: appDelegate.environment.vocabulary,
-                focus: appDelegate.environment.settingsFocus
+                focus: appDelegate.environment.settingsFocus,
+                onShortcutCaptureChange: { appDelegate.environment.setShortcutCaptureActive($0) }
             )
                 .onDisappear { appDelegate.environment.settingsWindowDidClose() }
         }

@@ -2,7 +2,8 @@ import Platform
 import SwiftUI
 import Vocabulary
 
-/// The compact settings pane used by the menu-bar app.
+/// The compact settings pane used by the menu-bar app, split into General,
+/// Recording, and Transcription tabs.
 ///
 /// Source selection reads from and writes to the same `RecorderMenuModel` as
 /// the menu, so the pickers here show the applications and microphones that
@@ -23,14 +24,20 @@ public struct ScribeSettingsView: View {
     @State private var isChoosingRecordingsFolder = false
     @State private var folderSelectionError: String?
     @State private var highlightedSection: SettingsSection?
+    @State private var selectedTab: SettingsTab = .general
+    @StateObject private var shortcutCapture: ShortcutCaptureModel
 
+    /// `onShortcutCaptureChange` is called with `true` while a shortcut field is
+    /// listening for keys and `false` when it stops, so the owner can take the
+    /// registered global shortcuts down and reapply them afterwards.
     public init(
         settings: ScribeSettings,
         sources: RecorderMenuModel,
         meetingDetector: MeetingDetector? = nil,
         calendar: CalendarMeetingService? = nil,
         vocabulary: VocabularyViewModel? = nil,
-        focus: SettingsFocusModel = SettingsFocusModel()
+        focus: SettingsFocusModel = SettingsFocusModel(),
+        onShortcutCaptureChange: @escaping @MainActor (Bool) -> Void = { _ in }
     ) {
         self.settings = settings
         self.sources = sources
@@ -38,21 +45,58 @@ public struct ScribeSettingsView: View {
         self.calendar = calendar
         self.vocabulary = vocabulary
         self.focus = focus
+        _shortcutCapture = StateObject(wrappedValue: ShortcutCaptureModel(onCaptureChange: onShortcutCaptureChange))
     }
 
     public var body: some View {
         ScrollViewReader { proxy in
-            settingsForm
-                .onChange(of: focus.requestCount) { showRequestedSection(with: proxy) }
-                .onAppear { showRequestedSection(with: proxy) }
+            TabView(selection: $selectedTab) {
+                generalTab
+                    .tabItem { Label("General", systemImage: "gearshape") }
+                    .tag(SettingsTab.general)
+                recordingTab
+                    .tabItem { Label("Recording", systemImage: "record.circle") }
+                    .tag(SettingsTab.recording)
+                transcriptionTab
+                    .tabItem { Label("Transcription", systemImage: "text.quote") }
+                    .tag(SettingsTab.transcription)
+            }
+            .onChange(of: focus.requestCount) { showRequestedSection(with: proxy) }
+            .onAppear { showRequestedSection(with: proxy) }
+        }
+        .frame(width: 560, height: 640)
+        .animation(.snappy, value: highlightedSection)
+        // Enumerated on open, as the menu does, so an application launched after
+        // Scribe and a microphone plugged in a moment ago both appear.
+        .onAppear { sources.refreshSources() }
+        .onAppear { settings.refreshLaunchAtLoginStatus() }
+        .onChange(of: selectedTab) { shortcutCapture.stop() }
+        .onDisappear { shortcutCapture.stop() }
+        .fileImporter(
+            isPresented: $isChoosingRecordingsFolder,
+            allowedContentTypes: [.folder],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                guard let url = urls.first else { return }
+                do {
+                    try settings.setRecordingsFolder(url)
+                    folderSelectionError = nil
+                } catch {
+                    folderSelectionError = error.localizedDescription
+                }
+            case .failure(let error):
+                folderSelectionError = error.localizedDescription
+            }
         }
     }
 
-    private var settingsForm: some View {
-        let presentation = sources.presentation
+    // MARK: - General
 
-        return Form {
-            Section("General") {
+    private var generalTab: some View {
+        Form {
+            Section("Startup") {
                 Toggle(
                     "Launch Scribe at login",
                     isOn: Binding(
@@ -71,54 +115,54 @@ public struct ScribeSettingsView: View {
                 }
             }
 
-            Section("Recordings") {
-                LabeledContent("Folder") {
-                    Text(settings.recordingsFolderURL.path)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .foregroundStyle(.secondary)
-                }
-                Button("Choose Folder…") {
-                    isChoosingRecordingsFolder = true
-                }
-                if let folderSelectionError {
-                    Text(folderSelectionError)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                }
-            }
-
-            TranscriptionModelSettingsView(settings: settings, installer: settings.modelInstaller)
-
-            if let vocabulary {
-                VocabularySettingsSection(
-                    model: vocabulary,
-                    isHighlighted: highlightedSection == .vocabulary
+            Section("Global shortcuts") {
+                shortcutField("Start recording", $settings.startShortcut, default: .defaultStart, action: .start)
+                shortcutField("Stop recording", $settings.stopShortcut, default: .defaultStop, action: .stop)
+                shortcutField(
+                    "Copy timestamp",
+                    $settings.copyTimestampShortcut,
+                    default: .defaultCopyTimestamp,
+                    action: .copyTimestamp
                 )
-                .id(SettingsSection.vocabulary)
-            }
-
-            Section("Processing") {
-                Toggle("Transcribe when the final recording is ready", isOn: $settings.transcribeWhenFinalRecordingIsReady)
-                Toggle("Keep recording files for debugging", isOn: $settings.keepRecordingFilesForDebugging)
-                Text("By default, Scribe deletes the meeting folder and its component audio after the final recording has been safely copied into Transcriptions. Turn this on to retain those files for debugging and reprocessing.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                Toggle("Identify me from my microphone", isOn: $settings.microphoneSpeakerPrior)
-                Text("For remote calls with separate microphone and system tracks. Keep this off for in-room meetings: your microphone may capture other people. Labels are applied only when source evidence is clear.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                Picker("Speakers", selection: $settings.transcriptionSpeakerCount) {
-                    Text("Automatic").tag(RecorderSpeakerCountPreference.automatic)
-                    ForEach(1...8, id: \.self) { count in
-                        Text("Exactly \(count)").tag(RecorderSpeakerCountPreference.known(count))
-                    }
-                }
-                Text("Automatic lets diarization choose. An exact count is for meetings you know were captured with that many speakers; it may use FluidAudio’s K-means fallback.")
+                Text("Click a shortcut, then press the keys you want; Escape cancels. Include ⌘, ⌃, or ⌥ (function keys work alone). Copy timestamp puts the recording's elapsed time on the clipboard so it can be pasted into notes. If another app already owns a shortcut, Scribe will show the conflict and keep its menu commands available.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
+        }
+        .formStyle(.grouped)
+    }
 
+    private func shortcutField(
+        _ title: String,
+        _ binding: Binding<GlobalShortcut>,
+        default defaultShortcut: GlobalShortcut,
+        action: HotkeyAction
+    ) -> some View {
+        ShortcutRecorderField(
+            title: title,
+            shortcut: binding,
+            defaultShortcut: defaultShortcut,
+            owner: { candidate in
+                assignedShortcuts.first { $0.action != action && $0.shortcut == candidate }?.title
+            },
+            capture: shortcutCapture
+        )
+    }
+
+    private var assignedShortcuts: [(action: HotkeyAction, title: String, shortcut: GlobalShortcut)] {
+        [
+            (.start, "Start recording", settings.startShortcut),
+            (.stop, "Stop recording", settings.stopShortcut),
+            (.copyTimestamp, "Copy timestamp", settings.copyTimestampShortcut)
+        ]
+    }
+
+    // MARK: - Recording
+
+    private var recordingTab: some View {
+        let presentation = sources.presentation
+
+        return Form {
             Section {
                 Picker("Application", selection: sources.selectedApplication) {
                     Text("None").tag(String?.none)
@@ -150,6 +194,27 @@ public struct ScribeSettingsView: View {
                 }
             }
 
+            Section("Recordings") {
+                LabeledContent("Folder") {
+                    Text(settings.recordingsFolderURL.path)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .foregroundStyle(.secondary)
+                }
+                Button("Choose Folder…") {
+                    isChoosingRecordingsFolder = true
+                }
+                if let folderSelectionError {
+                    Text(folderSelectionError)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                }
+                Toggle("Keep recording files for debugging", isOn: $settings.keepRecordingFilesForDebugging)
+                Text("By default, Scribe deletes the meeting folder and its component audio after the final recording has been safely copied into Transcriptions. Turn this on to retain those files for debugging and reprocessing.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
             if let meetingDetector {
                 MeetingDetectionSettingsView(settings: settings, detector: meetingDetector)
             }
@@ -157,67 +222,61 @@ public struct ScribeSettingsView: View {
             if let calendar {
                 CalendarSettingsView(settings: settings, calendar: calendar)
             }
+        }
+        .formStyle(.grouped)
+    }
 
-            Section("Global shortcuts") {
-                Picker("Start recording", selection: $settings.startShortcut) {
-                    ForEach(GlobalShortcut.commonChoices) { shortcut in
-                        Text(shortcut.displayName).tag(shortcut)
+    // MARK: - Transcription
+
+    private var transcriptionTab: some View {
+        Form {
+            Section("Processing") {
+                Toggle("Transcribe when the final recording is ready", isOn: $settings.transcribeWhenFinalRecordingIsReady)
+                Toggle("Identify me from my microphone", isOn: $settings.microphoneSpeakerPrior)
+                Text("For remote calls with separate microphone and system tracks. Keep this off for in-room meetings: your microphone may capture other people. Labels are applied only when source evidence is clear.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                Picker("Speakers", selection: $settings.transcriptionSpeakerCount) {
+                    Text("Automatic").tag(RecorderSpeakerCountPreference.automatic)
+                    ForEach(1...8, id: \.self) { count in
+                        Text("Exactly \(count)").tag(RecorderSpeakerCountPreference.known(count))
                     }
                 }
-                Picker("Stop recording", selection: $settings.stopShortcut) {
-                    ForEach(GlobalShortcut.commonChoices) { shortcut in
-                        Text(shortcut.displayName).tag(shortcut)
-                    }
-                }
-                Picker("Copy timestamp", selection: $settings.copyTimestampShortcut) {
-                    ForEach(GlobalShortcut.commonChoices) { shortcut in
-                        Text(shortcut.displayName).tag(shortcut)
-                    }
-                }
-                Text("Choose a different shortcut for each action. Copy timestamp puts the recording's elapsed time on the clipboard so it can be pasted into notes. If another app already owns one, Scribe will show the conflict and keep its menu commands available.")
+                Text("Automatic lets diarization choose. An exact count is for meetings you know were captured with that many speakers; it may use FluidAudio’s K-means fallback.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
 
-        }
-        .formStyle(.grouped)
-        .frame(width: 560, height: 820)
-        .animation(.snappy, value: highlightedSection)
-        // Enumerated on open, as the menu does, so an application launched after
-        // Scribe and a microphone plugged in a moment ago both appear.
-        .onAppear { sources.refreshSources() }
-        .onAppear { settings.refreshLaunchAtLoginStatus() }
-        .fileImporter(
-            isPresented: $isChoosingRecordingsFolder,
-            allowedContentTypes: [.folder],
-            allowsMultipleSelection: false
-        ) { result in
-            switch result {
-            case .success(let urls):
-                guard let url = urls.first else { return }
-                do {
-                    try settings.setRecordingsFolder(url)
-                    folderSelectionError = nil
-                } catch {
-                    folderSelectionError = error.localizedDescription
-                }
-            case .failure(let error):
-                folderSelectionError = error.localizedDescription
+            TranscriptionModelSettingsView(settings: settings, installer: settings.modelInstaller)
+
+            if let vocabulary {
+                VocabularySettingsSection(
+                    model: vocabulary,
+                    isHighlighted: highlightedSection == .vocabulary
+                )
+                .id(SettingsSection.vocabulary)
             }
         }
+        .formStyle(.grouped)
     }
 
     /// Scrolls to whatever asked to be shown and marks it briefly.
     ///
     /// The mark matters more than the scroll: a person who pressed "Vocabulary"
-    /// in the transcript window arrives in a window of eight sections and needs
+    /// in the transcript window arrives on a tab of several sections and needs
     /// to be told which one answered them.
     private func showRequestedSection(with proxy: ScrollViewProxy) {
         guard let section = focus.section else { return }
         focus.clear()
-        withAnimation(.snappy) { proxy.scrollTo(section, anchor: .top) }
+        let tab = SettingsTab(containing: section)
+        let switchesTab = selectedTab != tab
+        selectedTab = tab
         highlightedSection = section
         Task {
+            // A tab that was not showing has to lay out before its rows exist
+            // to scroll to.
+            if switchesTab { try? await Task.sleep(for: .milliseconds(100)) }
+            withAnimation(.snappy) { proxy.scrollTo(section, anchor: .top) }
             try? await Task.sleep(for: .seconds(3))
             if highlightedSection == section { highlightedSection = nil }
         }
@@ -232,5 +291,19 @@ public struct ScribeSettingsView: View {
         }
         lines.append("System Default follows whichever input macOS has selected when the recording starts.")
         return lines.joined(separator: " ")
+    }
+}
+
+/// The tabs Settings is split into: the app itself, capturing audio, and
+/// turning that audio into a transcript.
+enum SettingsTab: Hashable {
+    case general
+    case recording
+    case transcription
+
+    init(containing section: SettingsSection) {
+        switch section {
+        case .vocabulary: self = .transcription
+        }
     }
 }

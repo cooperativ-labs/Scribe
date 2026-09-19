@@ -158,6 +158,10 @@ public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
         transportView.apply(presentation)
         statusItemRow.title = presentation.statusTitle
         statusItemRow.image = NSImage(systemSymbolName: presentation.statusSymbol, accessibilityDescription: nil)
+        // The Record button already communicates the ready state, so do not
+        // spend a menu row repeating "Idle". Keep the item in the menu and
+        // toggle visibility so active-state updates never rebuild an open menu.
+        statusItemRow.isHidden = presentation.statusTitle == "Idle"
         applyCopyTimestampItem(copyTimestampRow, presentation: presentation)
         isCapturing = presentation.isCapturing
         applyRecordingIndicator()

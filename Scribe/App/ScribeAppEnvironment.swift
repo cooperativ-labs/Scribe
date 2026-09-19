@@ -260,6 +260,23 @@ final class ScribeAppEnvironment: ObservableObject {
         )
     }
 
+    /// Takes the global shortcuts down while a Settings field is listening for
+    /// a new one, so pressing the current combination records it rather than
+    /// starting a recording, and puts them back, with any change, afterwards.
+    func setShortcutCaptureActive(_ isActive: Bool) {
+        if isActive {
+            hotkeys.unregisterAll()
+        } else {
+            coordinator.reportShortcutRegistration(
+                hotkeys.register(
+                    start: settings.startShortcut,
+                    stop: settings.stopShortcut,
+                    copyTimestamp: settings.copyTimestampShortcut
+                )
+            )
+        }
+    }
+
     /// Shows the first-run permission window when either permission is missing.
     /// After a denial macOS stops prompting, so the window's real job is to hand
     /// over the System Settings route.

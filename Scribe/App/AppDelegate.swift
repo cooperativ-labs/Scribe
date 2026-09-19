@@ -96,7 +96,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 meetingDetector: environment.meetingDetector,
                 calendar: environment.calendar,
                 vocabulary: environment.vocabulary,
-                focus: environment.settingsFocus
+                focus: environment.settingsFocus,
+                onShortcutCaptureChange: { [environment] in environment.setShortcutCaptureActive($0) }
             )
         ))
         window.title = "Settings"
