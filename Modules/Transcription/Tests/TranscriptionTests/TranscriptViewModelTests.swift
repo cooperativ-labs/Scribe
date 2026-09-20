@@ -113,6 +113,25 @@ final class TranscriptViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.exportOutcomes.contains { $0.format == .subtitles && !$0.succeeded })
     }
 
+    func testCopyKnowledgebaseUsesTheSchemaBackedDocument() async throws {
+        let transcript = try fixture(named: "one-speaker")
+        let clipboard = ClipboardSpy()
+        let viewModel = TranscriptViewModel(
+            files: [TranscriptReviewFile(
+                sourceSnapshotURL: URL(fileURLWithPath: "/tmp/scribe-snapshot.flac"),
+                transcript: transcript,
+                jobState: .complete
+            )],
+            playback: PlaybackSpy(),
+            clipboard: clipboard
+        )
+
+        await viewModel.copyKnowledgebaseToClipboard()
+
+        XCTAssertEqual(clipboard.text, try TranscriptExporter.knowledgebaseJSON(transcript))
+        XCTAssertEqual(viewModel.exportMessage, TranscriptExportMessage(text: "Copied Knowledgebase JSON to the clipboard.", isFailure: false))
+    }
+
     func testFileExporterWritesToTheExactFileTheSavePanelChose() throws {
         let transcript = try fixture(named: "two-speakers")
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("scribe-named-export-\(UUID().uuidString)", isDirectory: true)
@@ -645,6 +664,16 @@ private final class PlaybackSpy: TranscriptPlaybackSeeking {
     func setPlaybackObserver(_ observer: (@MainActor (TranscriptPlaybackEvent) -> Void)?) { self.observer = observer }
 
     func emit(_ event: TranscriptPlaybackEvent) { observer?(event) }
+}
+
+@MainActor
+private final class ClipboardSpy: TranscriptClipboardWriting {
+    private(set) var text: String?
+
+    func write(_ text: String) -> Bool {
+        self.text = text
+        return true
+    }
 }
 
 private final class ImporterSpy: TranscriptFileImporting, @unchecked Sendable {

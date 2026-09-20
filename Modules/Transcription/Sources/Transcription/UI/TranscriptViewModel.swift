@@ -13,6 +13,7 @@ public final class TranscriptViewModel {
     }
     public private(set) var selectedSegmentID: TranscriptSegment.ID?
     public private(set) var exportOutcomes: [TranscriptExportOutcome] = []
+    public private(set) var exportMessage: TranscriptExportMessage?
 
     /// People available to the speaker picker, refreshed from the library.
     public private(set) var people: [SpeakerPersonRef] = []
@@ -50,6 +51,7 @@ public final class TranscriptViewModel {
 
     @ObservationIgnored private let playback: any TranscriptPlaybackSeeking
     @ObservationIgnored private let exportWriter: any TranscriptExportWriting
+    @ObservationIgnored private let clipboard: any TranscriptClipboardWriting
     @ObservationIgnored private let directory: (any TranscriptSpeakerDirectory)?
     @ObservationIgnored private let revisionStore: (any TranscriptRevisionStoring)?
     @ObservationIgnored private let fileDeleter: (any TranscriptFileDeleting)?
@@ -59,6 +61,8 @@ public final class TranscriptViewModel {
     /// Hands a finished transcript to a coding agent. Absent in a build with no
     /// agent host, which hides the action rather than offering a dead end.
     @ObservationIgnored private let agentDispatcher: (any TranscriptAgentDispatching)?
+    /// What the send sheet remembers between sendings.
+    @ObservationIgnored private let agentPreferences: TranscriptAgentPreferences
     /// Opens the vocabulary editor in the host's Settings window. Absent in a
     /// build with no settings surface — the toolbar then hides the button
     /// rather than offering a route that goes nowhere.
@@ -71,10 +75,24 @@ public final class TranscriptViewModel {
 
     /// What the host found for the send sheet, or nil until it has been asked.
     public private(set) var agentEnvironment: TranscriptAgentEnvironment?
-    public var selectedAgentID: TranscriptAgent.ID?
-    public var selectedAgentFolderID: TranscriptAgentFolder.ID?
-    /// What the person wants done with the transcript. Empty means the default.
-    public var agentInstruction = ""
+    /// Changing the agent brings back the model and effort it was last sent with.
+    public var selectedAgentID: TranscriptAgent.ID? {
+        didSet { if selectedAgentID != oldValue { restoreAgentRunSettings() } }
+    }
+    /// The model to run, as the agent's own command line names it. Empty means
+    /// whatever the agent uses by default.
+    public var agentModel = ""
+    /// Nil leaves the effort to the agent.
+    public var agentEffort: TranscriptAgentEffort?
+    /// Nil means no folder: the agent answers in its session and saves nothing.
+    public private(set) var selectedAgentFolderID: TranscriptAgentFolder.ID?
+    /// True once the person has picked "No Folder", so a refresh does not put
+    /// a folder back for them.
+    private var agentFolderDeclined = false
+    /// An MCP server the agent is told holds related information. Optional.
+    public var agentMCPURL: String
+    /// What the person wants done with the transcript, starting as the default.
+    public var agentInstruction = TranscriptAgentRequest.defaultInstruction
     /// True while the agent's session is being created.
     public private(set) var isSendingToAgent = false
     /// The outcome of the last send, shown until the next one.
@@ -85,6 +103,7 @@ public final class TranscriptViewModel {
         selectedFileID: TranscriptReviewFile.ID? = nil,
         playback: any TranscriptPlaybackSeeking,
         exportWriter: any TranscriptExportWriting = FileTranscriptExportWriter(),
+        clipboard: any TranscriptClipboardWriting = SystemTranscriptClipboard(),
         directory: (any TranscriptSpeakerDirectory)? = nil,
         revisionStore: (any TranscriptRevisionStoring)? = nil,
         fileDeleter: (any TranscriptFileDeleting)? = nil,
@@ -92,12 +111,14 @@ public final class TranscriptViewModel {
         reprocessor: (any TranscriptReprocessing)? = nil,
         retranscriber: (any TranscriptRetranscribing)? = nil,
         agentDispatcher: (any TranscriptAgentDispatching)? = nil,
+        agentPreferences: TranscriptAgentPreferences = TranscriptAgentPreferences(),
         openVocabularySettings: (@MainActor () -> Void)? = nil
     ) {
         self.files = files
         self.selectedFileID = selectedFileID ?? files.first?.id
         self.playback = playback
         self.exportWriter = exportWriter
+        self.clipboard = clipboard
         self.directory = directory
         self.revisionStore = revisionStore
         self.fileDeleter = fileDeleter
@@ -105,6 +126,8 @@ public final class TranscriptViewModel {
         self.reprocessor = reprocessor
         self.retranscriber = retranscriber
         self.agentDispatcher = agentDispatcher
+        self.agentPreferences = agentPreferences
+        agentMCPURL = agentPreferences.mcpURL
         self.openVocabularySettings = openVocabularySettings
         selectFileIfNeeded()
         playback.setPlaybackObserver { [weak self] event in self?.handle(event) }
@@ -652,6 +675,7 @@ public final class TranscriptViewModel {
 
     /// Exports each requested format separately so an SRT failure does not lose valid TXT/JSON.
     public func export(_ formats: Set<TranscriptExportFormat>, to directoryURL: URL, basename: String? = nil) {
+        exportMessage = nil
         guard let transcript = selectedTranscript else {
             exportOutcomes = formats.map {
                 TranscriptExportOutcome(format: $0, destinationURL: nil, errorMessage: "This file has no completed transcript to export.")
@@ -664,6 +688,7 @@ public final class TranscriptViewModel {
 
     /// Writes one format to the exact file the Save panel chose, including a renamed file.
     public func export(_ format: TranscriptExportFormat, toFile fileURL: URL) {
+        exportMessage = nil
         guard let transcript = selectedTranscript else {
             exportOutcomes = [
                 TranscriptExportOutcome(
@@ -693,6 +718,40 @@ public final class TranscriptViewModel {
         export(format, toFile: fileURL)
     }
 
+    /// Copies the same schema-backed Knowledgebase document as the file export,
+    /// after bringing any current speaker-library labels into the revision.
+    public func copyKnowledgebaseToClipboard() async {
+        exportMessage = nil
+        await refreshLabelsFromLibrary(announceUnchanged: false)
+        guard let transcript = selectedTranscript else {
+            exportMessage = TranscriptExportMessage(
+                text: "This file has no completed transcript to copy.",
+                isFailure: true
+            )
+            return
+        }
+
+        do {
+            let document = try TranscriptExporter.knowledgebaseJSON(transcript)
+            if clipboard.write(document) {
+                exportMessage = TranscriptExportMessage(
+                    text: "Copied Knowledgebase JSON to the clipboard.",
+                    isFailure: false
+                )
+            } else {
+                exportMessage = TranscriptExportMessage(
+                    text: "Could not copy Knowledgebase JSON to the clipboard.",
+                    isFailure: true
+                )
+            }
+        } catch {
+            exportMessage = TranscriptExportMessage(
+                text: "Could not copy Knowledgebase JSON: \(Self.describe(error))",
+                isFailure: true
+            )
+        }
+    }
+
     // MARK: - Sending to an agent
 
     /// Whether the window offers the send action at all. Without a host
@@ -718,11 +777,37 @@ public final class TranscriptViewModel {
         if let reason = agentEnvironment?.unavailableReason { return reason }
         if selectedTranscript == nil { return "This file has no completed transcript to send." }
         if agents.isEmpty { return "No coding agent was found on this Mac." }
-        if agentFolders.isEmpty { return "Connect the folder the agent should work in." }
         if selectedAgent == nil { return "Choose an agent." }
-        guard let folder = selectedAgentFolder else { return "Choose a folder." }
-        if !folder.isReachable { return "\(folder.displayName) is no longer where it was. Connect it again." }
+        if let folder = selectedAgentFolder, !folder.isReachable {
+            return "\(folder.displayName) is no longer where it was. Connect it again."
+        }
+        if !Self.isAcceptableMCPURL(agentMCPURL) { return "The MCP URL should start with http:// or https://." }
         return nil
+    }
+
+    /// The models typed for the selected agent before, most recent first.
+    public var agentModelHistory: [String] {
+        selectedAgentID.map(agentPreferences.modelHistory(for:)) ?? []
+    }
+
+    /// Picks the folder the agent works in, or none at all with nil.
+    public func selectAgentFolder(id: TranscriptAgentFolder.ID?) {
+        selectedAgentFolderID = id
+        agentFolderDeclined = id == nil
+    }
+
+    /// Empty is fine — the URL is optional — but what is there has to be one.
+    private static func isAcceptableMCPURL(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return true }
+        guard let url = URL(string: trimmed), let scheme = url.scheme?.lowercased() else { return false }
+        return (scheme == "http" || scheme == "https") && url.host?.isEmpty == false
+    }
+
+    private func restoreAgentRunSettings() {
+        guard let selectedAgentID else { return }
+        agentModel = agentPreferences.lastModel(for: selectedAgentID)
+        agentEffort = agentPreferences.effort(for: selectedAgentID)
     }
 
     public var canSubmitAgentHandoff: Bool { agentHandoffProblem == nil && !isSendingToAgent }
@@ -745,7 +830,7 @@ public final class TranscriptViewModel {
         let environment = await agentDispatcher.connectFolder()
         apply(environment)
         if let connected = environment.folders.first(where: { !known.contains($0.id) }) {
-            selectedAgentFolderID = connected.id
+            selectAgentFolder(id: connected.id)
         }
     }
 
@@ -765,15 +850,23 @@ public final class TranscriptViewModel {
     public func sendToAgent() async -> Bool {
         guard let agentDispatcher, canSubmitAgentHandoff else { return false }
         await refreshLabelsFromLibrary(announceUnchanged: false)
-        guard let transcript = selectedTranscript, let agent = selectedAgent, let folder = selectedAgentFolder else { return false }
+        guard let transcript = selectedTranscript, let agent = selectedAgent else { return false }
         isSendingToAgent = true
         defer { isSendingToAgent = false }
-        let outcome = await agentDispatcher.send(TranscriptAgentRequest(
+        let request = TranscriptAgentRequest(
             transcript: transcript,
             agent: agent,
-            folder: folder,
+            model: agentModel,
+            effort: agentEffort,
+            folder: selectedAgentFolder,
+            mcpURL: agentMCPURL,
             instruction: agentInstruction
-        ))
+        )
+        let outcome = await agentDispatcher.send(request)
+        if outcome.succeeded {
+            agentPreferences.recordSend(agentID: agent.id, model: request.model, effort: request.effort)
+            agentPreferences.mcpURL = request.mcpURL ?? ""
+        }
         agentMessage = TranscriptSpeakerActionMessage(text: outcome.summary, isFailure: !outcome.succeeded)
         return outcome.succeeded
     }
@@ -788,9 +881,11 @@ public final class TranscriptViewModel {
     private func apply(_ environment: TranscriptAgentEnvironment) {
         agentEnvironment = environment
         if selectedAgentID == nil || !environment.agents.contains(where: { $0.id == selectedAgentID }) {
-            selectedAgentID = environment.agents.first?.id
+            let remembered = environment.agents.first { $0.id == agentPreferences.lastAgentID }
+            selectedAgentID = (remembered ?? environment.agents.first)?.id
         }
-        if selectedAgentFolderID == nil || !environment.folders.contains(where: { $0.id == selectedAgentFolderID }) {
+        let folderIsGone = selectedAgentFolderID != nil && !environment.folders.contains { $0.id == selectedAgentFolderID }
+        if folderIsGone || (selectedAgentFolderID == nil && !agentFolderDeclined) {
             selectedAgentFolderID = environment.folders.first(where: \.isReachable)?.id ?? environment.folders.first?.id
         }
     }
@@ -1145,10 +1240,12 @@ public final class TranscriptViewModel {
         playheadMilliseconds = 0
         guard let file = selectedFile else {
             selectedSegmentID = nil
+            exportMessage = nil
             return
         }
         playback.load(sourceSnapshotURL: file.sourceSnapshotURL)
         selectedSegmentID = nil
+        exportMessage = nil
     }
 
     private static func describe(_ error: Error) -> String {

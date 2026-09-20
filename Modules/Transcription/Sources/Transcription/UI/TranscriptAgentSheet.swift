@@ -2,8 +2,8 @@ import SwiftUI
 
 /// Hands the transcript on screen to a coding agent working in a folder.
 ///
-/// Three choices and nothing else: who does the work, where they do it, and
-/// what they are being asked for. The sheet closes when the session exists;
+/// Who does the work and how hard they think, where they do it if anywhere,
+/// what else they can consult, and what they are being asked for. The sheet closes when the session exists;
 /// a refusal keeps it open with the reason, because every field is still worth
 /// keeping when the send did not happen.
 struct TranscriptAgentSheet: View {
@@ -17,17 +17,18 @@ struct TranscriptAgentSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
-            Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     agentSection
                     folderSection
+                    mcpSection
                     instructionSection
                 }
                 .padding(.horizontal, 20)
-                .padding(.vertical, 18)
+                .padding(.top, 4)
+                .padding(.bottom, 18)
             }
-            .frame(maxHeight: 420)
+            .frame(maxHeight: 480)
             Divider()
             footer
         }
@@ -53,24 +54,19 @@ struct TranscriptAgentSheet: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Send to Agent").font(.title3.weight(.semibold))
-            Text("\u{201C}\(transcriptName)\u{201D} is written to a file the agent reads, and its session opens in Latch.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 18)
-        .padding(.bottom, 14)
+        Text("Send to Agent")
+            .font(.title3.weight(.semibold))
+            .help("\u{201C}\(transcriptName)\u{201D}")
+            .padding(.horizontal, 20)
+            .padding(.top, 18)
+            .padding(.bottom, 10)
     }
 
     // MARK: - Agent
 
     @ViewBuilder
     private var agentSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Agent").font(.headline)
+        VStack(alignment: .leading, spacing: 8) {
             if viewModel.agents.isEmpty {
                 unavailableNote(
                     viewModel.agentEnvironment?.unavailableReason
@@ -84,12 +80,44 @@ struct TranscriptAgentSheet: View {
                 }
                 .labelsHidden()
                 .pickerStyle(.menu)
-                if let agent = viewModel.selectedAgent {
-                    Text("Runs `\(agent.commandLabel)` in the folder below.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    modelField
+                    if viewModel.selectedAgent?.supportsEffort == true {
+                        Picker("Effort", selection: $viewModel.agentEffort) {
+                            Text("Default effort").tag(TranscriptAgentEffort?.none)
+                            Divider()
+                            ForEach(TranscriptAgentEffort.allCases) { effort in
+                                Text(effort.rawValue).tag(TranscriptAgentEffort?.some(effort))
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .fixedSize()
+                    }
                 }
             }
+        }
+    }
+
+    /// A combo box in two parts: free text, because model names change faster
+    /// than Scribe ships, and beside it the names typed for this agent before.
+    private var modelField: some View {
+        HStack(spacing: 4) {
+            TextField("Model", text: $viewModel.agentModel, prompt: Text("Model (agent default)"))
+                .textFieldStyle(.roundedBorder)
+                .autocorrectionDisabled()
+            Menu {
+                ForEach(viewModel.agentModelHistory, id: \.self) { model in
+                    Button(model) { viewModel.agentModel = model }
+                }
+            } label: {
+                Image(systemName: "clock.arrow.circlepath")
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .disabled(viewModel.agentModelHistory.isEmpty)
+            .help("Recently used models")
         }
     }
 
@@ -106,13 +134,13 @@ struct TranscriptAgentSheet: View {
                 }
                 .controlSize(.small)
             }
-            if viewModel.agentFolders.isEmpty {
-                Text("Connect the folder the agent should work in. Its session opens there in Latch.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            } else {
-                Picker("Folder", selection: $viewModel.selectedAgentFolderID) {
+            if !viewModel.agentFolders.isEmpty {
+                Picker("Folder", selection: Binding(
+                    get: { viewModel.selectedAgentFolderID },
+                    set: { viewModel.selectAgentFolder(id: $0) }
+                )) {
+                    Text("No Folder").tag(TranscriptAgentFolder.ID?.none)
+                    Divider()
                     ForEach(viewModel.agentFolders) { folder in
                         Text(folder.isReachable ? folder.displayName : "\(folder.displayName) (missing)")
                             .tag(TranscriptAgentFolder.ID?.some(folder.id))
@@ -137,6 +165,17 @@ struct TranscriptAgentSheet: View {
         }
     }
 
+    // MARK: - MCP
+
+    private var mcpSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("MCP").font(.headline)
+            TextField("MCP URL", text: $viewModel.agentMCPURL, prompt: Text("https://"))
+                .textFieldStyle(.roundedBorder)
+                .autocorrectionDisabled()
+        }
+    }
+
     // MARK: - Instruction
 
     @ViewBuilder
@@ -150,20 +189,7 @@ struct TranscriptAgentSheet: View {
                 .scrollContentBackground(.hidden)
                 .padding(6)
                 .background(.background.secondary, in: RoundedRectangle(cornerRadius: 6))
-                .overlay(alignment: .topLeading) {
-                    if viewModel.agentInstruction.isEmpty {
-                        Text(TranscriptAgentRequest.defaultInstruction)
-                            .font(.body)
-                            .foregroundStyle(.tertiary)
-                            .padding(.horizontal, 11)
-                            .padding(.vertical, 14)
-                            .allowsHitTesting(false)
-                    }
-                }
                 .overlay { RoundedRectangle(cornerRadius: 6).strokeBorder(.separator) }
-            Text("Sent with the transcript. Leave it empty to ask for the summary above.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
     }
 

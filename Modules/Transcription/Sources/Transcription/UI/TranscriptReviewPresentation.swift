@@ -51,6 +51,17 @@ public struct TranscriptSpeakerActionMessage: Equatable, Sendable {
     }
 }
 
+/// Result of copying or saving a transcript export.
+public struct TranscriptExportMessage: Equatable, Sendable {
+    public let text: String
+    public let isFailure: Bool
+
+    public init(text: String, isFailure: Bool) {
+        self.text = text
+        self.isFailure = isFailure
+    }
+}
+
 /// What the transport bar shows while the selected source is playing.
 public struct TranscriptPlaybackStatus: Equatable, Sendable {
     /// The turn whose words are being spoken, or the last one that started

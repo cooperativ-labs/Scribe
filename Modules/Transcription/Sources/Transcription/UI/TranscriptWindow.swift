@@ -289,7 +289,7 @@ public struct TranscriptWindow: View {
         .toolbar { toolbar }
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 0) {
-                TranscriptExportResults(outcomes: viewModel.exportOutcomes)
+                TranscriptExportResults(outcomes: viewModel.exportOutcomes, message: viewModel.exportMessage)
                 if !transcript.segments.isEmpty {
                     TranscriptTransportBar(viewModel: viewModel, shortcutsEnabled: !isTyping)
                 }
@@ -596,12 +596,15 @@ public struct TranscriptWindow: View {
                 Button("Export TXT") { exportTranscript(formats: [.plainText]) }
                 Button("Export JSON") { exportTranscript(formats: [.json]) }
                 Button("Export for Knowledgebase") { exportTranscript(formats: [.knowledgebase]) }
+                Button("Copy for Knowledgebase") {
+                    Task { await viewModel.copyKnowledgebaseToClipboard() }
+                }
                 Button("Export SRT") { exportTranscript(formats: [.subtitles]) }
                 Divider()
                 Button("Export All") { exportTranscript(formats: Set(TranscriptExportFormat.allCases)) }
             }
             .disabled(viewModel.selectedTranscript == nil)
-            .help("Save a copy of this transcript as TXT, Scribe JSON, Knowledgebase JSON, or SRT. This does not change the recordings folder in Settings.")
+            .help("Save a copy of this transcript as TXT, Scribe JSON, Knowledgebase JSON, or SRT, or copy Knowledgebase JSON to the clipboard. This does not change the recordings folder in Settings.")
             Button("Keyboard Shortcuts", systemImage: "keyboard") { isShowingShortcuts.toggle() }
                 .popover(isPresented: $isShowingShortcuts, arrowEdge: .bottom) { TranscriptShortcutsHelp() }
                 .help("Keyboard shortcuts")
@@ -1327,10 +1330,15 @@ private struct TranscriptShortcutsHelp: View {
 
 private struct TranscriptExportResults: View {
     let outcomes: [TranscriptExportOutcome]
+    let message: TranscriptExportMessage?
 
     var body: some View {
-        if !outcomes.isEmpty {
+        if !outcomes.isEmpty || message != nil {
             VStack(alignment: .leading, spacing: 3) {
+                if let message {
+                    Label(message.text, systemImage: message.isFailure ? "xmark.octagon.fill" : "checkmark.circle.fill")
+                        .foregroundStyle(message.isFailure ? .red : .green)
+                }
                 ForEach(outcomes) { outcome in
                     if outcome.succeeded {
                         Label("Exported \(outcome.format.rawValue.uppercased()) to \(outcome.destinationURL?.lastPathComponent ?? "destination")", systemImage: "checkmark.circle.fill")

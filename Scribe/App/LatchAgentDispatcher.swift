@@ -7,8 +7,8 @@ import Transcription
 /// The host's side of handing a transcript to a coding agent.
 ///
 /// Scribe does not manage the agent's life. It writes the transcript somewhere
-/// readable, asks Latch for a persistent session running the agent in the
-/// folder the person connected, and steps out of the way: Latch owns the PTY,
+/// readable, asks Latch for a persistent session running the agent — in the
+/// folder the person chose, when they chose one — and steps out of the way: Latch owns the PTY,
 /// the agent owns the conversation. That boundary is Latch's documented
 /// integration shape, and it is why nothing here reads `~/.latch`, parses
 /// terminal output, or tries to follow the session afterwards.
@@ -75,7 +75,7 @@ final class AgentHandoffService {
             TranscriptAgentOutcome(
                 sessionName: nil,
                 agentName: request.agent.displayName,
-                folderName: request.folder.displayName,
+                folderName: request.folder?.displayName,
                 errorMessage: message
             )
         }
@@ -87,9 +87,11 @@ final class AgentHandoffService {
         guard let executableURL = tools.agents.first(where: { $0.agent.id == request.agent.id })?.executableURL else {
             return failure("\(request.agent.displayName) is no longer installed on this Mac.")
         }
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: request.folder.url.path, isDirectory: &isDirectory), isDirectory.boolValue else {
-            return failure("\(request.folder.displayName) is no longer where it was. Connect the folder again.")
+        if let folder = request.folder {
+            var isDirectory: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: folder.url.path, isDirectory: &isDirectory), isDirectory.boolValue else {
+                return failure("\(folder.displayName) is no longer where it was. Connect the folder again.")
+            }
         }
 
         let transcriptFileURL: URL
@@ -115,7 +117,7 @@ final class AgentHandoffService {
         return TranscriptAgentOutcome(
             sessionName: report.session.name,
             agentName: request.agent.displayName,
-            folderName: request.folder.displayName
+            folderName: request.folder?.displayName
         )
     }
 
@@ -141,26 +143,21 @@ final class AgentHandoffService {
 
     // MARK: - The transcript the agent reads
 
-    /// Writes the plain-text export the agent is pointed at, with a short
-    /// header naming the recording it came from. Handing over a file rather
-    /// than a very long command keeps the transcript out of every process
-    /// listing on the machine, and lets the agent re-read it as it works.
+    /// Writes the document the agent is pointed at: the same Knowledgebase
+    /// export the window saves and copies, byte for byte, so what an agent
+    /// files in the Knowledgebase is what Scribe itself would have uploaded.
+    /// Handing over a file rather than a very long command keeps the
+    /// transcript out of every process listing on the machine, and lets the
+    /// agent re-read it as it works.
     private func writeHandoffFile(for transcript: CanonicalTranscript) throws -> URL {
         try FileManager.default.createDirectory(at: handoffDirectoryURL, withIntermediateDirectories: true)
-        let body = try TranscriptExporter.plainText(transcript)
+        let document = try TranscriptExporter.export(transcript, as: .knowledgebase)
         let name = FileTranscriptExportWriter.basename(for: transcript)
         let stamp = Self.fileStampFormatter.string(from: Date())
         let destination = handoffDirectoryURL
             .appendingPathComponent("\(Self.fileSafe(name))-\(stamp)")
-            .appendingPathExtension("txt")
-
-        var header = "Transcript: \(transcript.title ?? transcript.source.filename)\n"
-        header += "Recording: \(transcript.source.filename)\n"
-        header += "Length: \(TranscriptTimecode.string(fromMilliseconds: transcript.source.durationMs))\n"
-        let speakers = transcript.speakers.map(\.labelSnapshot)
-        if !speakers.isEmpty { header += "Speakers: \(speakers.joined(separator: ", "))\n" }
-        header += "Produced by Scribe. One paragraph per turn, timestamped [start --> end].\n\n"
-        try Data((header + body).utf8).write(to: destination, options: .atomic)
+            .appendingPathExtension(TranscriptExportFormat.knowledgebase.fileExtension)
+        try document.write(to: destination, options: .atomic)
         return destination
     }
 
@@ -185,26 +182,29 @@ final class AgentHandoffService {
 
     /// Builds the launch manifest for one send.
     ///
-    /// `argv` is the resolved agent binary and the prompt, which every agent
-    /// Scribe offers accepts as a positional argument that starts an
-    /// interactive session. The absolute path matters: the session inherits
+    /// `argv` is the resolved agent binary, the options naming the model and
+    /// effort, and the prompt, which every agent Scribe offers accepts as a
+    /// positional argument that starts an interactive session. The absolute
+    /// path matters: the session inherits
     /// whatever environment Latch runs with, and an agent installed under a
     /// version manager is not reliably on that `PATH`.
+    ///
+    /// Without a folder the session opens where the transcript was written: a
+    /// place that is Scribe's own, where the agent can read the file and has
+    /// no repository to wander into.
     static func manifest(
         for request: TranscriptAgentRequest,
         executableURL: URL,
         transcriptFileURL: URL
     ) -> LatchLaunchManifest {
-        let prompt = """
-        \(request.instruction)
-
-        The transcript is at \(transcriptFileURL.path). Read that file first: it is a Scribe meeting transcript, one paragraph per turn, with timestamps and speaker names.
-        """
+        let workingDirectory = request.folder?.url.standardizedFileURL
+            ?? transcriptFileURL.deletingLastPathComponent().standardizedFileURL
+        let prompt = prompt(for: request, transcriptFileURL: transcriptFileURL)
         let title = request.transcript.title ?? request.transcript.source.filename
         return LatchLaunchManifest(
             launch: .init(
-                argv: [executableURL.path, prompt],
-                cwd: request.folder.url.standardizedFileURL.path,
+                argv: [executableURL.path] + runOptions(for: request) + [prompt],
+                cwd: workingDirectory.path,
                 // The transcript's location, so a person or the agent can reach
                 // the file again from the session's own shell.
                 env: ["SCRIBE_TRANSCRIPT_FILE": transcriptFileURL.path]
@@ -216,6 +216,47 @@ final class AgentHandoffService {
                 source: .init(kind: "scribe", externalRunID: request.transcript.transcriptID)
             )
         )
+    }
+
+    /// The person's instruction, then only what they could not have written
+    /// themselves: where the transcript is, the MCP server they named, and
+    /// whether a report belongs on disk. A report is saved only into a folder
+    /// the person chose; otherwise the agent answers in its session.
+    static func prompt(for request: TranscriptAgentRequest, transcriptFileURL: URL) -> String {
+        var paragraphs = [
+            request.instruction,
+            "The transcript is at \(transcriptFileURL.path). Read that file first: it is Scribe's Knowledgebase transcript export (\(KnowledgebaseTranscriptExporter.schema) JSON), with the speakers, timestamps, and every segment.",
+        ]
+        if let mcpURL = request.mcpURL {
+            paragraphs.append("Related information can be found at this MCP URL: \(mcpURL)")
+        }
+        if let folder = request.folder {
+            paragraphs.append("Save your report as a Markdown file in \(folder.url.standardizedFileURL.path), the folder this session opened in.")
+        } else {
+            paragraphs.append("Print your summary here in this session. Do not save it to a file unless the instruction above asks for one.")
+        }
+        return paragraphs.joined(separator: "\n\n")
+    }
+
+    /// How each agent's command line names a model and an effort, as each
+    /// documents it: `claude --model … --effort …`, `codex -m … -c
+    /// model_reasoning_effort="…"` (a TOML value, hence the quotes),
+    /// `gemini -m …`, `cursor-agent --model …`. The last two take no effort.
+    static func runOptions(for request: TranscriptAgentRequest) -> [String] {
+        var options: [String] = []
+        switch request.agent.id {
+        case "claude":
+            if let model = request.model { options += ["--model", model] }
+            if let effort = request.effort { options += ["--effort", effort.rawValue] }
+        case "codex":
+            if let model = request.model { options += ["-m", model] }
+            if let effort = request.effort { options += ["-c", "model_reasoning_effort=\"\(effort.rawValue)\""] }
+        case "gemini":
+            if let model = request.model { options += ["-m", model] }
+        default:
+            if let model = request.model { options += ["--model", model] }
+        }
+        return options
     }
 
     // MARK: - Showing the session
@@ -345,8 +386,8 @@ struct AgentToolLocator: Sendable {
     /// its prompt as a positional argument and stays interactive afterwards,
     /// which is what makes one `argv` shape serve all of them.
     static let catalog: [TranscriptAgent] = [
-        TranscriptAgent(id: "claude", displayName: "Claude Code", commandLabel: "claude"),
-        TranscriptAgent(id: "codex", displayName: "Codex", commandLabel: "codex"),
+        TranscriptAgent(id: "claude", displayName: "Claude Code", commandLabel: "claude", supportsEffort: true),
+        TranscriptAgent(id: "codex", displayName: "Codex", commandLabel: "codex", supportsEffort: true),
         TranscriptAgent(id: "gemini", displayName: "Gemini CLI", commandLabel: "gemini"),
         TranscriptAgent(id: "cursor-agent", displayName: "Cursor Agent", commandLabel: "cursor-agent"),
     ]
@@ -458,7 +499,7 @@ struct LatchTranscriptAgentDispatcher: TranscriptAgentDispatching {
             return TranscriptAgentOutcome(
                 sessionName: nil,
                 agentName: request.agent.displayName,
-                folderName: request.folder.displayName,
+                folderName: request.folder?.displayName,
                 errorMessage: Self.goneReason
             )
         }
