@@ -14,7 +14,7 @@ public final class RecorderMenuModel: ObservableObject {
 
     private let coordinator: any RecordingCoordinating
     private let now: @MainActor () -> Date
-    private let copyTimestampShortcut: @MainActor () -> GlobalShortcut
+    private let pasteTimestampShortcut: @MainActor () -> GlobalShortcut
     private var snapshot: RecorderSnapshot
     private var observation: RecorderObservationToken?
     private var elapsedTimeTicker: Timer?
@@ -22,16 +22,16 @@ public final class RecorderMenuModel: ObservableObject {
     public init(
         coordinator: any RecordingCoordinating,
         now: @escaping @MainActor () -> Date = { Date() },
-        copyTimestampShortcut: @escaping @MainActor () -> GlobalShortcut = { .defaultCopyTimestamp }
+        pasteTimestampShortcut: @escaping @MainActor () -> GlobalShortcut = { .defaultPasteTimestamp }
     ) {
         self.coordinator = coordinator
         self.now = now
-        self.copyTimestampShortcut = copyTimestampShortcut
+        self.pasteTimestampShortcut = pasteTimestampShortcut
         snapshot = coordinator.snapshot
         presentation = MenuPresentation(
             snapshot: coordinator.snapshot,
             at: now(),
-            copyTimestampShortcut: copyTimestampShortcut()
+            pasteTimestampShortcut: pasteTimestampShortcut()
         )
         observation = coordinator.observeSnapshot { [weak self] snapshot in
             guard let self else { return }
@@ -46,7 +46,7 @@ public final class RecorderMenuModel: ObservableObject {
         presentation = MenuPresentation(
             snapshot: snapshot,
             at: now(),
-            copyTimestampShortcut: copyTimestampShortcut()
+            pasteTimestampShortcut: pasteTimestampShortcut()
         )
     }
 
@@ -80,7 +80,7 @@ public final class RecorderMenuModel: ObservableObject {
     public func stopRecording() { coordinator.submit(.stop) }
     public func pauseRecording() { coordinator.submit(.pause) }
     public func resumeRecording() { coordinator.submit(.resume) }
-    public func copyTimestamp() { coordinator.submit(.copyTimestamp) }
+    public func pasteTimestamp() { coordinator.submit(.pasteTimestamp) }
     public func openRecordingsFolder() { coordinator.submit(.openRecordingsFolder) }
     public func requestPermissions() { coordinator.submit(.requestPermissions) }
     public func openSystemSettings(_ pane: SystemSettingsPane) { coordinator.submit(.openSystemSettings(pane)) }

@@ -147,24 +147,24 @@ final class MockRecordingCoordinatorTests: XCTestCase {
         XCTAssertTrue(coordinator.snapshot.state.isRecording)
     }
 
-    func testCopyTimestampWritesElapsedTextAndIsIgnoredWhileIdle() async {
+    func testPasteTimestampWritesElapsedTextAndIsIgnoredWhileIdle() async {
         let start = Date(timeIntervalSince1970: 1_000)
         var now = start
         let coordinator = MockRecordingCoordinator(snapshot: readySnapshot(), now: { now })
 
-        coordinator.submit(.copyTimestamp)
+        coordinator.submit(.pasteTimestamp)
         await coordinator.waitUntilIdle()
-        XCTAssertTrue(coordinator.copiedTimestamps.isEmpty)
+        XCTAssertTrue(coordinator.pastedTimestamps.isEmpty)
         XCTAssertTrue(coordinator.performedCommands.isEmpty)
 
         coordinator.submit(.start)
         await coordinator.waitUntilIdle()
         now = start.addingTimeInterval(83)
-        coordinator.submit(.copyTimestamp)
+        coordinator.submit(.pasteTimestamp)
         await coordinator.waitUntilIdle()
 
-        XCTAssertEqual(coordinator.copiedTimestamps, ["01:23"])
-        XCTAssertEqual(coordinator.performedCommands, [.start, .copyTimestamp])
+        XCTAssertEqual(coordinator.pastedTimestamps, ["at 01:23"])
+        XCTAssertEqual(coordinator.performedCommands, [.start, .pasteTimestamp])
     }
 
     func testSourcesRefreshFromTheProviderAndSelectionsPersistInTheSnapshot() async {

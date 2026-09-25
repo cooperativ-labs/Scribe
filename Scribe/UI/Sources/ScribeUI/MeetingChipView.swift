@@ -104,7 +104,7 @@ struct MeetingChipView: View {
                     .foregroundStyle(session.isPaused ? AnyShapeStyle(.secondary) : AnyShapeStyle(Color.red))
                     .accessibilityLabel(session.isPaused ? "Paused" : "Recording")
                 // Plain text, not a control: the elapsed figure is here to
-                // say the recording is running, and Copy Timestamp lives in the
+                // say the recording is running, and Paste Timestamp lives in the
                 // menu and on its global shortcut.
                 Text(session.elapsedText)
                     .font(.system(size: 14, weight: .medium))

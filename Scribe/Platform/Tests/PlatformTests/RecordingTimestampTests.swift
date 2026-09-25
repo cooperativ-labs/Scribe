@@ -9,20 +9,20 @@ final class RecordingTimestampTests: XCTestCase {
         XCTAssertEqual(RecordingTimestamp.elapsedText(3_723), "1:02:03")
     }
 
-    func testCopyableTextFollowsTheRecordingClock() {
+    func testPastableTextFollowsTheRecordingClock() {
         let start = Date(timeIntervalSince1970: 1_000)
         let activity = RecordingActivity(sessionID: UUID(), startedAt: start)
 
         XCTAssertEqual(
-            RecordingTimestamp.copyableText(state: .recording(activity), at: start.addingTimeInterval(83)),
-            "01:23"
+            RecordingTimestamp.pastableText(state: .recording(activity), at: start.addingTimeInterval(83)),
+            "at 01:23"
         )
         XCTAssertEqual(
-            RecordingTimestamp.copyableText(state: .paused(activity), at: start.addingTimeInterval(83)),
-            "01:23"
+            RecordingTimestamp.pastableText(state: .paused(activity), at: start.addingTimeInterval(83)),
+            "at 01:23"
         )
-        XCTAssertEqual(RecordingTimestamp.copyableText(state: .starting, at: start), "00:00")
-        XCTAssertNil(RecordingTimestamp.copyableText(state: .idle, at: start))
-        XCTAssertNil(RecordingTimestamp.copyableText(state: .stopping, at: start))
+        XCTAssertEqual(RecordingTimestamp.pastableText(state: .starting, at: start), "at 00:00")
+        XCTAssertNil(RecordingTimestamp.pastableText(state: .idle, at: start))
+        XCTAssertNil(RecordingTimestamp.pastableText(state: .stopping, at: start))
     }
 }

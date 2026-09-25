@@ -36,7 +36,7 @@ public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
     private let transportView = RecordingTransportView()
     private let transportRow = NSMenuItem()
     private let statusItemRow = NSMenuItem()
-    private let copyTimestampRow = NSMenuItem()
+    private let pasteTimestampRow = NSMenuItem()
     let applicationMenu = NSMenu()
     let microphoneMenu = NSMenu()
     let recordingModeMenu = NSMenu()
@@ -108,8 +108,8 @@ public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
         transportView.resumeAction = { [weak self] in self?.perform { $0.resumeRecording() } }
         transportView.stopAction = { [weak self] in self?.perform { $0.stopRecording() } }
 
-        copyTimestampRow.target = self
-        copyTimestampRow.action = #selector(copyTimestamp)
+        pasteTimestampRow.target = self
+        pasteTimestampRow.action = #selector(pasteTimestamp)
 
         presentationObservation = model.$presentation.sink { [weak self] presentation in
             self?.applyLiveState(presentation)
@@ -162,7 +162,7 @@ public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
         // spend a menu row repeating "Idle". Keep the item in the menu and
         // toggle visibility so active-state updates never rebuild an open menu.
         statusItemRow.isHidden = presentation.statusTitle == "Idle"
-        applyCopyTimestampItem(copyTimestampRow, presentation: presentation)
+        applyPasteTimestampItem(pasteTimestampRow, presentation: presentation)
         isCapturing = presentation.isCapturing
         applyRecordingIndicator()
     }
@@ -203,8 +203,8 @@ public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
             menu.addItem(.disabled(detail))
         }
 
-        applyCopyTimestampItem(copyTimestampRow, presentation: presentation)
-        menu.addItem(copyTimestampRow)
+        applyPasteTimestampItem(pasteTimestampRow, presentation: presentation)
+        menu.addItem(pasteTimestampRow)
 
         if let prompt = presentation.permissionPrompt {
             menu.addItem(.separator())
@@ -311,14 +311,14 @@ public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
         }
     }
 
-    @objc private func copyTimestamp() {
-        model.copyTimestamp()
+    @objc private func pasteTimestamp() {
+        model.pasteTimestamp()
     }
 
-    private func applyCopyTimestampItem(_ item: NSMenuItem, presentation: MenuPresentation) {
-        item.title = "Copy Timestamp"
-        item.isEnabled = presentation.isCopyTimestampEnabled
-        let shortcut = presentation.copyTimestampShortcut
+    private func applyPasteTimestampItem(_ item: NSMenuItem, presentation: MenuPresentation) {
+        item.title = "Paste Timestamp"
+        item.isEnabled = presentation.isPasteTimestampEnabled
+        let shortcut = presentation.pasteTimestampShortcut
         item.keyEquivalent = shortcut.keyEquivalentCharacter
         item.keyEquivalentModifierMask = shortcut.menuModifierMask
     }

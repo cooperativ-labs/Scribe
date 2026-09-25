@@ -50,16 +50,16 @@ public struct ScribeSettingsView: View {
 
     public var body: some View {
         ScrollViewReader { proxy in
-            TabView(selection: $selectedTab) {
-                generalTab
-                    .tabItem { Label("General", systemImage: "gearshape") }
-                    .tag(SettingsTab.general)
-                recordingTab
-                    .tabItem { Label("Recording", systemImage: "record.circle") }
-                    .tag(SettingsTab.recording)
-                transcriptionTab
-                    .tabItem { Label("Transcription", systemImage: "text.quote") }
-                    .tag(SettingsTab.transcription)
+            VStack(spacing: 0) {
+                HStack(spacing: 4) {
+                    ForEach(SettingsTab.allCases, id: \.self) { tab in
+                        settingsTabButton(tab)
+                    }
+                }
+                .padding(.top, 14)
+                .padding(.bottom, 8)
+
+                selectedTabContent
             }
             .onChange(of: focus.requestCount) { showRequestedSection(with: proxy) }
             .onAppear { showRequestedSection(with: proxy) }
@@ -92,6 +92,37 @@ public struct ScribeSettingsView: View {
         }
     }
 
+    private var selectedTabContent: some View {
+        Group {
+            switch selectedTab {
+            case .general: generalTab
+            case .recording: recordingTab
+            case .transcription: transcriptionTab
+            }
+        }
+    }
+
+    private func settingsTabButton(_ tab: SettingsTab) -> some View {
+        let isSelected = selectedTab == tab
+
+        return Button {
+            withAnimation(.snappy) { selectedTab = tab }
+        } label: {
+            Label(tab.title, systemImage: tab.symbol)
+                .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    isSelected ? Color.accentColor.opacity(0.14) : .clear,
+                    in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                )
+                .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityValue(isSelected ? "Selected" : "")
+    }
+
     // MARK: - General
 
     private var generalTab: some View {
@@ -119,12 +150,12 @@ public struct ScribeSettingsView: View {
                 shortcutField("Start recording", $settings.startShortcut, default: .defaultStart, action: .start)
                 shortcutField("Stop recording", $settings.stopShortcut, default: .defaultStop, action: .stop)
                 shortcutField(
-                    "Copy timestamp",
-                    $settings.copyTimestampShortcut,
-                    default: .defaultCopyTimestamp,
-                    action: .copyTimestamp
+                    "Paste timestamp",
+                    $settings.pasteTimestampShortcut,
+                    default: .defaultPasteTimestamp,
+                    action: .pasteTimestamp
                 )
-                Text("Click a shortcut, then press the keys you want; Escape cancels. Include ⌘, ⌃, or ⌥ (function keys work alone). Copy timestamp puts the recording's elapsed time on the clipboard so it can be pasted into notes. If another app already owns a shortcut, Scribe will show the conflict and keep its menu commands available.")
+                Text("Click a shortcut, then press the keys you want; Escape cancels. Include ⌘, ⌃, or ⌥ (function keys work alone). Paste timestamp copies text such as “at 01:23” and pastes it at the cursor in your active app. Pasting needs Accessibility access; until that is granted, the text is still on the clipboard. If another app already owns a shortcut, Scribe will show the conflict and keep its menu commands available.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -153,7 +184,7 @@ public struct ScribeSettingsView: View {
         [
             (.start, "Start recording", settings.startShortcut),
             (.stop, "Stop recording", settings.stopShortcut),
-            (.copyTimestamp, "Copy timestamp", settings.copyTimestampShortcut)
+            (.pasteTimestamp, "Paste timestamp", settings.pasteTimestampShortcut)
         ]
     }
 
@@ -296,10 +327,26 @@ public struct ScribeSettingsView: View {
 
 /// The tabs Settings is split into: the app itself, capturing audio, and
 /// turning that audio into a transcript.
-enum SettingsTab: Hashable {
+enum SettingsTab: Hashable, CaseIterable {
     case general
     case recording
     case transcription
+
+    var title: String {
+        switch self {
+        case .general: "General"
+        case .recording: "Recording"
+        case .transcription: "Transcription"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .general: "gearshape"
+        case .recording: "record.circle"
+        case .transcription: "text.quote"
+        }
+    }
 
     init(containing section: SettingsSection) {
         switch section {

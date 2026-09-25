@@ -370,11 +370,11 @@ final class MeetingChipTests: XCTestCase {
         model.record()
         await coordinator.waitUntilIdle()
 
-        // The clock on the chip is a label. Copy Timestamp is a menu command
+        // The clock on the chip is a label. Paste Timestamp is a menu command
         // with a global shortcut, which is what a person reaches for mid-call
         // anyway — the chip is gone seconds after the recording starts.
-        XCTAssertTrue(coordinator.copiedTimestamps.isEmpty)
-        XCTAssertFalse(coordinator.performedCommands.contains(.copyTimestamp))
+        XCTAssertTrue(coordinator.pastedTimestamps.isEmpty)
+        XCTAssertFalse(coordinator.performedCommands.contains(.pasteTimestamp))
     }
 
     // MARK: The panel

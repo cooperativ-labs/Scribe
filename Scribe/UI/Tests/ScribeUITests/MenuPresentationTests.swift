@@ -294,22 +294,22 @@ final class MenuPresentationTests: XCTestCase {
         XCTAssertTrue(presentation.isStartEnabled)
     }
 
-    func testCopyTimestampIsOfferedWhileARecordingHasAnElapsedFigure() async {
+    func testPasteTimestampIsOfferedWhileARecordingHasAnElapsedFigure() async {
         let start = Date(timeIntervalSince1970: 1_000)
         let coordinator = MockRecordingCoordinator(snapshot: readySnapshot(), now: { start })
         var now = start
         let presentationAt: () -> MenuPresentation = {
-            MenuPresentation(snapshot: coordinator.snapshot, at: now, copyTimestampShortcut: .defaultCopyTimestamp)
+            MenuPresentation(snapshot: coordinator.snapshot, at: now, pasteTimestampShortcut: .defaultPasteTimestamp)
         }
 
-        XCTAssertFalse(presentationAt().isCopyTimestampEnabled)
+        XCTAssertFalse(presentationAt().isPasteTimestampEnabled)
 
         coordinator.submit(.start)
         await coordinator.waitUntilIdle()
         now = start.addingTimeInterval(83)
         let recording = presentationAt()
-        XCTAssertTrue(recording.isCopyTimestampEnabled)
-        XCTAssertEqual(recording.copyTimestampShortcut, .defaultCopyTimestamp)
+        XCTAssertTrue(recording.isPasteTimestampEnabled)
+        XCTAssertEqual(recording.pasteTimestampShortcut, .defaultPasteTimestamp)
     }
 
     // MARK: Source pickers

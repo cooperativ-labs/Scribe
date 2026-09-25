@@ -283,9 +283,9 @@ public enum RecordingCommand: Equatable, Sendable {
     case requestPermissions
     case openSystemSettings(SystemSettingsPane)
     case quit
-    /// Copies the current recording's elapsed time for notes. A no-op when
-    /// nothing is being recorded.
-    case copyTimestamp
+    /// Types the current recording's elapsed time at the cursor of the app the
+    /// person is taking notes in. A no-op when nothing is being recorded.
+    case pasteTimestamp
 }
 
 // MARK: - Coordinator
@@ -367,5 +367,5 @@ extension RecordingCoordinating {
     /// menu and keyboard commands must not be able to interleave differently.
     public func startRecordingFromShortcut() { submit(.start) }
     public func stopRecordingFromShortcut() { submit(.stop) }
-    public func copyTimestampFromShortcut() { submit(.copyTimestamp) }
+    public func pasteTimestampFromShortcut() { submit(.pasteTimestamp) }
 }

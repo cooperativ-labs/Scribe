@@ -15,7 +15,7 @@ public struct GlobalShortcut: Codable, Hashable, Sendable, Identifiable {
 
     public static let defaultStart = GlobalShortcut(keyCode: UInt32(kVK_ANSI_R), modifiers: UInt32(cmdKey | shiftKey))
     public static let defaultStop = GlobalShortcut(keyCode: UInt32(kVK_ANSI_S), modifiers: UInt32(cmdKey | shiftKey))
-    public static let defaultCopyTimestamp = GlobalShortcut(keyCode: UInt32(kVK_ANSI_T), modifiers: UInt32(cmdKey | shiftKey))
+    public static let defaultPasteTimestamp = GlobalShortcut(keyCode: UInt32(kVK_ANSI_T), modifiers: UInt32(cmdKey | shiftKey))
 
     public var displayName: String {
         let modifierText = [
@@ -131,19 +131,19 @@ public struct GlobalShortcut: Codable, Hashable, Sendable, Identifiable {
 public protocol RecordingShortcutCoordinating: AnyObject {
     func startRecordingFromShortcut()
     func stopRecordingFromShortcut()
-    func copyTimestampFromShortcut()
+    func pasteTimestampFromShortcut()
 }
 
 public enum HotkeyAction: String, CaseIterable, Sendable {
     case start
     case stop
-    case copyTimestamp
+    case pasteTimestamp
 
     public var displayName: String {
         switch self {
         case .start: "Start"
         case .stop: "Stop"
-        case .copyTimestamp: "Copy timestamp"
+        case .pasteTimestamp: "Paste timestamp"
         }
     }
 
@@ -153,7 +153,7 @@ public enum HotkeyAction: String, CaseIterable, Sendable {
         switch self {
         case .start: 1
         case .stop: 2
-        case .copyTimestamp: 3
+        case .pasteTimestamp: 3
         }
     }
 }
@@ -201,7 +201,7 @@ public protocol HotKeyRegistering: AnyObject {
     func unregisterAll()
 }
 
-/// Registers independent start, stop, and copy-timestamp shortcuts and routes them to one coordinator.
+/// Registers independent start, stop, and paste-timestamp shortcuts and routes them to one coordinator.
 /// Repeated hardware events for the same action are suppressed for a short window.
 @MainActor
 public final class HotkeyService {
@@ -228,7 +228,7 @@ public final class HotkeyService {
     public func register(
         start: GlobalShortcut,
         stop: GlobalShortcut,
-        copyTimestamp: GlobalShortcut = .defaultCopyTimestamp
+        pasteTimestamp: GlobalShortcut = .defaultPasteTimestamp
     ) -> HotkeyRegistrationReport {
         registrar.unregisterAll()
         lastEventDate.removeAll()
@@ -236,7 +236,7 @@ public final class HotkeyService {
         let assignments: [(HotkeyAction, GlobalShortcut)] = [
             (.start, start),
             (.stop, stop),
-            (.copyTimestamp, copyTimestamp)
+            (.pasteTimestamp, pasteTimestamp)
         ]
 
         var failures: [HotkeyAction: HotkeyRegistrationFailure] = [:]
@@ -280,7 +280,7 @@ public final class HotkeyService {
         switch action {
         case .start: coordinator?.startRecordingFromShortcut()
         case .stop: coordinator?.stopRecordingFromShortcut()
-        case .copyTimestamp: coordinator?.copyTimestampFromShortcut()
+        case .pasteTimestamp: coordinator?.pasteTimestampFromShortcut()
         }
     }
 

@@ -70,3 +70,12 @@ Workers/TranscriptionWorker/models/*
 
 
 /dist
+# Benchmark inputs: keep references, scripts, manifests tracked; frozen meeting
+# snapshots (audio, transcripts, run artifacts) and engine outputs stay local.
+benchmark-files/**/meeting--*/
+benchmark-files/**/results/
+benchmark-files/**/*.wav
+benchmark-files/**/*.mp4
+benchmark-files/**/*.m4a
+benchmark-files/**/*.flac
+benchmark-files/**/*.rttm

@@ -49,8 +49,8 @@ public final class MockRecordingCoordinator: RecordingCoordinating {
     public var acceptedCommands: [RecordingCommand] { queue.acceptedCommands }
     /// Commands that actually changed capture state.
     public private(set) var performedCommands: [RecordingCommand] = []
-    /// Elapsed figures copied for notes. Empty when copy was a no-op.
-    public private(set) var copiedTimestamps: [String] = []
+    /// Elapsed figures pasted into notes. Empty when paste was a no-op.
+    public private(set) var pastedTimestamps: [String] = []
 
     private let queue = RecordingCommandQueue()
     private let broadcaster = RecorderSnapshotBroadcaster()
@@ -153,7 +153,7 @@ public final class MockRecordingCoordinator: RecordingCoordinating {
             permissions?.openSystemSettings(pane)
             performedCommands.append(command)
         case .quit: quit()
-        case .copyTimestamp: copyTimestamp()
+        case .pasteTimestamp: pasteTimestamp()
         }
     }
 
@@ -227,10 +227,10 @@ public final class MockRecordingCoordinator: RecordingCoordinating {
         snapshot.state = .recording(activity)
     }
 
-    private func copyTimestamp() {
-        guard let text = RecordingTimestamp.copyableText(state: snapshot.state, at: now()) else { return }
-        copiedTimestamps.append(text)
-        performedCommands.append(.copyTimestamp)
+    private func pasteTimestamp() {
+        guard let text = RecordingTimestamp.pastableText(state: snapshot.state, at: now()) else { return }
+        pastedTimestamps.append(text)
+        performedCommands.append(.pasteTimestamp)
     }
 
     private func refreshSources() async {

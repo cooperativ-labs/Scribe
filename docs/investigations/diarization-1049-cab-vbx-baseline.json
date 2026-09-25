@@ -1,0 +1,191 @@
+{
+  "schema_version": 1,
+  "transcript_free": true,
+  "objective": "coo:1049.akqc",
+  "scored": "2026-09-24",
+  "purpose": "Fresh FluidAudio 0.15.7 VBx baseline on the restored CAB run, the comparison point for a Nemotron 3 benchmark.",
+  "run": {
+    "meeting": "meeting--cecb678e89d2e0bc89c9687e1c980d5b",
+    "run": "C465C5EC-6EFF-4C43-A472-2EB2367BFA78",
+    "canonical_sha256": "9e7a1140737c0716400af2496e6d344ad35933e338332366f0e9d372dc40ed25",
+    "diarization_clusters": 10
+  },
+  "reference": {
+    "file": "benchmark-files/CAB/BENCHMARK CALL - Transcrpt segments.json",
+    "sha256": "cf9664ca8970c228360ae374870659826db4d4a0262bea702495a06166677eb5",
+    "named_speakers": 9,
+    "ninth_speaker_word_share_pct": 1.19,
+    "note": "Lower bound on words Nemotron 3 (8 speaker slots) must mislabel on this call."
+  },
+  "canonical": {
+    "alignment": {
+      "matched_reference_segments": 1404,
+      "method": "time",
+      "reference_segment_coverage_pct": 94.865,
+      "reference_segments": 1480,
+      "replay_word_coverage_pct": 96.902,
+      "replay_words": 20111,
+      "scored_words": 19488
+    },
+    "agreement": {
+      "correct_pct": 95.315,
+      "correct_words": 18575,
+      "optimal_one_to_one_mapping": {
+        "hypothesis_1": "reference_1",
+        "hypothesis_2": "reference_2",
+        "hypothesis_3": "reference_3",
+        "hypothesis_4": "reference_4",
+        "hypothesis_5": "reference_5",
+        "hypothesis_6": "reference_6",
+        "hypothesis_7": "reference_7",
+        "hypothesis_8": "reference_8",
+        "hypothesis_9": "reference_9"
+      },
+      "per_speaker_confusion": {
+        "hypothesis_1": {
+          "reference_1": 5660,
+          "reference_3": 2,
+          "reference_5": 4,
+          "reference_7": 4,
+          "reference_9": 5
+        },
+        "hypothesis_10": {
+          "reference_8": 3
+        },
+        "hypothesis_2": {
+          "reference_2": 960
+        },
+        "hypothesis_3": {
+          "reference_3": 2688,
+          "reference_7": 14,
+          "reference_9": 17
+        },
+        "hypothesis_4": {
+          "reference_1": 1,
+          "reference_4": 214
+        },
+        "hypothesis_5": {
+          "reference_5": 2156,
+          "reference_6": 3,
+          "reference_7": 6
+        },
+        "hypothesis_6": {
+          "reference_1": 4,
+          "reference_3": 7,
+          "reference_6": 870
+        },
+        "hypothesis_7": {
+          "reference_1": 13,
+          "reference_2": 4,
+          "reference_3": 1,
+          "reference_7": 3183
+        },
+        "hypothesis_8": {
+          "reference_3": 2,
+          "reference_8": 1186
+        },
+        "hypothesis_9": {
+          "reference_1": 8,
+          "reference_4": 2,
+          "reference_9": 1658
+        }
+      },
+      "scored_words": 19488,
+      "unknown_pct": 4.172,
+      "unknown_words": 813,
+      "wder_pct": 4.685,
+      "wrong_pct": 0.513,
+      "wrong_words": 100
+    }
+  },
+  "effective": {
+    "alignment": {
+      "matched_reference_segments": 1404,
+      "method": "time",
+      "reference_segment_coverage_pct": 94.865,
+      "reference_segments": 1480,
+      "replay_word_coverage_pct": 96.902,
+      "replay_words": 20111,
+      "scored_words": 19488
+    },
+    "agreement": {
+      "correct_pct": 98.112,
+      "correct_words": 19120,
+      "optimal_one_to_one_mapping": {
+        "hypothesis_1": "reference_1",
+        "hypothesis_2": "reference_2",
+        "hypothesis_3": "reference_3",
+        "hypothesis_4": "reference_4",
+        "hypothesis_5": "reference_5",
+        "hypothesis_6": "reference_6",
+        "hypothesis_7": "reference_7",
+        "hypothesis_8": "reference_8",
+        "hypothesis_9": "reference_9"
+      },
+      "per_speaker_confusion": {
+        "hypothesis_1": {
+          "reference_1": 5750,
+          "reference_3": 2,
+          "reference_5": 5,
+          "reference_7": 4,
+          "reference_8": 1,
+          "reference_9": 7
+        },
+        "hypothesis_10": {
+          "reference_8": 3
+        },
+        "hypothesis_2": {
+          "reference_2": 979
+        },
+        "hypothesis_3": {
+          "reference_3": 2797,
+          "reference_7": 15,
+          "reference_9": 20
+        },
+        "hypothesis_4": {
+          "reference_1": 1,
+          "reference_4": 223
+        },
+        "hypothesis_5": {
+          "reference_5": 2224,
+          "reference_6": 3,
+          "reference_7": 6
+        },
+        "hypothesis_6": {
+          "reference_1": 5,
+          "reference_3": 7,
+          "reference_6": 913
+        },
+        "hypothesis_7": {
+          "reference_1": 13,
+          "reference_2": 5,
+          "reference_3": 2,
+          "reference_7": 3277
+        },
+        "hypothesis_8": {
+          "reference_3": 3,
+          "reference_6": 1,
+          "reference_8": 1254
+        },
+        "hypothesis_9": {
+          "reference_1": 8,
+          "reference_3": 1,
+          "reference_4": 2,
+          "reference_9": 1703
+        }
+      },
+      "scored_words": 19488,
+      "unknown_pct": 1.303,
+      "unknown_words": 254,
+      "wder_pct": 1.888,
+      "wrong_pct": 0.585,
+      "wrong_words": 114
+    }
+  },
+  "provenance": {
+    "diarization_sha256": "10a63843a794c7a2c9f4c4897b0b07a3398643d5e59e9a4ffe72906be5a91dcf",
+    "engine_revision": "41540ea237350afe5117a082b5c28eda642d0612",
+    "executable_sha256": "fbedf6ba91d957d9b3c19a6f18214fec7d56a22efbd2ac43ee524b71f5239c98",
+    "run_revision": 10
+  }
+}

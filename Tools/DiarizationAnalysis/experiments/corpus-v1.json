@@ -23,8 +23,8 @@
     },
     {
       "id": "cab",
-      "run": "/Users/jake/Meeting Transcripts/meeting--cecb678e89d2e0bc89c9687e1c980d5b/runs/01D75E08-6B5B-4C90-935D-7786C61BABA3",
-      "canonical_sha256": "e8096e5fe0709cc8d9e44c76f116bbfff709d9b0670f9ad6522abbfc071c2dac",
+      "run": "/Users/jake/Development/Tooling/Scribe/benchmark-files/CAB/meeting--cecb678e89d2e0bc89c9687e1c980d5b/runs/C465C5EC-6EFF-4C43-A472-2EB2367BFA78",
+      "canonical_sha256": "9e7a1140737c0716400af2496e6d344ad35933e338332366f0e9d372dc40ed25",
       "references": {
         "segments": "benchmark-files/CAB/BENCHMARK CALL - Transcrpt segments.json",
         "paragraphs": "benchmark-files/CAB/BENCHMARK CALL - Paragraphs.json"

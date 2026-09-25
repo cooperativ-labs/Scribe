@@ -31,12 +31,12 @@ public struct MenuPresentation: Equatable, Sendable {
     /// `nil` when the coordinator has not reported one (or no input exists).
     public let systemDefaultMicrophoneName: String?
     public let shortcutIssues: [String]
-    /// The global shortcut shown beside Copy Timestamp. The menu does not
+    /// The global shortcut shown beside Paste Timestamp. The menu does not
     /// register it; Carbon does. This is only the badge a person uses to learn
     /// the key.
-    public let copyTimestampShortcut: GlobalShortcut
-    /// True while a recording has an elapsed figure that can be copied.
-    public let isCopyTimestampEnabled: Bool
+    public let pasteTimestampShortcut: GlobalShortcut
+    /// True while a recording has an elapsed figure that can be pasted.
+    public let isPasteTimestampEnabled: Bool
     /// A live session — recording or held. What the status item's red dot
     /// reports, since the chip only stays on screen for the first few seconds
     /// of it.
@@ -45,7 +45,7 @@ public struct MenuPresentation: Equatable, Sendable {
     public let recoveryNotice: String?
     public let recordingsFolderName: String
 
-    public init(snapshot: RecorderSnapshot, at date: Date, copyTimestampShortcut: GlobalShortcut = .defaultCopyTimestamp) {
+    public init(snapshot: RecorderSnapshot, at date: Date, pasteTimestampShortcut: GlobalShortcut = .defaultPasteTimestamp) {
         let permissions = snapshot.permissions
         let isReady = permissions.isReadyToRecord(for: snapshot.recordingMode)
 
@@ -106,8 +106,8 @@ public struct MenuPresentation: Equatable, Sendable {
         selectedMicrophoneID = snapshot.selectedMicrophoneID
         systemDefaultMicrophoneName = snapshot.microphones.first { $0.uniqueID == snapshot.systemDefaultMicrophoneID }?.name
         shortcutIssues = snapshot.shortcutIssues
-        self.copyTimestampShortcut = copyTimestampShortcut
-        isCopyTimestampEnabled = RecordingTimestamp.copyableText(state: snapshot.state, at: date) != nil
+        self.pasteTimestampShortcut = pasteTimestampShortcut
+        isPasteTimestampEnabled = RecordingTimestamp.pastableText(state: snapshot.state, at: date) != nil
         isCapturing = snapshot.state.isCapturing
         recoveryNotice = snapshot.recoveryNotice
         recordingsFolderName = snapshot.recordingsFolderURL.lastPathComponent

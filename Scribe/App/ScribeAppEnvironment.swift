@@ -102,7 +102,7 @@ final class ScribeAppEnvironment: ObservableObject {
         self.coordinator = coordinator
         menuModel = RecorderMenuModel(
             coordinator: coordinator,
-            copyTimestampShortcut: { settings.copyTimestampShortcut }
+            pasteTimestampShortcut: { settings.pasteTimestampShortcut }
         )
         meetingChipModel = MeetingChipModel(
             coordinator: coordinator,
@@ -134,7 +134,7 @@ final class ScribeAppEnvironment: ObservableObject {
             hotkeys.register(
                 start: settings.startShortcut,
                 stop: settings.stopShortcut,
-                copyTimestamp: settings.copyTimestampShortcut
+                pasteTimestamp: settings.pasteTimestampShortcut
             )
         )
         observeProcessingQueue()
@@ -255,7 +255,7 @@ final class ScribeAppEnvironment: ObservableObject {
             hotkeys.register(
                 start: settings.startShortcut,
                 stop: settings.stopShortcut,
-                copyTimestamp: settings.copyTimestampShortcut
+                pasteTimestamp: settings.pasteTimestampShortcut
             )
         )
     }
@@ -271,7 +271,7 @@ final class ScribeAppEnvironment: ObservableObject {
                 hotkeys.register(
                     start: settings.startShortcut,
                     stop: settings.stopShortcut,
-                    copyTimestamp: settings.copyTimestampShortcut
+                    pasteTimestamp: settings.pasteTimestampShortcut
                 )
             )
         }

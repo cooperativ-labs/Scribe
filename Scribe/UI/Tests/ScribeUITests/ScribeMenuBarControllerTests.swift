@@ -112,12 +112,12 @@ final class ScribeMenuBarControllerTests: XCTestCase {
         XCTAssertEqual(controller.microphoneMenu.items.filter { $0.state == .on }.map(\.title), ["USB-Podmic-01 (not connected)"])
     }
 
-    func testCopyTimestampShowsItsShortcutAndIsEnabledWhileRecording() async throws {
+    func testPasteTimestampShowsItsShortcutAndIsEnabledWhileRecording() async throws {
         let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
         let controller = makeController(coordinator)
         controller.menuNeedsUpdate(controller.menu)
 
-        let idle = try XCTUnwrap(controller.menu.items.first { $0.title == "Copy Timestamp" })
+        let idle = try XCTUnwrap(controller.menu.items.first { $0.title == "Paste Timestamp" })
         XCTAssertFalse(idle.isEnabled)
         XCTAssertEqual(idle.keyEquivalent, "t")
         XCTAssertTrue(idle.keyEquivalentModifierMask.contains(.command))
@@ -127,11 +127,11 @@ final class ScribeMenuBarControllerTests: XCTestCase {
         await coordinator.waitUntilIdle()
         controller.menuNeedsUpdate(controller.menu)
 
-        let recording = try XCTUnwrap(controller.menu.items.first { $0.title == "Copy Timestamp" })
+        let recording = try XCTUnwrap(controller.menu.items.first { $0.title == "Paste Timestamp" })
         XCTAssertTrue(recording.isEnabled)
     }
 
-    func testCopyTimestampWritesTheElapsedFigure() async {
+    func testPasteTimestampWritesTheElapsedFigure() async {
         let start = Date(timeIntervalSince1970: 1_000)
         var now = start
         let coordinator = MockRecordingCoordinator(snapshot: readySnapshot(), now: { now })
@@ -140,11 +140,11 @@ final class ScribeMenuBarControllerTests: XCTestCase {
         await coordinator.waitUntilIdle()
         now = start.addingTimeInterval(83)
 
-        model.copyTimestamp()
+        model.pasteTimestamp()
         await coordinator.waitUntilIdle()
 
-        XCTAssertEqual(coordinator.copiedTimestamps, ["01:23"])
-        XCTAssertEqual(coordinator.performedCommands, [.start, .copyTimestamp])
+        XCTAssertEqual(coordinator.pastedTimestamps, ["at 01:23"])
+        XCTAssertEqual(coordinator.performedCommands, [.start, .pasteTimestamp])
     }
 
     func testTheStatusItemWearsARedDotWhileRecordingWithoutTheChip() async {

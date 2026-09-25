@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "recording": "cab",
+  "snapshot_dir": "benchmark-files/CAB/meeting--cecb678e89d2e0bc89c9687e1c980d5b",
+  "snapshotted": "2026-09-24",
+  "source_meeting": "~/Meeting Transcripts/meeting--cecb678e89d2e0bc89c9687e1c980d5b",
+  "run": "C465C5EC-6EFF-4C43-A472-2EB2367BFA78",
+  "engine": {
+    "runtime": "FluidAudio 0.15.7",
+    "runtimeRevision": "41540ea237350afe5117a082b5c28eda642d0612",
+    "modelRevision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594"
+  },
+  "note": "Files are gitignored (audio, transcripts). embeddings.json is deliberately not snapshotted: voiceprints are not needed for replay.",
+  "sha256": {
+    "import.json": "3b63e618eb9d171dfc4298e66cbc696a69069daa39e1e9625f4b576aa3a9376c",
+    "runs/C465C5EC-6EFF-4C43-A472-2EB2367BFA78/canonical-transcript.json": "9e7a1140737c0716400af2496e6d344ad35933e338332366f0e9d372dc40ed25",
+    "runs/C465C5EC-6EFF-4C43-A472-2EB2367BFA78/diarization.json": "10a63843a794c7a2c9f4c4897b0b07a3398643d5e59e9a4ffe72906be5a91dcf",
+    "runs/C465C5EC-6EFF-4C43-A472-2EB2367BFA78/job.json": "c23856394de2e88fc0bb3dae1714d032d628db58c03e3d2903b7908af629b62f",
+    "runs/C465C5EC-6EFF-4C43-A472-2EB2367BFA78/prepare.json": "28be6c4cd48dc4bea1774a41baf146609b3a0cfe028eff8d9f019b300760e38c",
+    "runs/C465C5EC-6EFF-4C43-A472-2EB2367BFA78/prepared.wav": "26a4d005f6ff7666f375b3677bc5c7d8f2c794b9ac6753eb6c82caa32e1ffae6",
+    "runs/C465C5EC-6EFF-4C43-A472-2EB2367BFA78/speaker-recognition.json": "01f356f1ab6248e80f3693ed8afce10ba45fd737610bf3922bcc85fb6085550c",
+    "runs/C465C5EC-6EFF-4C43-A472-2EB2367BFA78/transcript.json": "8d7005efdf1ccb867424e936781a7ea31bbd14ff642ac67777d44fcdab8f0e26",
+    "runs/C465C5EC-6EFF-4C43-A472-2EB2367BFA78/words.json": "9b288a04130a68ef68f688392da1942486011c5c2e063406aea1b7f15dd935a8",
+    "source.mp4": "cecb678e89d2e0bc89c9687e1c980d5b385bd6047623e93b18a35468baa4c514"
+  }
+}
