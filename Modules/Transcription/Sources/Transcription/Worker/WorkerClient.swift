@@ -207,18 +207,19 @@ public actor WorkerClient {
     @discardableResult
     public func handshake(requestID: String = UUID().uuidString) async throws -> WorkerHandshake {
         try start()
-        try send(WorkerEnvelope(kind: .request, requestID: requestID, payload: .object(["operation": .string("handshake")])))
+        let expectedVersion = configuration.installation.mode == "dictation" ? 2 : WorkerEnvelope.currentVersion
+        try send(WorkerEnvelope(version: expectedVersion, kind: .request, requestID: requestID, payload: .object(["operation": .string("handshake")])))
         while true {
             let envelope = try await receive(stage: "handshake")
             guard envelope.requestID == requestID else { continue }
             switch envelope.kind {
             case .stageResult:
                 let payload = envelope.payload.objectValue ?? [:]
-                let version = payload["protocolVersion"]?.integerValue ?? WorkerEnvelope.currentVersion
-                guard version == WorkerEnvelope.currentVersion else {
+                let version = payload["protocolVersion"]?.integerValue ?? expectedVersion
+                guard version == expectedVersion else {
                     throw WorkerFailure(
                         code: WorkerFailure.protocolErrorCode,
-                        message: "The transcription helper speaks protocol version \(version); this build supports version \(WorkerEnvelope.currentVersion).",
+                        message: "The transcription helper speaks protocol version \(version); this session requires version \(expectedVersion).",
                         stage: "handshake"
                     )
                 }
@@ -317,6 +318,36 @@ public actor WorkerClient {
                 throw failure(from: envelope, stage: "extract_embedding")
             case .progress, .request, .cancel:
                 continue
+            }
+        }
+    }
+
+    /// A single command in the resident dictation session. Dictation workers
+    /// are launched with --mode dictation and do not use batch run events.
+    public func dictationCommand(
+        _ operation: String,
+        payload: [String: WorkerJSONValue] = [:],
+        requestID: String = UUID().uuidString
+    ) async throws -> [String: WorkerJSONValue] {
+        guard ["warm", "dictate", "unload"].contains(operation) else {
+            throw WorkerFailure(code: WorkerFailure.protocolErrorCode, message: "Unsupported dictation command.")
+        }
+        try start()
+        var body = payload
+        body["operation"] = .string(operation)
+        try send(WorkerEnvelope(version: 2, kind: .request, requestID: requestID, payload: .object(body)))
+        while true {
+            let envelope = try await receive(stage: operation)
+            guard envelope.requestID == requestID else { continue }
+            switch envelope.kind {
+            case .stageResult:
+                let result = envelope.payload.objectValue ?? [:]
+                guard result["stage"]?.stringValue == operation else {
+                    throw WorkerFailure(code: WorkerFailure.protocolErrorCode, message: "Unexpected dictation stage.", stage: operation)
+                }
+                return result
+            case .error: throw failure(from: envelope, stage: operation)
+            case .progress, .request, .cancel: continue
             }
         }
     }

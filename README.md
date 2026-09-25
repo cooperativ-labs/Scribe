@@ -1,15 +1,28 @@
 # Scribe
 
-Scribe is a local macOS meeting-audio recorder. This repository currently
-contains the host-app scaffold and the complete menu-bar interface: state
-display (Idle, Starting, Recording with elapsed time, Stopping, Error),
-background-processing progress reported separately from capture, application
-and microphone pickers, folder opening, settings, global shortcuts, and the
-first-run permission flow. Everything runs against
-`MockRecordingCoordinator`, which implements the `RecordingCoordinating`
-contract without capturing anything. Capture, processing, and transcription
-are deliberately absent; replacing the mock with the capture-backed
-coordinator in `Scribe/App/ScribeAppEnvironment.swift` is what lands them.
+Scribe records meeting audio and transcribes it locally on macOS. Its menu-bar
+controls manage capture and processing, while the Transcripts window keeps the
+finished results. It also offers system-wide dictation into focused text fields.
+
+## Dictation
+
+Install the transcription model in **Settings → Dictation**, then enable
+dictation and grant Microphone and Accessibility access. On macOS 27, keyboard
+monitoring may be listed alongside Accessibility under **Device Control and
+Data Access**. Scribe shows the required permission rows in the Dictation tab.
+
+Hold the **right Command** key while speaking and release it to insert. Or
+double-tap right Command to keep listening, then tap it again to finish.
+Press Escape or use the indicator's Cancel control to discard a hands-free
+dictation. The indicator appears near the focused field, and insertion follows
+the field currently focused when transcription finishes. Settings let you
+adjust spacing, the indicator, sounds, and model memory use.
+
+Dictation runs offline. Scribe does not send dictated audio or text anywhere,
+and it keeps no dictation history. Audio is held in memory during capture; a
+temporary WAV given to the local worker is removed after transcription.
+Text goes directly into the focused field when possible, with a paste fallback
+for apps that do not support Accessibility insertion.
 
 ## Build and test
 

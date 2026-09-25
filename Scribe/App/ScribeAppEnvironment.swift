@@ -1,5 +1,7 @@
 import AppKit
 import Capture
+import Combine
+import Dictation
 import Platform
 import Processing
 import ScribeAppCore
@@ -52,6 +54,10 @@ final class ScribeAppEnvironment: ObservableObject {
     private var transcriptWindow: NSWindow?
     private var speakersWindow: NSWindow?
 
+    private let dictationMonitor = DictationTriggerMonitor()
+    private(set) var dictationCoordinator: DictationCoordinator?
+    private var dictationSettingsObservation: AnyCancellable?
+    nonisolated(unsafe) private var dictationPermissionTimer: Timer?
     private let hotkeys: HotkeyService
     private var firstRunWindow: NSWindow?
     private var selectionObservation: RecorderObservationToken?
@@ -114,6 +120,9 @@ final class ScribeAppEnvironment: ObservableObject {
         meetingDetector = MeetingDetector(settings: settings, titleProvider: calendar)
 
         transcription = try? TranscriptionHostService(settings: settings, scheduler: processingQueue)
+        if let installation = try? WorkerLocator.locate() {
+            dictationCoordinator = DictationCoordinator(engine: DictationEngine(installation: installation))
+        }
         vocabulary = VocabularyViewModel.applicationSupportModel()
         agentHandoff = AgentHandoffService(settings: settings)
         // The review window's Send to Agent action reaches Latch through this
@@ -159,11 +168,81 @@ final class ScribeAppEnvironment: ObservableObject {
             self?.meetingChipModel.meetingWasDetected(meeting)
         }
         meetingDetector.start()
+        dictationMonitor.onEvent = { [weak self] event in
+            self?.dictationCoordinator?.consume(event)
+        }
+        dictationMonitor.onSecureInputChange = { [weak self] blocked in
+            self?.settings.setDictationSecureInputBlocked(blocked)
+            self?.dictationCoordinator?.setSecureInputBlocked(blocked)
+        }
+        dictationMonitor.onRightCommandObserved = { [weak self] in
+            self?.settings.noteDictationRightCommand()
+        }
+        dictationSettingsObservation = settings.$dictationEnabled.sink { [weak self] _ in
+            Task { @MainActor [weak self] in self?.syncDictationMonitor() }
+        }
+        dictationPermissionTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.syncDictationMonitor() }
+        }
+        syncDictationMonitor()
     }
 
     deinit {
         queueEventTask?.cancel()
         updateTask?.cancel()
+        dictationPermissionTimer?.invalidate()
+    }
+
+    private func syncDictationMonitor() {
+        var modelUnavailable = false
+        if settings.dictationEnabled {
+            switch settings.modelInstaller.state {
+            case .notInstalled, .failed:
+                settings.dictationEnabled = false
+                modelUnavailable = true
+            case .checking, .installing, .installed:
+                break
+            }
+        }
+        guard settings.dictationEnabled, settings.modelInstaller.state == .installed,
+              permissions.dictationAccess().isReady else {
+            dictationMonitor.stop()
+            dictationCoordinator?.setEnabled(false)
+            if modelUnavailable { dictationCoordinator?.showModelUnavailable() }
+            return
+        }
+        guard let dictationCoordinator else {
+            dictationMonitor.stop()
+            NSLog("Dictation is enabled but the transcription worker is unavailable")
+            return
+        }
+        dictationCoordinator.microphoneID = settings.rememberedMicrophoneID
+        dictationCoordinator.language = settings.dictationLanguage
+        dictationCoordinator.keepModelLoaded = settings.dictationKeepModelLoaded
+        dictationCoordinator.idleUnloadMinutes = settings.dictationIdleUnloadMinutes
+        dictationCoordinator.textOptions = DictationTextOptions(
+            leadingSpace: settings.dictationLeadingSpace,
+            trailingSpace: settings.dictationTrailingSpace,
+            restoreClipboard: settings.dictationRestoreClipboard
+        )
+        dictationCoordinator.setEnabled(true)
+        dictationMonitor.state.holdThreshold = Double(settings.dictationHoldThresholdMs) / 1_000
+        dictationMonitor.state.doubleTapInterval = Double(settings.dictationDoubleTapMs) / 1_000
+        dictationMonitor.state.maximumDuration = Double(min(settings.dictationMaxDictationMinutes, 5)) * 60
+        dictationMonitor.start()
+    }
+
+    func stopToggleDictation() { dictationMonitor.stopToggle() }
+    func cancelToggleDictation() { dictationMonitor.cancelToggle() }
+
+    func toggleDictation() {
+        if !settings.dictationEnabled, settings.modelInstaller.state != .installed {
+            dictationCoordinator?.showModelUnavailable()
+            settingsFocus.request(.dictation)
+            openSettingsWindow?()
+            return
+        }
+        settings.dictationEnabled.toggle()
     }
 
     var updateMenuCommands: UpdateMenuCommands {
@@ -250,6 +329,7 @@ final class ScribeAppEnvironment: ObservableObject {
     /// Applies whatever changed while the Settings window was open. Shortcut
     /// conflicts are shown in the menu; the menu commands are never affected.
     func settingsWindowDidClose() {
+        syncDictationMonitor()
         coordinator.setRecordingsFolder(settings.recordingsFolderURL)
         coordinator.reportShortcutRegistration(
             hotkeys.register(
@@ -281,7 +361,9 @@ final class ScribeAppEnvironment: ObservableObject {
     /// After a denial macOS stops prompting, so the window's real job is to hand
     /// over the System Settings route.
     func presentFirstRunPermissionsIfNeeded() {
-        guard !permissions.currentStatus().isReadyToRecord else { return }
+        let recordingReady = permissions.currentStatus().isReadyToRecord
+        let dictationReady = !settings.dictationEnabled || permissions.dictationAccess().isReady
+        guard !recordingReady || !dictationReady else { return }
         coordinator.submit(.requestPermissions)
 
         if let firstRunWindow {
@@ -291,7 +373,7 @@ final class ScribeAppEnvironment: ObservableObject {
         }
 
         let window = NSWindow(contentViewController: NSHostingController(
-            rootView: ScribePermissionsView(model: menuModel) { [weak self] in
+            rootView: ScribePermissionsView(model: menuModel, settings: settings, permissions: permissions) { [weak self] in
                 self?.firstRunWindow?.close()
             }
         ))

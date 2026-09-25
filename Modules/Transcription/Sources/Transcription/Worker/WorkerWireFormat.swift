@@ -113,7 +113,7 @@ public enum WorkerWireFormat {
         let envelope: WorkerEnvelope
         do { envelope = try JSONDecoder().decode(WorkerEnvelope.self, from: data) }
         catch { throw WorkerWireFormatError.malformedMessage(error.localizedDescription) }
-        guard envelope.version == WorkerEnvelope.currentVersion else {
+        guard envelope.version == 1 || envelope.version == 2 else {
             throw WorkerWireFormatError.unsupportedVersion(envelope.version)
         }
         return envelope

@@ -1,3 +1,6 @@
+import ApplicationServices
+import AVFoundation
+import CoreGraphics
 import Foundation
 
 /// One permission that stands between the person and a recording, together with
@@ -59,7 +62,7 @@ public extension PermissionSnapshot {
 
     func blockingRequirements(for mode: RecordingMode) -> [PermissionRequirement] {
         let panes: [SystemSettingsPane] = switch mode {
-        case .systemAudioAndMicrophone: SystemSettingsPane.allCases
+        case .systemAudioAndMicrophone: [.screenRecording, .microphone]
         case .microphoneOnly: [.microphone]
         }
         return panes.compactMap { pane in
@@ -81,6 +84,7 @@ public extension PermissionSnapshot {
         switch pane {
         case .screenRecording: screenAndSystemAudio
         case .microphone: microphone
+        case .accessibility, .inputMonitoring: .denied // Dictation access is tracked separately.
         }
     }
 
@@ -108,6 +112,10 @@ public extension PermissionSnapshot {
             "Scribe has not asked for microphone access yet."
         case (.microphone, _):
             "Microphone access was declined, so Scribe cannot record your voice."
+        case (.accessibility, _):
+            "Accessibility access is needed for dictation."
+        case (.inputMonitoring, _):
+            "Keyboard monitoring access is needed for dictation."
         }
     }
 }
@@ -126,6 +134,8 @@ public final class PermissionService: RecordingPermissionProviding, @unchecked S
     private var lastSnapshot: PermissionSnapshot?
     private var revocationHandler: (@Sendable (PermissionRevocation) -> Void)?
     private var monitor: DispatchSourceTimer?
+    private var lastDictationAccess: DictationAccess?
+    private var dictationRevocationHandler: (@Sendable () -> Void)?
 
     public init(
         provider: RecordingPermissionProviding = SystemRecordingPermissions(),
@@ -159,6 +169,34 @@ public final class PermissionService: RecordingPermissionProviding, @unchecked S
     public var lastKnownSnapshot: PermissionSnapshot? { lock.withLock { lastSnapshot } }
 
     /// Installs the callback used to report a permission that stops being granted.
+    public func observeDictationRevocation(_ handler: @escaping @Sendable () -> Void) {
+        lock.withLock { dictationRevocationHandler = handler }
+    }
+
+    public func dictationAccess() -> DictationAccess {
+        let access = DictationAccess.current()
+        let handler = lock.withLock { () -> (@Sendable () -> Void)? in
+            let previous = lastDictationAccess
+            lastDictationAccess = access
+            return previous?.isReady == true && !access.isReady ? dictationRevocationHandler : nil
+        }
+        handler?()
+        return access
+    }
+
+    @MainActor
+    public func requestDictationAccess() async -> DictationAccess {
+        if !AXIsProcessTrusted() {
+            let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
+            _ = AXIsProcessTrustedWithOptions(options)
+        }
+        if !CGPreflightListenEventAccess() { _ = CGRequestListenEventAccess() }
+        if AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined {
+            _ = await AVCaptureDevice.requestAccess(for: .audio)
+        }
+        return dictationAccess()
+    }
+
     public func observeRevocations(_ handler: @escaping @Sendable (PermissionRevocation) -> Void) {
         lock.withLock { revocationHandler = handler }
     }
@@ -172,7 +210,10 @@ public final class PermissionService: RecordingPermissionProviding, @unchecked S
         stopMonitoring()
         let timer = DispatchSource.makeTimerSource(queue: queue)
         timer.schedule(deadline: .now() + interval, repeating: interval)
-        timer.setEventHandler { [weak self] in _ = self?.currentStatus() }
+        timer.setEventHandler { [weak self] in
+            _ = self?.currentStatus()
+            _ = self?.dictationAccess()
+        }
         timer.resume()
         lock.withLock { monitor = timer }
     }
@@ -192,7 +233,7 @@ public final class PermissionService: RecordingPermissionProviding, @unchecked S
             let previous = lastSnapshot
             lastSnapshot = snapshot
             guard let previous else { return ([], revocationHandler) }
-            let withdrawn = SystemSettingsPane.allCases.compactMap { pane -> PermissionRevocation? in
+            let withdrawn = [SystemSettingsPane.screenRecording, .microphone].compactMap { pane -> PermissionRevocation? in
                 guard previous.status(of: pane).isGranted, !snapshot.status(of: pane).isGranted else { return nil }
                 return PermissionRevocation(pane: pane, currentStatus: snapshot.status(of: pane), observedAt: now)
             }
@@ -200,5 +241,23 @@ public final class PermissionService: RecordingPermissionProviding, @unchecked S
         }
         for revocation in revocations { handler?(revocation) }
         return snapshot
+    }
+}
+
+
+public struct DictationAccess: Equatable, Sendable {
+    public let microphone: PermissionStatus
+    public let accessibility: Bool
+    public let keyboardListening: Bool
+
+    public var isReady: Bool { microphone == .granted && accessibility && keyboardListening }
+
+    public static func current() -> Self {
+        let microphone: PermissionStatus = switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized: .granted
+        case .notDetermined: .notDetermined
+        default: .denied
+        }
+        return Self(microphone: microphone, accessibility: AXIsProcessTrusted(), keyboardListening: CGPreflightListenEventAccess())
     }
 }

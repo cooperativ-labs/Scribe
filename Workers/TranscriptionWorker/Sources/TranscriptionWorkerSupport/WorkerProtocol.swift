@@ -60,7 +60,7 @@ public enum WorkerProtocol {
         }
         do {
             let envelope = try JSONDecoder().decode(WorkerEnvelope.self, from: data)
-            guard envelope.version == WorkerEnvelope.currentVersion else {
+            guard envelope.version == 1 || envelope.version == 2 else {
                 throw WorkerProtocolError.unsupportedVersion(envelope.version)
             }
             return envelope
@@ -79,8 +79,8 @@ public enum WorkerProtocol {
         return data
     }
 
-    public static func error(requestID: String, code: String, message: String, details: JSONValue = .object([:])) -> WorkerEnvelope {
-        WorkerEnvelope(kind: .error, requestID: requestID, payload: .object([
+    public static func error(requestID: String, code: String, message: String, details: JSONValue = .object([:]), version: Int = WorkerEnvelope.currentVersion) -> WorkerEnvelope {
+        WorkerEnvelope(version: version, kind: .error, requestID: requestID, payload: .object([
             "code": .string(code),
             "message": .string(message),
             "details": details,

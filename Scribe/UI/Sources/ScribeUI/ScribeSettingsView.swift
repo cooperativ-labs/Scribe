@@ -3,7 +3,7 @@ import SwiftUI
 import Vocabulary
 
 /// The compact settings pane used by the menu-bar app, split into General,
-/// Recording, and Transcription tabs.
+/// Recording, Transcription, and Dictation tabs.
 ///
 /// Source selection reads from and writes to the same `RecorderMenuModel` as
 /// the menu, so the pickers here show the applications and microphones that
@@ -19,12 +19,15 @@ public struct ScribeSettingsView: View {
     /// Absent only when the vocabulary store could not be opened; Settings then
     /// hides the section rather than showing an editor that can save nothing.
     private let vocabulary: VocabularyViewModel?
+    private let permissions: PermissionService?
     /// Requests from elsewhere in the app to open Settings at one section.
     @ObservedObject private var focus: SettingsFocusModel
     @State private var isChoosingRecordingsFolder = false
     @State private var folderSelectionError: String?
     @State private var highlightedSection: SettingsSection?
     @State private var selectedTab: SettingsTab = .general
+    @State private var dictationAccess = DictationAccess.current()
+    @ObservedObject private var modelInstaller: TranscriptionModelInstaller
     @StateObject private var shortcutCapture: ShortcutCaptureModel
 
     /// `onShortcutCaptureChange` is called with `true` while a shortcut field is
@@ -36,14 +39,17 @@ public struct ScribeSettingsView: View {
         meetingDetector: MeetingDetector? = nil,
         calendar: CalendarMeetingService? = nil,
         vocabulary: VocabularyViewModel? = nil,
+        permissions: PermissionService? = nil,
         focus: SettingsFocusModel = SettingsFocusModel(),
         onShortcutCaptureChange: @escaping @MainActor (Bool) -> Void = { _ in }
     ) {
         self.settings = settings
+        self.modelInstaller = settings.modelInstaller
         self.sources = sources
         self.meetingDetector = meetingDetector
         self.calendar = calendar
         self.vocabulary = vocabulary
+        self.permissions = permissions
         self.focus = focus
         _shortcutCapture = StateObject(wrappedValue: ShortcutCaptureModel(onCaptureChange: onShortcutCaptureChange))
     }
@@ -98,6 +104,7 @@ public struct ScribeSettingsView: View {
             case .general: generalTab
             case .recording: recordingTab
             case .transcription: transcriptionTab
+            case .dictation: dictationTab
             }
         }
     }
@@ -291,6 +298,100 @@ public struct ScribeSettingsView: View {
         .formStyle(.grouped)
     }
 
+    // MARK: - Dictation
+
+    private var dictationTab: some View {
+        Form {
+            Section("Dictation") {
+                Toggle("Enable dictation", isOn: $settings.dictationEnabled)
+                    .disabled(modelInstaller.state != .installed)
+                    .onChange(of: settings.dictationEnabled) {
+                        guard settings.dictationEnabled else { return }
+                        Task { dictationAccess = await permissions?.requestDictationAccess() ?? DictationAccess.current() }
+                    }
+                Text("Requires Microphone and Accessibility access. Your speech stays on this Mac.")
+                    .font(.footnote).foregroundStyle(.secondary)
+                permissionRow("Microphone", allowed: dictationAccess.microphone == .granted, pane: .microphone)
+                permissionRow("Accessibility", allowed: dictationAccess.accessibility, pane: .accessibility)
+                if !dictationAccess.keyboardListening {
+                    permissionRow("Keyboard monitoring", allowed: false, pane: .inputMonitoring)
+                    Text("On macOS 27 this access may appear with Accessibility under Device Control and Data Access.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                if !dictationAccess.isReady && settings.dictationEnabled {
+                    Text("Dictation will start when access is granted.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                if settings.dictationEnabled && settings.dictationSecureInputBlocked {
+                    Text("Dictation is paused while Secure Keyboard Entry is on")
+                        .foregroundStyle(.orange)
+                }
+                if settings.dictationEnabled && !settings.dictationRightCommandObserved {
+                    Text("No right Command key event has been detected. If you remapped that key, restore its right Command mapping to use dictation.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                if modelInstaller.state != .installed {
+                    Text("Download the transcription model below to enable dictation.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+            }
+            .id(SettingsSection.dictation)
+
+            TranscriptionModelSettingsView(settings: settings, installer: settings.modelInstaller)
+
+            Section("How it works") {
+                Text("Hold right ⌘ and speak; release to insert. Double-tap right ⌘ to keep listening; tap again to insert. Escape cancels.")
+                    .foregroundStyle(.secondary)
+            }
+            Section("Insertion") {
+                Toggle("Add a space before dictated text when needed", isOn: $settings.dictationLeadingSpace)
+                Toggle("Add a space after dictated text", isOn: $settings.dictationTrailingSpace)
+                Toggle("Restore clipboard after pasting", isOn: $settings.dictationRestoreClipboard)
+            }
+            Section("Indicator") {
+                Picker("Position", selection: $settings.dictationIndicatorPosition) {
+                    Text("Near the text cursor").tag("caret")
+                    Text("Bottom center").tag("bottom")
+                    Text("Off").tag("off")
+                }
+                Toggle("Play a sound when listening starts and stops", isOn: $settings.dictationPlaySounds)
+            }
+            Section("Language") {
+                Picker("Language", selection: $settings.dictationLanguage) {
+                    Text("Automatic").tag("automatic")
+                    Text("English").tag("en")
+                }
+            }
+            Section("Advanced") {
+                Toggle("Keep model loaded while dictation is on", isOn: $settings.dictationKeepModelLoaded)
+                if !settings.dictationKeepModelLoaded {
+                    Stepper("Unload after \(settings.dictationIdleUnloadMinutes) minutes idle", value: $settings.dictationIdleUnloadMinutes, in: 1...60)
+                }
+                Stepper("Double-tap speed: \(settings.dictationDoubleTapMs) ms", value: $settings.dictationDoubleTapMs, in: 250...700, step: 25)
+                Stepper("Hold threshold: \(settings.dictationHoldThresholdMs) ms", value: $settings.dictationHoldThresholdMs, in: 200...600, step: 25)
+                Stepper("Maximum dictation: \(settings.dictationMaxDictationMinutes) minutes", value: $settings.dictationMaxDictationMinutes, in: 1...5)
+                Toggle("Stop after 3 seconds of silence", isOn: $settings.dictationSilenceAutoStop)
+            }
+        }
+        .formStyle(.grouped)
+        .task {
+            while !Task.isCancelled {
+                dictationAccess = permissions?.dictationAccess() ?? DictationAccess.current()
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
+    }
+
+    private func permissionRow(_ name: String, allowed: Bool, pane: SystemSettingsPane) -> some View {
+        HStack {
+            Label("\(name): \(allowed ? "Allowed" : "Not allowed")", systemImage: allowed ? "checkmark.circle.fill" : "exclamationmark.circle")
+            Spacer()
+            if !allowed {
+                Button("Open System Settings") { permissions?.openSystemSettings(pane) }
+            }
+        }
+    }
+
     /// Scrolls to whatever asked to be shown and marks it briefly.
     ///
     /// The mark matters more than the scroll: a person who pressed "Vocabulary"
@@ -331,12 +432,14 @@ enum SettingsTab: Hashable, CaseIterable {
     case general
     case recording
     case transcription
+    case dictation
 
     var title: String {
         switch self {
         case .general: "General"
         case .recording: "Recording"
         case .transcription: "Transcription"
+        case .dictation: "Dictation"
         }
     }
 
@@ -345,12 +448,14 @@ enum SettingsTab: Hashable, CaseIterable {
         case .general: "gearshape"
         case .recording: "record.circle"
         case .transcription: "text.quote"
+        case .dictation: "waveform"
         }
     }
 
     init(containing section: SettingsSection) {
         switch section {
         case .vocabulary: self = .transcription
+        case .dictation: self = .dictation
         }
     }
 }

@@ -145,6 +145,10 @@ else
   require_executable "$worker_path"
 fi
 ditto "$worker_path" "$helpers_dir/TranscriptionWorker"
+worker_resources="$(dirname "$worker_path")/TranscriptionWorker_TranscriptionWorkerSupport.bundle"
+[[ -d "$worker_resources" ]] || die "Dictation VAD resource bundle is missing beside the worker: $worker_resources"
+ditto "$worker_resources" "$helpers_dir/TranscriptionWorker_TranscriptionWorkerSupport.bundle"
+ditto "$worker_resources" "$app_path/Contents/Resources/TranscriptionWorker_TranscriptionWorkerSupport.bundle"
 bash "$repo_root/Scripts/embed-ffmpeg-runtime.sh" "$SCRIBE_FFMPEG_PATH" "$SCRIBE_FFPROBE_PATH" "$helpers_dir" "$frameworks_dir"
 
 if [[ -n "${SCRIBE_RUNTIME_PAYLOADS_DIR:-}" ]]; then
@@ -160,6 +164,7 @@ fi
 
 copy_notice 'WebRTC.txt' "$SCRIBE_NOTICE_WEBRTC"
 copy_notice 'FluidAudio.txt' "$SCRIBE_NOTICE_FLUIDAUDIO"
+copy_notice 'Silero-VAD.txt' "$repo_root/Workers/TranscriptionWorker/Licenses/Silero-VAD.txt"
 copy_notice 'Parakeet-CC-BY-4.0.txt' "$SCRIBE_NOTICE_PARAKEET"
 copy_notice 'Diarization-Models.txt' "$SCRIBE_NOTICE_DIARIZATION"
 copy_notice 'FFmpeg.txt' "$SCRIBE_NOTICE_FFMPEG"

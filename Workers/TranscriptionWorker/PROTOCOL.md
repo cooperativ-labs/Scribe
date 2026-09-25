@@ -1,13 +1,14 @@
-# Transcription worker protocol (v1)
+# Transcription worker protocol (v2)
 
 `TranscriptionWorker` reads and writes UTF-8 JSON objects on standard input and
 standard output. One object occupies one newline-delimited record. Diagnostic
 text is written only to standard error. The protocol version is an integer in
-every envelope; v1 only accepts `version: 1`.
+every envelope. Version 1 batch requests remain accepted; resident dictation
+operations require version 2.
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "kind": "request",
   "requestID": "a-host-generated-id",
   "payload": { "operation": "handshake" }
@@ -20,6 +21,29 @@ identifier. Invalid JSON, an unsupported version, and oversize records produce
 a structured `error` response with `code: "protocol_error"`.
 
 ## Operations
+
+Launch with `--mode dictation` for a long-lived, ASR-only session. This
+mode accepts `warm`, `dictate`, and `unload` and refuses batch `run`.
+`warm` validates the offline manifest, loads Parakeet through
+`OfflineModelLoader.loadASR`, and retains one `AsrManager`. It also loads
+the bundled Silero VAD Core ML resource by explicit URL, with no ModelHub
+download path. A `stage_result` with `stage: "warm", status: "ready"` means
+the model is usable. Repeated `warm` calls are idempotent.
+
+`dictate` requires absolute `audioPath` and `runDirectory` paths, with the
+WAV directly inside the run directory. The WAV must be nonempty, mono 16 kHz,
+and at most five minutes. Optional `language` is a FluidAudio language code
+or `automatic`. The worker runs VAD first; silence returns
+`stage_result` with `stage: "dictate", status: "no_speech", text: ""`, and
+an empty `tokens` array. Speech is transcribed from an `AVAudioPCMBuffer`
+with a fresh decoder state. The response has `status: "complete"`, `text`,
+and `tokens` containing text, token ID, start/end seconds, and confidence.
+Speech shorter than six seconds gets a silent tail for inference because the
+pinned Parakeet build returned empty text on a real three-second clip without
+it; token times are clamped to the original recording duration.
+`unload` releases the resident managers and replies with `status: "ready"`.
+The host closes the helper after unloading. No dictation audio or transcript
+is persisted by the worker.
 
 `handshake` returns a `stage_result` containing protocol and worker versions,
 the pinned FluidAudio version, and explicit `networking: "disabled"`,

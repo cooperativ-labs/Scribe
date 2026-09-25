@@ -69,12 +69,12 @@ final class WorkerClientTests: XCTestCase {
     }
 
     func testAnEnvelopeVersionTheHostDoesNotSupportIsRefused() async throws {
-        let unsupported = #"{"version":2,"kind":"stage_result","requestID":"%s","payload":{"stage":"handshake"}}"#
+        let unsupported = #"{"version":3,"kind":"stage_result","requestID":"%s","payload":{"stage":"handshake"}}"#
         let client = try makeClient(FakeTranscriptionWorker(handshakeRecord: unsupported, steps: []))
 
         let failure = await failure(of: { _ = try await client.handshake() })
         XCTAssertEqual(failure.code, WorkerFailure.protocolErrorCode)
-        XCTAssertTrue(failure.message.contains("version 2"), failure.message)
+        XCTAssertTrue(failure.message.contains("version 3"), failure.message)
     }
 
     func testAMalformedRecordIsRefusedRatherThanIgnored() async throws {

@@ -10,11 +10,13 @@ public struct WorkerInstallation: Sendable, Equatable {
     public let executableURL: URL
     public let manifestURL: URL?
     public let modelsDirectoryURL: URL?
+    public let mode: String?
 
-    public init(executableURL: URL, manifestURL: URL? = nil, modelsDirectoryURL: URL? = nil) {
+    public init(executableURL: URL, manifestURL: URL? = nil, modelsDirectoryURL: URL? = nil, mode: String? = nil) {
         self.executableURL = executableURL
         self.manifestURL = manifestURL
         self.modelsDirectoryURL = modelsDirectoryURL
+        self.mode = mode
     }
 
     /// The helper's argument vector. Paths are passed as separate arguments and
@@ -24,6 +26,7 @@ public struct WorkerInstallation: Sendable, Equatable {
         var arguments: [String] = []
         if let manifestURL { arguments += ["--manifest", manifestURL.path] }
         if let modelsDirectoryURL { arguments += ["--models-directory", modelsDirectoryURL.path] }
+        if let mode { arguments += ["--mode", mode] }
         return arguments
     }
 }

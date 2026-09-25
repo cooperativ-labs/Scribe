@@ -5,12 +5,17 @@ import Foundation
 /// intentionally observed only between stages, where each prior result is
 /// already an atomically committed file.
 public final class WorkerRequestLoop: @unchecked Sendable {
+    public enum Mode: String, Sendable { case batch, dictation }
     private let configuration: WorkerJobRunner.Configuration
+    private let mode: Mode
+    private let dictation: WorkerDictationSession
     private let state = WorkerRequestState()
     private let writer = WorkerEnvelopeWriter()
 
-    public init(configuration: WorkerJobRunner.Configuration) {
+    public init(configuration: WorkerJobRunner.Configuration, mode: Mode = .batch) {
         self.configuration = configuration
+        self.mode = mode
+        self.dictation = WorkerDictationSession(configuration: configuration)
     }
 
     public func run() {
@@ -70,16 +75,35 @@ public final class WorkerRequestLoop: @unchecked Sendable {
         }
         switch operation {
         case "handshake":
-            writer.write(WorkerEnvelope(kind: .stageResult, requestID: envelope.requestID, payload: .object([
-                "stage": .string("handshake"), "protocolVersion": .number(Double(WorkerEnvelope.currentVersion)),
+            writer.write(WorkerEnvelope(version: envelope.version, kind: .stageResult, requestID: envelope.requestID, payload: .object([
+                "stage": .string("handshake"), "protocolVersion": .number(Double(envelope.version)),
                 "workerVersion": .string("0.2.0"), "networking": .string("disabled"),
                 "runtimeDownloads": .bool(false), "telemetry": .bool(false), "fluidAudio": .string(OfflineDiarizationAdapter.fluidAudioVersion),
             ])))
         case "validate_assets":
             validateAssets(requestID: envelope.requestID)
+        case "warm", "dictate", "unload":
+            guard envelope.version == 2 else {
+                writer.write(WorkerProtocol.error(requestID: envelope.requestID, code: "unsupported_version", message: "Dictation operations require protocol v2."))
+                return
+            }
+            guard mode == .dictation else {
+                writer.write(WorkerProtocol.error(requestID: envelope.requestID, code: "unsupported_operation", message: "Dictation operations require --mode dictation."))
+                return
+            }
+            let semaphore = DispatchSemaphore(value: 0)
+            Task {
+                await dictation.handle(operation: operation, requestID: envelope.requestID, payload: payload) { self.writer.write($0) }
+                semaphore.signal()
+            }
+            semaphore.wait()
         case "extract_embedding":
             extractEmbedding(requestID: envelope.requestID, payload: payload)
         case "run":
+            guard mode == .batch else {
+                writer.write(WorkerProtocol.error(requestID: envelope.requestID, code: "unsupported_operation", message: "Batch runs are unavailable in dictation mode."))
+                return
+            }
             if state.isCancelled(envelope.requestID) {
                 writer.write(WorkerProtocol.error(requestID: envelope.requestID, code: "cancelled", message: "The request was cancelled before its first stage boundary."))
                 return

@@ -29,7 +29,8 @@ let package = Package(
             name: "TranscriptionWorkerSupport",
             dependencies: [
                 .product(name: "FluidAudio", package: "FluidAudio"),
-            ]
+            ],
+            resources: [.copy("Resources/silero-vad-unified-256ms-v6.2.1.mlmodelc")]
         ),
         .executableTarget(name: "TranscriptionWorker", dependencies: ["TranscriptionWorkerSupport"]),
         .executableTarget(name: "ASRBenchmark", dependencies: ["TranscriptionWorkerSupport"]),

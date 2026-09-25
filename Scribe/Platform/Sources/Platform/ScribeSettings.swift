@@ -82,6 +82,60 @@ public final class ScribeSettings: ObservableObject {
         didSet { defaults.set(meetingDomains, forKey: Key.meetingDomains) }
     }
 
+    // MARK: Dictation
+
+    @Published public var dictationEnabled: Bool {
+        didSet { defaults.set(dictationEnabled, forKey: Key.dictationEnabled) }
+    }
+    @Published public private(set) var dictationSecureInputBlocked = false
+    @Published public private(set) var dictationRightCommandObserved: Bool {
+        didSet { defaults.set(dictationRightCommandObserved, forKey: Key.dictationRightCommandObserved) }
+    }
+
+    public func setDictationSecureInputBlocked(_ blocked: Bool) {
+        dictationSecureInputBlocked = blocked
+    }
+
+    public func noteDictationRightCommand() {
+        if !dictationRightCommandObserved { dictationRightCommandObserved = true }
+    }
+    @Published public var dictationLeadingSpace: Bool {
+        didSet { defaults.set(dictationLeadingSpace, forKey: Key.dictationLeadingSpace) }
+    }
+    @Published public var dictationTrailingSpace: Bool {
+        didSet { defaults.set(dictationTrailingSpace, forKey: Key.dictationTrailingSpace) }
+    }
+    @Published public var dictationRestoreClipboard: Bool {
+        didSet { defaults.set(dictationRestoreClipboard, forKey: Key.dictationRestoreClipboard) }
+    }
+    @Published public var dictationIndicatorPosition: String {
+        didSet { defaults.set(dictationIndicatorPosition, forKey: Key.dictationIndicatorPosition) }
+    }
+    @Published public var dictationPlaySounds: Bool {
+        didSet { defaults.set(dictationPlaySounds, forKey: Key.dictationPlaySounds) }
+    }
+    @Published public var dictationLanguage: String {
+        didSet { defaults.set(dictationLanguage, forKey: Key.dictationLanguage) }
+    }
+    @Published public var dictationKeepModelLoaded: Bool {
+        didSet { defaults.set(dictationKeepModelLoaded, forKey: Key.dictationKeepModelLoaded) }
+    }
+    @Published public var dictationIdleUnloadMinutes: Int {
+        didSet { defaults.set(dictationIdleUnloadMinutes, forKey: Key.dictationIdleUnloadMinutes) }
+    }
+    @Published public var dictationDoubleTapMs: Int {
+        didSet { defaults.set(dictationDoubleTapMs, forKey: Key.dictationDoubleTapMs) }
+    }
+    @Published public var dictationHoldThresholdMs: Int {
+        didSet { defaults.set(dictationHoldThresholdMs, forKey: Key.dictationHoldThresholdMs) }
+    }
+    @Published public var dictationMaxDictationMinutes: Int {
+        didSet { defaults.set(dictationMaxDictationMinutes, forKey: Key.dictationMaxDictationMinutes) }
+    }
+    @Published public var dictationSilenceAutoStop: Bool {
+        didSet { defaults.set(dictationSilenceAutoStop, forKey: Key.dictationSilenceAutoStop) }
+    }
+
     // MARK: Calendar
 
     /// Names recordings and transcripts after the Apple Calendar meeting in
@@ -141,6 +195,20 @@ public final class ScribeSettings: ObservableObject {
         disabledMeetingApplicationIDs = Set(defaults.stringArray(forKey: Key.disabledMeetingApplicationIDs) ?? [])
         meetingDomains = defaults.stringArray(forKey: Key.meetingDomains) ?? MeetingDomain.defaults
         useCalendarMeetingNames = defaults.object(forKey: Key.useCalendarMeetingNames) as? Bool ?? false
+        dictationEnabled = defaults.object(forKey: Key.dictationEnabled) as? Bool ?? false
+        dictationRightCommandObserved = defaults.bool(forKey: Key.dictationRightCommandObserved)
+        dictationLeadingSpace = defaults.object(forKey: Key.dictationLeadingSpace) as? Bool ?? true
+        dictationTrailingSpace = defaults.object(forKey: Key.dictationTrailingSpace) as? Bool ?? false
+        dictationRestoreClipboard = defaults.object(forKey: Key.dictationRestoreClipboard) as? Bool ?? true
+        dictationIndicatorPosition = defaults.string(forKey: Key.dictationIndicatorPosition) ?? "caret"
+        dictationPlaySounds = defaults.object(forKey: Key.dictationPlaySounds) as? Bool ?? false
+        dictationLanguage = defaults.string(forKey: Key.dictationLanguage) ?? "automatic"
+        dictationKeepModelLoaded = defaults.object(forKey: Key.dictationKeepModelLoaded) as? Bool ?? true
+        dictationIdleUnloadMinutes = defaults.object(forKey: Key.dictationIdleUnloadMinutes) as? Int ?? 10
+        dictationDoubleTapMs = defaults.object(forKey: Key.dictationDoubleTapMs) as? Int ?? 400
+        dictationHoldThresholdMs = defaults.object(forKey: Key.dictationHoldThresholdMs) as? Int ?? 300
+        dictationMaxDictationMinutes = min(max(defaults.object(forKey: Key.dictationMaxDictationMinutes) as? Int ?? 5, 1), 5)
+        dictationSilenceAutoStop = defaults.object(forKey: Key.dictationSilenceAutoStop) as? Bool ?? false
         // A folder that has been moved or deleted is dropped from the list
         // rather than resolved to something else: the send sheet offers what is
         // still there, and connecting it again is one button away.
@@ -347,6 +415,20 @@ public final class ScribeSettings: ObservableObject {
         static let disabledMeetingApplicationIDs = "scribe.settings.disabledMeetingApplicationIDs"
         static let meetingDomains = "scribe.settings.meetingDomains"
         static let useCalendarMeetingNames = "scribe.settings.useCalendarMeetingNames"
+        static let dictationEnabled = "scribe.settings.dictation.enabled"
+        static let dictationRightCommandObserved = "scribe.settings.dictation.rightCommandObserved"
+        static let dictationLeadingSpace = "scribe.settings.dictation.leadingSpace"
+        static let dictationTrailingSpace = "scribe.settings.dictation.trailingSpace"
+        static let dictationRestoreClipboard = "scribe.settings.dictation.restoreClipboard"
+        static let dictationIndicatorPosition = "scribe.settings.dictation.indicatorPosition"
+        static let dictationPlaySounds = "scribe.settings.dictation.playSounds"
+        static let dictationLanguage = "scribe.settings.dictation.language"
+        static let dictationKeepModelLoaded = "scribe.settings.dictation.keepModelLoaded"
+        static let dictationIdleUnloadMinutes = "scribe.settings.dictation.idleUnloadMinutes"
+        static let dictationDoubleTapMs = "scribe.settings.dictation.doubleTapMs"
+        static let dictationHoldThresholdMs = "scribe.settings.dictation.holdThresholdMs"
+        static let dictationMaxDictationMinutes = "scribe.settings.dictation.maxDictationMinutes"
+        static let dictationSilenceAutoStop = "scribe.settings.dictation.silenceAutoStop"
         static let agentFolderBookmarks = "scribe.settings.agentFolderBookmarks"
     }
 

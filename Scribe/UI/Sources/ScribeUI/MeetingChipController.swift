@@ -98,7 +98,7 @@ public final class MeetingChipController {
             panel.setContentSize(size)
         }
         reposition()
-        // Ordered *regardless*: Scribe has no Dock icon and is rarely the active
+        // Ordered *regardless*: Scribe is rarely the active
         // app, so an ordinary `orderFront` would put the chip behind the call.
         if !panel.isVisible { panel.orderFrontRegardless() }
     }

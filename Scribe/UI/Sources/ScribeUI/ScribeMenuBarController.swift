@@ -28,6 +28,14 @@ public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
     /// The plain label for the status item, kept so the recording dot can be
     /// added to and taken off the end of it.
     private let accessibilityLabel: String
+    private let normalImage: NSImage?
+    public var dictationEnabled: (() -> Bool)?
+    public var toggleDictation: (() -> Void)?
+    public var openDictationSettings: (() -> Void)?
+    public var dictationSecureInputBlocked: (() -> Bool)?
+    public var isDictationListening = false {
+        didSet { if oldValue != isDictationListening { applyRecordingIndicator() } }
+    }
 
     private let statusItem: NSStatusItem
     /// Internal, not private, so the menu a build produces can be inspected
@@ -83,6 +91,7 @@ public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
         self.updates = updates
         self.openSettings = openSettings
         self.accessibilityLabel = accessibilityLabel
+        self.normalImage = image
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
 
@@ -172,11 +181,15 @@ public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
 
     private func applyRecordingIndicator() {
         guard let button = statusItem.button else { return }
+        button.image = isDictationListening
+            ? NSImage(systemSymbolName: "mic.fill", accessibilityDescription: "Dictation listening")
+            : normalImage
         let shows = showsRecordingIndicator
         button.attributedTitle = shows ? Self.recordingIndicator : NSAttributedString()
         // Read aloud too: the dot is the only thing that says a recording is
         // running once the chip has gone.
-        button.setAccessibilityLabel(shows ? "\(accessibilityLabel) — recording" : accessibilityLabel)
+        button.setAccessibilityLabel(isDictationListening ? "\(accessibilityLabel) — dictation listening" :
+            (shows ? "\(accessibilityLabel) — recording" : accessibilityLabel))
     }
 
     private func perform(_ action: (RecorderMenuModel) -> Void) {
@@ -241,6 +254,18 @@ public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
             menu.addItem(.disabled("Microphone-only recording — no application needed"))
         }
         menu.addItem(submenuItem(title: "Microphone", submenu: microphoneMenu))
+        if let dictationEnabled, let toggleDictation {
+            menu.addItem(.separator())
+            if dictationEnabled(), dictationSecureInputBlocked?() == true {
+                menu.addItem(.disabled("Dictation is paused while Secure Keyboard Entry is on"))
+            }
+            let item = ActionMenuItem(title: dictationEnabled() ? "Dictation: On" : "Dictation: Off", handler: toggleDictation)
+            item.state = dictationEnabled() ? .on : .off
+            menu.addItem(item)
+            if let openDictationSettings {
+                menu.addItem(ActionMenuItem(title: "Dictation Settings…", handler: openDictationSettings))
+            }
+        }
 
         // Shortcut registration can fail without disabling anything here.
         if !presentation.shortcutIssues.isEmpty {

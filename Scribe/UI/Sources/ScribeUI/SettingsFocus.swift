@@ -4,6 +4,7 @@ import Foundation
 /// A place in Settings something outside Settings can ask for.
 public enum SettingsSection: String, Hashable, Sendable {
     case vocabulary
+    case dictation
 }
 
 /// Carries "open Settings at the vocabulary" from the transcript window to the

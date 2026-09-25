@@ -10,11 +10,12 @@ let package = Package(
         // The vocabulary is an independent module with its own store and
         // editor, the way the speaker library is; Settings only hosts it.
         .package(path: "../../Modules/Vocabulary"),
+        .package(path: "../../Modules/Dictation"),
     ],
     targets: [
         .target(
             name: "ScribeUI",
-            dependencies: ["Platform", .product(name: "Vocabulary", package: "Vocabulary")]
+            dependencies: ["Platform", .product(name: "Vocabulary", package: "Vocabulary"), .product(name: "Dictation", package: "Dictation")]
         ),
         .testTarget(name: "ScribeUITests", dependencies: ["ScribeUI", "Platform"])
     ]

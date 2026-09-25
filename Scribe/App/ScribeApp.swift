@@ -20,6 +20,7 @@ struct ScribeApp: App {
                 sources: appDelegate.environment.menuModel,
                 meetingDetector: appDelegate.environment.meetingDetector,
                 vocabulary: appDelegate.environment.vocabulary,
+                permissions: appDelegate.environment.permissions,
                 focus: appDelegate.environment.settingsFocus,
                 onShortcutCaptureChange: { appDelegate.environment.setShortcutCaptureActive($0) }
             )
