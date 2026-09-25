@@ -1,0 +1,832 @@
+{
+  "baseline": "scribe-quality-v1",
+  "baseline_manifest_sha256": "7bd63d637472785145e841c67325d952e0c0f398eba4e703ad5dbc57c7ede75e",
+  "name": "bounded-gap-and-inferred-grouping-v1",
+  "recipe_sha256": "740eb674a9ed387c428db93eb4829a16beb2ca42c69529d511877d3eeba61d44",
+  "recordings": {
+    "cab": {
+      "alignment": {
+        "hypothesis_coverage": 0.955170503198509,
+        "hypothesis_tokens": 19853,
+        "matched_tokens": 18963,
+        "method": "unicode casefold + Unicode word runs; SequenceMatcher autojunk=False",
+        "reference_coverage": 0.9586471866943026,
+        "reference_tokens": 19781
+      },
+      "asides": {
+        "one_word": 0,
+        "rows": 0,
+        "up_to_three_words": 0,
+        "words": 0
+      },
+      "attribution": {
+        "canonical": {
+          "confusion": [
+            {
+              "count": 5346,
+              "hypothesis": "speaker_1",
+              "reference": "reference_1"
+            },
+            {
+              "count": 2,
+              "hypothesis": "speaker_1",
+              "reference": "reference_3"
+            },
+            {
+              "count": 1,
+              "hypothesis": "speaker_1",
+              "reference": "reference_7"
+            },
+            {
+              "count": 4,
+              "hypothesis": "speaker_1",
+              "reference": "reference_9"
+            },
+            {
+              "count": 3,
+              "hypothesis": "speaker_10",
+              "reference": "reference_8"
+            },
+            {
+              "count": 922,
+              "hypothesis": "speaker_2",
+              "reference": "reference_2"
+            },
+            {
+              "count": 2639,
+              "hypothesis": "speaker_3",
+              "reference": "reference_3"
+            },
+            {
+              "count": 15,
+              "hypothesis": "speaker_3",
+              "reference": "reference_7"
+            },
+            {
+              "count": 11,
+              "hypothesis": "speaker_3",
+              "reference": "reference_9"
+            },
+            {
+              "count": 1,
+              "hypothesis": "speaker_4",
+              "reference": "reference_1"
+            },
+            {
+              "count": 216,
+              "hypothesis": "speaker_4",
+              "reference": "reference_4"
+            },
+            {
+              "count": 2114,
+              "hypothesis": "speaker_5",
+              "reference": "reference_5"
+            },
+            {
+              "count": 6,
+              "hypothesis": "speaker_5",
+              "reference": "reference_7"
+            },
+            {
+              "count": 4,
+              "hypothesis": "speaker_6",
+              "reference": "reference_1"
+            },
+            {
+              "count": 3,
+              "hypothesis": "speaker_6",
+              "reference": "reference_3"
+            },
+            {
+              "count": 853,
+              "hypothesis": "speaker_6",
+              "reference": "reference_6"
+            },
+            {
+              "count": 13,
+              "hypothesis": "speaker_7",
+              "reference": "reference_1"
+            },
+            {
+              "count": 7,
+              "hypothesis": "speaker_7",
+              "reference": "reference_2"
+            },
+            {
+              "count": 3108,
+              "hypothesis": "speaker_7",
+              "reference": "reference_7"
+            },
+            {
+              "count": 1189,
+              "hypothesis": "speaker_8",
+              "reference": "reference_8"
+            },
+            {
+              "count": 6,
+              "hypothesis": "speaker_9",
+              "reference": "reference_1"
+            },
+            {
+              "count": 2,
+              "hypothesis": "speaker_9",
+              "reference": "reference_4"
+            },
+            {
+              "count": 1595,
+              "hypothesis": "speaker_9",
+              "reference": "reference_9"
+            },
+            {
+              "count": 124,
+              "hypothesis": "unknown",
+              "reference": "reference_1"
+            },
+            {
+              "count": 28,
+              "hypothesis": "unknown",
+              "reference": "reference_2"
+            },
+            {
+              "count": 164,
+              "hypothesis": "unknown",
+              "reference": "reference_3"
+            },
+            {
+              "count": 9,
+              "hypothesis": "unknown",
+              "reference": "reference_4"
+            },
+            {
+              "count": 58,
+              "hypothesis": "unknown",
+              "reference": "reference_5"
+            },
+            {
+              "count": 49,
+              "hypothesis": "unknown",
+              "reference": "reference_6"
+            },
+            {
+              "count": 127,
+              "hypothesis": "unknown",
+              "reference": "reference_7"
+            },
+            {
+              "count": 86,
+              "hypothesis": "unknown",
+              "reference": "reference_8"
+            },
+            {
+              "count": 58,
+              "hypothesis": "unknown",
+              "reference": "reference_9"
+            }
+          ],
+          "correct": 17982,
+          "scored_tokens": 18763,
+          "unknown": 703,
+          "unknown_pct": 3.7467,
+          "unscoreable": 200,
+          "wrong": 78,
+          "wrong_pct": 0.4157
+        },
+        "effective": {
+          "confusion": [
+            {
+              "count": 5426,
+              "hypothesis": "speaker_1",
+              "reference": "reference_1"
+            },
+            {
+              "count": 2,
+              "hypothesis": "speaker_1",
+              "reference": "reference_3"
+            },
+            {
+              "count": 1,
+              "hypothesis": "speaker_1",
+              "reference": "reference_7"
+            },
+            {
+              "count": 7,
+              "hypothesis": "speaker_1",
+              "reference": "reference_9"
+            },
+            {
+              "count": 3,
+              "hypothesis": "speaker_10",
+              "reference": "reference_8"
+            },
+            {
+              "count": 943,
+              "hypothesis": "speaker_2",
+              "reference": "reference_2"
+            },
+            {
+              "count": 2727,
+              "hypothesis": "speaker_3",
+              "reference": "reference_3"
+            },
+            {
+              "count": 15,
+              "hypothesis": "speaker_3",
+              "reference": "reference_7"
+            },
+            {
+              "count": 13,
+              "hypothesis": "speaker_3",
+              "reference": "reference_9"
+            },
+            {
+              "count": 1,
+              "hypothesis": "speaker_4",
+              "reference": "reference_1"
+            },
+            {
+              "count": 224,
+              "hypothesis": "speaker_4",
+              "reference": "reference_4"
+            },
+            {
+              "count": 2167,
+              "hypothesis": "speaker_5",
+              "reference": "reference_5"
+            },
+            {
+              "count": 6,
+              "hypothesis": "speaker_5",
+              "reference": "reference_7"
+            },
+            {
+              "count": 4,
+              "hypothesis": "speaker_6",
+              "reference": "reference_1"
+            },
+            {
+              "count": 3,
+              "hypothesis": "speaker_6",
+              "reference": "reference_3"
+            },
+            {
+              "count": 888,
+              "hypothesis": "speaker_6",
+              "reference": "reference_6"
+            },
+            {
+              "count": 13,
+              "hypothesis": "speaker_7",
+              "reference": "reference_1"
+            },
+            {
+              "count": 7,
+              "hypothesis": "speaker_7",
+              "reference": "reference_2"
+            },
+            {
+              "count": 3188,
+              "hypothesis": "speaker_7",
+              "reference": "reference_7"
+            },
+            {
+              "count": 1,
+              "hypothesis": "speaker_8",
+              "reference": "reference_3"
+            },
+            {
+              "count": 1253,
+              "hypothesis": "speaker_8",
+              "reference": "reference_8"
+            },
+            {
+              "count": 7,
+              "hypothesis": "speaker_9",
+              "reference": "reference_1"
+            },
+            {
+              "count": 2,
+              "hypothesis": "speaker_9",
+              "reference": "reference_3"
+            },
+            {
+              "count": 2,
+              "hypothesis": "speaker_9",
+              "reference": "reference_4"
+            },
+            {
+              "count": 1635,
+              "hypothesis": "speaker_9",
+              "reference": "reference_9"
+            },
+            {
+              "count": 43,
+              "hypothesis": "unknown",
+              "reference": "reference_1"
+            },
+            {
+              "count": 7,
+              "hypothesis": "unknown",
+              "reference": "reference_2"
+            },
+            {
+              "count": 73,
+              "hypothesis": "unknown",
+              "reference": "reference_3"
+            },
+            {
+              "count": 1,
+              "hypothesis": "unknown",
+              "reference": "reference_4"
+            },
+            {
+              "count": 5,
+              "hypothesis": "unknown",
+              "reference": "reference_5"
+            },
+            {
+              "count": 14,
+              "hypothesis": "unknown",
+              "reference": "reference_6"
+            },
+            {
+              "count": 47,
+              "hypothesis": "unknown",
+              "reference": "reference_7"
+            },
+            {
+              "count": 22,
+              "hypothesis": "unknown",
+              "reference": "reference_8"
+            },
+            {
+              "count": 13,
+              "hypothesis": "unknown",
+              "reference": "reference_9"
+            }
+          ],
+          "correct": 18451,
+          "scored_tokens": 18763,
+          "unknown": 225,
+          "unknown_pct": 1.1992,
+          "unscoreable": 200,
+          "wrong": 87,
+          "wrong_pct": 0.4637
+        }
+      },
+      "boundaries": [
+        {
+          "ambiguous_unaligned_starts": 66,
+          "hypothesis_boundaries": 616,
+          "matched": 217,
+          "precision": 0.3522727272727273,
+          "recall": 0.49318181818181817,
+          "reference_boundaries": 440,
+          "tolerance_lexical_tokens": 0,
+          "unmatched_hypothesis": 399,
+          "unmatched_reference": 223
+        },
+        {
+          "ambiguous_unaligned_starts": 66,
+          "hypothesis_boundaries": 616,
+          "matched": 231,
+          "precision": 0.375,
+          "recall": 0.525,
+          "reference_boundaries": 440,
+          "tolerance_lexical_tokens": 1,
+          "unmatched_hypothesis": 385,
+          "unmatched_reference": 209
+        },
+        {
+          "ambiguous_unaligned_starts": 66,
+          "hypothesis_boundaries": 616,
+          "matched": 246,
+          "precision": 0.39935064935064934,
+          "recall": 0.5590909090909091,
+          "reference_boundaries": 440,
+          "tolerance_lexical_tokens": 3,
+          "unmatched_hypothesis": 370,
+          "unmatched_reference": 194
+        }
+      ],
+      "canonical_word_labels_identical": true,
+      "change": {
+        "canonical": {
+          "baseline_only": 0,
+          "candidate_only": 0,
+          "common_tokens": 18963,
+          "corrected_wrong": 0,
+          "newly_wrong": 0,
+          "transitions": {
+            "correct->correct": 17982,
+            "unknown->unknown": 703,
+            "unscoreable->unscoreable": 200,
+            "wrong->wrong": 78
+          }
+        },
+        "effective": {
+          "baseline_only": 0,
+          "candidate_only": 0,
+          "common_tokens": 18963,
+          "corrected_wrong": 0,
+          "newly_wrong": 0,
+          "transitions": {
+            "correct->correct": 18440,
+            "unknown->correct": 11,
+            "unknown->unknown": 225,
+            "unscoreable->unscoreable": 200,
+            "wrong->wrong": 87
+          }
+        }
+      },
+      "conservation": {
+        "display_content_equal": true,
+        "duplicated_display_words": 0,
+        "main_plus_aside_words_equal": true,
+        "missing_display_words": 0,
+        "saved_words_equal": true,
+        "source_segments_equal": true,
+        "unique_input_word_ids": true
+      },
+      "mapping": {
+        "speaker_1": "reference_1",
+        "speaker_2": "reference_2",
+        "speaker_3": "reference_3",
+        "speaker_4": "reference_4",
+        "speaker_5": "reference_5",
+        "speaker_6": "reference_6",
+        "speaker_7": "reference_7",
+        "speaker_8": "reference_8",
+        "speaker_9": "reference_9"
+      },
+      "provenance": {
+        "binary_sha256": "07a838cb847a053b0c4c4aae7bcf08df12b77e61c834a4d8c15406238a3b26f8",
+        "config_sha256": "a116b4ef0c03c9d4a6fa845db0e66bad2492f1fd2cc5fb92330c9b1144b67a12",
+        "diarization_sha256": "2465dd7f543f4799a0131626a4e67e845b1061d8f84de309f16ba11f36cffcaa",
+        "source_hashes": {
+          "Modules/Transcription/Sources/Transcription/Import/AudioPreparationService.swift": "0e7473c0c4df28118f0693f6556c044086d98c19728ad974e11eec297371e311",
+          "Modules/Transcription/Sources/Transcription/Jobs/TranscriptAssemblyStageRunner.swift": "685daa81dee199d784f66fc6b2912d0b389757f230f609f442c7056673e560f9",
+          "Modules/Transcription/Sources/Transcription/Transcript/CanonicalTranscript.swift": "3842b44b2f0c4821d2c97696f6c127c0f8125a065f57fccc11f7d2db322c80c0",
+          "Modules/Transcription/Sources/Transcription/Transcript/CanonicalTranscriptValidator.swift": "ddc25dafe80ee362cc4376b9d3e3c50b8531b9dc07b262179fe624860aa16aa6",
+          "Modules/Transcription/Sources/Transcription/Transcript/SourceEnergyPrior.swift": "06b922eb585e261a9ed3189269d9c9b82697ab6cb3ce9d467238536c67dd8c5c",
+          "Modules/Transcription/Sources/Transcription/Transcript/SpeakerTurnBuilder.swift": "8a1e993a90a8abf1ff6f227286ec840790fe81a05b64747f2bb4f08bd483cd43",
+          "Modules/Transcription/Sources/Transcription/Transcript/TokenTimingReconciler.swift": "a820df944b13acc70ce3107bfc8ee2d286aa6cf832f54cb0525e904a6fd1ecd3",
+          "Modules/Transcription/Sources/Transcription/Transcript/TranscriptDisplayGrouper.swift": "c010eebb3c8b7746394c8ad5cff89088cd08cbe5f13bc75fe71d925ed3f8329e",
+          "Modules/Transcription/Sources/Transcription/Transcript/TranscriptParagraph.swift": "d978afd6ba261bb977490ada35ee4a30060d1ca5fda4096fb7d8164e6649a301",
+          "Modules/Transcription/Sources/Transcription/Transcript/UnknownFragmentReconciler.swift": "6021eea76dd556e6731b63ad6031ac837ac9eec677aeba4e77465a3452bcbd0c",
+          "Modules/Transcription/Sources/Transcription/Transcript/WorkerASRTranscript.swift": "c7a9497b01f46a5c42a72b14fb281b87fff6c97209b1887039bac5ba6158b6b8",
+          "Modules/Transcription/Sources/Transcription/UI/TranscriptReviewPresentation.swift": "bb18ca143d9678921b35b3a421ea642d4cc3adc1714870368c4411bcb1fbd56a",
+          "Scribe/App/Sources/ScribeAppCore/SourceEnergyTimeline.swift": "497a848ec8996c4fc899166cfc027df747047e2539ac373f78c0aa83ea746d29",
+          "Tools/DiarizationAnalysis/Replay.swift": "b65571f88a34b2f8a1cc5411d9834047361597164e2951634750dcd6166c2a71",
+          "Tools/DiarizationAnalysis/benchmark.py": "636b30f90f48cb067a796592bd161f952748f03038ff2194234d5f9d5e4d4b5a",
+          "Tools/DiarizationAnalysis/compare.py": "b472e34b0beac5686746e140aceac8f317c2e0d761c6d6859793e58d02634be8",
+          "Tools/DiarizationAnalysis/quality.py": "afbeddf32a418d6a386480440938e3c9692714d8bbe48f4025d8bc160933aa66",
+          "Tools/DiarizationAnalysis/replay.py": "d7c18f29d8cc8a0bfc4a75b9eda1fde63bb1ae8aabbcb7a1648dfa699a0ee73c",
+          "Tools/DiarizationAnalysis/review_excerpts.py": "64107f5a8f6e818140448b4bb6eb88e56fcff89c5d662825c22b0a5a0fc3414a",
+          "Tools/DiarizationAnalysis/summarize.py": "d068e8468005d9e1f7efbf70b99a46d44a5f2635d2ef8c5b9dc931ba7d35cf5c",
+          "Tools/DiarizationAnalysis/test_analysis.py": "f6ee5909515324d64286b8f803fce4c867ae1a42230a9de5cbd3c995a900c1c1",
+          "Tools/DiarizationAnalysis/test_quality.py": "e0772adf330decd8ec2d3212edc61244811c16b5fcb0b1d960fe308524abed82",
+          "Tools/DiarizationAnalysis/test_wder.py": "5e0a72917209d3035c1ef5b175ac68dd7c731dd9f6cd005391a00d9d15e30c52",
+          "Tools/DiarizationAnalysis/wder.py": "03c7bf8a4b66c517cea20051fcbd73e745e0ca2dd05156daacab30e4fac326dc",
+          "Workers/TranscriptionWorker/Package.resolved": "78a4138907a3456753ad36cf46df162dfd90483b2f329548c53670394c89c952",
+          "Workers/TranscriptionWorker/model_manifest.json": "fefc6b59f2392a34ad58f94099d80af9d75e1e0413da9b61fb750bed6926e024"
+        },
+        "speaker_correspondence": {},
+        "word_input": "saved"
+      },
+      "reading": {
+        "one_word": 90,
+        "rows": 617,
+        "up_to_three_words": 138,
+        "words": 19853
+      },
+      "reference": {
+        "kind": "machine reference, not human ground truth",
+        "rows": 1493,
+        "zero_duration_rows": 60
+      },
+      "saved": {
+        "one_word": 486,
+        "rows": 1292,
+        "up_to_three_words": 615,
+        "words": 19853
+      },
+      "saved_boundary_changes": {
+        "combinations": {
+          "builder_speaker_change": 122,
+          "builder_speaker_change+pause_1s": 50,
+          "builder_speaker_change+pause_1s+sentence_break": 17,
+          "builder_speaker_change+sentence_break": 23,
+          "nearest_evidence_change": 610,
+          "nearest_evidence_change+builder_speaker_change": 74,
+          "nearest_evidence_change+builder_speaker_change+pause_1s": 64,
+          "nearest_evidence_change+builder_speaker_change+pause_1s+sentence_break": 12,
+          "nearest_evidence_change+builder_speaker_change+sentence_break": 14,
+          "nearest_evidence_change+pause_1s": 40,
+          "nearest_evidence_change+pause_1s+sentence_break": 2,
+          "nearest_evidence_change+sentence_break": 6,
+          "pause_1s": 72,
+          "pause_1s+sentence_break": 6,
+          "sentence_break": 167,
+          "word_cap": 11,
+          "word_cap+sentence_break": 1
+        },
+        "predicate_version": "speaker-turn-grouping-v2",
+        "same_speaker_inferred_distance_changes": 7
+      },
+      "time_sensitivity": {
+        "canonical": {
+          "correct": 18460,
+          "unknown": 690,
+          "unscoreable": 201,
+          "wrong": 98
+        },
+        "effective": {
+          "correct": 18910,
+          "unknown": 227,
+          "unscoreable": 201,
+          "wrong": 111
+        },
+        "unit": "saved words, greatest positive time overlap; fixed lexical mapping"
+      },
+      "word_comparison": {
+        "baseline_unmatched_tokens": 0,
+        "baseline_words": 19853,
+        "candidate_unmatched_tokens": 0,
+        "candidate_words": 19853,
+        "common_lexical_tokens": 19853,
+        "normalized_lexical_sequence_equal": true,
+        "saved_word_objects_equal": true
+      }
+    },
+    "latest": {
+      "alignment": {
+        "hypothesis_coverage": 0.9688686408504176,
+        "hypothesis_tokens": 5268,
+        "matched_tokens": 5104,
+        "method": "unicode casefold + Unicode word runs; SequenceMatcher autojunk=False",
+        "reference_coverage": 0.9705267161057235,
+        "reference_tokens": 5259
+      },
+      "asides": {
+        "one_word": 0,
+        "rows": 0,
+        "up_to_three_words": 0,
+        "words": 0
+      },
+      "attribution": {
+        "canonical": {
+          "confusion": [
+            {
+              "count": 1405,
+              "hypothesis": "speaker_1",
+              "reference": "reference_1"
+            },
+            {
+              "count": 31,
+              "hypothesis": "speaker_1",
+              "reference": "reference_2"
+            },
+            {
+              "count": 22,
+              "hypothesis": "speaker_2",
+              "reference": "reference_1"
+            },
+            {
+              "count": 3271,
+              "hypothesis": "speaker_2",
+              "reference": "reference_2"
+            },
+            {
+              "count": 156,
+              "hypothesis": "unknown",
+              "reference": "reference_1"
+            },
+            {
+              "count": 219,
+              "hypothesis": "unknown",
+              "reference": "reference_2"
+            }
+          ],
+          "correct": 4676,
+          "scored_tokens": 5104,
+          "unknown": 375,
+          "unknown_pct": 7.3472,
+          "unscoreable": 0,
+          "wrong": 53,
+          "wrong_pct": 1.0384
+        },
+        "effective": {
+          "confusion": [
+            {
+              "count": 1493,
+              "hypothesis": "speaker_1",
+              "reference": "reference_1"
+            },
+            {
+              "count": 37,
+              "hypothesis": "speaker_1",
+              "reference": "reference_2"
+            },
+            {
+              "count": 39,
+              "hypothesis": "speaker_2",
+              "reference": "reference_1"
+            },
+            {
+              "count": 3424,
+              "hypothesis": "speaker_2",
+              "reference": "reference_2"
+            },
+            {
+              "count": 51,
+              "hypothesis": "unknown",
+              "reference": "reference_1"
+            },
+            {
+              "count": 60,
+              "hypothesis": "unknown",
+              "reference": "reference_2"
+            }
+          ],
+          "correct": 4917,
+          "scored_tokens": 5104,
+          "unknown": 111,
+          "unknown_pct": 2.1748,
+          "unscoreable": 0,
+          "wrong": 76,
+          "wrong_pct": 1.489
+        }
+      },
+      "boundaries": [
+        {
+          "ambiguous_unaligned_starts": 17,
+          "hypothesis_boundaries": 237,
+          "matched": 98,
+          "precision": 0.41350210970464135,
+          "recall": 0.5157894736842106,
+          "reference_boundaries": 190,
+          "tolerance_lexical_tokens": 0,
+          "unmatched_hypothesis": 139,
+          "unmatched_reference": 92
+        },
+        {
+          "ambiguous_unaligned_starts": 17,
+          "hypothesis_boundaries": 237,
+          "matched": 106,
+          "precision": 0.4472573839662447,
+          "recall": 0.5578947368421052,
+          "reference_boundaries": 190,
+          "tolerance_lexical_tokens": 1,
+          "unmatched_hypothesis": 131,
+          "unmatched_reference": 84
+        },
+        {
+          "ambiguous_unaligned_starts": 17,
+          "hypothesis_boundaries": 237,
+          "matched": 115,
+          "precision": 0.48523206751054854,
+          "recall": 0.6052631578947368,
+          "reference_boundaries": 190,
+          "tolerance_lexical_tokens": 3,
+          "unmatched_hypothesis": 122,
+          "unmatched_reference": 75
+        }
+      ],
+      "canonical_word_labels_identical": true,
+      "change": {
+        "canonical": {
+          "baseline_only": 0,
+          "candidate_only": 0,
+          "common_tokens": 5104,
+          "corrected_wrong": 0,
+          "newly_wrong": 0,
+          "transitions": {
+            "correct->correct": 4676,
+            "unknown->unknown": 375,
+            "wrong->wrong": 53
+          }
+        },
+        "effective": {
+          "baseline_only": 0,
+          "candidate_only": 0,
+          "common_tokens": 5104,
+          "corrected_wrong": 0,
+          "newly_wrong": 0,
+          "transitions": {
+            "correct->correct": 4916,
+            "unknown->correct": 1,
+            "unknown->unknown": 111,
+            "wrong->wrong": 76
+          }
+        }
+      },
+      "conservation": {
+        "display_content_equal": true,
+        "duplicated_display_words": 0,
+        "main_plus_aside_words_equal": true,
+        "missing_display_words": 0,
+        "saved_words_equal": true,
+        "source_segments_equal": true,
+        "unique_input_word_ids": true
+      },
+      "mapping": {
+        "speaker_1": "reference_1",
+        "speaker_2": "reference_2"
+      },
+      "provenance": {
+        "binary_sha256": "07a838cb847a053b0c4c4aae7bcf08df12b77e61c834a4d8c15406238a3b26f8",
+        "config_sha256": "a116b4ef0c03c9d4a6fa845db0e66bad2492f1fd2cc5fb92330c9b1144b67a12",
+        "diarization_sha256": "3c2c5f6b8cc12446b90c58eb024fcd9c3b81af1213ca31ce4749700bf9382ba1",
+        "source_hashes": {
+          "Modules/Transcription/Sources/Transcription/Import/AudioPreparationService.swift": "0e7473c0c4df28118f0693f6556c044086d98c19728ad974e11eec297371e311",
+          "Modules/Transcription/Sources/Transcription/Jobs/TranscriptAssemblyStageRunner.swift": "685daa81dee199d784f66fc6b2912d0b389757f230f609f442c7056673e560f9",
+          "Modules/Transcription/Sources/Transcription/Transcript/CanonicalTranscript.swift": "3842b44b2f0c4821d2c97696f6c127c0f8125a065f57fccc11f7d2db322c80c0",
+          "Modules/Transcription/Sources/Transcription/Transcript/CanonicalTranscriptValidator.swift": "ddc25dafe80ee362cc4376b9d3e3c50b8531b9dc07b262179fe624860aa16aa6",
+          "Modules/Transcription/Sources/Transcription/Transcript/SourceEnergyPrior.swift": "06b922eb585e261a9ed3189269d9c9b82697ab6cb3ce9d467238536c67dd8c5c",
+          "Modules/Transcription/Sources/Transcription/Transcript/SpeakerTurnBuilder.swift": "8a1e993a90a8abf1ff6f227286ec840790fe81a05b64747f2bb4f08bd483cd43",
+          "Modules/Transcription/Sources/Transcription/Transcript/TokenTimingReconciler.swift": "a820df944b13acc70ce3107bfc8ee2d286aa6cf832f54cb0525e904a6fd1ecd3",
+          "Modules/Transcription/Sources/Transcription/Transcript/TranscriptDisplayGrouper.swift": "c010eebb3c8b7746394c8ad5cff89088cd08cbe5f13bc75fe71d925ed3f8329e",
+          "Modules/Transcription/Sources/Transcription/Transcript/TranscriptParagraph.swift": "d978afd6ba261bb977490ada35ee4a30060d1ca5fda4096fb7d8164e6649a301",
+          "Modules/Transcription/Sources/Transcription/Transcript/UnknownFragmentReconciler.swift": "6021eea76dd556e6731b63ad6031ac837ac9eec677aeba4e77465a3452bcbd0c",
+          "Modules/Transcription/Sources/Transcription/Transcript/WorkerASRTranscript.swift": "c7a9497b01f46a5c42a72b14fb281b87fff6c97209b1887039bac5ba6158b6b8",
+          "Modules/Transcription/Sources/Transcription/UI/TranscriptReviewPresentation.swift": "bb18ca143d9678921b35b3a421ea642d4cc3adc1714870368c4411bcb1fbd56a",
+          "Scribe/App/Sources/ScribeAppCore/SourceEnergyTimeline.swift": "497a848ec8996c4fc899166cfc027df747047e2539ac373f78c0aa83ea746d29",
+          "Tools/DiarizationAnalysis/Replay.swift": "b65571f88a34b2f8a1cc5411d9834047361597164e2951634750dcd6166c2a71",
+          "Tools/DiarizationAnalysis/benchmark.py": "636b30f90f48cb067a796592bd161f952748f03038ff2194234d5f9d5e4d4b5a",
+          "Tools/DiarizationAnalysis/compare.py": "b472e34b0beac5686746e140aceac8f317c2e0d761c6d6859793e58d02634be8",
+          "Tools/DiarizationAnalysis/quality.py": "afbeddf32a418d6a386480440938e3c9692714d8bbe48f4025d8bc160933aa66",
+          "Tools/DiarizationAnalysis/replay.py": "d7c18f29d8cc8a0bfc4a75b9eda1fde63bb1ae8aabbcb7a1648dfa699a0ee73c",
+          "Tools/DiarizationAnalysis/review_excerpts.py": "64107f5a8f6e818140448b4bb6eb88e56fcff89c5d662825c22b0a5a0fc3414a",
+          "Tools/DiarizationAnalysis/summarize.py": "d068e8468005d9e1f7efbf70b99a46d44a5f2635d2ef8c5b9dc931ba7d35cf5c",
+          "Tools/DiarizationAnalysis/test_analysis.py": "f6ee5909515324d64286b8f803fce4c867ae1a42230a9de5cbd3c995a900c1c1",
+          "Tools/DiarizationAnalysis/test_quality.py": "e0772adf330decd8ec2d3212edc61244811c16b5fcb0b1d960fe308524abed82",
+          "Tools/DiarizationAnalysis/test_wder.py": "5e0a72917209d3035c1ef5b175ac68dd7c731dd9f6cd005391a00d9d15e30c52",
+          "Tools/DiarizationAnalysis/wder.py": "03c7bf8a4b66c517cea20051fcbd73e745e0ca2dd05156daacab30e4fac326dc",
+          "Workers/TranscriptionWorker/Package.resolved": "78a4138907a3456753ad36cf46df162dfd90483b2f329548c53670394c89c952",
+          "Workers/TranscriptionWorker/model_manifest.json": "fefc6b59f2392a34ad58f94099d80af9d75e1e0413da9b61fb750bed6926e024"
+        },
+        "speaker_correspondence": {},
+        "word_input": "saved"
+      },
+      "reading": {
+        "one_word": 61,
+        "rows": 238,
+        "up_to_three_words": 86,
+        "words": 5268
+      },
+      "reference": {
+        "kind": "machine reference, not human ground truth",
+        "rows": 534,
+        "zero_duration_rows": 41
+      },
+      "saved": {
+        "one_word": 248,
+        "rows": 582,
+        "up_to_three_words": 326,
+        "words": 5268
+      },
+      "saved_boundary_changes": {
+        "combinations": {
+          "builder_speaker_change": 78,
+          "builder_speaker_change+pause_1s": 13,
+          "builder_speaker_change+sentence_break": 11,
+          "nearest_evidence_change": 331,
+          "nearest_evidence_change+builder_speaker_change": 55,
+          "nearest_evidence_change+builder_speaker_change+pause_1s": 7,
+          "nearest_evidence_change+builder_speaker_change+pause_1s+sentence_break": 4,
+          "nearest_evidence_change+builder_speaker_change+sentence_break": 14,
+          "nearest_evidence_change+pause_1s": 14,
+          "nearest_evidence_change+sentence_break": 12,
+          "pause_1s": 18,
+          "pause_1s+sentence_break": 3,
+          "sentence_break": 21
+        },
+        "predicate_version": "speaker-turn-grouping-v2",
+        "same_speaker_inferred_distance_changes": 2
+      },
+      "time_sensitivity": {
+        "canonical": {
+          "correct": 4706,
+          "unknown": 379,
+          "wrong": 107
+        },
+        "effective": {
+          "correct": 4946,
+          "unknown": 115,
+          "wrong": 131
+        },
+        "unit": "saved words, greatest positive time overlap; fixed lexical mapping"
+      },
+      "word_comparison": {
+        "baseline_unmatched_tokens": 0,
+        "baseline_words": 5268,
+        "candidate_unmatched_tokens": 0,
+        "candidate_words": 5268,
+        "common_lexical_tokens": 5268,
+        "normalized_lexical_sequence_equal": true,
+        "saved_word_objects_equal": true
+      }
+    }
+  },
+  "validation": "Two previously explored development recordings; machine references, no human adjudication or holdout."
+}

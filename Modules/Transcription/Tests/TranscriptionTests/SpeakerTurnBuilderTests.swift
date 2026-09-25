@@ -186,13 +186,15 @@ final class SpeakerTurnBuilderTests: XCTestCase {
         XCTAssertNil(tie.segments[0].effectiveSpeakerID)
     }
 
-    func testInferredWordDoesNotContaminateConfirmedSegmentOrLoseDistance() throws {
+    func testAdjacentInferredWordsKeepMaximumDistanceWithoutContaminatingConfirmedSegment() throws {
         let result = try SpeakerTurnBuilder().build(words: [word("a", "a", 0, 200), word("b", "b", 220, 250), word("c", "c", 300, 330)],
             diarizedTurns: [turn("A", 0, 200)])
-        XCTAssertEqual(result.segments.count, 3)
+        XCTAssertEqual(result.segments.count, 2)
         XCTAssertEqual(result.segments[0].speakerID, "speaker_1")
-        XCTAssertEqual(result.segments[1].speakerInference?.evidence, .nearestInterval(distanceMs: 20))
-        XCTAssertEqual(result.segments[2].speakerInference?.evidence, .nearestInterval(distanceMs: 100))
+        XCTAssertNil(result.segments[1].speakerID)
+        XCTAssertEqual(result.segments[1].speakerInference?.evidence, .nearestInterval(distanceMs: 100))
+        XCTAssertEqual(result.segments[1].words?.map(\.text), ["b", "c"])
+        XCTAssertEqual(result.wordAssignments.map(\.speakerID), ["speaker_1", nil, nil])
     }
 
     func testInferenceEvidenceRoundTripsAndRetainsLegacyStrings() throws {
@@ -204,6 +206,27 @@ final class SpeakerTurnBuilderTests: XCTestCase {
         XCTAssertEqual(String(data: try encoder.encode(TranscriptSpeakerInferenceEvidence.diarizationCoverage), encoding: .utf8), "\"diarization_coverage\"")
         XCTAssertThrowsError(try decoder.decode(TranscriptSpeakerInferenceEvidence.self, from: Data(#"{"type":"nearest_interval","distance_ms":251}"#.utf8)))
         XCTAssertThrowsError(try encoder.encode(TranscriptSpeakerInferenceEvidence.nearestInterval(distanceMs: -1)))
+    }
+
+    func testInferredDistanceAggregationPreservesSpeakerPauseAndLengthBoundaries() throws {
+        let descending = try SpeakerTurnBuilder().build(
+            words: [word("a", "a", 0, 40), word("b", "b", 100, 140)],
+            diarizedTurns: [turn("A", 200, 500)])
+        XCTAssertEqual(descending.segments.count, 1)
+        XCTAssertEqual(descending.segments[0].speakerInference?.evidence, .nearestInterval(distanceMs: 160))
+
+        let changed = try SpeakerTurnBuilder().build(
+            words: [word("a", "a", 220, 250), word("b", "b", 800, 830)],
+            diarizedTurns: [turn("A", 0, 200), turn("B", 1000, 1200)])
+        XCTAssertEqual(changed.segments.map(\.effectiveSpeakerID), ["speaker_1", "speaker_2"])
+        let paused = try SpeakerTurnBuilder().build(
+            words: [word("a", "a", 220, 250), word("b", "b", 1500, 1530)],
+            diarizedTurns: [turn("A", 0, 200), turn("A", 1700, 1900)])
+        XCTAssertEqual(paused.segments.count, 2)
+        let capped = try SpeakerTurnBuilder(configuration: .init(grouping: .init(preferredWordCount: 1, maximumWordCount: 1))).build(
+            words: [word("a", "a", 220, 250), word("b", "b", 300, 330)],
+            diarizedTurns: [turn("A", 0, 200)])
+        XCTAssertEqual(capped.segments.count, 2)
     }
 
     private func phraseWord(_ id: String, _ start: Int, _ end: Int) -> RecognizedWord {

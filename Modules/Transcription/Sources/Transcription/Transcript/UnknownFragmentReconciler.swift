@@ -33,9 +33,11 @@ public struct AcousticSpeakerInterval: Sendable, Equatable {
 /// with at least one named neighbor is inferred only with unique adequate
 /// diarization coverage. Unoccupied holes still require two agreeing neighbors
 /// and at most three words; unique coverage permits up to six. Neighbor identity and
-/// wording are not evidence. Manual labels are left untouched.
+/// wording are not evidence. Bounded nearest-interval neighbors can anchor an
+/// unfinished fragment, but never propagate this pass's own suggestions.
+/// Manual labels are left untouched.
 public struct UnknownFragmentReconciler: Sendable {
-    public static let provenance = "unknown-fragment-reconciliation-v2"
+    public static let provenance = "unknown-fragment-reconciliation-v3"
 
     public struct Configuration: Sendable, Equatable {
         public var maximumUnknownDurationMs: Int
@@ -144,9 +146,9 @@ public struct UnknownFragmentReconciler: Sendable {
 
         let previous = segments[safe: index - 1]
         let next = segments[safe: index + 1]
-        let neighbors = [previous, next].compactMap { $0 }.filter { $0.speakerID != nil }
-        guard let neighborID = neighbors.first?.speakerID,
-              neighbors.allSatisfy({ $0.speakerID == neighborID }),
+        let neighbors = [previous, next].compactMap { $0 }.filter { neighborSpeaker($0) != nil }
+        guard let neighborID = neighbors.first.flatMap({ neighborSpeaker($0) }),
+              neighbors.allSatisfy({ neighborSpeaker($0) == neighborID }),
               segment.endMs > segment.startMs,
               segment.endMs - segment.startMs <= configuration.maximumUnknownDurationMs,
               segment.storedWordCount <= configuration.maximumWordCount,
@@ -188,7 +190,11 @@ public struct UnknownFragmentReconciler: Sendable {
             // Holes still require both original neighbors and the historical
             // three-word bound. Only unique acoustic coverage gets the wider limit.
             guard let previous, let next,
-                  previous.speakerID == neighborID, next.speakerID == neighborID,
+                  neighborSpeaker(previous) == neighborID, neighborSpeaker(next) == neighborID,
+                  // A complete unknown utterance may be a real short response.
+                  // Inferred neighbors alone must not absorb it into their turn.
+                  (previous.speakerID != nil && next.speakerID != nil
+                    || !TranscriptDisplayGrouper().endsSentence(segment.lastStoredWordText)),
                   segment.storedWordCount <= min(3, configuration.maximumWordCount),
                   let hole = diarizationHole(
                 for: segment,
@@ -243,6 +249,28 @@ public struct UnknownFragmentReconciler: Sendable {
 
     private func neighborGap(previous: TranscriptSegment, next: TranscriptSegment) -> (startMs: Int, endMs: Int) {
         (previous.endMs, next.startMs)
+    }
+
+    // Use only original canonical labels or the builder's bounded acoustic
+    // inference. Never cascade this pass's own gap/coverage suggestions, and
+    // never use a manual unknown as an anchor.
+    private func neighborSpeaker(_ segment: TranscriptSegment) -> String? {
+        if let speakerID = segment.speakerID { return speakerID }
+        guard segment.attributionSource != .manual,
+              let inference = segment.speakerInference,
+              inference.provenance == SpeakerTurnBuilder.attributionProvenance,
+              case let .nearestInterval(distance) = inference.evidence,
+              (0...250).contains(distance) else { return nil }
+        return inference.speakerID
+    }
+
+    private func supportsNeighbor(_ interval: AcousticSpeakerInterval, _ segment: TranscriptSegment) -> Bool {
+        if Self.overlapMs(startA: segment.startMs, endA: segment.endMs,
+                          startB: interval.startMs, endB: interval.endMs) > 0 { return true }
+        guard segment.speakerID == nil, neighborSpeaker(segment) != nil,
+              case let .nearestInterval(distance) = segment.speakerInference?.evidence else { return false }
+        let gap = max(0, max(interval.startMs - segment.endMs, segment.startMs - interval.endMs))
+        return gap <= distance
     }
 
     // MARK: - Acoustic evidence
@@ -307,23 +335,13 @@ public struct UnknownFragmentReconciler: Sendable {
             $0.speakerID == neighborID
                 && !$0.overlapsAnotherSpeaker
                 && ($0.qualityScore ?? 1) >= configuration.minimumIntervalQuality
-                && Self.overlapMs(
-                    startA: previous.startMs,
-                    endA: previous.endMs,
-                    startB: $0.startMs,
-                    endB: $0.endMs
-                ) > 0
+                && supportsNeighbor($0, previous)
         }
         let nextCoverage = intervals.filter {
             $0.speakerID == neighborID
                 && !$0.overlapsAnotherSpeaker
                 && ($0.qualityScore ?? 1) >= configuration.minimumIntervalQuality
-                && Self.overlapMs(
-                    startA: next.startMs,
-                    endA: next.endMs,
-                    startB: $0.startMs,
-                    endB: $0.endMs
-                ) > 0
+                && supportsNeighbor($0, next)
         }
         guard let previousEnd = previousCoverage.map(\.endMs).max(),
               let nextStart = nextCoverage.map(\.startMs).min()

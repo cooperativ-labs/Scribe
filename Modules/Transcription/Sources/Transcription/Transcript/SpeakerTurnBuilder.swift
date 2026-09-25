@@ -8,6 +8,7 @@ import Foundation
 /// `speaker_2`, and so on when a diarized speaker first appears on the timeline.
 public struct SpeakerTurnBuilder: Sendable {
     public static let attributionProvenance = "speaker-turn-attribution-v3"
+    public static let groupingProvenance = "speaker-turn-grouping-v2"
     public static let confidenceProvenance = "word-overlap-margin-v1"
     public static let exclusiveTimelineProvenance = "interval-extension-quality-v1"
 
@@ -311,8 +312,10 @@ public struct SpeakerTurnBuilder: Sendable {
     }
 
     private func canAppend(_ next: Attribution, to current: DraftSegment, canonicalSpeakerID: String?) -> Bool {
-        // Keep inferred evidence separate from confirmed words and from different distances.
-        guard current.attributions.last?.nearestDistanceMs == next.nearestDistanceMs else { return false }
+        // Confirmed and inferred words retain separate canonical attribution.
+        // A changing distance alone is not a speaker/paragraph boundary; the
+        // segment stores the furthest distance as a conservative evidence bound.
+        guard (current.attributions.last?.nearestDistanceMs == nil) == (next.nearestDistanceMs == nil) else { return false }
         return TranscriptDisplayGrouper(configuration: configuration.grouping).shouldContinue(
             currentSpeakerID: current.canonicalSpeakerID,
             currentStartMs: current.startMs,
@@ -395,7 +398,7 @@ public struct SpeakerTurnBuilder: Sendable {
                 speakerConfidence: attributions.map(\.confidence).min(),
                 words: words,
                 attributionSource: attributions[0].nearestDistanceMs == nil ? nil : .inferred,
-                speakerInference: attributions[0].nearestDistanceMs.flatMap { distance in
+                speakerInference: attributions.compactMap(\.nearestDistanceMs).max().flatMap { distance in
                     canonicalSpeakerID.map { TranscriptSpeakerInference(
                         speakerID: $0, speakerLabel: speakerLabel,
                         evidence: .nearestInterval(distanceMs: distance), provenance: SpeakerTurnBuilder.attributionProvenance

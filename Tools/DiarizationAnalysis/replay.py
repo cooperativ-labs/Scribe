@@ -5,6 +5,7 @@ Usage: replay.py RUN TRANSCRIPT_OR_saved DIARIZATION --output PRIVATE_JSON
 Requires macOS/Swift. No inference, networking or source-meeting writes.
 """
 import argparse
+import os
 import pathlib
 import subprocess
 import tempfile
@@ -49,7 +50,8 @@ def main():
                         *[str(host / f'Transcript/{n}.swift') for n in names],
                         str(root / 'Scribe/App/Sources/ScribeAppCore/SourceEnergyTimeline.swift'),
                         str(mapping_path), str(bundle_path), str(records_path), str(root / 'Tools/DiarizationAnalysis/Replay.swift'),
-                        '-o', str(executable)], check=True)
+                        '-o', str(executable)], check=True,
+                       env={**os.environ, 'TMPDIR': str(temp)})
         if a.keep_executable:
             shutil.copy2(executable, a.keep_executable)
         with a.output.open('w') as output:

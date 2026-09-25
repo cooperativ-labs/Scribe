@@ -443,6 +443,63 @@ final class UnknownFragmentReconcilerTests: XCTestCase {
         XCTAssertEqual(reconciler.reconcile(segments: [nearest], speakers: speakers, intervals: []), [nearest])
     }
 
+    func testBoundedAcousticNeighborsRepairAnUnfinishedHoleWithoutChangingCanonicalWords() throws {
+        let words = [
+            RecognizedWord(id: "left", text: "a", startMs: 220, endMs: 300, enclosingStartMs: 220, enclosingEndMs: 300),
+            RecognizedWord(id: "hole", text: "small", startMs: 500, endMs: 650, enclosingStartMs: 500, enclosingEndMs: 650),
+            RecognizedWord(id: "right", text: "gap", startMs: 800, endMs: 880, enclosingStartMs: 800, enclosingEndMs: 880),
+        ]
+        let built = try SpeakerTurnBuilder().build(words: words, diarizedTurns: [
+            DiarizedSpeakerTurn(speakerID: "A", startMs: 0, endMs: 200),
+            DiarizedSpeakerTurn(speakerID: "A", startMs: 1000, endMs: 1400),
+        ])
+        let intervals = [interval("A", 0, 200), interval("A", 1000, 1400)]
+        let reconciler = UnknownFragmentReconciler()
+        let result = reconciler.reconcile(segments: built.segments, speakers: built.speakers, intervals: intervals)
+        XCTAssertEqual(result[1].speakerInference?.evidence, .diarizationBoundaryGap)
+        XCTAssertEqual(result[1].speakerInference?.diarizationHoleMs, 800)
+        XCTAssertEqual(result.map(\.speakerID), [nil, nil, nil])
+        XCTAssertEqual(result.map(\.words), built.segments.map(\.words))
+        XCTAssertEqual(result.map(\.effectiveSpeakerID), ["speaker_1", "speaker_1", "speaker_1"])
+        XCTAssertEqual(reconciler.reconcile(segments: result, speakers: built.speakers, intervals: intervals), result)
+        XCTAssertEqual(TranscriptParagraphGrouper().paragraphs(from: result).count, 1)
+
+        let competing = intervals + [interval("B", 450, 700)]
+        XCTAssertNil(reconciler.reconcile(segments: built.segments, speakers: built.speakers, intervals: competing)[1].speakerInference)
+        let lowQuality = intervals.map { AcousticSpeakerInterval(speakerID: $0.speakerID, startMs: $0.startMs, endMs: $0.endMs, qualityScore: 0.5) }
+        XCTAssertNil(reconciler.reconcile(segments: built.segments, speakers: built.speakers, intervals: lowQuality)[1].speakerInference)
+        XCTAssertNil(reconciler.reconcile(segments: built.segments, speakers: built.speakers, intervals: [interval("A", 0, 200)])[1].speakerInference)
+    }
+
+    func testInferredAnchorsDoNotAbsorbCompletedRepliesOrCascadeGapEvidence() {
+        func anchor(_ id: String, start: Int, end: Int,
+                    evidence: TranscriptSpeakerInferenceEvidence = .nearestInterval(distanceMs: 120),
+                    provenance: String = SpeakerTurnBuilder.attributionProvenance,
+                    attribution: TranscriptSpeakerAttributionSource = .inferred) -> TranscriptSegment {
+            TranscriptSegment(id: id, speakerID: nil, speakerLabel: "Unknown speaker", startMs: start, endMs: end,
+                text: "anchor", overlap: false, timingQuality: .asrWord, attributionSource: attribution,
+                speakerInference: TranscriptSpeakerInference(speakerID: "speaker_1", speakerLabel: "Speaker 1",
+                    evidence: evidence, provenance: provenance))
+        }
+        let left = anchor("left", start: 220, end: 300)
+        let right = anchor("right", start: 800, end: 880)
+        let intervals = [interval("A", 0, 200), interval("A", 1000, 1400)]
+        let reconciler = UnknownFragmentReconciler()
+        for text in ["Right.", "Really?", "Yes!"] {
+            let reply = segment("reply", speaker: nil, start: 500, end: 650, text: text)
+            XCTAssertNil(reconciler.reconcile(segments: [left, reply, right], speakers: speakers, intervals: intervals)[1].speakerInference)
+        }
+        let fragment = segment("fragment", speaker: nil, start: 500, end: 650, text: "small")
+        for badAnchor in [
+            anchor("left", start: 220, end: 300, evidence: .diarizationBoundaryGap, provenance: UnknownFragmentReconciler.provenance),
+            anchor("left", start: 220, end: 300, attribution: .manual),
+            anchor("left", start: 220, end: 300, evidence: .nearestInterval(distanceMs: 251)),
+            anchor("left", start: 220, end: 300, provenance: "unrecognized"),
+        ] {
+            XCTAssertNil(reconciler.reconcile(segments: [badAnchor, fragment, right], speakers: speakers, intervals: intervals)[1].speakerInference)
+        }
+    }
+
     private func segment(
         _ id: String,
         speaker: String?,

@@ -311,6 +311,7 @@ public struct TranscriptAssemblyStageRunner: TranscriptionStageRunning {
                 ]),
                 "nearest_interval": .object([
                     "maximum_distance_ms": .number(250),
+                    "segment_distance_aggregation": .string("maximum_word_distance"),
                     "attribution_source": .string("inferred"),
                     "rejects_competing_intervals": .boolean(true),
                 ]),
@@ -326,6 +327,7 @@ public struct TranscriptAssemblyStageRunner: TranscriptionStageRunning {
                 ]),
             ]),
             "display_grouping": .object([
+                "provenance": .string(SpeakerTurnBuilder.groupingProvenance),
                 "pause_split_ms": .number(Double(turnBuilder.configuration.grouping.pauseSplitMs)),
                 "preferred_duration_ms": .number(Double(turnBuilder.configuration.grouping.preferredSegmentDurationMs)),
                 "preferred_word_count": .number(Double(turnBuilder.configuration.grouping.preferredWordCount)),

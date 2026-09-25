@@ -23,8 +23,8 @@ benchmark-files/scripts/score.sh cab /path/to/candidate.json     # another diari
 
 `score.sh` keeps the snapshot's ASR `transcript.json` fixed, so only the diarizer
 changes. It runs `wder.py` in canonical and effective label modes and writes
-transcript-free JSON to `CAB/results/`. It also gives `replay.py` a fresh
-`TMPDIR`, because a stale agent-session `TMPDIR` makes `swiftc` fail.
+transcript-free JSON to `CAB/results/`. `replay.py` gives `swiftc` a valid
+temporary directory even when the caller inherited a stale session `TMPDIR`.
 
 VBx baseline, FluidAudio 0.15.7, scored 2026-09-24:
 

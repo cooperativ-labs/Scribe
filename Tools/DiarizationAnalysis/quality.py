@@ -140,8 +140,10 @@ def boundary_metrics(replay, refs, pairs, tolerance=0):
 
 
 def boundary_causes(replay):
-    # Diagnostic reconstruction of the pinned v3 builder predicates. It does not
-    # generate host output. Later predicate changes need a versioned diagnostic.
+    # Diagnostic reconstruction only; Python never generates host output.
+    version = replay.get('grouping_provenance', 'speaker-turn-attribution-v3')
+    if version not in ('speaker-turn-attribution-v3', 'speaker-turn-grouping-v2'):
+        raise ValueError('Unsupported grouping predicates: ' + version)
     counts = collections.Counter()
     distance_changes = 0
     for a, b in zip(replay['segments'], replay['segments'][1:]):
@@ -152,7 +154,8 @@ def boundary_causes(replay):
         ia = a.get('speaker_id') or (a.get('speaker_inference', {}).get('speaker_id') if da is not None else None)
         ib = b.get('speaker_id') or (b.get('speaker_inference', {}).get('speaker_id') if db is not None else None)
         reasons = []
-        if da != db: reasons.append('nearest_evidence_change')
+        if (da != db if version == 'speaker-turn-attribution-v3' else (da is None) != (db is None)):
+            reasons.append('nearest_evidence_change')
         if ia != ib: reasons.append('builder_speaker_change')
         if b['start_ms']-a['end_ms'] >= 1000: reasons.append('pause_1s')
         if b['words'][0]['end_ms']-a['start_ms'] > 30000: reasons.append('duration_cap')
@@ -160,7 +163,7 @@ def boundary_causes(replay):
         if a['words'][-1]['text'][-1:] in ('.','?','!') and (ia is None or a['end_ms']-a['start_ms'] >= 12000 or len(a['words']) >= 40): reasons.append('sentence_break')
         counts['+'.join(reasons) or 'unexplained'] += 1
         if da is not None and db is not None and da != db and ia == ib: distance_changes += 1
-    return dict(predicate_version='speaker-turn-attribution-v3', combinations=dict(counts), same_speaker_inferred_distance_changes=distance_changes)
+    return dict(predicate_version=version, combinations=dict(counts), same_speaker_inferred_distance_changes=distance_changes)
 
 
 def evaluate(replay, refs, paragraphs, mapping):

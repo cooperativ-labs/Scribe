@@ -342,9 +342,16 @@ An unaligned first token stays ambiguous, even if a nearby later token matches.
 Main paragraphs and asides are separate rows. Unmatched hypothesis/reference
 boundaries, precision and recall are reported. These are agreement diagnostics,
 not proof of desirable segmentation. `saved_boundary_changes` reconstructs the
-pinned v3 builder predicates for explanation only; Python does not generate any
-host transcript. Update/version those predicates when a later candidate changes
-the construction algorithm.
+builder predicates for explanation only; Python does not generate any host
+transcript. Historical replays use the pinned v3 predicates; current replays
+declare `speaker-turn-grouping-v2`, where changing nearest-interval distance
+alone is no longer a boundary.
+
+The current production refinement can be reproduced with
+`refinement_experiment.py --bundle <frozen-bundle> --private-output <new-private-dir> --output <aggregate.json>`.
+It snapshots/builds the host and checks conservation and new speaker disagreements.
+See [coo:1055 evidence](../../docs/investigations/diarization-1055-refinement.md)
+for the bounded reconciliation policy, single-word reductions, and limitations.
 
 Conservation checks fail on missing/duplicated source word IDs, changed word
 text/timing, or missing/duplicated source segments, including main rows **plus

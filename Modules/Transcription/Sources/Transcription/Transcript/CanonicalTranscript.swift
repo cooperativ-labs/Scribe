@@ -266,6 +266,7 @@ public enum TranscriptSpeakerInferenceEvidence: Codable, Sendable, Equatable {
     case diarizationCoverage
     case diarizationBoundaryGap
     case sourceEnergy
+    /// Maximum word-to-interval distance in this inferred segment (0...250 ms).
     case nearestInterval(distanceMs: Int)
 
     private enum CodingKeys: String, CodingKey { case type; case distanceMs = "distance_ms" }

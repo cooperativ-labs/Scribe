@@ -5,7 +5,7 @@ import tempfile
 import unittest
 
 from quality import (align, tokens, reference, mapping_for, score, review_pack,
-                     boundary_metrics, conservation, verify_bundle)
+                     boundary_metrics, boundary_causes, conservation, verify_bundle)
 from wder import sha256
 
 
@@ -17,6 +17,19 @@ def replay(texts, labels):
 
 
 class QualityTests(unittest.TestCase):
+    def test_boundary_diagnostics_distinguish_historical_distance_splits(self):
+        rows = [dict(start_ms=0, end_ms=100, words=[dict(text='a', end_ms=100)],
+                     speaker_inference=dict(speaker_id='speaker_1', evidence=dict(type='nearest_interval', distance_ms=20))),
+                dict(start_ms=120, end_ms=200, words=[dict(text='b', end_ms=200)],
+                     speaker_inference=dict(speaker_id='speaker_1', evidence=dict(type='nearest_interval', distance_ms=100)))]
+        self.assertEqual(boundary_causes(dict(segments=rows))['combinations'], {'nearest_evidence_change': 1})
+        current = dict(segments=rows, grouping_provenance='speaker-turn-grouping-v2')
+        self.assertEqual(boundary_causes(current)['combinations'], {'unexplained': 1})
+        rows[1].pop('speaker_inference'); rows[1]['speaker_id'] = 'speaker_1'
+        self.assertEqual(boundary_causes(current)['combinations'], {'nearest_evidence_change': 1})
+        with self.assertRaises(ValueError):
+            boundary_causes(dict(segments=rows, grouping_provenance='unsupported'))
+
     def test_split_contraction_uses_common_lexical_coordinates(self):
         b = replay(["don't", 'stop'], ['a','a'])
         c = replay(["don'", 't', 'stop'], ['a','a','a'])

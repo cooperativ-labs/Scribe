@@ -69,7 +69,7 @@ struct Replay {
              "word_ids": p.sourceSegmentIDs.flatMap { wordIDsBySegment[$0] ?? [] }, "source_segment_ids": p.sourceSegmentIDs,
              "start_ms": p.startMs, "end_ms": p.endMs]
         }
-        var output: [String: Any] = ["words": words.map { w -> [String: Any] in
+        var output: [String: Any] = ["grouping_provenance": SpeakerTurnBuilder.groupingProvenance, "words": words.map { w -> [String: Any] in
             ["id": w.id, "text": w.text, "startMs": w.startMs as Any? ?? NSNull(),
              "endMs": w.endMs as Any? ?? NSNull(), "enclosingStartMs": w.enclosingStartMs,
              "enclosingEndMs": w.enclosingEndMs]

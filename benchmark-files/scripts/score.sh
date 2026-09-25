@@ -22,8 +22,6 @@ esac
 DIARIZATION=${2:-$RUN/diarization.json}
 LABEL=${3:-${${DIARIZATION:t}:r}}
 
-# replay.py compiles Swift; a stale session TMPDIR makes swiftc fail.
-export TMPDIR=$(mktemp -d /private/tmp/scribe-bench.XXXXXX)
 mkdir -p "$OUT"
 for MODE in canonical effective; do
   python3 "$ROOT/Tools/DiarizationAnalysis/wder.py" "$RUN" \
@@ -34,4 +32,3 @@ for MODE in canonical effective; do
 print("%9s: WDER %.3f%%  wrong %.3f%%  unknown %.3f%%  (%d words)" % (sys.argv[2], a["wder_pct"], a["wrong_pct"], a["unknown_pct"], a["scored_words"]))' \
     "$OUT/$LABEL-$MODE.json" $MODE
 done
-rm -rf "$TMPDIR"
