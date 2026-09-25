@@ -19,13 +19,8 @@ public struct SpeakersView: View {
         NavigationSplitView {
             List(selection: $viewModel.selectedProfileID) {
                 ForEach(viewModel.rows) { row in
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(row.displayName).lineLimit(1)
-                        Text(row.matchingStatus)
-                            .font(.caption)
-                            .foregroundStyle(row.isNameOnly ? .secondary : .primary)
-                    }
-                    .tag(row.id)
+                    SpeakerListRow(row: row, isOwner: viewModel.ownerProfileID == row.id)
+                        .tag(row.id)
                     .contextMenu {
                         Button("Delete Person…", role: .destructive) { profilePendingDeletion = row }
                     }
@@ -33,10 +28,15 @@ public struct SpeakersView: View {
             }
             .navigationTitle("Speakers")
             .frame(minWidth: 230)
-            .safeAreaInset(edge: .bottom) {
-                Button("Add Person", systemImage: "person.badge.plus") { isAddingPerson = true }
-                    .padding(8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                // Opaque so rows scrolling underneath never show through the button.
+                VStack(spacing: 0) {
+                    Divider()
+                    Button("Add Person", systemImage: "person.badge.plus") { isAddingPerson = true }
+                        .padding(8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .background(Color(nsColor: .windowBackgroundColor))
             }
         } detail: {
             if let row = viewModel.selectedRow {
@@ -83,6 +83,43 @@ public struct SpeakersView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(.bar)
             }
+        }
+    }
+}
+
+/// One sidebar row: the name, a "Me" tag on the owner's profile, and a
+/// trailing icon for matching state. The full status stays in the tooltip.
+private struct SpeakerListRow: View {
+    let row: SpeakerLibraryRow
+    let isOwner: Bool
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(row.displayName).lineLimit(1)
+            if isOwner {
+                Text("Me")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(.quaternary, in: Capsule())
+                    .accessibilityLabel("This is me")
+            }
+            Spacer(minLength: 4)
+            statusIcon
+        }
+        .help(row.matchingStatus)
+    }
+
+    @ViewBuilder private var statusIcon: some View {
+        if row.needsReenrollment {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+                .accessibilityLabel(row.matchingStatus)
+        } else if !row.isNameOnly && row.automaticMatchingEnabled {
+            Image(systemName: "waveform")
+                .foregroundStyle(.secondary)
+                .accessibilityLabel(row.matchingStatus)
         }
     }
 }

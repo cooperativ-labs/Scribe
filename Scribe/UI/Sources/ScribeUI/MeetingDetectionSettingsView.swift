@@ -39,6 +39,16 @@ public struct MeetingDetectionSettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Text("Automatic stop applies only to recordings started from the meeting prompt.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        } header: {
+            Text("Meeting detection")
+        }
+
+        // The applications are what the settings above apply to, so they get
+        // their own card rather than reading as more switches of the same kind.
+        Section {
             ForEach(offeredApplications) { application in
                 Toggle(isOn: applicationBinding(application)) {
                     HStack(spacing: 6) {
@@ -50,15 +60,15 @@ public struct MeetingDetectionSettingsView: View {
                         }
                     }
                 }
-                .disabled(!settings.meetingDetectionEnabled)
             }
 
-            Text("A call is detected when one of these applications has the microphone open. Muting does not end a call; quitting or hanging up does. Automatic stop applies only to recordings started from the meeting prompt.")
+            Text("A call is detected when one of these applications has the microphone open. Muting does not end a call; quitting or hanging up does.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         } header: {
-            Text("Meeting detection")
+            Text("Applications")
         }
+        .disabled(!settings.meetingDetectionEnabled)
 
         Section {
             ForEach(settings.meetingDomains, id: \.self) { domain in
