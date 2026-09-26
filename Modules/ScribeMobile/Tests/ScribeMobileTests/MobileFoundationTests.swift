@@ -139,6 +139,41 @@ private actor CancellingInference: MeetingInference {
     #expect(await library.isInstalled())
 }
 
+@Test func modelInstallationExplainsWrongFolderAndMissingFiles() async throws {
+    let root = try scratch(); defer { try? FileManager.default.removeItem(at: root) }
+    let manifest = root.appending(path: "manifest.json")
+    try Data("""
+    {"schemaVersion":1,"profileID":"test","fluidAudio":{"repository":"test","revision":"test"},
+     "telemetry":{"enabled":false,"runtimeDownloadsAllowed":false},"totalDeclaredOnDiskBytes":3,
+     "assets":[{"id":"test","relativePath":"asset","upstream":{"repository":"test","revision":"test"},
+       "checksum":{"algorithm":"sha256","value":"test","scope":"test"},"license":"test",
+       "requiredFiles":[{"relativePath":"Model.mlmodelc/coremldata.bin","bytes":3,"sha256":"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"}]}]}
+    """.utf8).write(to: manifest)
+    let library = try ModelLibrary(directory: root.appending(path: "installed"), manifestURL: manifest)
+    func message(_ source: URL) async -> String {
+        do { try await library.install(from: source); return "" } catch { return error.localizedDescription }
+    }
+    // The model folder is nested one level below the chosen folder.
+    let outer = root.appending(path: "Transfer")
+    let source = outer.appending(path: "models")
+    let assetDirectory = source.appending(path: "asset/Model.mlmodelc")
+    try FileManager.default.createDirectory(at: assetDirectory, withIntermediateDirectories: true)
+    #expect(await message(outer).contains("inside “models”"))
+    // The asset folder itself was chosen instead of its parent.
+    #expect(await message(source.appending(path: "asset")).contains("Choose the folder that contains “asset”"))
+    // An unrelated folder names what is expected.
+    let unrelated = root.appending(path: "Other")
+    try FileManager.default.createDirectory(at: unrelated, withIntermediateDirectories: true)
+    #expect(await message(unrelated).contains("Missing: “asset”"))
+    // The layout is right but a file never arrived on this device.
+    let missing = await message(source)
+    #expect(missing.contains("Model file is missing: asset/Model.mlmodelc/coremldata.bin"))
+    #expect(!missing.contains("no such file"))
+    try Data("abc".utf8).write(to: assetDirectory.appending(path: "coremldata.bin"))
+    try await library.install(from: source)
+    #expect(await library.isInstalled())
+}
+
 @Test func interruptedImportCannotAppearReady() async throws {
     let root = try scratch(); defer { try? FileManager.default.removeItem(at: root) }
     let store = try MeetingStore(root: root)

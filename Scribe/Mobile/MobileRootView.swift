@@ -203,7 +203,7 @@ struct MobileRootView: View {
             Form {
                 Section("Offline transcription") {
                     Label(model.modelsInstalled ? "Models installed and verified" : "Models not installed", systemImage: model.modelsInstalled ? "checkmark.shield" : "arrow.down.circle")
-                    Text("Choose the Scribe model folder containing Parakeet and speaker diarization models. Scribe verifies the files before installing them. About 505 MB of model storage is required, plus temporary installation space.")
+                    Text("Choose the folder that contains both “parakeet-tdt-0.6b-v3-coreml” and “speaker-diarization-coreml”, not one of those folders on its own. If it lives in iCloud Drive, download it fully in Files first. Scribe verifies the files before installing them. About 505 MB of model storage is required, plus temporary installation space.")
                     Button("Install model folder…") { settings = false; installing = true }.disabled(!model.canStart)
                 }
                 Section("Recording access") {

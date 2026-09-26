@@ -549,7 +549,11 @@ extension ScribeAppEnvironment {
         host.sizingOptions = []
         let window = NSWindow(contentViewController: host)
         window.title = "Transcripts"
-        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        // SwiftUI lays its toolbar out as if the content runs under the title
+        // bar and reserves a toolbar-height top pocket for it. Without a full-size
+        // content view AppKit has already placed the content below the bar, so on
+        // the macOS 26 SDK that pocket lands on the transcript header instead.
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
         window.contentMinSize = NSSize(width: 820, height: 600)
         window.isReleasedWhenClosed = false
         // A remembered frame wins; the fixed default applies only the first time.

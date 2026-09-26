@@ -2,10 +2,22 @@
 set -euo pipefail
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$repo_root"
+staged_models=0
+
+cleanup_staged_models() {
+  local exit_status=$?
+  if ((staged_models)); then
+    rm -rf -- "$repo_root/Tests/ScribeMobileTests/DeviceFixtures/models"
+  fi
+  trap - EXIT
+  exit "$exit_status"
+}
+trap cleanup_staged_models EXIT
 
 # Optional local-only fixtures are copied only after comparison with the committed
 # mobile manifest. The app itself never bundles these model test resources.
 if [[ "${1:-}" == "--models" ]]; then
+  staged_models=1
   python3 - <<'PY'
 from pathlib import Path
 import hashlib, json, shutil

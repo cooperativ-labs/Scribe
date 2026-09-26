@@ -13,7 +13,10 @@ are committed. The desktop app remains in `Scribe.xcodeproj`.
 2. In Settings, install the pinned Scribe model folder. The folder must contain
    `parakeet-tdt-0.6b-v3-coreml` and `speaker-diarization-coreml`, such as the
    existing `Workers/TranscriptionWorker/models` produced by the repository's
-   model packaging workflow. Transfer it to Files first. Installation copies
+   model packaging workflow. Transfer it to Files first and choose the folder
+   that contains both subfolders, not one subfolder on its own. Folders in
+   iCloud Drive or other Files providers are downloaded during installation;
+   a file that never arrives is reported by name. Installation copies
    only allowlisted files, verifies sizes and SHA-256 values, and preserves a
    previous installation on verification failure. No network inference or
    automatic model download runs in the app.
