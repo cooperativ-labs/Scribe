@@ -1,4 +1,5 @@
 import Platform
+import PlatformTestSupport
 import XCTest
 @testable import ScribeUI
 
@@ -370,10 +371,6 @@ final class MenuPresentationTests: XCTestCase {
 
     private func presentation(for coordinator: MockRecordingCoordinator) -> MenuPresentation {
         MenuPresentation(snapshot: coordinator.snapshot, at: Date())
-    }
-
-    private func readySnapshot() -> RecorderSnapshot {
-        RecorderSnapshot(permissions: .allGranted, recordingsFolderURL: URL(fileURLWithPath: "/tmp/scribe", isDirectory: true))
     }
 }
 

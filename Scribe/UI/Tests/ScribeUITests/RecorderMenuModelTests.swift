@@ -1,4 +1,5 @@
 import Platform
+import PlatformTestSupport
 import XCTest
 @testable import ScribeUI
 
@@ -145,9 +146,5 @@ final class RecorderMenuModelTests: XCTestCase {
         XCTAssertTrue(terminated)
         XCTAssertEqual(coordinator.snapshot.state, .idle)
         XCTAssertEqual(coordinator.snapshot.processing.jobs.count, 1)
-    }
-
-    private func readySnapshot() -> RecorderSnapshot {
-        RecorderSnapshot(permissions: .allGranted, recordingsFolderURL: URL(fileURLWithPath: "/tmp/scribe", isDirectory: true))
     }
 }

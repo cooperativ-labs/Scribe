@@ -1,10 +1,10 @@
 import Foundation
+import Platform
 
 /// A coordinator that fully implements the menu's contract without any capture.
 ///
-/// It exists so the menu-bar interface can be built, tested, and run before the
-/// capture core lands. Every state the menu renders is reachable from here, and
-/// the command path is the real serialized one rather than a shortcut for tests.
+/// Shared by the Platform and UI regression suites. This target is linked only
+/// by tests, so simulation and command history stay out of the application.
 ///
 /// Source enumeration is optional: pass a `CaptureSourceProviding` to populate
 /// the pickers from the live system while recording itself stays simulated.
@@ -20,7 +20,7 @@ public final class MockRecordingCoordinator: RecordingCoordinating {
     // MARK: Scripting
 
     /// When true, `start` and `stop` park in `.starting` / `.stopping` until
-    /// `finishStart()` / `finishStop()` is called, so those states can be shown.
+    /// `finishPendingTransition()` is called, so those states can be shown.
     public var holdsTransitions = false
     /// Failure returned by the next start instead of entering `.recording`.
     public var startFailure: RecorderFailure?
@@ -46,7 +46,7 @@ public final class MockRecordingCoordinator: RecordingCoordinating {
     public private(set) var sourceRefreshCount = 0
     public private(set) var quitCount = 0
     /// Commands that reached the coordinator, including the harmless ones.
-    public var acceptedCommands: [RecordingCommand] { queue.acceptedCommands }
+    public private(set) var acceptedCommands: [RecordingCommand] = []
     /// Commands that actually changed capture state.
     public private(set) var performedCommands: [RecordingCommand] = []
     /// Elapsed figures pasted into notes. Empty when paste was a no-op.
@@ -77,7 +77,8 @@ public final class MockRecordingCoordinator: RecordingCoordinating {
     // MARK: RecordingCoordinating
 
     public func submit(_ command: RecordingCommand) {
-        queue.enqueue(command) { [weak self] in
+        acceptedCommands.append(command)
+        queue.enqueue { [weak self] in
             await self?.perform(command)
         }
     }

@@ -1,6 +1,4 @@
 import ApplicationServices
-import AVFoundation
-import CoreGraphics
 import Foundation
 
 /// One permission that stands between the person and a recording, together with
@@ -188,9 +186,7 @@ public final class PermissionService: RecordingPermissionProviding, @unchecked S
             let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
             _ = AXIsProcessTrustedWithOptions(options)
         }
-        if AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined {
-            _ = await AVCaptureDevice.requestAccess(for: .audio)
-        }
+        await MicrophonePermission.requestIfNeeded()
         return dictationAccess()
     }
 
@@ -251,11 +247,6 @@ public struct DictationAccess: Equatable, Sendable {
     public var isReady: Bool { microphone == .granted && accessibility }
 
     public static func current() -> Self {
-        let microphone: PermissionStatus = switch AVCaptureDevice.authorizationStatus(for: .audio) {
-        case .authorized: .granted
-        case .notDetermined: .notDetermined
-        default: .denied
-        }
-        return Self(microphone: microphone, accessibility: AXIsProcessTrusted())
+        Self(microphone: MicrophonePermission.currentStatus(), accessibility: AXIsProcessTrusted())
     }
 }

@@ -1,4 +1,5 @@
 import Platform
+import PlatformTestSupport
 import XCTest
 
 @MainActor
@@ -231,10 +232,6 @@ final class MockRecordingCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.snapshot.state, .idle)
         XCTAssertEqual(coordinator.snapshot.processing.jobs.count, 1, "the interrupted session is still handed to processing")
         XCTAssertTrue(terminated)
-    }
-
-    private func readySnapshot(recordingsFolderURL: URL = URL(fileURLWithPath: "/tmp/scribe", isDirectory: true)) -> RecorderSnapshot {
-        RecorderSnapshot(permissions: .allGranted, recordingsFolderURL: recordingsFolderURL)
     }
 }
 

@@ -10,7 +10,7 @@ and checks the exit criteria for IMPLEMENTATION_PLAN.md section 3:
 - and a missing or revoked permission surfaces as an actionable error instead of
   an empty recording.
 
-`Tools/CaptureHarness` is the separate feasibility instrument that produced
+The retired `Tools/CaptureHarness` was the feasibility instrument that produced
 [docs/feasibility/capture-timing.md](../../docs/feasibility/capture-timing.md).
 This tool exercises the product code those findings were fed into.
 

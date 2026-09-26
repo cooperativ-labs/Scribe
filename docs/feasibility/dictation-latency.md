@@ -1,5 +1,8 @@
 # Resident dictation ASR and VAD feasibility (macOS 27)
 
+> Historical report: `DictationFeasibility` was retired in coo:1071. Its commands below
+> describe the original run. See [maintained tools and coverage](../../Tools/README.md).
+
 ## Setup
 
 - 25 September 2026; MacBookPro18,3 (M1 Pro, 32 GB), macOS 27.0, Xcode 27.0.

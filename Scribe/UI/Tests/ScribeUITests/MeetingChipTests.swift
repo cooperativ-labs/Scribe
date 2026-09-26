@@ -1,5 +1,6 @@
 import AppKit
 import Platform
+import PlatformTestSupport
 import XCTest
 @testable import ScribeUI
 
@@ -470,10 +471,6 @@ final class MeetingChipTests: XCTestCase {
         now: @escaping @MainActor () -> Date = { Date() }
     ) -> MeetingChipModel {
         MeetingChipModel(coordinator: coordinator, now: now)
-    }
-
-    private func readySnapshot() -> RecorderSnapshot {
-        RecorderSnapshot(permissions: .allGranted, recordingsFolderURL: URL(fileURLWithPath: "/tmp/scribe", isDirectory: true))
     }
 
     private func zoomCall(at date: Date = Date(timeIntervalSince1970: 1_000), calendarTitle: String? = nil) -> DetectedMeeting {

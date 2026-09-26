@@ -8,17 +8,12 @@ import Foundation
 /// intact even when a command suspends.
 @MainActor
 public final class RecordingCommandQueue {
-    /// Commands accepted so far, in order. Useful for asserting that a redundant
-    /// command was still observed even though it did nothing.
-    public private(set) var acceptedCommands: [RecordingCommand] = []
-
     private var tail: Task<Void, Never>?
     private var pendingCount = 0
 
     public init() {}
 
-    public func enqueue(_ command: RecordingCommand, _ work: @escaping @MainActor () async -> Void) {
-        acceptedCommands.append(command)
+    public func enqueue(_ work: @escaping @MainActor () async -> Void) {
         pendingCount += 1
         let previous = tail
         tail = Task { @MainActor in

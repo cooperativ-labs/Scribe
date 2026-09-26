@@ -1,5 +1,8 @@
 # FluidAudio 0.17.4 upgrade — coo:1069
 
+> Historical report: `DictationFeasibility` was retired in coo:1071. Its commands below
+> describe the original run. See [maintained tools and coverage](../../Tools/README.md).
+
 Implemented 2026-09-26 for objective `coo:1069.5tg3`. This supersedes the
 original recommendation below: the worker and dictation probe now pin **0.17.4**,
 revision **`21493f8dac5a97e65742e6ff26f42f164c2fda0f`**. SwiftPM regenerated both

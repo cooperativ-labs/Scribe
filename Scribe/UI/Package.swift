@@ -17,6 +17,9 @@ let package = Package(
             name: "ScribeUI",
             dependencies: ["Platform", .product(name: "Vocabulary", package: "Vocabulary"), .product(name: "Dictation", package: "Dictation")]
         ),
-        .testTarget(name: "ScribeUITests", dependencies: ["ScribeUI", "Platform"])
+        .testTarget(name: "ScribeUITests", dependencies: [
+            "ScribeUI", "Platform",
+            .product(name: "PlatformTestSupport", package: "Platform"),
+        ])
     ]
 )

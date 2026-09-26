@@ -29,30 +29,14 @@ far-end waveform is *exactly known* even though the echo path and the near-end s
 makes these two more useful than a fully uncontrolled recording: the reference signal can be
 correlated against the microphone track to estimate the true acoustic delay.
 
-Recording any of these needs the Screen & System Audio Recording grant, which is a human action and
-requires the **application-bundle** build of the harness — a bare executable cannot be granted it at
-all. See [capture-permissions.md](../../docs/feasibility/capture-permissions.md).
+## Capture provenance
 
-## Recording one
-
-```sh
-cd Tools/CaptureHarness
-./Scripts/build-signed.sh
-BIN=./bin/CaptureHarness.app/Contents/MacOS/capture-harness   # the bundled build; see permissions doc
-"$BIN" devices                       # microphone uids and running bundle identifiers
-
-"$BIN" fixture \
-  --scenario far-end-only \
-  --id builtin-far-end-only \
-  --devices "MacBook Pro built-in speakers, built-in microphone" \
-  --all-system-audio \
-  --seconds 15 \
-  --fixtures-dir ../../Tests/Fixtures/real
-```
-
-The tool prints the scenario script, counts down `--lead-in` seconds, records `--seconds`, and then
-writes the fixture directory. It never invents a device description: `--devices` is required,
-because a recording whose hardware is unknown cannot be interpreted later.
+These fixtures were created by the retired `Tools/CaptureHarness` feasibility
+probe. The recordings and their metadata remain regression inputs; the original
+capture commands are available in Git history. For new production capture checks,
+use [CaptureIntegration](../../../Tools/CaptureIntegration/README.md), which drives
+the shipping capture and storage code. It does not generate this historical
+fixture format automatically.
 
 ## Scenarios
 

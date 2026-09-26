@@ -1,5 +1,8 @@
 # Focused-field AX feasibility matrix (macOS 27)
 
+> Historical report: `DictationFeasibility` was retired in coo:1071. Its commands below
+> describe the original run. See [maintained tools and coverage](../../Tools/README.md).
+
 ## Method and scope
 
 The Developer ID signed, unsandboxed throwaway probe in `Tools/DictationFeasibility` ran as an app after the user enabled it in macOS 27's **Device Control and Data Access** pane. `AXIsProcessTrusted()` and `CGPreflightPostEventAccess()` then returned true. Its one-shot AX checks record only app name, role, error codes, geometry, value length and insertion success flags; they do not log field contents. It uses a 250 ms messaging timeout on the system-wide element and focused element, with a 1-second diagnostic retry.

@@ -21,7 +21,7 @@ public struct SystemRecordingPermissions: RecordingPermissionProviding {
     public func currentStatus() -> PermissionSnapshot {
         PermissionSnapshot(
             screenAndSystemAudio: Self.screenRecordingStatus(),
-            microphone: Self.microphoneStatus()
+            microphone: MicrophonePermission.currentStatus()
         )
     }
 
@@ -31,9 +31,7 @@ public struct SystemRecordingPermissions: RecordingPermissionProviding {
             // prompt and the person has to grant access in System Settings.
             _ = CGRequestScreenCaptureAccess()
         }
-        if AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined {
-            _ = await AVCaptureDevice.requestAccess(for: .audio)
-        }
+        await MicrophonePermission.requestIfNeeded()
         return currentStatus()
     }
 
@@ -47,12 +45,21 @@ public struct SystemRecordingPermissions: RecordingPermissionProviding {
     private static func screenRecordingStatus() -> PermissionStatus {
         CGPreflightScreenCaptureAccess() ? .granted : .denied
     }
+}
 
-    private static func microphoneStatus() -> PermissionStatus {
+/// Shared by recording and dictation so both paths interpret and request access alike.
+enum MicrophonePermission {
+    static func currentStatus() -> PermissionStatus {
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .authorized: .granted
         case .notDetermined: .notDetermined
         default: .denied
+        }
+    }
+
+    static func requestIfNeeded() async {
+        if currentStatus() == .notDetermined {
+            _ = await AVCaptureDevice.requestAccess(for: .audio)
         }
     }
 }

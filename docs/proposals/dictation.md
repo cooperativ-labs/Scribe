@@ -1,5 +1,9 @@
 # System-wide dictation
 
+> Implementation update (coo:1071): dictation uses AppKit event monitors and
+> requires Microphone and Accessibility only. The conditional Input Monitoring
+> fallback discussed below was not adopted; its throwaway probes were retired.
+
 **Proposal (coo:1066):** Add a dictation mode to Scribe. The person holds or
 double-taps the right ⌘ key in any app, speaks, and the transcribed text
 lands in the field they were typing in. A small indicator

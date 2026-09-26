@@ -1,9 +1,0 @@
-<!doctype html>
-<meta charset="utf-8">
-<title>Scribe AX feasibility fields</title>
-<style>body{font:16px system-ui;max-width:640px;margin:48px auto}textarea,[contenteditable]{display:block;width:100%;min-height:100px;margin:12px 0 32px;border:1px solid #999;padding:12px}</style>
-<label for="plain">Textarea</label>
-<textarea id="plain" aria-label="Scribe AX textarea">seed</textarea>
-<label for="rich">Contenteditable</label>
-<div id="rich" contenteditable="true" role="textbox" aria-label="Scribe AX contenteditable">seed</div>
-<script>window.addEventListener('load', () => document.getElementById(location.hash.slice(1) || 'plain')?.focus())</script>

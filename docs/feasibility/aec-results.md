@@ -1,5 +1,8 @@
 # Offline AEC feasibility results
 
+> Historical report: `AECHarness` was retired in coo:1071. Its commands below
+> describe the original run. See [maintained tools and coverage](../../Tools/README.md).
+
 Measured on 2026-09-03 with the checked-in deterministic fixture suite. These
 results are a feasibility result for Apple Silicon and the pinned WebRTC Audio
 Processing Module 2.1 / WebRTC M131 bridge; they are not a claim about real

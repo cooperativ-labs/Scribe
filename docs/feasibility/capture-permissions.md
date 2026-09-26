@@ -1,5 +1,8 @@
 # Capture harness permissions
 
+> Historical report: `CaptureHarness` was retired in coo:1071. Its commands below
+> describe the original run. See [maintained tools and coverage](../../Tools/README.md).
+
 The capture harness is a command-line tool, not an application bundle. macOS still gates it with
 TCC, so a person must grant two permissions before it can record anything. This page lists the exact
 steps and the signing behaviour that makes them necessary.

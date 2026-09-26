@@ -107,7 +107,7 @@ public struct RenderDelayPlan: Sendable, Equatable {
 
 /// Estimates the render-to-capture delay across a whole session.
 ///
-/// The feasibility harness in `Tools/AECHarness` established the per-window test
+/// The retired AEC feasibility harness established the per-window test
 /// this reuses — a decimated broad search refined at full rate, accepted only from
 /// an active window with strong correlation and a clear non-neighbouring peak
 /// margin. `docs/feasibility/aec-results.md` also recorded what that test alone

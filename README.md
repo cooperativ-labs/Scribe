@@ -244,14 +244,15 @@ package products, so parallel workstreams do not need to edit
 | Bundled transcription helper | `Workers/TranscriptionWorker/` |
 | Standalone processing utility | `Tools/ScribeProcess/` |
 | Vocabulary command line | `Tools/ScribeVocabulary/` (`scribe-vocab`) |
-| Capture feasibility harness | `Tools/CaptureHarness/` |
+| Live capture integration gate | `Tools/CaptureIntegration/` |
 | Audio-quality metrics tool | `Tools/AudioMetrics/` |
 | Host-app tests and synthetic fixtures | `Tests/`, `Tests/Fixtures/` |
 | Native-build and release scripts | `Scripts/` |
 
-The `Native/`, `Modules/`, `Workers/`, and `Tools/` packages start as compileable
-placeholders only; their future owners replace the placeholder APIs without
-adding feature logic to the host application.
+See [Development tools](Tools/README.md) for the maintained regression gates and
+the replacements for retired feasibility probes. Shared recorder test doubles
+and fixtures live in the `PlatformTestSupport` target and are not linked into
+the app.
 
 ### In-app updates
 

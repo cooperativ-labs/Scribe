@@ -1,5 +1,8 @@
 # ScreenCaptureKit capture timing feasibility
 
+> Historical report: `CaptureHarness` was retired in coo:1071. Its commands below
+> describe the original run. See [maintained tools and coverage](../../Tools/README.md).
+
 Status: measured on 2026-09-03 across ten real `SCStream` runs. The capture harness
 (`capture-harness record`), the device-matrix probes (`capture-harness probe-filter`,
 `capture-harness probe-interruptions`) and the real-fixture recorder (`capture-harness fixture`) all
@@ -39,7 +42,7 @@ reports a common timeline rather than an unproven one. Permission steps are in
 
 ## Inspector
 
-It reports each track's initial and final PTS, frames, timestamp-versus-sample-duration drift in seconds and ppm, gaps, overlaps, full-format changes, ignored journal lines, and the evidential status of clock alignment. A discontinuity greater than one sample is reported. Its JSONL contract is in [the harness README](../../Tools/CaptureHarness/README.md).
+It reports each track's initial and final PTS, frames, timestamp-versus-sample-duration drift in seconds and ppm, gaps, overlaps, full-format changes, ignored journal lines, and the evidential status of clock alignment. A discontinuity greater than one sample is reported. Its JSONL contract is in the retired harness README (available in Git history).
 
 ## Producing the device matrix
 

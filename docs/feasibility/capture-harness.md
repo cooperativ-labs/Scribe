@@ -1,9 +1,12 @@
 # ScreenCaptureKit capture harness — configuration and run report
 
+> Historical report: `CaptureHarness` was retired in coo:1071. Its commands below
+> describe the original run. See [maintained tools and coverage](../../Tools/README.md).
+
 The harness is `Tools/CaptureHarness`, a standalone Swift package that does not depend on
 `Scribe.xcodeproj`. Build and permission steps are in
 [capture-permissions.md](capture-permissions.md); the journal contract and CLI reference are in
-[the package README](../../Tools/CaptureHarness/README.md). Timing analysis of the journals it
+the retired package README (available in Git history). Timing analysis of the journals it
 produces lives in [capture-timing.md](capture-timing.md).
 
 ## What the stream is configured to do

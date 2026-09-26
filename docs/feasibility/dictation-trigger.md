@@ -1,5 +1,8 @@
 # Right Command trigger feasibility (macOS 27)
 
+> Historical report: `DictationFeasibility` was retired in coo:1071. Its commands below
+> describe the original run. See [maintained tools and coverage](../../Tools/README.md).
+
 ## Probe and permission state
 
 `Tools/DictationFeasibility/TriggerProbe.swift` is a throwaway, Developer ID signed, hardened-runtime, unsandboxed app (`com.scribe.dictation-feasibility-trigger`). It installs `NSEvent` global `flagsChanged` and `keyDown` monitors, a `.listenOnly` CGEvent tap for those event types, logs `CGEventSource.keyState(.combinedSessionState, key: 54)` and `.hidSystemState` in callbacks and every 20 ms, and polls `IsSecureEventInputEnabled()` for changes. It runs the AppKit application event loop, which was necessary for the `NSEvent` callbacks in this probe. It does not alter the app target or register a hotkey.

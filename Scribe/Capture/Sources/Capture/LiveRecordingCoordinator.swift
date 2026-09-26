@@ -131,7 +131,7 @@ public final class LiveRecordingCoordinator: RecordingCoordinating {
     }
 
     public func submit(_ command: RecordingCommand) {
-        queue.enqueue(command) { [weak self] in await self?.perform(command) }
+        queue.enqueue { [weak self] in await self?.perform(command) }
     }
 
     public func reportShortcutRegistration(_ report: HotkeyRegistrationReport) {
@@ -189,7 +189,7 @@ public final class LiveRecordingCoordinator: RecordingCoordinating {
     /// would race the drain: the manifest would still say `capturing` and the
     /// session would come back as recovery work instead of a finished meeting.
     public func stopForTermination(then completion: @escaping @MainActor () -> Void) {
-        queue.enqueue(.stop) { [weak self] in
+        queue.enqueue { [weak self] in
             await self?.perform(.stop)
             completion()
         }

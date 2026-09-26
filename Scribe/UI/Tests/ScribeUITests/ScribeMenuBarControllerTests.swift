@@ -1,5 +1,6 @@
 import AppKit
 import Platform
+import PlatformTestSupport
 import XCTest
 @testable import ScribeUI
 
@@ -282,9 +283,5 @@ final class ScribeMenuBarControllerTests: XCTestCase {
             updates: { updates },
             openSettings: {}
         )
-    }
-
-    private func readySnapshot() -> RecorderSnapshot {
-        RecorderSnapshot(permissions: .allGranted, recordingsFolderURL: URL(fileURLWithPath: "/tmp/scribe", isDirectory: true))
     }
 }

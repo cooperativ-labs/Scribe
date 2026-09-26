@@ -1,5 +1,8 @@
 # Dictation indicator visual check
 
+> Historical report: `DictationIndicatorHarness` was retired in coo:1071. Its commands below
+> describe the original run. See [maintained tools and coverage](../../../Tools/README.md).
+
 Rendered from `Tools/DictationIndicatorHarness` with SwiftUI `ImageRenderer` at 2× scale on macOS 27. These are the actual `DictationIndicatorView` states; the harness does not start another Scribe instance.
 
 | State | Screenshot |

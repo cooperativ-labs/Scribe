@@ -1,5 +1,8 @@
 # FLAC encoder feasibility
 
+> Historical report: `FLACProbe` was retired in coo:1071. Its commands below
+> describe the original run. See [maintained tools and coverage](../../Tools/README.md).
+
 ## Decision
 
 Use the system AudioToolbox FLAC encoder through `AVAudioFile`, with a mandatory
