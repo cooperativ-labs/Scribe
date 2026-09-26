@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import Platform
 import ScribeAppCore
 import ScribeUI
 import SwiftUI
@@ -25,6 +26,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var wasDictationListening = false
     private var dictationStartSoundTask: Task<Void, Never>?
     private var didPlayDictationStartSound = false
+    private var dictationSound: NSSound?
+
+    private func playDictationSound(_ name: String, settings: ScribeSettings) {
+        guard let sound = NSSound(named: NSSound.Name(name)) else { return }
+        sound.volume = Float(settings.dictationSoundVolume)
+        dictationSound = sound
+        sound.play()
+    }
     /// Retained while visible because the status item is otherwise Scribe's
     /// only AppKit-owned surface.
     private var settingsWindow: NSWindow?
@@ -64,20 +73,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     self.dictationStartSoundTask = nil
                     if listening, environment.settings.dictationPlaySounds {
                         if dictation.triggerMode == .doubleTap {
-                            NSSound(named: NSSound.Name("ScribeMicStart"))?.play()
+                            self.playDictationSound("ScribeMicStart", settings: environment.settings)
                             self.didPlayDictationStartSound = true
                         } else {
                             self.dictationStartSoundTask = Task { [weak self] in
                                 try? await Task.sleep(for: .milliseconds(300))
                                 guard let self, !Task.isCancelled,
                                       case .listening = dictation.state else { return }
-                                NSSound(named: NSSound.Name("ScribeMicStart"))?.play()
+                                self.playDictationSound("ScribeMicStart", settings: environment.settings)
                                 self.didPlayDictationStartSound = true
                             }
                         }
                     } else if !listening {
                         if self.didPlayDictationStartSound, environment.settings.dictationPlaySounds {
-                            NSSound(named: NSSound.Name("ScribeMicStop"))?.play()
+                            self.playDictationSound("ScribeMicStop", settings: environment.settings)
                         }
                         self.didPlayDictationStartSound = false
                     }

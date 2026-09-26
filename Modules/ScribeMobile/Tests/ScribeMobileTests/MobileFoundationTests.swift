@@ -174,6 +174,62 @@ private actor CancellingInference: MeetingInference {
     #expect(await library.isInstalled())
 }
 
+private final class FetchLog: @unchecked Sendable {
+    private let lock = NSLock()
+    private var urls: [URL] = []
+    var payload = Data("abc".utf8)
+    func record(_ url: URL) -> Data { lock.withLock { urls.append(url); return payload } }
+    var requests: [URL] { lock.withLock { urls } }
+}
+
+@Test func modelDownloadVerifiesPublishesAndResumes() async throws {
+    let root = try scratch(); defer { try? FileManager.default.removeItem(at: root) }
+    func manifest(_ repository: String) throws -> URL {
+        let url = root.appending(path: "manifest-\(UUID()).json")
+        try Data("""
+        {"schemaVersion":1,"profileID":"test","fluidAudio":{"repository":"test","revision":"test"},
+         "telemetry":{"enabled":false,"runtimeDownloadsAllowed":false},"totalDeclaredOnDiskBytes":3,
+         "assets":[{"id":"test","relativePath":"asset","upstream":{"repository":"\(repository)","revision":"7dd20fe6b1797d35f5e3307e8b1732d9a178edfe"},
+           "checksum":{"algorithm":"sha256","value":"test","scope":"test"},"license":"test",
+           "requiredFiles":[{"relativePath":"Model.mlmodelc/weights/weight.bin","bytes":3,"sha256":"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"}]}]}
+        """.utf8).write(to: url)
+        return url
+    }
+    let log = FetchLog()
+    let fetch: ModelLibrary.Fetch = { url, received in
+        let data = log.record(url)
+        let file = FileManager.default.temporaryDirectory.appending(path: "scribe-fetch-\(UUID())")
+        try data.write(to: file); received(Int64(data.count))
+        return file
+    }
+    let installed = root.appending(path: "Models")
+    let library = try ModelLibrary(directory: installed, manifestURL: manifest("https://huggingface.co/FluidInference/test-coreml"))
+    // A corrupt response is rejected and never published.
+    log.payload = Data("bad".utf8)
+    await #expect(throws: MobileError.self) { try await library.download(fetch: fetch) { _ in } }
+    #expect(await !library.isInstalled())
+    let leftovers = FileManager.default.enumerator(atPath: installed.path)?.allObjects as? [String] ?? []
+    #expect(!leftovers.contains { $0.contains(".scribe-download-") || $0.hasSuffix("weight.bin") })
+    // A verified response is published and reported through to completion.
+    log.payload = Data("abc".utf8)
+    let final = FetchLog()
+    try await library.download(fetch: fetch) { progress in
+        if progress.completedBytes == progress.totalBytes { _ = final.record(URL(filePath: "/done")) }
+    }
+    #expect(await library.isInstalled())
+    #expect(log.requests.last?.absoluteString ==
+        "https://huggingface.co/FluidInference/test-coreml/resolve/7dd20fe6b1797d35f5e3307e8b1732d9a178edfe/Model.mlmodelc/weights/weight.bin")
+    #expect(!final.requests.isEmpty)
+    // Retrying reuses verified files instead of downloading them again.
+    let count = log.requests.count
+    try await library.download(fetch: fetch) { _ in }
+    #expect(log.requests.count == count)
+    // Only pinned Hugging Face sources are ever requested.
+    let untrusted = try ModelLibrary(directory: root.appending(path: "Other"), manifestURL: manifest("https://example.com/FluidInference/test-coreml"))
+    await #expect(throws: MobileError.self) { try await untrusted.download(fetch: fetch) { _ in } }
+    #expect(log.requests.count == count)
+}
+
 @Test func interruptedImportCannotAppearReady() async throws {
     let root = try scratch(); defer { try? FileManager.default.removeItem(at: root) }
     let store = try MeetingStore(root: root)

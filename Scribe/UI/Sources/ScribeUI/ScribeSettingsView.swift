@@ -362,6 +362,13 @@ public struct ScribeSettingsView: View {
                 Text("Show a read-only draft of recent speech, refreshed every few seconds. Words may change; the full transcript is inserted when you stop. Uses more processing power. If the indicator position is Off, previews appear at the bottom of the screen. Takes effect on your next dictation.")
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("Play a sound when listening starts and stops", isOn: $settings.dictationPlaySounds)
+                if settings.dictationPlaySounds {
+                    Slider(value: $settings.dictationSoundVolume, in: 0...1) {
+                        Text("Indicator sound volume")
+                    }
+                    Text("Adjusts the start and stop sounds independently of system volume.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
             Section("Language") {
                 Picker("Language", selection: $settings.dictationLanguage) {

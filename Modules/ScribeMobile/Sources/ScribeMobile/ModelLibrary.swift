@@ -1,11 +1,12 @@
 import Foundation
 import ScribeInference
 
-/// Installs only the files enumerated by the app's trusted, pinned manifest.
-/// No runtime network access and no user-provided manifest can change the trust root.
+/// Installs only the files enumerated by the app's trusted, pinned manifest, either from a
+/// chosen folder or by an explicit download (see ModelDownload.swift). Inference never
+/// reaches the network, and no user-provided manifest can change the trust root.
 public actor ModelLibrary {
     public let directory: URL
-    private let manifest: ModelManifest
+    let manifest: ModelManifest
     public init(directory: URL, manifestURL: URL) throws {
         self.directory = directory
         self.manifest = try ModelManifest.load(from: manifestURL)
@@ -32,10 +33,13 @@ public actor ModelLibrary {
     public func isInstalled() -> Bool { manifest.validate(modelsDirectory: directory).isValid }
     public func install(from source: URL) throws {
         if let problem = layoutProblem(at: source) { throw MobileError.message(problem) }
-        let staging = directory.deletingLastPathComponent().appending(path: "models-staging-\(UUID().uuidString)")
+        // Stage outside the user-visible Scribe folder, on the same volume for the final swap.
+        let scratch = try FileManager.default.url(for: .itemReplacementDirectory, in: .userDomainMask,
+                                                  appropriateFor: directory.deletingLastPathComponent(), create: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let staging = scratch.appending(path: "models")
         try MeetingStore.privateDirectory(staging)
         try StorageCapacity.require(Int64(manifest.totalDeclaredOnDiskBytes) + StorageCapacity.recordingReserve, at: staging)
-        defer { try? FileManager.default.removeItem(at: staging) }
         // Files-provider folders (iCloud Drive, third-party providers) can list files that are
         // not yet on this device. Request the whole tree once; each file is then read through
         // a coordinated read, which waits for its download before the copy starts.

@@ -55,6 +55,26 @@ assertions pass.
 - ReplayKit call capture remains a separate feasibility gate. There is no broadcast
   extension or promise of remote-call audio in this v1 foundation.
 
+## Model download and Scribe folder — objective `coo:1074.4cnd`
+
+| Check | Result |
+| --- | --- |
+| Mobile package tests | 10 passed, including a new download test: a corrupt response is rejected and never published, the pinned `resolve/<revision>` URL is requested, progress reaches completion, a retry reuses verified files, and a non-Hugging Face source is refused before any request |
+| Real Hugging Face download (macOS harness running `ModelLibrary.download`) | 504 MB from the pinned revisions, verified and installed in 87–89 s. Cancelling at 150 MB left no partial file; the resumed download completed and verified |
+| Hosted iPad simulator tests | 2 passed, 0 skipped, including the folder install through the new staging location and real ASR plus diarization |
+| Simulator launch | `Documents/Models` is created on first launch; models planted in the old Application Support location moved there and kept the backup-exclusion attribute |
+
+The first real download showed that the task delegate passed to
+`URLSession.download(from:delegate:)` never received write progress, so the bar
+jumped from 0 to 446 MB during the encoder. The mobile downloader now uses a
+session-level download delegate (475 progress updates during the resumed run).
+The desktop `TranscriptionModelDownloader` still uses the old pattern.
+
+Not yet checked: the Settings sheet and Files visibility were not viewed
+interactively because the simulator ran headless with no way to tap. A physical
+download on the iPad, including backgrounding during the download, is still
+outstanding.
+
 ## Real-model simulator evidence
 
 The iPad Pro 11-inch (M5) **simulator**, iOS 27.0 build `24A5390f`, processed

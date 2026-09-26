@@ -196,22 +196,75 @@ struct MobileRootView: View {
         }
     }
     private func modelsButtonTitle(_ meeting: Meeting) -> String {
-        model.modelsInstalled ? (meeting.state == .paused || meeting.state == .failed ? "Resume transcription" : "Transcribe meeting") : "Set up offline models"
+        model.modelsInstalled ? (meeting.state == .paused || meeting.state == .failed ? "Resume transcription" : "Transcribe meeting") : "Download offline models"
+    }
+    @ViewBuilder private var modelStatus: some View {
+        if let progress = model.modelDownload {
+            VStack(alignment: .leading, spacing: 6) {
+                ProgressView(value: Double(progress.completedBytes), total: Double(max(1, progress.totalBytes)))
+                    .accessibilityLabel("Model download")
+                Text("Downloading and verifying models…")
+                Text("\(ByteCountFormatter.string(fromByteCount: progress.completedBytes, countStyle: .file)) of \(ByteCountFormatter.string(fromByteCount: progress.totalBytes, countStyle: .file)) · Keep Scribe open")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Button("Cancel Download", role: .cancel) { model.cancelModelDownload() }
+        } else if model.checkingModels {
+            HStack { ProgressView(); Text("Checking installed models…") }
+        } else if model.modelsInstalled {
+            Label("Installed · Ready to transcribe", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+            Button("Show in Files", systemImage: "folder") { showModelsInFiles() }
+        } else {
+            if let error = model.modelDownloadError {
+                Text(error).font(.footnote).foregroundStyle(.red)
+            } else {
+                Text("Download the model to enable transcription.").foregroundStyle(.secondary)
+            }
+            Button(model.modelDownloadError == nil ? "Download Model" : "Retry Download", systemImage: "arrow.down.circle") { model.downloadModels() }
+                .buttonStyle(.borderedProminent).disabled(model.busy)
+        }
+    }
+    /// Files opens the app's Documents folder through the shareddocuments scheme.
+    private func showModelsInFiles() {
+        Task {
+            let directory = await model.models.directory
+            var components = URLComponents(url: directory, resolvingAgainstBaseURL: false)
+            components?.scheme = "shareddocuments"
+            if let url = components?.url { await UIApplication.shared.open(url) }
+        }
     }
     private var settingsView: some View {
         NavigationStack {
             Form {
-                Section("Offline transcription") {
-                    Label(model.modelsInstalled ? "Models installed and verified" : "Models not installed", systemImage: model.modelsInstalled ? "checkmark.shield" : "arrow.down.circle")
-                    Text("Choose the folder that contains both “parakeet-tdt-0.6b-v3-coreml” and “speaker-diarization-coreml”, not one of those folders on its own. If it lives in iCloud Drive, download it fully in Files first. Scribe verifies the files before installing them. About 505 MB of model storage is required, plus temporary installation space.")
-                    Button("Install model folder…") { settings = false; installing = true }.disabled(!model.canStart)
+                Section {
+                    LabeledContent("Model", value: "Parakeet v3 · Recommended")
+                    Text("Runs on this device. The \(ByteCountFormatter.string(fromByteCount: model.models.downloadBytes, countStyle: .file)) download includes the speaker-separation model. Wi-Fi is recommended.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                    LabeledContent("Folder") {
+                        Text("On My \(UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone") › Scribe › Models").foregroundStyle(.secondary)
+                    }
+                    modelStatus
+                } header: {
+                    Text("Offline transcription")
+                } footer: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Link("Parakeet v3 on Hugging Face · CC BY 4.0", destination: URL(string: "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml")!)
+                        Link("Speaker diarization on Hugging Face · CC BY 4.0", destination: URL(string: "https://huggingface.co/FluidInference/speaker-diarization-coreml")!)
+                    }
+                }
+                Section {
+                    Button("Install from a folder in Files…") { settings = false; installing = true }
+                        .disabled(!model.canStart || model.modelDownload != nil)
+                } header: {
+                    Text("Install without downloading")
+                } footer: {
+                    Text("Choose a folder that contains both “parakeet-tdt-0.6b-v3-coreml” and “speaker-diarization-coreml”. Files in iCloud Drive are downloaded first. Scribe verifies every file before installing.")
                 }
                 Section("Recording access") {
                     Text("Microphone access is requested when you first record. Recording can continue while the screen is locked. Calls and disconnected microphones can interrupt recording.")
                     Text("Scribe records the microphone. It does not capture audio from calls in Meet, Zoom, Teams, or Slack. Import a recording from those apps to transcribe it.")
                 }
                 Section("Privacy") {
-                    Text("Record with everyone’s permission. Audio and transcripts are stored locally and excluded from device cloud backups. Export shares only the transcript text. Deleting a meeting removes its audio, transcript, and processing files.")
+                    Text("Record with everyone’s permission. Audio and transcripts are stored privately on this device and excluded from device cloud backups; only the models appear in the Scribe folder in Files. Export shares only the transcript text. Deleting a meeting removes its audio, transcript, and processing files.")
                     Text("No account, cloud inference, speech-recognition permission, or contacts access is needed. Speaker names are assigned manually within each meeting.")
                 }
             }.navigationTitle("Settings").toolbar { Button("Done") { settings = false } }

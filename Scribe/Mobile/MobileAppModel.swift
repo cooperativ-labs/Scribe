@@ -9,6 +9,10 @@ final class MobileAppModel {
     var selection: UUID?
     var error: String?
     var modelsInstalled = false
+    var checkingModels = true
+    /// Non-nil while the pinned models are downloading into the Scribe folder.
+    var modelDownload: ModelLibrary.DownloadProgress?
+    var modelDownloadError: String?
     var busy = false
     var recordingID: UUID?
     var processingID: UUID?
@@ -19,6 +23,9 @@ final class MobileAppModel {
     let processor: MeetingProcessor
     let recorder = MicrophoneRecorder()
     private var work: Task<Void, Never>?
+    private var downloadTask: Task<Void, Never>?
+    private var downloadBackgroundTask = UIBackgroundTaskIdentifier.invalid
+    private var downloadExpired = false
 
     init() throws {
         let root = try MeetingStore.defaultRoot()
@@ -26,15 +33,30 @@ final class MobileAppModel {
         guard let manifest = Bundle.main.url(forResource: "model_manifest", withExtension: "json") else {
             throw MobileError.message("The model manifest is missing from this app.")
         }
-        models = try ModelLibrary(directory: root.appending(path: "Models"), manifestURL: manifest)
+        let modelsDirectory = try ModelLibrary.defaultDirectory()
+        // Earlier builds kept models in private Application Support; move them into the Scribe folder.
+        let legacy = root.appending(path: "Models")
+        if FileManager.default.fileExists(atPath: legacy.path), !FileManager.default.fileExists(atPath: modelsDirectory.path) {
+            try? FileManager.default.moveItem(at: legacy, to: modelsDirectory)
+        }
+        // Creating the folder up front makes Scribe appear in Files before the first download.
+        try MeetingStore.privateDirectory(modelsDirectory)
+        models = try ModelLibrary(directory: modelsDirectory, manifestURL: manifest)
         processor = MeetingProcessor(store: store)
         recorder.onStopped = { [weak self] notice in self?.recordingStopped(notice: notice) }
     }
     var selected: Meeting? { meetings.first { $0.id == selection } }
     var canStart: Bool { !busy && recordingID == nil && processingID == nil }
     func load() async {
-        do { meetings = try await store.list(recoverInterrupted: true); modelsInstalled = await models.isInstalled() }
+        do { meetings = try await store.list(recoverInterrupted: true) }
         catch { self.error = error.localizedDescription }
+        await refreshModels()
+    }
+    func refreshModels() async {
+        guard modelDownload == nil else { return }
+        checkingModels = true
+        modelsInstalled = await models.isInstalled()
+        checkingModels = false
     }
     private func update(_ meeting: Meeting) {
         if let index = meetings.firstIndex(where: { $0.id == meeting.id }) { meetings[index] = meeting }
@@ -108,16 +130,53 @@ final class MobileAppModel {
             self.error = error.localizedDescription
         }
     }
+    /// Downloads into the Scribe folder like the desktop installer. Verified files survive a
+    /// cancellation or interruption, so tapping Download again resumes with the remaining files.
+    func downloadModels() {
+        guard downloadTask == nil, !busy else { return }
+        modelDownloadError = nil; downloadExpired = false
+        modelDownload = .init(completedBytes: 0, totalBytes: models.downloadBytes, file: "")
+        // Keep the screen awake and ask for time to finish if Scribe briefly leaves the foreground.
+        UIApplication.shared.isIdleTimerDisabled = true
+        downloadBackgroundTask = UIApplication.shared.beginBackgroundTask(withName: "Scribe model download") { [weak self] in
+            MainActor.assumeIsolated {
+                self?.downloadExpired = true
+                self?.downloadTask?.cancel()
+                self?.endDownloadBackgroundTask()
+            }
+        }
+        downloadTask = Task {
+            do {
+                try await models.download { [weak self] progress in
+                    Task { @MainActor in if self?.downloadTask != nil { self?.modelDownload = progress } }
+                }
+            } catch is CancellationError {
+                if downloadExpired { modelDownloadError = "The download paused while Scribe was in the background. Download again to continue; finished files are kept." }
+            } catch {
+                modelDownloadError = error.localizedDescription
+            }
+            downloadTask = nil; modelDownload = nil
+            UIApplication.shared.isIdleTimerDisabled = false
+            endDownloadBackgroundTask()
+            await refreshModels()
+        }
+    }
+    func cancelModelDownload() { downloadTask?.cancel() }
+    private func endDownloadBackgroundTask() {
+        guard downloadBackgroundTask != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(downloadBackgroundTask)
+        downloadBackgroundTask = .invalid
+    }
     func installModels(_ url: URL) async {
-        guard canStart else { return }
+        guard canStart, modelDownload == nil else { return }
         busy = true; defer { busy = false }
         let granted = url.startAccessingSecurityScopedResource()
         defer { if granted { url.stopAccessingSecurityScopedResource() } }
-        do { try await models.install(from: url); modelsInstalled = true }
+        do { try await models.install(from: url); modelsInstalled = true; modelDownloadError = nil }
         catch { self.error = error.localizedDescription }
     }
     func process(_ meeting: Meeting) {
-        guard canStart else { return }
+        guard canStart, modelDownload == nil else { return }
         processingID = meeting.id; stopPlayback()
         work = Task {
             defer { processingID = nil }

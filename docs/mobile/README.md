@@ -10,16 +10,23 @@ are committed. The desktop app remains in `Scribe.xcodeproj`.
 1. Record an in-person meeting through the microphone, or import a supported
    audio/video file from Files. Import uses the first audio track and platform
    codecs; protected or unsupported media produces an error.
-2. In Settings, install the pinned Scribe model folder. The folder must contain
-   `parakeet-tdt-0.6b-v3-coreml` and `speaker-diarization-coreml`, such as the
-   existing `Workers/TranscriptionWorker/models` produced by the repository's
-   model packaging workflow. Transfer it to Files first and choose the folder
-   that contains both subfolders, not one subfolder on its own. Folders in
-   iCloud Drive or other Files providers are downloaded during installation;
-   a file that never arrives is reported by name. Installation copies
-   only allowlisted files, verifies sizes and SHA-256 values, and preserves a
-   previous installation on verification failure. No network inference or
-   automatic model download runs in the app.
+2. In Settings, tap **Download Model**, as on the desktop. Scribe fetches the
+   pinned Parakeet v3 and speaker-diarization revisions (about 505 MB) from
+   Hugging Face into its on-device folder, shown in Files as
+   **On My iPad › Scribe › Models** (On My iPhone on iPhone). Every file is
+   checked against the bundled manifest's size and SHA-256 before an atomic
+   rename publishes it, so cancelling or losing the connection never leaves a
+   partial model file. Tapping Download again resumes, reusing files that
+   already verify. Keep Scribe open: the screen stays awake during the download,
+   and a download that the system suspends in the background asks you to
+   resume. Inference itself never touches the network.
+
+   Offline alternative: **Install from a folder in Files…** accepts a folder
+   containing `parakeet-tdt-0.6b-v3-coreml` and `speaker-diarization-coreml`,
+   such as `Workers/TranscriptionWorker/models`. Choose the folder that contains
+   both subfolders, not one on its own. iCloud Drive and other provider files are
+   downloaded during installation. Only allowlisted files are copied and
+   verified, and a previous installation is kept if verification fails.
 3. Select Transcribe. Keep Scribe in the foreground. It decodes incrementally to
    16 kHz mono, runs ASR, releases that model set, then runs global diarization.
    Pause or interruption preserves completed stages; Resume starts from the
@@ -64,8 +71,13 @@ scales with Dynamic Type; content remains flat, with glass reserved for controls
   App Group, iCloud or background-inference entitlement is requested.
 - Only user-selected security-scoped file/folder URLs are opened. Imported media
   is copied to the private container with file coordination before access ends.
-- Recordings and checkpoints are below Application Support and excluded from
-  backups. Audio uses `completeUnlessOpen` protection so an already-open
+- The app's Documents folder is the user-visible **Scribe** folder in Files
+  (`UIFileSharingEnabled`, `LSSupportsOpeningDocumentsInPlace`). It holds only
+  `Models`, which is excluded from backups; models from earlier builds are moved
+  there from Application Support on first launch. The only network requests are
+  the user-started model downloads from pinned `huggingface.co` revisions.
+- Recordings and checkpoints are below Application Support, not visible in Files,
+  and excluded from backups. Audio uses `completeUnlessOpen` protection so an already-open
   recording can continue after lock. Metadata uses protection available after
   first unlock, allowing an interrupted recording's state to be saved.
 - Calls/audio interruptions, input disconnection, media-services reset, encoding
