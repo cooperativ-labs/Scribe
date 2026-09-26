@@ -115,6 +115,9 @@ public final class ScribeSettings: ObservableObject {
     @Published public var dictationIndicatorPosition: String {
         didSet { defaults.set(dictationIndicatorPosition, forKey: Key.dictationIndicatorPosition) }
     }
+    @Published public var dictationLivePreview: Bool {
+        didSet { defaults.set(dictationLivePreview, forKey: Key.dictationLivePreview) }
+    }
     @Published public var dictationPlaySounds: Bool {
         didSet { defaults.set(dictationPlaySounds, forKey: Key.dictationPlaySounds) }
     }
@@ -206,6 +209,7 @@ public final class ScribeSettings: ObservableObject {
         dictationTrailingSpace = defaults.object(forKey: Key.dictationTrailingSpace) as? Bool ?? false
         dictationRestoreClipboard = defaults.object(forKey: Key.dictationRestoreClipboard) as? Bool ?? true
         dictationIndicatorPosition = defaults.string(forKey: Key.dictationIndicatorPosition) ?? "caret"
+        dictationLivePreview = defaults.bool(forKey: Key.dictationLivePreview)
         dictationPlaySounds = defaults.object(forKey: Key.dictationPlaySounds) as? Bool ?? false
         dictationLanguage = defaults.string(forKey: Key.dictationLanguage) ?? "automatic"
         dictationKeepModelLoaded = defaults.object(forKey: Key.dictationKeepModelLoaded) as? Bool ?? true
@@ -426,6 +430,7 @@ public final class ScribeSettings: ObservableObject {
         static let dictationTrailingSpace = "scribe.settings.dictation.trailingSpace"
         static let dictationRestoreClipboard = "scribe.settings.dictation.restoreClipboard"
         static let dictationIndicatorPosition = "scribe.settings.dictation.indicatorPosition"
+        static let dictationLivePreview = "scribe.settings.dictation.livePreview"
         static let dictationPlaySounds = "scribe.settings.dictation.playSounds"
         static let dictationLanguage = "scribe.settings.dictation.language"
         static let dictationKeepModelLoaded = "scribe.settings.dictation.keepModelLoaded"

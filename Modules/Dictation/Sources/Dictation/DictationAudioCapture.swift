@@ -44,11 +44,12 @@ final class AudioRing: @unchecked Sendable {
         level = sqrt(sum / Float(incoming))
     }
 
-    func snapshot() -> [Float] {
+    func snapshot(maxSamples: Int = AudioRing.capacity) -> [Float] {
         lock.lock(); defer { lock.unlock() }
         guard count > 0 else { return [] }
-        let start = (cursor - count + Self.capacity) % Self.capacity
-        return (0..<count).map { storage[(start + $0) % Self.capacity] }
+        let length = min(count, max(0, maxSamples))
+        let start = (cursor - length + Self.capacity) % Self.capacity
+        return (0..<length).map { storage[(start + $0) % Self.capacity] }
     }
 
     func rms() -> Float { lock.lock(); defer { lock.unlock() }; return level }
@@ -103,6 +104,9 @@ public final class DictationAudioCapture {
         engine = nil
         isRecording = false
     }
+
+    /// Copies only the recent window; capture continues on the audio queue.
+    func previewSamples() -> [Float] { ring.snapshot(maxSamples: 16_000 * 15) }
 
     public func finish() throws -> [Float] {
         stop()

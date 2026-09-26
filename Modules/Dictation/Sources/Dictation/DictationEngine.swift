@@ -20,6 +20,8 @@ public actor DictationEngine {
     private var pressureSource: DispatchSourceMemoryPressure?
     private var keepLoaded = true
     private var idleMinutes = 10
+    private var requestBusy = false
+    private var requestWaiters: [CheckedContinuation<Void, Never>] = []
     private var inFlight = false
     private var pendingUnload = false
     private var epoch = 0
@@ -110,7 +112,20 @@ public actor DictationEngine {
     }
 
     public func dictate(audioURL: URL, runDirectoryURL: URL, language: String? = nil) async throws -> DictationTranscript {
+        // Actors are reentrant across worker awaits. Serialize preview and final
+        // requests, including a new session started before the old one drains.
+        if requestBusy {
+            await withCheckedContinuation { requestWaiters.append($0) }
+        } else {
+            requestBusy = true
+        }
+        defer {
+            if requestWaiters.isEmpty { requestBusy = false }
+            else { requestWaiters.removeFirst().resume() }
+        }
+        try Task.checkCancellation()
         try await warm()
+        try Task.checkCancellation()
         guard let worker else { throw WorkerFailure(code: "worker_unavailable", message: "Dictation helper is unavailable.") }
         var payload: [String: WorkerJSONValue] = [
             "audioPath": .string(audioURL.path),

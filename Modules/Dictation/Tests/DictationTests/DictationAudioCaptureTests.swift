@@ -3,6 +3,17 @@ import XCTest
 @testable import Dictation
 
 final class DictationAudioCaptureTests: XCTestCase {
+    func testPreviewSnapshotIsBoundedAndDoesNotConsumeFinalAudio() {
+        let ring = AudioRing()
+        let samples = (0..<(AudioRing.capacity + 10)).map(Float.init)
+        samples.withUnsafeBufferPointer { ring.append($0.baseAddress!, count: $0.count) }
+        XCTAssertEqual(ring.snapshot(maxSamples: 4), Array(samples.suffix(4)))
+        XCTAssertEqual(ring.snapshot(maxSamples: 0), [])
+        XCTAssertEqual(ring.snapshot().count, AudioRing.capacity)
+        XCTAssertEqual(ring.snapshot().first, 10)
+        XCTAssertEqual(ring.snapshot(maxSamples: 4), Array(samples.suffix(4)))
+    }
+
     @MainActor
     func testAudioTapConvertsOnBackgroundQueue() async throws {
         let format = try XCTUnwrap(AVAudioFormat(

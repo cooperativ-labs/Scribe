@@ -934,7 +934,7 @@ private struct TranscriptTransportBar: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .modifier(TranscriptGlassPanel())
+        .glassSurface(shape: .rounded(TranscriptDesign.Spacing.transportCornerRadius), interactive: true)
         .padding(.horizontal)
         .padding(.bottom, 12)
         .frame(maxWidth: .infinity)
@@ -954,20 +954,6 @@ private struct TranscriptTransportBar: View {
 
     private static func rateLabel(_ rate: Float) -> String {
         rate == rate.rounded() ? "\(Int(rate))×" : String(format: "%.2g×", rate)
-    }
-}
-
-/// Liquid glass on systems that draw it, a material panel everywhere else.
-private struct TranscriptGlassPanel: ViewModifier {
-    func body(content: Content) -> some View {
-        if #available(macOS 26, *) {
-            content.glassEffect(.regular.interactive(), in: .rect(cornerRadius: 14))
-        } else {
-            content
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
-                .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(.white.opacity(0.18), lineWidth: 0.5))
-                .shadow(color: .black.opacity(0.18), radius: 12, y: 4)
-        }
     }
 }
 

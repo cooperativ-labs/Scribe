@@ -19,6 +19,9 @@ public enum DictationState: Sendable, Equatable {
 public final class DictationCoordinator: ObservableObject {
     @Published public private(set) var state: DictationState = .idle
     @Published public private(set) var triggerMode: DictationTriggerMode = .hold
+    @Published public private(set) var livePreview: String?
+    public var livePreviewEnabled = false
+    private var previewTask: Task<Void, Never>?
     private let engine: DictationEngine
     private let inserter: DictationTextInserter
     private let capture = DictationAudioCapture()
@@ -99,6 +102,7 @@ public final class DictationCoordinator: ObservableObject {
     public func consume(_ event: DictationTriggerEvent) {
         switch event {
         case .listeningStarted(let mode):
+            stopPreview()
             transcriptionTask?.cancel()
             generation += 1
             triggerMode = mode
@@ -112,7 +116,9 @@ public final class DictationCoordinator: ObservableObject {
             }
             do {
                 try capture.start(microphoneID: microphoneID)
+                livePreview = livePreviewEnabled ? "Listening for speech…" : nil
                 state = .listening(level: 0)
+                if livePreviewEnabled { startPreview() }
                 levelTimer?.invalidate()
                 levelTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
                     MainActor.assumeIsolated {
@@ -123,6 +129,7 @@ public final class DictationCoordinator: ObservableObject {
             } catch { state = .error(error.localizedDescription) }
         case .listeningEnded:
             guard capture.isRecording else { return }
+            stopPreview()
             levelTimer?.invalidate()
             levelTimer = nil
             let samples: [Float]
@@ -172,11 +179,13 @@ public final class DictationCoordinator: ObservableObject {
                 state = .error("Maximum dictation length reached. Start a new dictation to continue.")
             }
         case .secureInputBlocked:
+            cancel()
             state = .error("Dictation is paused while Secure Keyboard Entry is on")
         }
     }
 
     public func cancel() {
+        stopPreview()
         generation += 1
         transcriptionTask?.cancel()
         transcriptionTask = nil
@@ -186,6 +195,43 @@ public final class DictationCoordinator: ObservableObject {
         startingFocus?.cancel()
         startingFocus = nil
         state = .idle
+    }
+
+    private func stopPreview() {
+        previewTask?.cancel()
+        previewTask = nil
+        livePreview = nil
+    }
+
+    private func startPreview() {
+        let session = generation
+        let language = self.language
+        previewTask = Task { [weak self, engine] in
+            // One bounded request at a time; slow inference never builds a queue.
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(2)) }
+                catch { return }
+                guard let self, self.generation == session, self.capture.isRecording else { return }
+                let samples = self.capture.previewSamples()
+                guard samples.count >= 8_000 else { continue }
+                let directory = FileManager.default.temporaryDirectory.appending(
+                    path: "ScribeDictationPreview-\(UUID().uuidString)", directoryHint: .isDirectory)
+                do {
+                    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                    defer { try? FileManager.default.removeItem(at: directory) }
+                    let audio = directory.appending(path: "preview.wav")
+                    try Self.writeWAV(samples, to: audio)
+                    let result = try await engine.dictate(audioURL: audio, runDirectoryURL: directory, language: language)
+                    guard !Task.isCancelled, self.generation == session, self.capture.isRecording else { return }
+                    let text = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    self.livePreview = result.hasSpeech && !text.isEmpty ? text : "Listening for speech…"
+                } catch {
+                    guard !Task.isCancelled, self.generation == session, self.capture.isRecording else { return }
+                    self.livePreview = "Preview unavailable. Final transcription will run when you stop."
+                    return
+                }
+            }
+        }
     }
 
     private static func writeWAV(_ samples: [Float], to url: URL) throws {

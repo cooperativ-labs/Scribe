@@ -33,6 +33,21 @@ final class DictationEngineTests: XCTestCase {
             selection.directory = customFolder
             let changed = try await engine.dictate(audioURL: root.appending(path: "audio.wav"), runDirectoryURL: root)
             XCTAssertNotEqual(first.text, changed.text, "A new folder requires a new helper")
+            // Concurrent preview/final calls must not consume each other's
+            // response envelopes or deadlock the resident worker.
+            async let preview = engine.dictate(audioURL: root.appending(path: "audio.wav"), runDirectoryURL: root)
+            async let final = engine.dictate(audioURL: root.appending(path: "audio.wav"), runDirectoryURL: root)
+            let results = try await (preview, final)
+            XCTAssertEqual(results.0.text, changed.text)
+            XCTAssertEqual(results.1.text, changed.text)
+            let cancelled = Task { () throws -> DictationTranscript in
+                withUnsafeCurrentTask { $0?.cancel() }
+                return try await engine.dictate(audioURL: root.appending(path: "audio.wav"), runDirectoryURL: root)
+            }
+            do { _ = try await cancelled.value; XCTFail("Cancelled requests must not reach the worker") }
+            catch is CancellationError { }
+            let afterCancel = try await engine.dictate(audioURL: root.appending(path: "audio.wav"), runDirectoryURL: root)
+            XCTAssertEqual(afterCancel.text, changed.text)
             await engine.unload()
 
             let arguments = try String(contentsOf: root.appending(path: "arguments"), encoding: .utf8)

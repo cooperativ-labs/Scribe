@@ -18,6 +18,7 @@ public final class DictationIndicatorController {
     private let openSettings: () -> Void
     private let panel: NSPanel
     private let host: NSHostingController<DictationIndicatorView>
+    private var previewObservation: AnyCancellable?
     private var observation: AnyCancellable?
     private var mode: DictationTriggerMode = .hold
     private var generation = 0
@@ -51,6 +52,10 @@ public final class DictationIndicatorController {
         panel.isReleasedWhenClosed = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         panel.setAccessibilityLabel("Dictation status")
+        previewObservation = coordinator.$livePreview.sink { [weak self] preview in
+            guard let self, self.visible, case .listening = self.coordinator.state else { return }
+            self.render(self.coordinator.state, preview: preview)
+        }
         observation = coordinator.$state.sink { [weak self] state in self?.apply(state) }
     }
 
@@ -154,13 +159,16 @@ public final class DictationIndicatorController {
         }
     }
 
-    private func render(_ state: DictationState) {
-        guard position() != "off" else { panel.orderOut(nil); return }
+    private func render(_ state: DictationState, preview: String? = nil) {
+        let livePreview: String?
+        if case .listening = state { livePreview = preview ?? coordinator.livePreview }
+        else { livePreview = nil }
+        guard position() != "off" || livePreview != nil else { panel.orderOut(nil); return }
         host.rootView = DictationIndicatorView(
-            state: state, showsToggleControls: mode == .doubleTap, showsTranscribingLabel: showLabel,
+            state: state, livePreview: livePreview, showsToggleControls: mode == .doubleTap, showsTranscribingLabel: showLabel,
             stop: stop, cancel: cancel, openSettings: openSettings
         )
-        let fit = host.sizeThatFits(in: NSSize(width: 700, height: 100))
+        let fit = host.sizeThatFits(in: NSSize(width: 700, height: 240))
         guard fit.width.isFinite, fit.height.isFinite, fit.width > 0, fit.height > 0 else { return }
         let size = NSSize(width: ceil(fit.width), height: ceil(fit.height))
         panel.setContentSize(size)
@@ -168,7 +176,7 @@ public final class DictationIndicatorController {
         guard let screen = targetScreen ?? NSScreen.screens.first(where: { $0.frame.contains(mouse) }) ?? NSScreen.main else { return }
         let visibleFrame = screen.visibleFrame
         var origin: NSPoint
-        if position() == "bottom" || anchor == nil {
+        if position() == "bottom" || position() == "off" || anchor == nil {
             origin = NSPoint(x: visibleFrame.midX - size.width / 2, y: visibleFrame.minY + 20)
         } else {
             origin = NSPoint(x: anchor!.x, y: anchor!.y)

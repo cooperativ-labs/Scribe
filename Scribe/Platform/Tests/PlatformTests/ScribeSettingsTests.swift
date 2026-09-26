@@ -28,6 +28,20 @@ private final class MockLoginItemManager: LoginItemManaging {
 
 @MainActor
 final class ScribeSettingsTests: XCTestCase {
+    func testLivePreviewDefaultsOffAndPersists() throws {
+        let suite = "LivePreviewTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let folder = FileManager.default.temporaryDirectory.appending(path: suite)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let settings = ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: folder)
+        XCTAssertFalse(settings.dictationLivePreview)
+        settings.dictationLivePreview = true
+        XCTAssertTrue(ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: folder).dictationLivePreview)
+        settings.dictationLivePreview = false
+        XCTAssertFalse(ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: folder).dictationLivePreview)
+    }
+
     func testDictationKeyPersistsAndUnknownValuesFallBackToRightCommand() throws {
         let suiteName = "ScribeSettingsTests-\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))

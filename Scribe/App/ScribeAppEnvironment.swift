@@ -181,7 +181,7 @@ final class ScribeAppEnvironment: ObservableObject {
         dictationMonitor.onActivationKeyObserved = { [weak self] in
             self?.settings.noteDictationKey()
         }
-        dictationSettingsObservation = settings.$dictationEnabled.combineLatest(settings.$dictationActivationKey).sink { [weak self] _ in
+        dictationSettingsObservation = settings.$dictationEnabled.combineLatest(settings.$dictationActivationKey, settings.$dictationLivePreview).sink { [weak self] _ in
             Task { @MainActor [weak self] in self?.syncDictationMonitor() }
         }
         dictationPermissionTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
@@ -220,6 +220,7 @@ final class ScribeAppEnvironment: ObservableObject {
             return
         }
         dictationCoordinator.microphoneID = settings.rememberedMicrophoneID
+        dictationCoordinator.livePreviewEnabled = settings.dictationLivePreview
         dictationCoordinator.language = settings.dictationLanguage
         dictationCoordinator.keepModelLoaded = settings.dictationKeepModelLoaded
         dictationCoordinator.idleUnloadMinutes = settings.dictationIdleUnloadMinutes

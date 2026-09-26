@@ -358,6 +358,9 @@ public struct ScribeSettingsView: View {
                     Text("Bottom center").tag("bottom")
                     Text("Off").tag("off")
                 }
+                Toggle("Live Preview", isOn: $settings.dictationLivePreview)
+                Text("Show a read-only draft of recent speech, refreshed every few seconds. Words may change; the full transcript is inserted when you stop. Uses more processing power. If the indicator position is Off, previews appear at the bottom of the screen. Takes effect on your next dictation.")
+                    .font(.caption).foregroundStyle(.secondary)
                 Toggle("Play a sound when listening starts and stops", isOn: $settings.dictationPlaySounds)
             }
             Section("Language") {

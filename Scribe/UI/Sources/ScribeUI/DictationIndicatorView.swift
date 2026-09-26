@@ -4,6 +4,7 @@ import SwiftUI
 /// A small, non-activating readout for the field that had focus at dictation start.
 public struct DictationIndicatorView: View {
     @State private var shimmer = false
+    public let livePreview: String?
     public let state: DictationState
     public let showsToggleControls: Bool
     public let showsTranscribingLabel: Bool
@@ -11,10 +12,11 @@ public struct DictationIndicatorView: View {
     public var cancel: () -> Void = {}
     public var openSettings: () -> Void = {}
 
-    public init(state: DictationState, showsToggleControls: Bool = false,
+    public init(state: DictationState, livePreview: String? = nil, showsToggleControls: Bool = false,
                 showsTranscribingLabel: Bool = false,
                 stop: @escaping () -> Void = {}, cancel: @escaping () -> Void = {},
                 openSettings: @escaping () -> Void = {}) {
+        self.livePreview = livePreview
         self.state = state
         self.showsToggleControls = showsToggleControls
         self.showsTranscribingLabel = showsTranscribingLabel
@@ -24,6 +26,29 @@ public struct DictationIndicatorView: View {
     }
 
     public var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            status
+            if let livePreview {
+                Text("Live Preview · Recent speech")
+                    .font(.caption2).foregroundStyle(.secondary)
+                Text(livePreview)
+                    .font(.system(size: 13))
+                    .lineLimit(5)
+                    .truncationMode(.head)
+                    .frame(width: 320, height: 85, alignment: .topLeading)
+                    .accessibilityLabel("Draft: \(livePreview)")
+            }
+        }
+        .font(.system(size: 12, weight: .medium))
+        .padding(.horizontal, 13)
+        .padding(.vertical, 9)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: livePreview == nil ? 26 : 16))
+        .overlay(RoundedRectangle(cornerRadius: livePreview == nil ? 26 : 16).strokeBorder(.white.opacity(0.2)))
+        .padding(9)
+        .fixedSize()
+    }
+
+    private var status: some View {
         HStack(spacing: 9) {
             switch state {
             case .idle:
@@ -80,12 +105,5 @@ public struct DictationIndicatorView: View {
                     .accessibilityAddTraits(.isButton)
             }
         }
-        .font(.system(size: 12, weight: .medium))
-        .padding(.horizontal, 13)
-        .padding(.vertical, 9)
-        .background(.regularMaterial, in: Capsule())
-        .overlay(Capsule().strokeBorder(.white.opacity(0.2)))
-        .padding(9)
-        .fixedSize()
     }
 }
