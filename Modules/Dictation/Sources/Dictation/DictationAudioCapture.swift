@@ -22,7 +22,7 @@ public enum DictationCaptureError: LocalizedError {
 
 /// Bounded five-minute PCM store. The input tap can append without hopping to
 /// the main actor; snapshots and RMS reads take the same short lock.
-private final class AudioRing: @unchecked Sendable {
+final class AudioRing: @unchecked Sendable {
     static let capacity = 16_000 * 60 * 5
     private let lock = NSLock()
     private var storage = [Float](repeating: 0, count: capacity)
@@ -141,14 +141,24 @@ public final class DictationAudioCapture {
             }
         }
         let inputFormat = input.outputFormat(forBus: 0)
+        let tap = try Self.makeTap(inputFormat: inputFormat, ring: ring)
+        input.installTap(onBus: 0, bufferSize: 1024, format: inputFormat, block: tap)
+        engine.prepare()
+        try engine.start()
+        self.engine = engine
+    }
+
+    // AVFAudio calls the tap on its own serial audio queue. Create both legacy
+    // callbacks outside MainActor so Swift does not add a main-actor check at
+    // entry. The converter belongs to this tap; only the locked ring is shared.
+    nonisolated static func makeTap(inputFormat: AVAudioFormat, ring: AudioRing) throws -> AVAudioNodeTapBlock {
         guard inputFormat.sampleRate > 0,
               let outputFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16_000,
                                                channels: 1, interleaved: false),
               let converter = AVAudioConverter(from: inputFormat, to: outputFormat) else {
             throw DictationCaptureError.inputUnavailable
         }
-        let ring = self.ring
-        input.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { buffer, _ in
+        return { buffer, _ in
             let capacity = AVAudioFrameCount(ceil(Double(buffer.frameLength) * 16_000 / inputFormat.sampleRate) + 64)
             guard let output = AVAudioPCMBuffer(pcmFormat: outputFormat, frameCapacity: capacity) else { return }
             var supplied = false
@@ -163,9 +173,6 @@ public final class DictationAudioCapture {
                 ring.append(pointer, count: Int(output.frameLength))
             }
         }
-        engine.prepare()
-        try engine.start()
-        self.engine = engine
     }
 
     private static func audioDeviceID(for uid: String) -> AudioDeviceID? {
