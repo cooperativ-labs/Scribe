@@ -121,7 +121,10 @@ final class ScribeAppEnvironment: ObservableObject {
 
         transcription = try? TranscriptionHostService(settings: settings, scheduler: processingQueue)
         if let installation = try? WorkerLocator.locate() {
-            dictationCoordinator = DictationCoordinator(engine: DictationEngine(installation: installation))
+            dictationCoordinator = DictationCoordinator(engine: DictationEngine(
+                installation: installation,
+                modelsDirectoryProvider: { @MainActor [settings] in settings.modelsFolderURL }
+            ))
         }
         vocabulary = VocabularyViewModel.applicationSupportModel()
         agentHandoff = AgentHandoffService(settings: settings)

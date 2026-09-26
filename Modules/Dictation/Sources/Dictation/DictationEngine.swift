@@ -12,7 +12,9 @@ public struct DictationTranscript: Sendable, Equatable {
 /// warm or dictate call launches a new one; batch transcription is untouched.
 public actor DictationEngine {
     private let installation: WorkerInstallation
+    private let modelsDirectoryProvider: @Sendable () async -> URL
     private var worker: WorkerClient?
+    private var workerModelsDirectory: URL?
     private var warmTask: Task<WorkerClient, Error>?
     private var idleTask: Task<Void, Never>?
     private var pressureSource: DispatchSourceMemoryPressure?
@@ -22,13 +24,17 @@ public actor DictationEngine {
     private var pendingUnload = false
     private var epoch = 0
 
-    public init(installation: WorkerInstallation) {
+    public init(
+        installation: WorkerInstallation,
+        modelsDirectoryProvider: @escaping @Sendable () async -> URL
+    ) {
         self.installation = WorkerInstallation(
             executableURL: installation.executableURL,
             manifestURL: installation.manifestURL,
             modelsDirectoryURL: installation.modelsDirectoryURL,
             mode: "dictation"
         )
+        self.modelsDirectoryProvider = modelsDirectoryProvider
     }
 
     public func configure(keepLoaded: Bool, idleMinutes: Int) {
@@ -46,7 +52,6 @@ public actor DictationEngine {
     }
 
     public func warm() async throws {
-        if let worker, await worker.isRunning { return }
         if let warmTask {
             let startedAtEpoch = epoch
             let client = try await warmTask.value
@@ -54,9 +59,27 @@ public actor DictationEngine {
             if worker == nil { worker = client }
             return
         }
-        let installation = self.installation
         let startedAtEpoch = epoch
         let task = Task<WorkerClient, Error> {
+            // Resolve the same folder Settings validates on every warm/dictate,
+            // including while a helper is resident. Never use the helper's cwd.
+            let modelsDirectory = await modelsDirectoryProvider()
+            guard epoch == startedAtEpoch else { throw CancellationError() }
+            if let worker, workerModelsDirectory == modelsDirectory, await worker.isRunning {
+                return worker
+            }
+            if let worker {
+                self.worker = nil
+                await worker.shutdown()
+            }
+            guard epoch == startedAtEpoch else { throw CancellationError() }
+            workerModelsDirectory = modelsDirectory
+            let installation = WorkerInstallation(
+                executableURL: self.installation.executableURL,
+                manifestURL: self.installation.manifestURL,
+                modelsDirectoryURL: modelsDirectory,
+                mode: "dictation"
+            )
             let client = WorkerClient(configuration: .init(installation: installation))
             do {
                 let handshake = try await client.handshake()
@@ -81,7 +104,7 @@ public actor DictationEngine {
             warmTask = nil
             scheduleIdleUnload()
         } catch {
-            warmTask = nil
+            if epoch == startedAtEpoch { warmTask = nil }
             throw error
         }
     }
