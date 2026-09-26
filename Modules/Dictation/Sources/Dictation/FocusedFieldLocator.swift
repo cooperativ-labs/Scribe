@@ -45,12 +45,29 @@ public struct SystemFocusedFieldAXClient: FocusedFieldAXClient {
         AXUIElementSetMessagingTimeout(element, 0.25)
         return element
     }
+    /// AX requests aimed at our own process skip IPC and run AppKit's
+    /// accessibility handlers on the calling thread. Off the main thread that
+    /// races NSTextView layout and deadlocks on its internal locks, so any
+    /// request targeting Scribe itself is hopped to the main thread.
+    private func onOwner<T>(pid: pid_t?, _ body: () -> T) -> T {
+        guard pid == getpid(), !Thread.isMainThread else { return body() }
+        return DispatchQueue.main.sync(execute: body)
+    }
+    private func onOwner<T>(of element: AXUIElement, _ body: () -> T) -> T {
+        var owner: pid_t = 0
+        return onOwner(pid: AXUIElementGetPid(element, &owner) == .success ? owner : nil, body)
+    }
     private func attribute(_ name: String, of element: AXUIElement) -> CFTypeRef? {
-        var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(timed(element), name as CFString, &value) == .success else { return nil }
-        return value
+        onOwner(of: element) {
+            var value: CFTypeRef?
+            guard AXUIElementCopyAttributeValue(timed(element), name as CFString, &value) == .success else { return nil }
+            return value
+        }
     }
     public func focusedElement(frontmostPID: pid_t) -> AXUIElement? {
+        onOwner(pid: frontmostPID) { focusedElementUnchecked(frontmostPID: frontmostPID) }
+    }
+    private func focusedElementUnchecked(frontmostPID: pid_t) -> AXUIElement? {
         let system = timed(AXUIElementCreateSystemWide())
         if let value = attribute(kAXFocusedUIElementAttribute as String, of: system),
            CFGetTypeID(value) == AXUIElementGetTypeID() { return timed(value as! AXUIElement) }
@@ -76,20 +93,26 @@ public struct SystemFocusedFieldAXClient: FocusedFieldAXClient {
         return AXValueGetValue(value as! AXValue, .cfRange, &range) ? range : nil
     }
     public func isSettable(_ name: String, on element: AXUIElement) -> Bool {
-        var result = DarwinBoolean(false)
-        return AXUIElementIsAttributeSettable(timed(element), name as CFString, &result) == .success && result.boolValue
+        onOwner(of: element) {
+            var result = DarwinBoolean(false)
+            return AXUIElementIsAttributeSettable(timed(element), name as CFString, &result) == .success && result.boolValue
+        }
     }
     public func setSelectedText(_ text: String, on element: AXUIElement) -> Bool {
-        AXUIElementSetAttributeValue(timed(element), kAXSelectedTextAttribute as CFString, text as CFString) == .success
+        onOwner(of: element) {
+            AXUIElementSetAttributeValue(timed(element), kAXSelectedTextAttribute as CFString, text as CFString) == .success
+        }
     }
     public func precedingCharacter(of element: AXUIElement, range: CFRange) -> String? {
         guard range.location > 0 else { return nil }
         var precedingRange = CFRange(location: range.location - 1, length: 1)
         guard let parameter = AXValueCreate(.cfRange, &precedingRange),
               AXUIElementSetMessagingTimeout(element, 0.25) == .success else { return nil }
-        var value: CFTypeRef?
-        guard AXUIElementCopyParameterizedAttributeValue(element, kAXStringForRangeParameterizedAttribute as CFString, parameter, &value) == .success else { return nil }
-        return value as? String
+        return onOwner(of: element) {
+            var value: CFTypeRef?
+            guard AXUIElementCopyParameterizedAttributeValue(element, kAXStringForRangeParameterizedAttribute as CFString, parameter, &value) == .success else { return nil }
+            return value as? String
+        }
     }
     public func frame(of element: AXUIElement) -> CGRect? {
         guard let position = attribute(kAXPositionAttribute as String, of: element),
@@ -104,9 +127,11 @@ public struct SystemFocusedFieldAXClient: FocusedFieldAXClient {
     public func caretFrame(of element: AXUIElement, range: CFRange) -> CGRect? {
         var copy = range
         guard let parameter = AXValueCreate(.cfRange, &copy) else { return nil }
-        var result: CFTypeRef?
-        guard AXUIElementCopyParameterizedAttributeValue(timed(element), kAXBoundsForRangeParameterizedAttribute as CFString, parameter, &result) == .success,
-              let result, CFGetTypeID(result) == AXValueGetTypeID() else { return nil }
+        let result: CFTypeRef? = onOwner(of: element) {
+            var result: CFTypeRef?
+            return AXUIElementCopyParameterizedAttributeValue(timed(element), kAXBoundsForRangeParameterizedAttribute as CFString, parameter, &result) == .success ? result : nil
+        }
+        guard let result, CFGetTypeID(result) == AXValueGetTypeID() else { return nil }
         var rect = CGRect.zero
         return AXValueGetValue(result as! AXValue, .cgRect, &rect) ? rect : nil
     }
@@ -119,8 +144,10 @@ public struct SystemFocusedFieldAXClient: FocusedFieldAXClient {
         // Electron only exposes its web contents to AX clients that set this
         // documented attribute; VoiceOver-style AXEnhancedUserInterface is avoided
         // because it changes window animation behaviour in the target app.
-        let app = timed(AXUIElementCreateApplication(pid))
-        return AXUIElementSetAttributeValue(app, "AXManualAccessibility" as CFString, kCFBooleanTrue) == .success
+        onOwner(pid: pid) {
+            let app = timed(AXUIElementCreateApplication(pid))
+            return AXUIElementSetAttributeValue(app, "AXManualAccessibility" as CFString, kCFBooleanTrue) == .success
+        }
     }
 }
 
