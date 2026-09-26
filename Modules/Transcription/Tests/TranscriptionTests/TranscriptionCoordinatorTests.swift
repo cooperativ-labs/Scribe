@@ -64,6 +64,24 @@ final class TranscriptionCoordinatorTests: XCTestCase {
         }
     }
 
+    func testRelaunchWithIndexedJobRecoversItOnce() async throws {
+        // A queued job is both listed in the queue index and discoverable in
+        // its run directory; launch must merge the two, not trap on the id.
+        let store = root.appendingPathComponent("Meeting Transcripts", isDirectory: true)
+        let source = root.appendingPathComponent("meeting.flac")
+        try Data("audio bytes".utf8).write(to: source)
+        let first = try TranscriptionCoordinator(
+            configuration: .init(transcriptStoreURL: store),
+            scheduler: TestScheduler(captureActive: true),
+            stageRunner: RecordingRunner()
+        )
+        let job = try await first.enqueue(.init(sourceURL: source, modelProfileID: "parakeet-v3"))
+
+        let relaunched = try TranscriptionCoordinator(configuration: .init(transcriptStoreURL: store), stageRunner: RecordingRunner())
+        let pendingIDs = await relaunched.pendingJobs().map(\.id)
+        XCTAssertEqual(pendingIDs, [job.id])
+    }
+
     func testActiveCaptureDefersQueuedWorkUntilItEnds() async throws {
         let store = root.appendingPathComponent("Meeting Transcripts", isDirectory: true)
         let source = root.appendingPathComponent("meeting.flac")

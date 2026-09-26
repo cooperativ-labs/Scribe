@@ -77,7 +77,11 @@ public actor TranscriptionCoordinator {
         try fileManager.createDirectory(at: configuration.transcriptStoreURL, withIntermediateDirectories: true)
         let indexed = try Self.readQueueIndex(at: configuration.queueFileURL, fileManager: fileManager)
         let discovered = Self.discoverRecoverableJobs(in: configuration.transcriptStoreURL, fileManager: fileManager)
-        var recoveredByID = Dictionary(uniqueKeysWithValues: (indexed + discovered).map { ($0.id, $0) })
+        // Every indexed job also lives in a run directory, so discovery finds it
+        // a second time; keep whichever copy was written last.
+        var recoveredByID = Dictionary((indexed + discovered).map { ($0.id, $0) }) { first, second in
+            second.updatedAt > first.updatedAt ? second : first
+        }
         for id in recoveredByID.keys {
             guard var job = recoveredByID[id], !job.state.isTerminal else { continue }
             // A process that stopped while a stage was executing has no claim to
