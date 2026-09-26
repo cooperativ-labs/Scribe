@@ -25,6 +25,8 @@ private final class FakeAX: FocusedFieldAXClient, @unchecked Sendable {
     var range = CFRange(location: 6, length: 0)
     var directWorks = false
     var textRole = true
+    var electron = false
+    var manualAccessibilityRequests = 0
     func focusedElement(frontmostPID: pid_t) -> AXUIElement? { frontmostPID == targetPID ? element : nil }
     func pid(of element: AXUIElement) -> pid_t? { targetPID }
     func string(_ attribute: String, of element: AXUIElement) -> String? {
@@ -41,6 +43,11 @@ private final class FakeAX: FocusedFieldAXClient, @unchecked Sendable {
     func frame(of element: AXUIElement) -> CGRect? { nil }
     func caretFrame(of element: AXUIElement, range: CFRange) -> CGRect? { nil }
     func window(of element: AXUIElement) -> AXUIElement? { nil }
+    func enableManualAccessibility(pid: pid_t) -> Bool {
+        manualAccessibilityRequests += 1
+        if electron { textRole = true }
+        return electron
+    }
 }
 
 @MainActor private final class FakePaste: DictationPasteClient {
@@ -79,5 +86,26 @@ final class DictationTextInserterTests: XCTestCase {
         XCTAssertEqual(outcome, .copied)
         XCTAssertEqual(paste.copied, " hello")
         XCTAssertNil(paste.pasted)
+    }
+    @MainActor func testElectronTreeIsEnabledBeforeInsertion() async {
+        let ax = FakeAX()
+        ax.textRole = false
+        ax.electron = true
+        let paste = FakePaste()
+        let inserter = DictationTextInserter(locator: FocusedFieldLocator(client: ax), paste: paste)
+        let outcome = await inserter.insertDictation("hello", frontmostPID: ax.targetPID, screenTop: 100,
+                                                    screens: [], currentPID: { ax.targetPID })
+        XCTAssertEqual(outcome, .pasted)
+        XCTAssertEqual(paste.pasted, "hello")
+        XCTAssertNil(paste.copied)
+        XCTAssertEqual(ax.manualAccessibilityRequests, 1)
+    }
+    @MainActor func testManualAccessibilityRequestedOncePerProcess() async {
+        let ax = FakeAX()
+        ax.textRole = false
+        let locator = FocusedFieldLocator(client: ax)
+        _ = await locator.locate(frontmostPID: ax.targetPID, screenTop: 100, screens: [])
+        _ = await locator.locate(frontmostPID: ax.targetPID, screenTop: 100, screens: [])
+        XCTAssertEqual(ax.manualAccessibilityRequests, 1)
     }
 }

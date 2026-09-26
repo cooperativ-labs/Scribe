@@ -31,6 +31,12 @@ public protocol FocusedFieldAXClient: Sendable {
     func frame(of element: AXUIElement) -> CGRect?
     func caretFrame(of element: AXUIElement, range: CFRange) -> CGRect?
     func window(of element: AXUIElement) -> AXUIElement?
+    /// Asks a Chromium/Electron app to build its accessibility tree. Returns true when the app accepted it.
+    func enableManualAccessibility(pid: pid_t) -> Bool
+}
+
+public extension FocusedFieldAXClient {
+    func enableManualAccessibility(pid: pid_t) -> Bool { false }
 }
 
 public struct SystemFocusedFieldAXClient: FocusedFieldAXClient {
@@ -109,19 +115,50 @@ public struct SystemFocusedFieldAXClient: FocusedFieldAXClient {
               CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
         return (value as! AXUIElement)
     }
+    public func enableManualAccessibility(pid: pid_t) -> Bool {
+        // Electron only exposes its web contents to AX clients that set this
+        // documented attribute; VoiceOver-style AXEnhancedUserInterface is avoided
+        // because it changes window animation behaviour in the target app.
+        let app = timed(AXUIElementCreateApplication(pid))
+        return AXUIElementSetAttributeValue(app, "AXManualAccessibility" as CFString, kCFBooleanTrue) == .success
+    }
 }
 
 public actor FocusedFieldLocator {
     private let client: any FocusedFieldAXClient
+    private var manualAccessibilityRequested: Set<pid_t> = []
     public init(client: any FocusedFieldAXClient = SystemFocusedFieldAXClient()) { self.client = client }
 
-    public func locate(frontmostPID: pid_t, screenTop: CGFloat, screens: [CGRect]) -> FocusedFieldSnapshot? {
+    private static let textRoles: Set<String> = ["AXTextField", "AXTextArea", "AXWebArea", "AXComboBox", "AXSearchField"]
+
+    private func focusedElement(frontmostPID: pid_t) -> AXUIElement? {
         guard let element = client.focusedElement(frontmostPID: frontmostPID),
               client.pid(of: element) == frontmostPID else { return nil }
+        return element
+    }
+
+    /// Electron apps expose only opaque groups until an AX client opts in. The
+    /// first request per process waits briefly while Chromium builds the tree.
+    private func focusedElementEnablingElectron(frontmostPID: pid_t) async -> AXUIElement? {
+        let element = focusedElement(frontmostPID: frontmostPID)
+        let isText = element.map { Self.textRoles.contains(client.string(kAXRoleAttribute as String, of: $0) ?? "") } ?? false
+        guard !isText, !manualAccessibilityRequested.contains(frontmostPID) else { return element }
+        manualAccessibilityRequested.insert(frontmostPID)
+        guard client.enableManualAccessibility(pid: frontmostPID) else { return element }
+        for _ in 0..<8 {
+            try? await Task.sleep(for: .milliseconds(50))
+            if let retry = focusedElement(frontmostPID: frontmostPID),
+               Self.textRoles.contains(client.string(kAXRoleAttribute as String, of: retry) ?? "") { return retry }
+        }
+        return focusedElement(frontmostPID: frontmostPID) ?? element
+    }
+
+    public func locate(frontmostPID: pid_t, screenTop: CGFloat, screens: [CGRect]) async -> FocusedFieldSnapshot? {
+        guard let element = await focusedElementEnablingElectron(frontmostPID: frontmostPID) else { return nil }
         let role = client.string(kAXRoleAttribute as String, of: element)
         let subrole = client.string(kAXSubroleAttribute as String, of: element)
         let secure = subrole == "AXSecureTextField" || role == "AXSecureTextField"
-        let textRole = ["AXTextField", "AXTextArea", "AXWebArea", "AXComboBox", "AXSearchField"].contains(role ?? "")
+        let textRole = Self.textRoles.contains(role ?? "")
         let range = client.selectedRange(of: element)
         func converted(_ rect: CGRect?) -> CGRect? {
             guard let rect, rect.isFinite, rect.width >= 0, rect.height > 0,
