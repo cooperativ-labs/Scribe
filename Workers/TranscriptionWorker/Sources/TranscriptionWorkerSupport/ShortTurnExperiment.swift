@@ -2,7 +2,7 @@ import FluidAudio
 import Foundation
 
 /// Explicit benchmark surface. The production diarize(fileURL:) path is unchanged.
-/// Audited against FluidAudio 41540ea: cluster(_:) does not use the embedding
+/// Audited against FluidAudio 21493f8: cluster(_:) does not use the embedding
 /// duration outside reconstruction when zeroVoteReembed is disabled.
 extension OfflineDiarizationAdapter {
     public struct ShortTurnVariant: Encodable, Sendable {

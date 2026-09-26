@@ -1,4 +1,81 @@
-# FluidAudio 0.17 upgrade recommendation — coo:1069
+# FluidAudio 0.17.4 upgrade — coo:1069
+
+Implemented 2026-09-26 for objective `coo:1069.5tg3`. This supersedes the
+original recommendation below: the worker and dictation probe now pin **0.17.4**,
+revision **`21493f8dac5a97e65742e6ff26f42f164c2fda0f`**. SwiftPM regenerated both
+package lockfiles and Xcode regenerated its lockfile. Runtime provenance,
+protocol expectations, and shipped dependency/model notices agree with the pin.
+No adapter API migration was required.
+
+The production stack remains Parakeet v3 plus offline VBx, using the same staged
+model manifest and assets. Nemotron is not enabled. Upstream's
+[v0.17.4 release](https://github.com/FluidInference/FluidAudio/releases/tag/v0.17.4)
+adds an M3 ANE-compatible Nemotron model path and logger controls; neither
+requires changing Scribe's model selection.
+
+## Validation on this host
+
+Built with Apple Swift 6.4 / Xcode beta, arm64 macOS 27, using isolated outputs
+under ignored `build/fluidaudio-0174/`. The fetched checkout's HEAD agrees with
+the resolved revision. Transcript-free results and executable hashes are in
+[fluidaudio-0174-validation.json](fluidaudio-0174-validation.json).
+
+| Check | Result |
+|---|---|
+| Worker release build and tests | All six executable products built; all 18 tests passed, covering token boundaries, VBx controls/export, enrollment clipping, cancellation/checkpoints, and dictation validation. |
+| Dictation probe release build | Passed against the same exact pin. |
+| Xcode Debug app | Build and deep/strict signature verification passed. |
+| Three upstream real ASR seam/final-window fixtures (16.9–21.4 s) | All expected final phrases retained; the third fixture includes “code and analyzing” without the former duplicated fragment. All token timings monotonic and in bounds. |
+| Three-second silence | Empty ASR result and dictation `no_speech`, no tokens. |
+| Full CAB ASR, 7,021.0265 s | Text and all **32,782 complete token records** (text, identity, start/end, confidence) exactly equal the frozen 0.15.7 transcript. Chunked processing; timings monotonic and in bounds. |
+| Full CAB VBx | All **779 interval records** and configuration exactly equal the frozen 0.15.7 output, including ten output clusters and overlap metadata. |
+| CAB attribution with current host replay | Both saved baseline and candidate score **4.685% canonical / 1.837% effective WDER**, 19,488 scored words. The historical 1.888% effective figure used older host replay; this is not an engine improvement. |
+| Resident dictation worker | Handshake reports 0.17.4; asset validation, warm, 3 s speech, longer speech, silence, unload, rewarm, and repeated requests pass. English, German and automatic modes exercised; German system-voice fixture retains expected words. Returned token timings valid. |
+| Offline inference | ASR, CAB VBx and resident dictation run under `sandbox-exec` with `(deny network*)`, using staged assets and bundled Silero VAD. |
+
+The entire upstream `Sources/FluidAudio/Diarizer/Offline` tree is unchanged
+between v0.15.7 and v0.17.4, including VBx clustering, FBank model use, embedding
+extraction and PLDA. Retain `fluidaudio-offline-fbank-16khz-mono-v0.15.6` as the
+voiceprint representation identifier. Model weights and normalization remain
+unchanged. The frozen CAB snapshot intentionally has no embedding vectors, so
+interval equality is not itself a cross-version vector comparison. A separate
+21.4-second, exact-one-speaker comparison against the cached development
+0.15.7 binary produced an exactly equal exported embedding record and intervals;
+both engine revisions were checked in the output.
+
+Serial CAB ASR took **36.7 s** on the new build versus **43.7 s** on the
+cached 0.15.7 development binary, with identical text. The control was not
+freshly rebuilt; its checkout revision and executable hash are recorded. This
+is one local comparison, not a general speedup claim. The initial 110.6 s
+candidate run overlapped other inference/compilation and is not comparable.
+CAB diarization took 43.9 s. Resident dictation's first warm took 73.5 s;
+rewarm took 4.9 s, and warm speech requests took 0.24–0.74 s in that run.
+Cold model-loading latency remains a limitation of this smoke test.
+
+## Reproduction and limits
+
+```sh
+swift test --package-path Workers/TranscriptionWorker \
+  --scratch-path build/fluidaudio-0174/worker --build-system swiftbuild -c release
+swift build --package-path Tools/DictationFeasibility \
+  --scratch-path build/fluidaudio-0174/probe --build-system swiftbuild -c release
+xcodebuild -project Scribe.xcodeproj -scheme Scribe -configuration Debug \
+  -destination 'platform=macOS,arch=arm64' -derivedDataPath build/fluidaudio-0174/app \
+  -clonedSourcePackagesDirPath build/fluidaudio-0174/xcode-packages \
+  ARCHS=arm64 EXCLUDED_ARCHS=x86_64 build
+```
+
+The ignored validation directory retains local harnesses, logs, raw outputs,
+and a deny-network sandbox profile. Meeting audio, transcripts, and voiceprints
+are not added to tracked source. The German fixture is synthesized, not a real
+German meeting. This verifies the worker protocol and local signed app build;
+it does not claim a microphone/Accessibility paste flow, a notarized release
+archive, a clean-machine installation, or broad English/German quality coverage.
+No deployment or release was performed.
+
+---
+
+# Original assessment — 2026-09-25
 
 Investigated 2026-09-25. This is a dependency assessment; no worker pin or
 production behavior changed.

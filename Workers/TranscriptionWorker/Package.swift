@@ -13,15 +13,11 @@ let package = Package(
         .executable(name: "SpeakerEnrollmentCalibration", targets: ["SpeakerEnrollmentCalibration"]),
     ],
     dependencies: [
-        // Deliberately exact rather than `from:`: token timing and diarization
-        // behaviour are part of the worker protocol's compatibility surface.
-        //
         // Keep the release exact: ASR token timing, long-file merge behavior,
-        // and offline diarization are part of the worker protocol's
-        // compatibility surface. v0.15.7 fixes speaker ceilings and structured
-        // cancellation while preserving the v0.15.6 embedding representation.
+        // and offline diarization are part of the worker protocol contract.
+        // v0.17.4 retains the VBx backend; Nemotron is not enabled by this pin.
         // Models remain staged locally; runtime downloads stay disabled.
-        .package(url: "https://github.com/FluidInference/FluidAudio.git", exact: "0.15.7"),
+        .package(url: "https://github.com/FluidInference/FluidAudio.git", exact: "0.17.4"),
         .package(path: "../../Modules/Speakers"),
     ],
     targets: [

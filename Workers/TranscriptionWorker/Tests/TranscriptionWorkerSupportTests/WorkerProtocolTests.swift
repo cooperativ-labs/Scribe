@@ -130,7 +130,7 @@ func offlineDiarizationContract() throws {
     #expect(result.embeddings.allSatisfy { abs($0.vector.reduce(0) { $1 * $1 + $0 }.squareRoot() - 1) < 0.0001 })
     #expect(result.embeddings.allSatisfy { $0.modelID == "wespeaker-embedding-coreml" })
     #expect(result.embeddings.allSatisfy { $0.preprocessingVersion == "fluidaudio-offline-fbank-16khz-mono-v0.15.6" })
-    #expect(result.engine.runtime == "FluidAudio 0.15.7")
+    #expect(result.engine.runtime == "FluidAudio 0.17.4")
     #expect(result.configuration.clusteringThreshold == 0.6)
     #expect(result.clusteringDiagnostics.separationAppearsCollapsed == false)
 }

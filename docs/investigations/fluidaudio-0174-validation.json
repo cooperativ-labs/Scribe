@@ -1,0 +1,300 @@
+{
+  "date": "2026-09-26",
+  "objective": "coo:1069.5tg3",
+  "fluidAudioVersion": "0.17.4",
+  "fluidAudioRevision": "21493f8dac5a97e65742e6ff26f42f164c2fda0f",
+  "toolchain": "Apple Swift 6.4 (swiftlang-6.4.0.27.1), Xcode-beta, arm64 macOS 27",
+  "binarySHA256": {
+    "TranscriptionWorker": "15e0a0df13df7d0fd94cd7f7b677e319933f3e3ee979ca1cad076a0214e959a3",
+    "ASRBenchmark": "2808a57c8edb28a70913449435906e384a86341c253b2cc4c385f731f5e26001",
+    "DiarizationBenchmark": "f670fd89ed561e32df4b35e070c58ed7f97f001eb50b69997b9471d859112807",
+    "DictationLatencyProbe": "bf040ffc2de89b094d1112f01f7b28209a762fe943ba936814a4a7d30c9839d1"
+  },
+  "builds": {
+    "workerRelease": "passed",
+    "workerTestsPassed": 18,
+    "dictationProbeRelease": "passed",
+    "xcodeDebugApp": "passed",
+    "xcodeAppDeepStrictCodeSignature": "passed"
+  },
+  "networkPolicy": "sandbox-exec: (version 1) (allow default) (deny network*)",
+  "asrFixtures": [
+    {
+      "sourceDurationSeconds": 21.439625,
+      "tokens": 89,
+      "usedChunkedProcessing": true,
+      "timingsAreMonotonicAndInBounds": true,
+      "asrProcessingSeconds": 0.7168170213699341,
+      "fixture": "01-validation-request-21.4s",
+      "tailPresent": true
+    },
+    {
+      "sourceDurationSeconds": 19.7863125,
+      "tokens": 92,
+      "usedChunkedProcessing": true,
+      "timingsAreMonotonicAndInBounds": true,
+      "asrProcessingSeconds": 0.4428669214248657,
+      "fixture": "02-release-readiness-19.8s",
+      "tailPresent": true
+    },
+    {
+      "sourceDurationSeconds": 16.9373125,
+      "tokens": 55,
+      "usedChunkedProcessing": true,
+      "timingsAreMonotonicAndInBounds": true,
+      "asrProcessingSeconds": 0.4469640254974365,
+      "fixture": "03-diff-explanation-16.9s",
+      "tailPresent": true
+    },
+    {
+      "sourceDurationSeconds": 3,
+      "tokens": 0,
+      "usedChunkedProcessing": false,
+      "timingsAreMonotonicAndInBounds": true,
+      "asrProcessingSeconds": 0.09957802295684814,
+      "fixture": "silence",
+      "tailPresent": true
+    }
+  ],
+  "cabASR": {
+    "oldTokenCount": 32782,
+    "newTokenCount": 32782,
+    "identicalText": true,
+    "matchingTokenCount": 32782,
+    "changedSpans": 0,
+    "insertedTokens": 0,
+    "removedTokens": 0,
+    "matchedStartDeltaMedian": 0.0,
+    "matchedStartDeltaMax": 0.0,
+    "timingsValid": true,
+    "processingSeconds": 110.58961701393127,
+    "completeTokenRecordsIdentical": true,
+    "serialControlSeconds": 43.718640089035034,
+    "serialCandidateSeconds": 36.70069909095764,
+    "serialTextIdentical": true,
+    "controlBuild": "Cached build/dev/TranscriptionWorker release binary; dependency checkout at 41540ea237350afe5117a082b5c28eda642d0612; not freshly rebuilt",
+    "controlASRBinarySHA256": "2c3c7b04f96b7f6ed0410d6712aca2acda5bc593aabeacd49146cba647b81244",
+    "timingCaveat": "Single runs; first candidate run overlapped other checks. No general speedup claim."
+  },
+  "cabDiarization": {
+    "intervals": 779,
+    "outputClusters": 10,
+    "intervalsExactlyMatchSaved0157": true,
+    "configurationExactlyMatchesSaved0157": true,
+    "wallClockSeconds": 43.902525,
+    "engine": {
+      "modelRevision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594",
+      "runtime": "FluidAudio 0.17.4",
+      "runtimeRevision": "21493f8dac5a97e65742e6ff26f42f164c2fda0f"
+    },
+    "currentHostReplayBaselineAndCandidate": {
+      "canonicalWDERPercent": 4.685,
+      "effectiveWDERPercent": 1.837,
+      "scoredWords": 19488
+    },
+    "historicalEffectiveWDERPercent": 1.888,
+    "scoreCaveat": "Recomputed both baseline and candidate using the current host replay; effective-score change is not an engine improvement."
+  },
+  "dictation": [
+    {
+      "operation": "handshake",
+      "clip": null,
+      "language": null,
+      "seconds": 0.445,
+      "status": null,
+      "tokens": 0
+    },
+    {
+      "operation": "validate_assets",
+      "clip": null,
+      "language": null,
+      "seconds": 2.26,
+      "status": "ready",
+      "tokens": 0
+    },
+    {
+      "operation": "warm",
+      "clip": null,
+      "language": null,
+      "seconds": 73.531,
+      "status": "ready",
+      "tokens": 0
+    },
+    {
+      "operation": "dictate",
+      "clip": "silence.wav",
+      "language": "automatic",
+      "seconds": 0.038,
+      "status": "no_speech",
+      "tokens": 0
+    },
+    {
+      "operation": "dictate",
+      "clip": "short.wav",
+      "language": "en",
+      "seconds": 0.235,
+      "status": "complete",
+      "tokens": 10
+    },
+    {
+      "operation": "dictate",
+      "clip": "speech.wav",
+      "language": "automatic",
+      "seconds": 0.501,
+      "status": "complete",
+      "tokens": 89
+    },
+    {
+      "operation": "dictate",
+      "clip": "speech.wav",
+      "language": "de",
+      "seconds": 0.744,
+      "status": "complete",
+      "tokens": 89
+    },
+    {
+      "operation": "unload",
+      "clip": null,
+      "language": null,
+      "seconds": 0.049,
+      "status": "ready",
+      "tokens": 0
+    },
+    {
+      "operation": "warm",
+      "clip": null,
+      "language": null,
+      "seconds": 4.894,
+      "status": "ready",
+      "tokens": 0
+    },
+    {
+      "operation": "dictate",
+      "clip": "short.wav",
+      "language": "automatic",
+      "seconds": 0.313,
+      "status": "complete",
+      "tokens": 10
+    },
+    {
+      "operation": "unload",
+      "clip": null,
+      "language": null,
+      "seconds": 0.012,
+      "status": "ready",
+      "tokens": 0
+    }
+  ],
+  "dictationGerman": [
+    {
+      "operation": "handshake",
+      "clip": null,
+      "language": null,
+      "seconds": 0.034,
+      "status": null,
+      "tokens": 0
+    },
+    {
+      "operation": "validate_assets",
+      "clip": null,
+      "language": null,
+      "seconds": 2.429,
+      "status": "ready",
+      "tokens": 0
+    },
+    {
+      "operation": "warm",
+      "clip": null,
+      "language": null,
+      "seconds": 0.982,
+      "status": "ready",
+      "tokens": 0
+    },
+    {
+      "operation": "dictate",
+      "clip": "silence.wav",
+      "language": "automatic",
+      "seconds": 0.043,
+      "status": "no_speech",
+      "tokens": 0
+    },
+    {
+      "operation": "dictate",
+      "clip": "short.wav",
+      "language": "en",
+      "seconds": 0.151,
+      "status": "complete",
+      "tokens": 10
+    },
+    {
+      "operation": "dictate",
+      "clip": "speech.wav",
+      "language": "automatic",
+      "seconds": 0.244,
+      "status": "complete",
+      "tokens": 89
+    },
+    {
+      "operation": "dictate",
+      "clip": "german.wav",
+      "language": "de",
+      "seconds": 0.148,
+      "status": "complete",
+      "tokens": 41
+    },
+    {
+      "operation": "dictate",
+      "clip": "german.wav",
+      "language": "automatic",
+      "seconds": 0.135,
+      "status": "complete",
+      "tokens": 41
+    },
+    {
+      "operation": "unload",
+      "clip": null,
+      "language": null,
+      "seconds": 0.005,
+      "status": "ready",
+      "tokens": 0
+    },
+    {
+      "operation": "warm",
+      "clip": null,
+      "language": null,
+      "seconds": 0.706,
+      "status": "ready",
+      "tokens": 0
+    },
+    {
+      "operation": "dictate",
+      "clip": "short.wav",
+      "language": "automatic",
+      "seconds": 0.109,
+      "status": "complete",
+      "tokens": 10
+    },
+    {
+      "operation": "unload",
+      "clip": null,
+      "language": null,
+      "seconds": 0.003,
+      "status": "ready",
+      "tokens": 0
+    }
+  ],
+  "limits": [
+    "No notarized archive, clean-machine installation, or microphone/Accessibility GUI flow performed.",
+    "German audio is a system-voice synthetic fixture, not a real meeting.",
+    "Initial dictation warm took 73.531 seconds; rewarm 4.894 seconds. Warm speech requests were under one second in this sample."
+  ],
+  "embeddingComparison": {
+    "fixture": "21.4-second upstream real speech fixture, exact one-speaker constraint",
+    "controlRevision": "41540ea237350afe5117a082b5c28eda642d0612",
+    "candidateRevision": "21493f8dac5a97e65742e6ff26f42f164c2fda0f",
+    "exportedEmbeddingsExactlyEqual": true,
+    "embeddingCount": 1,
+    "intervalsExactlyEqual": true,
+    "controlBuild": "Cached development release binary; not freshly rebuilt"
+  }
+}

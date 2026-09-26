@@ -1,7 +1,7 @@
 Offline speaker-diarization models
 
 This release uses the FluidInference Core ML speaker-diarization asset set
-consumed by FluidAudio v0.15.6 (pyannote segmentation, WeSpeaker embeddings,
+consumed by FluidAudio v0.17.4 (pyannote segmentation, WeSpeaker embeddings,
 and VBx clustering parameters).
 
 Upstream: https://huggingface.co/FluidInference/speaker-diarization-coreml

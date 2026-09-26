@@ -5,15 +5,15 @@ import Foundation
 /// Offline Parakeet v3 adapter for a *already prepared* 16 kHz mono source.
 ///
 /// `AsrManager.transcribe(_:decoderState:)` is deliberately used instead of a
-/// custom window implementation. In the pinned FluidAudio v0.15.6 it switches long
+/// custom window implementation. In the pinned FluidAudio v0.17.4 it switches long
 /// files to its disk-backed `ChunkProcessor`, which keeps 80 ms left context,
 /// uses a 2 s overlap, rebases decoder frames by the chunk start, and removes
 /// boundary duplicates before returning `ASRResult.tokenTimings` in seconds.
 ///
 /// v0.12.5 first carried the decoder's own token durations all the way through
-/// that chunk merge. v0.15.6 retains that fix and adds upstream seam-gap
-/// repair, final-window alignment, and token-order preservation. Word ends are
-/// decoder durations rather than next-token endpoints, so a token may
+/// that chunk merge. v0.17.4 also includes upstream seam reconciliation,
+/// fresh-state final-window decoding, and vocabulary-derived punctuation.
+/// Word ends are decoder durations rather than next-token endpoints, so a token may
 /// legitimately end a few frames past the prepared audio; that tail is clamped
 /// to the source duration rather than rejected.
 public struct ParakeetAdapter: Sendable {

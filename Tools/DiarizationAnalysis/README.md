@@ -17,7 +17,7 @@ swift build --package-path Workers/TranscriptionWorker --scratch-path "$EVAL/wor
   --build-system swiftbuild -c release --product ASRBenchmark
 ```
 
-For this Swift build system, executables are under `worker-build/out/Products/Release`. Confirm the actual build output path on your toolchain. The worker pin is FluidAudio `41540ea237350afe5117a082b5c28eda642d0612` (0.15.7).
+For this Swift build system, executables are under `worker-build/out/Products/Release`. Confirm the actual build output path on your toolchain. The worker pin is FluidAudio `21493f8dac5a97e65742e6ff26f42f164c2fda0f` (0.17.4).
 
 Build the public SpeakerKit SDK in a separate checkout of `https://github.com/argmaxinc/argmax-oss-swift.git`, at commit `ea872ffd35705aa757f33033500b9b0d40bd38df`, with `swift build -c release --product argmax-cli`. Its executable is `.build/release/argmax-cli`.
 
@@ -37,7 +37,7 @@ python3 Tools/DiarizationAnalysis/benchmark.py RUNS \
   --engine fluid --binary "$EVAL/worker-build/out/Products/Release/DiarizationBenchmark" \
   --models "$HOME/Library/Application Support/Scribe/Models" \
   --manifest Workers/TranscriptionWorker/model_manifest.json \
-  --revision 41540ea237350afe5117a082b5c28eda642d0612 --output "$EVAL/results"
+  --revision 21493f8dac5a97e65742e6ff26f42f164c2fda0f --output "$EVAL/results"
 
 python3 Tools/DiarizationAnalysis/benchmark.py RUNS \
   --engine speakerkit --binary /path/to/argmax-cli --models /path/to/speakerkit-coreml \

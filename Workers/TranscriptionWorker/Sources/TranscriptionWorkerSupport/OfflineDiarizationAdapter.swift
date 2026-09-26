@@ -155,12 +155,14 @@ public struct OfflineDiarizationAdapter: Sendable {
     }
 
     private static let embeddingModelID = "wespeaker-embedding-coreml"
-    public static let fluidAudioVersion = "0.15.7"
-    public static let fluidAudioRevision = "41540ea237350afe5117a082b5c28eda642d0612"
+    public static let fluidAudioVersion = "0.17.4"
+    public static let fluidAudioRevision = "21493f8dac5a97e65742e6ff26f42f164c2fda0f"
     /// v0.15.6 fixes the mask-matrix transpose and rejects very low-support
     /// masks before embedding. Those operations change vector semantics even
     /// though the WeSpeaker weights are unchanged, so old voiceprints must not
     /// be compared as if they shared a representation.
+    /// The offline diarizer source is unchanged from v0.15.7 to v0.17.4;
+    /// retain the representation identifier so existing voiceprints remain valid.
     private static let preprocessingVersion = "fluidaudio-offline-fbank-16khz-mono-v0.15.6"
     private static let normalizationVersion = "l2-unit-v1"
 
