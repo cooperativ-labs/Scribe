@@ -3,7 +3,7 @@ import SwiftUI
 import Vocabulary
 
 /// The compact settings pane used by the menu-bar app, split into General,
-/// Recording, Transcription, and Dictation tabs.
+/// Recording, Transcription, Dictation, and Assistants tabs.
 ///
 /// Source selection reads from and writes to the same `RecorderMenuModel` as
 /// the menu, so the pickers here show the applications and microphones that
@@ -29,6 +29,7 @@ public struct ScribeSettingsView: View {
     @State private var dictationAccess = DictationAccess.current()
     @ObservedObject private var modelInstaller: TranscriptionModelInstaller
     @StateObject private var shortcutCapture: ShortcutCaptureModel
+    @StateObject private var assistantConnector = AssistantConnectorPackage()
 
     /// `onShortcutCaptureChange` is called with `true` while a shortcut field is
     /// listening for keys and `false` when it stops, so the owner can take the
@@ -57,7 +58,8 @@ public struct ScribeSettingsView: View {
     public var body: some View {
         ScrollViewReader { proxy in
             VStack(spacing: 0) {
-                HStack(spacing: 4) {
+                // Five tabs only just fit the 560-point pane; keep them tight.
+                HStack(spacing: 2) {
                     ForEach(SettingsTab.allCases, id: \.self) { tab in
                         settingsTabButton(tab)
                     }
@@ -105,6 +107,7 @@ public struct ScribeSettingsView: View {
             case .recording: recordingTab
             case .transcription: transcriptionTab
             case .dictation: dictationTab
+            case .assistants: AssistantSettingsView(package: assistantConnector)
             }
         }
     }
@@ -118,7 +121,7 @@ public struct ScribeSettingsView: View {
             Label(tab.title, systemImage: tab.symbol)
                 .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
                 .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
-                .padding(.horizontal, 12)
+                .padding(.horizontal, 10)
                 .padding(.vertical, 8)
                 .background(
                     isSelected ? Color.accentColor.opacity(0.14) : .clear,
@@ -440,13 +443,14 @@ public struct ScribeSettingsView: View {
     }
 }
 
-/// The tabs Settings is split into: the app itself, capturing audio, and
-/// turning that audio into a transcript.
+/// The tabs Settings is split into: the app itself, capturing audio, turning
+/// that audio into a transcript, dictation, and connecting AI assistants.
 enum SettingsTab: Hashable, CaseIterable {
     case general
     case recording
     case transcription
     case dictation
+    case assistants
 
     var title: String {
         switch self {
@@ -454,6 +458,7 @@ enum SettingsTab: Hashable, CaseIterable {
         case .recording: "Recording"
         case .transcription: "Transcription"
         case .dictation: "Dictation"
+        case .assistants: "Assistants"
         }
     }
 
@@ -463,6 +468,7 @@ enum SettingsTab: Hashable, CaseIterable {
         case .recording: "record.circle"
         case .transcription: "text.quote"
         case .dictation: "waveform"
+        case .assistants: "sparkles"
         }
     }
 

@@ -11,6 +11,28 @@ it directly over stdio. ChatGPT and Claude web connect over Streamable HTTP and
 OAuth. It does not call a model API or require OpenAI/Anthropic API keys. The
 assistant performs the requested analysis on retrieved text.
 
+## From the Scribe app
+
+Settings → **Assistants** does the setup below from buttons, with the
+remaining steps listed beside each one:
+
+- **Add to Claude Code** stages the bundled plugin marketplace in
+  `~/Library/Application Support/Scribe/Integrations/claude` and runs
+  `claude plugin marketplace add` and `claude plugin install scribe@scribe-local`
+  in a login shell. **Copy Commands** copies the same two commands instead.
+- **Public address** takes your HTTPS tunnel/proxy origin and shows the
+  connector URL (`…/mcp`). **Copy Server Command** copies a command that
+  creates the owner key on first run and starts the HTTP bridge from the staged
+  copy, allowing Claude's callback (`https://claude.ai/api/mcp/auth_callback`)
+  and the ChatGPT callback, if one was entered. **Copy Owner Key** copies the
+  key for Scribe's consent page.
+- **Add to ChatGPT…** and **Add to Claude…** copy the connector URL and open
+  `chatgpt.com/plugins` or `claude.ai/customize/connectors` for pasting.
+
+`Scripts/build-app.sh` and `Scripts/package-app.sh` embed the package through
+`Scripts/embed-assistant-connector.sh` (a release requires npm; a development
+build skips it without npm, and the tab then says so).
+
 ## Build and test
 
 Node.js 22 or newer is required. From this directory:

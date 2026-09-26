@@ -150,6 +150,7 @@ worker_resources="$(dirname "$worker_path")/TranscriptionWorker_TranscriptionWor
 ditto "$worker_resources" "$helpers_dir/TranscriptionWorker_TranscriptionWorkerSupport.bundle"
 ditto "$worker_resources" "$app_path/Contents/Resources/TranscriptionWorker_TranscriptionWorkerSupport.bundle"
 bash "$repo_root/Scripts/embed-ffmpeg-runtime.sh" "$SCRIBE_FFMPEG_PATH" "$SCRIBE_FFPROBE_PATH" "$helpers_dir" "$frameworks_dir"
+bash "$repo_root/Scripts/embed-assistant-connector.sh" "$app_path"
 
 if [[ -n "${SCRIBE_RUNTIME_PAYLOADS_DIR:-}" ]]; then
   echo "Embedding local helper runtime payloads…"

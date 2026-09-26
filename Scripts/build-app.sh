@@ -103,6 +103,7 @@ fi
 
 ditto "$worker_path" "$helpers_dir/TranscriptionWorker"
 bash "$repo_root/Scripts/embed-ffmpeg-runtime.sh" "$ffmpeg_path" "$ffprobe_path" "$helpers_dir" "$frameworks_dir"
+bash "$repo_root/Scripts/embed-assistant-connector.sh" --optional "$app_path"
 
 # Xcode has already signed the bundle, and adding files to Contents invalidates
 # that seal. Re-sign ad hoc, leaves first, preserving the identifier and
