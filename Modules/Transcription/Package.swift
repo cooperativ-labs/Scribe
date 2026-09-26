@@ -6,6 +6,7 @@ let package = Package(
     platforms: [.macOS(.v15)],
     products: [.library(name: "Transcription", targets: ["Transcription"])],
     dependencies: [
+        .package(path: "../ScribeDesign"),
         // The speaker library is an independent service contract; review shares its
         // person IDs rather than defining a second identity type.
         .package(path: "../Speakers"),
@@ -18,6 +19,7 @@ let package = Package(
         .target(
             name: "Transcription",
             dependencies: [
+                .product(name: "ScribeDesign", package: "ScribeDesign"),
                 .product(name: "Speakers", package: "Speakers"),
                 .product(name: "ScribeAppCore", package: "app"),
             ],

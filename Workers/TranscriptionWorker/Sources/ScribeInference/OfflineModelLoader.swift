@@ -2,7 +2,7 @@
 import FluidAudio
 import Foundation
 
-/// The only model-loading entry point for the worker. It constructs FluidAudio
+/// Shared model-loading entry point for desktop workers and the mobile app. It constructs FluidAudio
 /// model values from files the host explicitly staged; it intentionally never
 /// calls `AsrModels.download`, `downloadAndLoad`, `DownloadUtils`, or a cache
 /// convenience API that may attempt recovery by downloading.

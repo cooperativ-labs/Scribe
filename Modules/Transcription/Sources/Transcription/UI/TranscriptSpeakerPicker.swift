@@ -171,86 +171,41 @@ struct TranscriptNewPersonPopover: View {
     }
 }
 
-/// Confirmation flow for matches the matcher scored but would not name.
-struct TranscriptSuggestionBanner: View {
-    let viewModel: TranscriptViewModel
-
-    var body: some View {
-        if !viewModel.pendingSuggestions.isEmpty {
-            VStack(alignment: .leading, spacing: 6) {
-                ForEach(viewModel.pendingSuggestions) { suggestion in
-                    HStack(spacing: 10) {
-                        Label(
-                            "\(suggestion.speakerID) may be \(suggestion.person.displayName) (\(suggestion.scoreDescription))",
-                            systemImage: "questionmark.circle"
-                        )
-                        Spacer()
-                        Button("Confirm") { viewModel.confirm(suggestion) }
-                        Button("Not now") { viewModel.dismiss(suggestion) }
-                    }
-                    .font(.callout)
-                }
-                Text("The generic label stays until you confirm. A similarity score is not proof of identity.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.yellow.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
-        }
-    }
-}
-
-/// The recording-local speakers of the selected transcript, each with its
-/// naming dropdown, a filter shortcut, and the separate enrollment action.
-struct TranscriptSpeakersInspector: View {
+/// The recording-local speakers of the selected transcript as a wrapping row
+/// of chips: palette dot, name, and turn count.
+///
+/// Clicking a chip filters the list to that speaker; pressing and holding or
+/// right-clicking opens naming, merging, and Remember Voice. A pending match
+/// rides on its chip with a one-tap confirm, and "Not now" lives in the chip's
+/// menu. The row wraps to at most three lines and then scrolls horizontally, so
+/// many speakers cannot squeeze the transcript out of the window.
+struct TranscriptSpeakerChips: View {
     @Bindable var viewModel: TranscriptViewModel
     @State private var newPersonSpeakerID: String?
+    @State private var availableWidth: CGFloat = 0
+
+    static let maxLines = 3
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            ForEach(viewModel.speakerRows) { row in
-                HStack(alignment: .center, spacing: 8) {
-                    Button {
-                        viewModel.speakerFilterID = viewModel.speakerFilterID == row.speakerID ? nil : row.speakerID
-                    } label: {
-                        Image(systemName: viewModel.speakerFilterID == row.speakerID ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
-                            .foregroundStyle(viewModel.speakerFilterID == row.speakerID ? Color.accentColor : Color.secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .help(viewModel.speakerFilterID == row.speakerID ? "Show every speaker" : "Show only this speaker's turns")
-                    .accessibilityLabel("Filter to \(row.label)")
-
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(row.label).fontWeight(.medium)
-                        Text("\(row.statusDescription) · \(row.segmentCount) turn\(row.segmentCount == 1 ? "" : "s")")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    TranscriptSpeakerMenu(
-                        viewModel: viewModel,
-                        scope: .cluster(speakerID: row.speakerID),
-                        onNewPerson: { newPersonSpeakerID = row.speakerID }
-                    ) {
-                        Text(row.profileID == nil ? "Name…" : "Rename…")
-                    }
-                    .help("Name every turn of this speaker, merge them into another speaker, or clear the name.")
-                    .popover(
-                        isPresented: Binding(
-                            get: { newPersonSpeakerID == row.speakerID },
-                            set: { if !$0, newPersonSpeakerID == row.speakerID { newPersonSpeakerID = nil } }
-                        ),
-                        arrowEdge: .bottom
-                    ) {
-                        TranscriptNewPersonPopover(viewModel: viewModel, scope: .cluster(speakerID: row.speakerID))
-                    }
-                    Button("Remember Voice…") { viewModel.beginRememberingVoice(speakerID: row.speakerID) }
-                        .help("Enroll confirmed excerpts so this person is recognised in future recordings.")
+        ScrollView(.horizontal) {
+            TranscriptChipFlowLayout(
+                targetWidth: availableWidth,
+                spacing: TranscriptDesign.Spacing.chipSpacing,
+                maxLines: Self.maxLines
+            ) {
+                ForEach(viewModel.speakerRows) { row in
+                    chip(for: row)
                 }
-                .padding(.vertical, 2)
             }
         }
+        .scrollIndicators(.automatic)
+        .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+        // The flow is at most three chip lines tall, so its ideal height is
+        // bounded; the horizontal scroll view otherwise has no height of its own.
+        .fixedSize(horizontal: false, vertical: true)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { availableWidth = $0 }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Speakers in this recording")
         .sheet(
             isPresented: Binding(
                 get: { viewModel.enrollmentSpeakerID != nil },
@@ -260,6 +215,185 @@ struct TranscriptSpeakersInspector: View {
             TranscriptEnrollmentSheet(viewModel: viewModel)
         }
     }
+
+    @ViewBuilder
+    private func chip(for row: TranscriptSpeakerRow) -> some View {
+        let isSelected = viewModel.speakerFilterID == row.speakerID
+        let color = viewModel.color(forSpeakerID: row.speakerID) ?? Color.secondary
+        // A speaker nobody has named yet keeps the dashed dot, as its turns do.
+        let swatch = row.profileID == nil ? nil : viewModel.speakerSwatch(forSpeakerID: row.speakerID)
+
+        HStack(spacing: 4) {
+            Menu {
+                menuItems(for: row)
+            } label: {
+                HStack(spacing: 6) {
+                    TranscriptSpeakerDot(swatch)
+                    Text(row.label)
+                        .foregroundStyle(.primary)
+                    Text(row.segmentCount, format: .number)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+                .font(TranscriptDesign.TypeRole.chip)
+                .lineLimit(1)
+                .contentShape(Capsule())
+            } primaryAction: {
+                viewModel.speakerFilterID = isSelected ? nil : row.speakerID
+            }
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help(chipHelp(for: row, isSelected: isSelected))
+            .accessibilityLabel("\(row.label), \(row.segmentCount) turn\(row.segmentCount == 1 ? "" : "s")")
+            .accessibilityValue(isSelected ? "Showing only this speaker" : "")
+            .accessibilityHint("Toggles a filter to this speaker's turns. Open the menu to name, merge, or remember the voice.")
+            .accessibilityAddTraits(isSelected ? .isSelected : [])
+
+            if let suggestion = row.suggestion {
+                suggestionBadge(suggestion, row: row)
+            }
+        }
+        .padding(.leading, 8)
+        .padding(.trailing, row.suggestion == nil ? 10 : 3)
+        .padding(.vertical, row.suggestion == nil ? 5 : 3)
+        .background(
+            isSelected ? color.opacity(TranscriptDesign.Tint.chipFill) : Color.primary.opacity(TranscriptDesign.Tint.neutralFill),
+            in: Capsule()
+        )
+        .overlay {
+            Capsule().strokeBorder(
+                isSelected ? color.opacity(0.6) : Color.primary.opacity(TranscriptDesign.Tint.hairline),
+                lineWidth: isSelected ? 1 : 0.5
+            )
+        }
+        .contextMenu { menuItems(for: row) }
+        .popover(
+            isPresented: Binding(
+                get: { newPersonSpeakerID == row.speakerID },
+                set: { if !$0, newPersonSpeakerID == row.speakerID { newPersonSpeakerID = nil } }
+            ),
+            arrowEdge: .bottom
+        ) {
+            TranscriptNewPersonPopover(viewModel: viewModel, scope: .cluster(speakerID: row.speakerID))
+        }
+    }
+
+    @ViewBuilder
+    private func menuItems(for row: TranscriptSpeakerRow) -> some View {
+        if let suggestion = row.suggestion {
+            Section("Suggested: \(suggestion.person.displayName) (\(suggestion.percentDescription))") {
+                Button("Confirm \(suggestion.person.displayName)") { viewModel.confirm(suggestion) }
+                Button("Not Now") { viewModel.dismiss(suggestion) }
+            }
+            Divider()
+        }
+        TranscriptSpeakerMenuItems(viewModel: viewModel, scope: .cluster(speakerID: row.speakerID)) {
+            newPersonSpeakerID = row.speakerID
+        }
+        Divider()
+        Button("Remember Voice…") { viewModel.beginRememberingVoice(speakerID: row.speakerID) }
+    }
+
+    private func suggestionBadge(_ suggestion: TranscriptSpeakerSuggestion, row: TranscriptSpeakerRow) -> some View {
+        Button {
+            viewModel.confirm(suggestion)
+        } label: {
+            HStack(spacing: 4) {
+                Text(suggestion.chipBadgeTitle)
+                Image(systemName: "checkmark.circle.fill")
+            }
+            .font(TranscriptDesign.TypeRole.badge)
+            .lineLimit(1)
+            .foregroundStyle(TranscriptDesign.reviewUncertain)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2)
+            .background(TranscriptDesign.reviewUncertain.opacity(TranscriptDesign.Tint.chipFill), in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .fixedSize()
+        .help("Confirm \(suggestion.person.displayName) for \(row.label). \(suggestion.scoreDescription.capitalizedFirst); a similarity score is not proof of identity. \"Not Now\" is in the chip's menu.")
+        .accessibilityLabel("Confirm \(suggestion.person.displayName) for \(row.label), \(suggestion.percentDescription) similar")
+    }
+
+    private func chipHelp(for row: TranscriptSpeakerRow, isSelected: Bool) -> String {
+        let action = isSelected ? "Click to show every speaker." : "Click to show only this speaker's turns."
+        return "\(row.statusDescription). \(action) Press and hold or right-click to name, merge, or remember this voice."
+    }
+}
+
+/// Wraps chips onto lines no wider than `targetWidth`, widening the lines when
+/// that would take more than `maxLines`, so the surrounding horizontal scroll
+/// view scrolls instead of the row growing taller.
+struct TranscriptChipFlowLayout: Layout {
+    var targetWidth: CGFloat
+    var spacing: CGFloat
+    var maxLines: Int
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        return Self.arrange(sizes: sizes, targetWidth: targetWidth, spacing: spacing, maxLines: maxLines).size
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        let arrangement = Self.arrange(sizes: sizes, targetWidth: targetWidth, spacing: spacing, maxLines: maxLines)
+        for (index, origin) in arrangement.origins.enumerated() {
+            subviews[index].place(
+                at: CGPoint(x: bounds.minX + origin.x, y: bounds.minY + origin.y),
+                proposal: ProposedViewSize(sizes[index])
+            )
+        }
+    }
+
+    struct Arrangement: Equatable {
+        var origins: [CGPoint]
+        var size: CGSize
+        var lineCount: Int
+    }
+
+    /// Greedy line filling at the narrowest width, from `targetWidth` up to one
+    /// single line, that fits in `maxLines`.
+    static func arrange(sizes: [CGSize], targetWidth: CGFloat, spacing: CGFloat, maxLines: Int) -> Arrangement {
+        guard !sizes.isEmpty else { return Arrangement(origins: [], size: .zero, lineCount: 0) }
+        let singleLine = sizes.map(\.width).reduce(0, +) + spacing * CGFloat(sizes.count - 1)
+        let widest = sizes.map(\.width).max() ?? 0
+        var width = min(max(targetWidth, widest), singleLine)
+        var arrangement = fill(sizes: sizes, width: width, spacing: spacing)
+        while arrangement.lineCount > max(maxLines, 1), width < singleLine {
+            width = min(width + max(widest / 2, 24), singleLine)
+            arrangement = fill(sizes: sizes, width: width, spacing: spacing)
+        }
+        return arrangement
+    }
+
+    private static func fill(sizes: [CGSize], width: CGFloat, spacing: CGFloat) -> Arrangement {
+        var origins: [CGPoint] = []
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var lineHeight: CGFloat = 0
+        var usedWidth: CGFloat = 0
+        var lineCount = 1
+        for size in sizes {
+            if x > 0, x + size.width > width + 0.5 {
+                y += lineHeight + spacing
+                x = 0
+                lineHeight = 0
+                lineCount += 1
+            }
+            origins.append(CGPoint(x: x, y: y))
+            usedWidth = max(usedWidth, x + size.width)
+            x += size.width + spacing
+            lineHeight = max(lineHeight, size.height)
+        }
+        return Arrangement(origins: origins, size: CGSize(width: usedWidth, height: y + lineHeight), lineCount: lineCount)
+    }
+}
+
+private extension String {
+    var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
 }
 
 /// Confirms clean excerpts before any voice signature is written.

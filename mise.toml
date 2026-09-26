@@ -30,6 +30,14 @@ cd Modules/Vocabulary && swift test
 cd Tools/ScribeVocabulary && swift test
 """
 
+[tasks.test-integrations]
+description = "Test Scribe MCP, OAuth, and transcript retrieval (Node.js 22+)"
+run = "npm --prefix Integrations/scribe test"
+
+[tasks.build-integrations]
+description = "Bundle the Scribe ChatGPT and Claude MCP bridge"
+run = "npm --prefix Integrations/scribe run build"
+
 [tasks.version]
 description = "Set the next UTC timestamp-based marketing and build version"
 run = "Scripts/bump-minor-version.sh"

@@ -64,20 +64,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     self.dictationStartSoundTask = nil
                     if listening, environment.settings.dictationPlaySounds {
                         if dictation.triggerMode == .doubleTap {
-                            NSSound(named: NSSound.Name("Tink"))?.play()
+                            NSSound(named: NSSound.Name("ScribeMicStart"))?.play()
                             self.didPlayDictationStartSound = true
                         } else {
                             self.dictationStartSoundTask = Task { [weak self] in
                                 try? await Task.sleep(for: .milliseconds(300))
                                 guard let self, !Task.isCancelled,
                                       case .listening = dictation.state else { return }
-                                NSSound(named: NSSound.Name("Tink"))?.play()
+                                NSSound(named: NSSound.Name("ScribeMicStart"))?.play()
                                 self.didPlayDictationStartSound = true
                             }
                         }
                     } else if !listening {
                         if self.didPlayDictationStartSound, environment.settings.dictationPlaySounds {
-                            NSSound(named: NSSound.Name("Pop"))?.play()
+                            NSSound(named: NSSound.Name("ScribeMicStop"))?.play()
                         }
                         self.didPlayDictationStartSound = false
                     }

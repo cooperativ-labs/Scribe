@@ -1,3 +1,4 @@
+import ScribeInference
 import Foundation
 
 /// Extracts a single-speaker embedding from confirmed enrollment ranges by

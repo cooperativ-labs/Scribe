@@ -27,6 +27,14 @@ temporary WAV given to the local worker is removed after transcription.
 Text goes directly into the focused field when possible, with a paste fallback
 for apps that do not support Accessibility insertion.
 
+## ChatGPT and Claude
+
+The [Scribe MCP integration](Integrations/scribe/README.md) lets ChatGPT and
+Claude find recent meetings, search saved transcripts, and retrieve timestamped
+text for summaries and action items. It includes a local Claude Code plugin,
+an OAuth-protected remote connector, and a ChatGPT transcript viewer. Setup is
+opt-in; recording and transcription continue to work offline.
+
 ## Build and test
 
 The host is macOS 15+ and Apple-Silicon-first. With Xcode installed, build and
@@ -276,3 +284,7 @@ on macOS, including an active recording, a cancelled/failed download, and an
 unwritable installation. Automated tests cover archive selection/extraction,
 bundle identity/version rejection, replacement, and rollback; they substitute
 code-signing assessment and Launch Services in the transaction fixtures.
+
+## iPad and iPhone foundation
+
+The native mobile app is in `ScribeMobile.xcodeproj`. See [the mobile guide](docs/mobile/README.md) for microphone recording, local imports, verified offline model setup, shared design/inference architecture, and device tests.

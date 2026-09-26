@@ -1,3 +1,4 @@
+import ScribeInference
 @preconcurrency import AVFoundation
 @preconcurrency import CoreML
 import FluidAudio

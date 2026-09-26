@@ -57,6 +57,16 @@ public struct OfflineDiarizationAdapter: Sendable {
         public let runtime: String
         public let runtimeRevision: String
         public let modelRevision: String
+
+        package init(
+            runtime: String,
+            runtimeRevision: String,
+            modelRevision: String
+        ) {
+            self.runtime = runtime
+            self.runtimeRevision = runtimeRevision
+            self.modelRevision = modelRevision
+        }
     }
 
     public struct AppliedConfiguration: Codable, Sendable, Equatable {
@@ -74,6 +84,36 @@ public struct OfflineDiarizationAdapter: Sendable {
         public let warmStartFa: Double
         public let warmStartFb: Double
         public let maximumVBxIterations: Int
+
+        package init(
+            knownSpeakerCount: Int?,
+            maximumSpeakerCount: Int?,
+            minimumGapDurationSeconds: Double,
+            minimumSegmentDurationSeconds: Double,
+            clusteringThreshold: Double,
+            embeddingExcludeOverlap: Bool,
+            minimumEmbeddingDurationSeconds: Double,
+            segmentationStepRatio: Double,
+            preserveOverlappingIntervals: Bool,
+            constrainedAssignment: Bool,
+            warmStartFa: Double,
+            warmStartFb: Double,
+            maximumVBxIterations: Int
+        ) {
+            self.knownSpeakerCount = knownSpeakerCount
+            self.maximumSpeakerCount = maximumSpeakerCount
+            self.minimumGapDurationSeconds = minimumGapDurationSeconds
+            self.minimumSegmentDurationSeconds = minimumSegmentDurationSeconds
+            self.clusteringThreshold = clusteringThreshold
+            self.embeddingExcludeOverlap = embeddingExcludeOverlap
+            self.minimumEmbeddingDurationSeconds = minimumEmbeddingDurationSeconds
+            self.segmentationStepRatio = segmentationStepRatio
+            self.preserveOverlappingIntervals = preserveOverlappingIntervals
+            self.constrainedAssignment = constrainedAssignment
+            self.warmStartFa = warmStartFa
+            self.warmStartFb = warmStartFb
+            self.maximumVBxIterations = maximumVBxIterations
+        }
     }
 
     public struct ClusterOccupancy: Codable, Sendable, Equatable {
@@ -81,6 +121,18 @@ public struct OfflineDiarizationAdapter: Sendable {
         public let embeddingCount: Int
         public let intervalCount: Int
         public let intervalSeconds: TimeInterval
+
+        package init(
+            clusterID: String,
+            embeddingCount: Int,
+            intervalCount: Int,
+            intervalSeconds: TimeInterval
+        ) {
+            self.clusterID = clusterID
+            self.embeddingCount = embeddingCount
+            self.intervalCount = intervalCount
+            self.intervalSeconds = intervalSeconds
+        }
     }
 
     public struct ClusteringDiagnostics: Codable, Sendable, Equatable {
@@ -94,6 +146,26 @@ public struct OfflineDiarizationAdapter: Sendable {
         /// This is deliberately a review signal, not an inferred speaker
         /// count. A genuine monologue can be highly imbalanced too.
         public let separationAppearsCollapsed: Bool
+
+        package init(
+            heuristicVersion: String,
+            embeddingCount: Int,
+            intervalCount: Int,
+            overlapIntervalCount: Int,
+            occupancies: [ClusterOccupancy],
+            dominantEmbeddingFraction: Double?,
+            dominantIntervalFraction: Double?,
+            separationAppearsCollapsed: Bool
+        ) {
+            self.heuristicVersion = heuristicVersion
+            self.embeddingCount = embeddingCount
+            self.intervalCount = intervalCount
+            self.overlapIntervalCount = overlapIntervalCount
+            self.occupancies = occupancies
+            self.dominantEmbeddingFraction = dominantEmbeddingFraction
+            self.dominantIntervalFraction = dominantIntervalFraction
+            self.separationAppearsCollapsed = separationAppearsCollapsed
+        }
     }
 
     public struct SpeakerInterval: Codable, Sendable, Equatable {
@@ -103,6 +175,20 @@ public struct OfflineDiarizationAdapter: Sendable {
         public let endSeconds: TimeInterval
         public let qualityScore: Float
         public let overlapsAnotherSpeaker: Bool
+
+        package init(
+            speakerID: String,
+            startSeconds: TimeInterval,
+            endSeconds: TimeInterval,
+            qualityScore: Float,
+            overlapsAnotherSpeaker: Bool
+        ) {
+            self.speakerID = speakerID
+            self.startSeconds = startSeconds
+            self.endSeconds = endSeconds
+            self.qualityScore = qualityScore
+            self.overlapsAnotherSpeaker = overlapsAnotherSpeaker
+        }
     }
 
     /// A normalized global speaker vector suitable for comparison only with a
@@ -114,6 +200,22 @@ public struct OfflineDiarizationAdapter: Sendable {
         public let modelRevision: String
         public let preprocessingVersion: String
         public let normalizationVersion: String
+
+        package init(
+            speakerID: String,
+            vector: [Float],
+            modelID: String,
+            modelRevision: String,
+            preprocessingVersion: String,
+            normalizationVersion: String
+        ) {
+            self.speakerID = speakerID
+            self.vector = vector
+            self.modelID = modelID
+            self.modelRevision = modelRevision
+            self.preprocessingVersion = preprocessingVersion
+            self.normalizationVersion = normalizationVersion
+        }
     }
 
     public struct Result: Codable, Sendable, Equatable {
@@ -125,6 +227,26 @@ public struct OfflineDiarizationAdapter: Sendable {
         public let engine: Engine
         public let configuration: AppliedConfiguration
         public let clusteringDiagnostics: ClusteringDiagnostics
+
+        package init(
+            intervals: [SpeakerInterval],
+            embeddings: [SpeakerEmbedding],
+            sourceDurationSeconds: TimeInterval,
+            usedDiskBackedAudio: Bool,
+            timings: Timings?,
+            engine: Engine,
+            configuration: AppliedConfiguration,
+            clusteringDiagnostics: ClusteringDiagnostics
+        ) {
+            self.intervals = intervals
+            self.embeddings = embeddings
+            self.sourceDurationSeconds = sourceDurationSeconds
+            self.usedDiskBackedAudio = usedDiskBackedAudio
+            self.timings = timings
+            self.engine = engine
+            self.configuration = configuration
+            self.clusteringDiagnostics = clusteringDiagnostics
+        }
     }
 
     public struct Timings: Codable, Sendable, Equatable {
@@ -134,6 +256,22 @@ public struct OfflineDiarizationAdapter: Sendable {
         public let speakerClusteringSeconds: TimeInterval
         public let postProcessingSeconds: TimeInterval
         public let totalProcessingSeconds: TimeInterval
+
+        package init(
+            audioLoadingSeconds: TimeInterval,
+            segmentationSeconds: TimeInterval,
+            embeddingExtractionSeconds: TimeInterval,
+            speakerClusteringSeconds: TimeInterval,
+            postProcessingSeconds: TimeInterval,
+            totalProcessingSeconds: TimeInterval
+        ) {
+            self.audioLoadingSeconds = audioLoadingSeconds
+            self.segmentationSeconds = segmentationSeconds
+            self.embeddingExtractionSeconds = embeddingExtractionSeconds
+            self.speakerClusteringSeconds = speakerClusteringSeconds
+            self.postProcessingSeconds = postProcessingSeconds
+            self.totalProcessingSeconds = totalProcessingSeconds
+        }
     }
 
     public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {

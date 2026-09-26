@@ -28,6 +28,8 @@
 		100000000000000000000119 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000009 /* Assets.xcassets */; };
 		100000000000000000000120 /* model_manifest.json in Resources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000010 /* model_manifest.json */; };
 		100000000000000000000121 /* Dictation in Frameworks */ = {isa = PBXBuildFile; productRef = 100000000000000000000214 /* Dictation */; };
+		100000000000000000000122 /* ScribeMicStart.wav in Resources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000011 /* ScribeMicStart.wav */; };
+		100000000000000000000123 /* ScribeMicStop.wav in Resources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000012 /* ScribeMicStop.wav */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -42,6 +44,8 @@
 		100000000000000000000006 /* ScribeAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ScribeAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		100000000000000000000009 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Resources/Assets.xcassets; sourceTree = "<group>"; };
 		100000000000000000000010 /* model_manifest.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = Workers/TranscriptionWorker/model_manifest.json; sourceTree = SOURCE_ROOT; };
+		100000000000000000000011 /* ScribeMicStart.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = Resources/ScribeMicStart.wav; sourceTree = "<group>"; };
+		100000000000000000000012 /* ScribeMicStop.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = Resources/ScribeMicStop.wav; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -54,7 +58,7 @@
 		100000000000000000000402 /* Scribe */ = {isa = PBXGroup; children = (100000000000000000000405 /* App */); path = Scribe; sourceTree = "<group>"; };
 		100000000000000000000403 /* Tests */ = {isa = PBXGroup; children = (100000000000000000000406 /* ScribeAppTests */); path = Tests; sourceTree = "<group>"; };
 		100000000000000000000404 /* Products */ = {isa = PBXGroup; children = (100000000000000000000005 /* Scribe.app */, 100000000000000000000006 /* ScribeAppTests.xctest */); name = Products; sourceTree = "<group>"; };
-		100000000000000000000405 /* App */ = {isa = PBXGroup; children = (100000000000000000000001 /* ScribeApp.swift */, 100000000000000000000002 /* AppDelegate.swift */, 100000000000000000000007 /* ScribeAppEnvironment.swift */, 100000000000000000000008 /* TranscriptionHostService.swift */, 10000000000000000000000A /* LatchAgentDispatcher.swift */, 100000000000000000000009 /* Assets.xcassets */, 100000000000000000000003 /* Scribe.entitlements */); path = App; sourceTree = "<group>"; };
+		100000000000000000000405 /* App */ = {isa = PBXGroup; children = (100000000000000000000001 /* ScribeApp.swift */, 100000000000000000000002 /* AppDelegate.swift */, 100000000000000000000007 /* ScribeAppEnvironment.swift */, 100000000000000000000008 /* TranscriptionHostService.swift */, 10000000000000000000000A /* LatchAgentDispatcher.swift */, 100000000000000000000009 /* Assets.xcassets */, 100000000000000000000011 /* ScribeMicStart.wav */, 100000000000000000000012 /* ScribeMicStop.wav */, 100000000000000000000003 /* Scribe.entitlements */); path = App; sourceTree = "<group>"; };
 		100000000000000000000406 /* ScribeAppTests */ = {isa = PBXGroup; children = (100000000000000000000004 /* ScribeAppTests.swift */); path = ScribeAppTests; sourceTree = "<group>"; };
 /* End PBXGroup section */
 
@@ -68,7 +72,7 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		100000000000000000000303 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (100000000000000000000119 /* Assets.xcassets in Resources */, 100000000000000000000120 /* model_manifest.json in Resources */); runOnlyForDeploymentPostprocessing = 0; };
+		100000000000000000000303 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (100000000000000000000119 /* Assets.xcassets in Resources */, 100000000000000000000120 /* model_manifest.json in Resources */, 100000000000000000000122 /* ScribeMicStart.wav in Resources */, 100000000000000000000123 /* ScribeMicStop.wav in Resources */); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */

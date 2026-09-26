@@ -1,0 +1,30 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { readFile, access } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+import { fixture } from './fixture.js';
+const exec = promisify(execFile);
+test('portable ChatGPT package and Claude marketplace contain complete client wiring', async t => {
+  const { root } = await fixture(t);
+  const script = fileURLToPath(new URL('../scripts/package.js', import.meta.url));
+  await exec(process.execPath, [script, '--output', root, '--url', 'https://scribe.example/mcp', '--app-id', 'plugin_asdk_app_test']);
+  const json = async file => JSON.parse(await readFile(path.join(root, file), 'utf8'));
+  const plugin = await json('chatgpt/scribe/plugin.json');
+  assert.equal(plugin.$schema, 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json');
+  assert.equal(plugin.extensions['com.openai'].apps, './.app.json');
+  assert.equal((await json('chatgpt/scribe/.app.json')).apps.scribe.id, 'plugin_asdk_app_test');
+  assert.deepEqual((await json('chatgpt/scribe/mcp.json')).mcpServers.scribe, { type: 'streamable-http', url: 'https://scribe.example/mcp' });
+  const marketplace = await json('claude/.claude-plugin/marketplace.json');
+  assert.equal(marketplace.plugins[0].source, './plugins/scribe');
+  await access(path.join(root, 'claude/plugins/scribe/dist/cli.mjs'));
+  await access(path.join(root, 'claude/plugins/scribe/ui/transcripts.html'));
+  await access(path.join(root, 'claude/plugins/scribe/THIRD-PARTY-NOTICES.txt'));
+  await access(path.join(root, 'chatgpt/scribe/skills/scribe-transcripts/SKILL.md'));
+  // Repackaging without a registered ID must not retain a previous account mapping.
+  await exec(process.execPath, [script, '--output', root, '--url', 'https://scribe.example/mcp']);
+  await assert.rejects(access(path.join(root, 'chatgpt/scribe/.app.json')));
+  await assert.rejects(exec(process.execPath, [script, '--output', root, '--url', 'http://unsafe.example/mcp']));
+});

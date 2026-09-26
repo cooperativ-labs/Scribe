@@ -28,11 +28,11 @@ public struct ParakeetAdapter: Sendable {
         public init(
             computeUnits: ASRComputeUnits = .cpuAndNeuralEngine,
             allowLowPrecisionAccumulationOnGPU: Bool = true,
-            streamingThresholdSamples: Int = ASRConstants.maxModelSamples
+            streamingThresholdSamples: Int? = nil
         ) {
             self.computeUnits = computeUnits
             self.allowLowPrecisionAccumulationOnGPU = allowLowPrecisionAccumulationOnGPU
-            self.streamingThresholdSamples = streamingThresholdSamples
+            self.streamingThresholdSamples = streamingThresholdSamples ?? ASRConstants.maxModelSamples
         }
     }
 
@@ -44,6 +44,20 @@ public struct ParakeetAdapter: Sendable {
         /// Source-media seconds, never chunk-relative frames.
         public let endSeconds: TimeInterval
         public let confidence: Float
+
+        package init(
+            text: String,
+            tokenID: Int,
+            startSeconds: TimeInterval,
+            endSeconds: TimeInterval,
+            confidence: Float
+        ) {
+            self.text = text
+            self.tokenID = tokenID
+            self.startSeconds = startSeconds
+            self.endSeconds = endSeconds
+            self.confidence = confidence
+        }
     }
 
     public struct Transcript: Codable, Sendable, Equatable {
@@ -53,6 +67,22 @@ public struct ParakeetAdapter: Sendable {
         public let processingTimeSeconds: TimeInterval
         public let usedChunkedProcessing: Bool
         public let timestampUnit: String
+
+        package init(
+            text: String,
+            tokens: [TimedToken],
+            sourceDurationSeconds: TimeInterval,
+            processingTimeSeconds: TimeInterval,
+            usedChunkedProcessing: Bool,
+            timestampUnit: String
+        ) {
+            self.text = text
+            self.tokens = tokens
+            self.sourceDurationSeconds = sourceDurationSeconds
+            self.processingTimeSeconds = processingTimeSeconds
+            self.usedChunkedProcessing = usedChunkedProcessing
+            self.timestampUnit = timestampUnit
+        }
     }
 
     public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {

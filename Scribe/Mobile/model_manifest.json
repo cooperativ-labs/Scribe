@@ -1,0 +1,366 @@
+{
+  "schemaVersion": 1,
+  "profileID": "parakeet-v3-offline-diarization-v1",
+  "fluidAudio": {
+    "repository": "https://github.com/FluidInference/FluidAudio.git",
+    "revision": "0.17.4 (21493f8dac5a97e65742e6ff26f42f164c2fda0f)"
+  },
+  "telemetry": {
+    "enabled": false,
+    "runtimeDownloadsAllowed": false
+  },
+  "totalDeclaredOnDiskBytes": 505044116,
+  "assets": [
+    {
+      "id": "parakeet-v3-preprocessor",
+      "relativePath": "parakeet-tdt-0.6b-v3-coreml",
+      "upstream": {
+        "repository": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml",
+        "revision": "7dd20fe6b1797d35f5e3307e8b1732d9a178edfe"
+      },
+      "checksum": {
+        "algorithm": "SHA-256",
+        "value": "129b76e3aeafa8afa3ea76d995b964b145fe83700d579f6ff42c4c38fa0968ea",
+        "scope": "Preprocessor.mlmodelc/weights/weight.bin"
+      },
+      "license": "CC-BY-4.0",
+      "requiredFiles": [
+        {
+          "relativePath": "Preprocessor.mlmodelc/coremldata.bin",
+          "bytes": 486,
+          "sha256": "dbde3f2300842c1fd51ef3ff948a0bcffe65ffd2dca10707f2509f32c1d65b1d"
+        },
+        {
+          "relativePath": "Preprocessor.mlmodelc/model.mil",
+          "bytes": 28181,
+          "sha256": "4b8518a956450fec57f06c2a21bdffc26973f7f1fa6842fb38fe917f896b6b93"
+        },
+        {
+          "relativePath": "Preprocessor.mlmodelc/metadata.json",
+          "bytes": 2841,
+          "sha256": "2a98699e22d279dd37fa1d238aeb1c6db1df0d6fad687775324157689d8f3acf"
+        },
+        {
+          "relativePath": "Preprocessor.mlmodelc/weights/weight.bin",
+          "sha256": "129b76e3aeafa8afa3ea76d995b964b145fe83700d579f6ff42c4c38fa0968ea",
+          "bytes": 491072
+        }
+      ]
+    },
+    {
+      "id": "parakeet-v3-encoder",
+      "relativePath": "parakeet-tdt-0.6b-v3-coreml",
+      "upstream": {
+        "repository": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml",
+        "revision": "7dd20fe6b1797d35f5e3307e8b1732d9a178edfe"
+      },
+      "checksum": {
+        "algorithm": "SHA-256",
+        "value": "e2020f323703477a5b21d7c2d282c403e371afb5962e79877e3033e73ba6f421",
+        "scope": "Encoder.mlmodelc/weights/weight.bin"
+      },
+      "license": "CC-BY-4.0",
+      "requiredFiles": [
+        {
+          "relativePath": "Encoder.mlmodelc/coremldata.bin",
+          "bytes": 485,
+          "sha256": "d48034a167a82e88fc3df64f60af963ab3983538271175b8319e7d5720a0fb86"
+        },
+        {
+          "relativePath": "Encoder.mlmodelc/model.mil",
+          "bytes": 959769,
+          "sha256": "ed7b19156ca29fa7dfd6891deb9fda4b0e8893f68597c985d135736546a43808"
+        },
+        {
+          "relativePath": "Encoder.mlmodelc/metadata.json",
+          "bytes": 2921,
+          "sha256": "da24da9cca943fb29d7fa8e376d57fca7cb3aa08ca51b956b0b0e56813f087e9"
+        },
+        {
+          "relativePath": "Encoder.mlmodelc/weights/weight.bin",
+          "sha256": "e2020f323703477a5b21d7c2d282c403e371afb5962e79877e3033e73ba6f421",
+          "bytes": 445187200
+        }
+      ]
+    },
+    {
+      "id": "parakeet-v3-decoder",
+      "relativePath": "parakeet-tdt-0.6b-v3-coreml",
+      "upstream": {
+        "repository": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml",
+        "revision": "7dd20fe6b1797d35f5e3307e8b1732d9a178edfe"
+      },
+      "checksum": {
+        "algorithm": "SHA-256",
+        "value": "48adf0f0d47c406c8253d4f7fef967436a39da14f5a65e66d5a4b407be355d41",
+        "scope": "Decoder.mlmodelc/weights/weight.bin"
+      },
+      "license": "CC-BY-4.0",
+      "requiredFiles": [
+        {
+          "relativePath": "Decoder.mlmodelc/coremldata.bin",
+          "bytes": 554,
+          "sha256": "18647af085d87bd8f3121c8a9b4d4564c1ede038dab63d295b4e745cf2d7fb99"
+        },
+        {
+          "relativePath": "Decoder.mlmodelc/model.mil",
+          "bytes": 13110,
+          "sha256": "ef2a0a281695398a62fde86ac269c68f73d5b578d7ed3b31f2ba91a2d1ea1f35"
+        },
+        {
+          "relativePath": "Decoder.mlmodelc/metadata.json",
+          "bytes": 3427,
+          "sha256": "a39e93cd8371b8ded92635c7804fcd0590f0d1dd9415c6d19a0484be073077d9"
+        },
+        {
+          "relativePath": "Decoder.mlmodelc/weights/weight.bin",
+          "sha256": "48adf0f0d47c406c8253d4f7fef967436a39da14f5a65e66d5a4b407be355d41",
+          "bytes": 23604992
+        }
+      ]
+    },
+    {
+      "id": "parakeet-v3-joint-decision",
+      "relativePath": "parakeet-tdt-0.6b-v3-coreml",
+      "upstream": {
+        "repository": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml",
+        "revision": "7dd20fe6b1797d35f5e3307e8b1732d9a178edfe"
+      },
+      "checksum": {
+        "algorithm": "SHA-256",
+        "value": "4e0e63d840032f7f07ddb1d64446051166281e5491bf22da8a945c41f6eedb3e",
+        "scope": "JointDecision.mlmodelc/weights/weight.bin"
+      },
+      "license": "CC-BY-4.0",
+      "requiredFiles": [
+        {
+          "relativePath": "JointDecision.mlmodelc/coremldata.bin",
+          "bytes": 534,
+          "sha256": "f56ded0404498e666ffcd84dda0c393924fc3581345ad03e41429ff560cb97b6"
+        },
+        {
+          "relativePath": "JointDecision.mlmodelc/model.mil",
+          "bytes": 9723,
+          "sha256": "2cb084d7e0dc86ad3ddaa53a9631cdd5d97f19839218845b0e65ca065a4d1a5e"
+        },
+        {
+          "relativePath": "JointDecision.mlmodelc/metadata.json",
+          "bytes": 2936,
+          "sha256": "3044edab5e4ee331d37cef7100074653c944a0e58184ab618aab183a0e0707bc"
+        },
+        {
+          "relativePath": "JointDecision.mlmodelc/weights/weight.bin",
+          "sha256": "4e0e63d840032f7f07ddb1d64446051166281e5491bf22da8a945c41f6eedb3e",
+          "bytes": 12642764
+        }
+      ]
+    },
+    {
+      "id": "parakeet-v3-vocabulary",
+      "relativePath": "parakeet-tdt-0.6b-v3-coreml",
+      "upstream": {
+        "repository": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml",
+        "revision": "7dd20fe6b1797d35f5e3307e8b1732d9a178edfe"
+      },
+      "checksum": {
+        "algorithm": "SHA-256",
+        "value": "7ec60e05f1b24480736ec0eed40900f4626bce1fa9a60fd700ec7e2a59198735",
+        "scope": "parakeet_vocab.json"
+      },
+      "license": "CC-BY-4.0",
+      "requiredFiles": [
+        {
+          "relativePath": "parakeet_vocab.json",
+          "sha256": "7ec60e05f1b24480736ec0eed40900f4626bce1fa9a60fd700ec7e2a59198735",
+          "bytes": 151122
+        }
+      ]
+    },
+    {
+      "id": "pyannote-segmentation-vad-overlap",
+      "relativePath": "speaker-diarization-coreml",
+      "upstream": {
+        "repository": "https://huggingface.co/FluidInference/speaker-diarization-coreml",
+        "revision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594"
+      },
+      "checksum": {
+        "algorithm": "SHA-256",
+        "value": "c3189a64946c75bc24fcb98afe89ad78c52bdbadfdf65e857fb1b81e2cc9fbb2",
+        "scope": "Segmentation.mlmodelc/weights/weight.bin"
+      },
+      "license": "CC-BY-4.0 (converted model; upstream pyannote/segmentation-3.0 is MIT)",
+      "requiredFiles": [
+        {
+          "relativePath": "Segmentation.mlmodelc/coremldata.bin",
+          "bytes": 812,
+          "sha256": "ea51481b8bd3e496ad3cf16f066ddaa37f20e8772eaac76b3393c28de20e06bc"
+        },
+        {
+          "relativePath": "Segmentation.mlmodelc/model.mil",
+          "bytes": 43063,
+          "sha256": "d37e4ce30b406a6b34f765f769b9baed3178cc0c2b2e299c641daa43a052dd3f"
+        },
+        {
+          "relativePath": "Segmentation.mlmodelc/metadata.json",
+          "bytes": 3410,
+          "sha256": "88dbf0b07208fe142e1729c2b4c974ad3599fcb2ae5d5f18fce782b225384124"
+        },
+        {
+          "relativePath": "Segmentation.mlmodelc/weights/weight.bin",
+          "sha256": "c3189a64946c75bc24fcb98afe89ad78c52bdbadfdf65e857fb1b81e2cc9fbb2",
+          "bytes": 5959360
+        }
+      ]
+    },
+    {
+      "id": "wespeaker-embeddings",
+      "relativePath": "speaker-diarization-coreml",
+      "upstream": {
+        "repository": "https://huggingface.co/FluidInference/speaker-diarization-coreml",
+        "revision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594"
+      },
+      "checksum": {
+        "algorithm": "SHA-256",
+        "value": "99356b2985b8d43880a657024d941d450b38820451ccff903f76ed4e52d1868b",
+        "scope": "Embedding.mlmodelc/weights/weight.bin"
+      },
+      "license": "CC-BY-4.0 (converted model; verify upstream WeSpeaker notices before distribution)",
+      "requiredFiles": [
+        {
+          "relativePath": "Embedding.mlmodelc/coremldata.bin",
+          "bytes": 704,
+          "sha256": "4a705bac27d151d9642f37609296042a15602a42253039e0921dc9e75da7e004"
+        },
+        {
+          "relativePath": "Embedding.mlmodelc/model.mil",
+          "bytes": 78432,
+          "sha256": "22fa958aef72a561c21f874a07cbdcd30fdf40ee961c0bc2fb67c119273b46d3"
+        },
+        {
+          "relativePath": "Embedding.mlmodelc/metadata.json",
+          "bytes": 2818,
+          "sha256": "1854371eb6b438fb8aeac96afb45c999af7902581c06afdfcd7ff3cb1ce66be5"
+        },
+        {
+          "relativePath": "Embedding.mlmodelc/weights/weight.bin",
+          "sha256": "99356b2985b8d43880a657024d941d450b38820451ccff903f76ed4e52d1868b",
+          "bytes": 13412288
+        }
+      ]
+    },
+    {
+      "id": "wespeaker-filterbank",
+      "relativePath": "speaker-diarization-coreml",
+      "upstream": {
+        "repository": "https://huggingface.co/FluidInference/speaker-diarization-coreml",
+        "revision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594"
+      },
+      "checksum": {
+        "algorithm": "SHA-256",
+        "value": "9e83fdd3ea78064b078069e4d9141603c61c47a27fd19e7e3142ff7476f8db36",
+        "scope": "FBank.mlmodelc/weights/weight.bin"
+      },
+      "license": "CC-BY-4.0",
+      "requiredFiles": [
+        {
+          "relativePath": "FBank.mlmodelc/coremldata.bin",
+          "bytes": 853,
+          "sha256": "57ac436bb0671cbb5527a339134d695f752eb77f7a18966b93c6835335595759"
+        },
+        {
+          "relativePath": "FBank.mlmodelc/model.mil",
+          "bytes": 15667,
+          "sha256": "27aaeb21569e81bdbe2eef87789f50a37cfea800039bd134448a9417de2f30ed"
+        },
+        {
+          "relativePath": "FBank.mlmodelc/metadata.json",
+          "bytes": 3409,
+          "sha256": "2623785f5d186893b82d01e84aa33a7704ef763c3309e02055f22dc9d871ce9a"
+        },
+        {
+          "relativePath": "FBank.mlmodelc/weights/weight.bin",
+          "sha256": "9e83fdd3ea78064b078069e4d9141603c61c47a27fd19e7e3142ff7476f8db36",
+          "bytes": 1776896
+        }
+      ]
+    },
+    {
+      "id": "vbx-rho-model",
+      "relativePath": "speaker-diarization-coreml",
+      "upstream": {
+        "repository": "https://huggingface.co/FluidInference/speaker-diarization-coreml",
+        "revision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594"
+      },
+      "checksum": {
+        "algorithm": "SHA-256",
+        "value": "80f7d229202636d372428c90596f11a91545f07da77259f07153aaf225914a36",
+        "scope": "PldaRho.mlmodelc/weights/weight.bin"
+      },
+      "license": "CC-BY-4.0",
+      "requiredFiles": [
+        {
+          "relativePath": "PldaRho.mlmodelc/coremldata.bin",
+          "bytes": 763,
+          "sha256": "4d9741477f721c79b09fcdfe455110c4b7d4272e2de3496bf1729d966d3ee418"
+        },
+        {
+          "relativePath": "PldaRho.mlmodelc/model.mil",
+          "bytes": 7613,
+          "sha256": "83aee2e5310d19b5f202aea97d07a0e12102556d1b32ef3ed08b36f7f9725041"
+        },
+        {
+          "relativePath": "PldaRho.mlmodelc/metadata.json",
+          "bytes": 2749,
+          "sha256": "b314cf25a93e46b4076883a6f5a2f8848b73c3851bd9d36074d067f35a1c7945"
+        },
+        {
+          "relativePath": "PldaRho.mlmodelc/weights/weight.bin",
+          "sha256": "80f7d229202636d372428c90596f11a91545f07da77259f07153aaf225914a36",
+          "bytes": 200192
+        }
+      ]
+    },
+    {
+      "id": "vbx-plda-parameters",
+      "relativePath": "speaker-diarization-coreml",
+      "upstream": {
+        "repository": "https://huggingface.co/FluidInference/speaker-diarization-coreml",
+        "revision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594"
+      },
+      "checksum": {
+        "algorithm": "SHA-256",
+        "value": "38ee28d4269c076cef254ee760bbd811f0738a92e0f01f9699ad372828c5de8f",
+        "scope": "plda-parameters.json"
+      },
+      "license": "CC-BY-4.0",
+      "requiredFiles": [
+        {
+          "relativePath": "plda-parameters.json",
+          "sha256": "38ee28d4269c076cef254ee760bbd811f0738a92e0f01f9699ad372828c5de8f",
+          "bytes": 89416
+        }
+      ]
+    },
+    {
+      "id": "vbx-xvector-transform",
+      "relativePath": "speaker-diarization-coreml",
+      "upstream": {
+        "repository": "https://huggingface.co/FluidInference/speaker-diarization-coreml",
+        "revision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594"
+      },
+      "checksum": {
+        "algorithm": "SHA-256",
+        "value": "f7cd5cc16e63e2d89db052a23018ecfc47a311998ed1e9e39838fbac65048688",
+        "scope": "xvector-transform.json"
+      },
+      "license": "CC-BY-4.0",
+      "requiredFiles": [
+        {
+          "relativePath": "xvector-transform.json",
+          "sha256": "f7cd5cc16e63e2d89db052a23018ecfc47a311998ed1e9e39838fbac65048688",
+          "bytes": 177499
+        }
+      ]
+    }
+  ]
+}

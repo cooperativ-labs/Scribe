@@ -3,8 +3,9 @@ import PackageDescription
 
 let package = Package(
     name: "TranscriptionWorker",
-    platforms: [.macOS(.v15)],
+    platforms: [.macOS(.v15), .iOS("26.0")],
     products: [
+        .library(name: "ScribeInference", targets: ["ScribeInference"]),
         .library(name: "TranscriptionWorkerSupport", targets: ["TranscriptionWorkerSupport"]),
         .executable(name: "TranscriptionWorker", targets: ["TranscriptionWorker"]),
         .executable(name: "ASRBenchmark", targets: ["ASRBenchmark"]),
@@ -21,9 +22,11 @@ let package = Package(
         .package(path: "../../Modules/Speakers"),
     ],
     targets: [
+        .target(name: "ScribeInference", dependencies: [.product(name: "FluidAudio", package: "FluidAudio")]),
         .target(
             name: "TranscriptionWorkerSupport",
             dependencies: [
+                "ScribeInference",
                 .product(name: "FluidAudio", package: "FluidAudio"),
             ],
             resources: [.copy("Resources/silero-vad-unified-256ms-v6.2.1.mlmodelc")]
@@ -43,6 +46,7 @@ let package = Package(
             name: "TranscriptionWorkerSupportTests",
             dependencies: [
                 "TranscriptionWorkerSupport",
+                "ScribeInference",
                 "TranscriptionWorker",
                 .product(name: "FluidAudio", package: "FluidAudio"),
             ]

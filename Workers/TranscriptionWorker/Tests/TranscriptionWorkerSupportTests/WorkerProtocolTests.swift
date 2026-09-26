@@ -1,3 +1,4 @@
+@testable import ScribeInference
 import Foundation
 import FluidAudio
 import Testing

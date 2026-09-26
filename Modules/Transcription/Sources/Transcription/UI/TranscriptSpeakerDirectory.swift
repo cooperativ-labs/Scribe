@@ -79,4 +79,14 @@ public struct TranscriptSpeakerSuggestion: Identifiable, Codable, Equatable, Sen
     public var scoreDescription: String {
         "similarity \(String(format: "%.2f", score))"
     }
+
+    /// The similarity as a whole percentage, for the compact chip badge.
+    public var percentDescription: String {
+        "\(Int((min(max(score, 0), 1) * 100).rounded()))%"
+    }
+
+    /// The badge on the speaker's chip: "Dana Whitfield? 82%".
+    public var chipBadgeTitle: String {
+        "\(person.displayName)? \(percentDescription)"
+    }
 }

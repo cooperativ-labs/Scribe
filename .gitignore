@@ -79,3 +79,6 @@ benchmark-files/**/*.mp4
 benchmark-files/**/*.m4a
 benchmark-files/**/*.flac
 benchmark-files/**/*.rttm
+
+# Optional physical-device inference fixtures staged by Scripts/test-mobile.sh.
+Tests/ScribeMobileTests/DeviceFixtures/models/

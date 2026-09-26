@@ -73,6 +73,53 @@ final class TranscriptViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.chronologicalSegments.first?.speakerLabel, "Unknown speaker")
     }
 
+    func testHeaderChipsNameTheLanguageAndReviewChipFiltersToNeedsReview() throws {
+        let transcript = try fixture(named: "unknown-speaker")
+        let file = TranscriptReviewFile(
+            sourceSnapshotURL: URL(fileURLWithPath: "/tmp/scribe-unknown-snapshot.flac"),
+            transcript: transcript,
+            jobState: .completeWithWarnings
+        )
+        let viewModel = TranscriptViewModel(files: [file], playback: PlaybackSpy())
+
+        XCTAssertEqual(viewModel.lengthText, "0:10")
+        XCTAssertEqual(viewModel.speakerCountText, "1 speaker")
+        XCTAssertEqual(viewModel.languageName, Locale.current.localizedString(forIdentifier: "en"))
+        XCTAssertNotEqual(viewModel.languageName, "en")
+        XCTAssertEqual(viewModel.languageHelp, "Source unknown (en)")
+
+        XCTAssertEqual(viewModel.reviewFilter, .all)
+        viewModel.showTurnsNeedingReview()
+        XCTAssertEqual(viewModel.reviewFilter, .needsReview)
+    }
+
+    func testLengthLabelShowsHoursOnlyPastTheHour() {
+        XCTAssertEqual(TranscriptReviewFile.lengthLabel(milliseconds: 2_537_000), "42:17")
+        XCTAssertEqual(TranscriptReviewFile.lengthLabel(milliseconds: 3_599_999), "59:59")
+        XCTAssertEqual(TranscriptReviewFile.lengthLabel(milliseconds: 3_725_000), "1:02:05")
+    }
+
+    func testSidebarDetailIsDayAndLengthOrJobState() throws {
+        let transcript = try fixture(named: "unknown-speaker")
+        let complete = TranscriptReviewFile(
+            sourceSnapshotURL: URL(fileURLWithPath: "/tmp/scribe-unknown-snapshot.flac"),
+            transcript: transcript,
+            jobState: .complete
+        )
+        let british = Locale(identifier: "en_GB")
+        let utc = try XCTUnwrap(TimeZone(identifier: "UTC"))
+        // ICU abbreviates September as "Sep" or "Sept" depending on the OS release.
+        let detail = complete.sidebarDetail(locale: british, timeZone: utc)
+        XCTAssertTrue(detail.hasPrefix("Thu 3 Sep"), detail)
+        XCTAssertTrue(detail.hasSuffix(" · 0:10"), detail)
+        XCTAssertFalse(complete.isInProgress)
+
+        let queued = TranscriptReviewFile(sourceSnapshotURL: URL(fileURLWithPath: "/tmp/queued.m4a"), transcript: nil, jobState: .queued)
+        XCTAssertTrue(queued.isInProgress)
+        XCTAssertEqual(queued.sidebarDetail(), "Queued")
+        XCTAssertTrue(TranscriptReviewFile(sourceSnapshotURL: URL(fileURLWithPath: "/tmp/p.m4a"), transcript: nil, jobState: .processing(progress: 0.4)).isInProgress)
+    }
+
     func testFileExporterWritesEveryRequestedFormatMatchingTheGoldens() throws {
         let transcript = try fixture(named: "two-speakers")
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("scribe-review-export-\(UUID().uuidString)", isDirectory: true)
@@ -111,6 +158,9 @@ final class TranscriptViewModelTests: XCTestCase {
 
         XCTAssertEqual(viewModel.exportOutcomes, [success, failure])
         XCTAssertTrue(viewModel.exportOutcomes.contains { $0.format == .subtitles && !$0.succeeded })
+        XCTAssertEqual(viewModel.toastCenter.visible.map(\.text), ["Exported 1 format; 1 failed."])
+        XCTAssertEqual(viewModel.toastCenter.visible.first?.kind, .failure)
+        XCTAssertEqual(viewModel.toastCenter.visible.first?.action, .showInFinder(success.destinationURL!))
     }
 
     func testCopyKnowledgebaseUsesTheSchemaBackedDocument() async throws {
@@ -130,6 +180,7 @@ final class TranscriptViewModelTests: XCTestCase {
 
         XCTAssertEqual(clipboard.text, try TranscriptExporter.knowledgebaseJSON(transcript))
         XCTAssertEqual(viewModel.exportMessage, TranscriptExportMessage(text: "Copied Knowledgebase JSON to the clipboard.", isFailure: false))
+        XCTAssertEqual(viewModel.toastCenter.visible.last?.text, "Copied Knowledgebase JSON to the clipboard.")
     }
 
     func testFileExporterWritesToTheExactFileTheSavePanelChose() throws {
@@ -615,6 +666,8 @@ final class TranscriptViewModelImportTests: XCTestCase {
         XCTAssertEqual(viewModel.importMessage?.text, "Queued 2 files for transcription.")
         XCTAssertEqual(viewModel.importMessage?.isFailure, false)
         XCTAssertFalse(viewModel.isImporting)
+        XCTAssertEqual(viewModel.toastCenter.visible.map(\.text), ["Queued 2 files for transcription."])
+        XCTAssertEqual(viewModel.toastCenter.visible.first?.kind, .result)
 
         viewModel.dismissImportMessage()
         XCTAssertNil(viewModel.importMessage)
@@ -630,6 +683,7 @@ final class TranscriptViewModelImportTests: XCTestCase {
 
         XCTAssertEqual(viewModel.importMessage?.text, "notes.txt is not media.")
         XCTAssertEqual(viewModel.importMessage?.isFailure, true)
+        XCTAssertEqual(viewModel.toastCenter.visible.first?.kind, .failure)
     }
 
     func testAMixedDropCountsBothQueuedAndRefused() {

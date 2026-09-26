@@ -1,3 +1,4 @@
+import ScribeInference
 @preconcurrency import AVFoundation
 import CryptoKit
 import Foundation

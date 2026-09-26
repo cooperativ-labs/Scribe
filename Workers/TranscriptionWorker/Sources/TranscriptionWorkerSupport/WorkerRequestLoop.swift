@@ -1,3 +1,4 @@
+import ScribeInference
 import Foundation
 
 /// A small stdin control plane that continues reading `cancel` envelopes while

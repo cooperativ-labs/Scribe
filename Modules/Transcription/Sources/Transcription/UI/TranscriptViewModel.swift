@@ -12,12 +12,31 @@ public final class TranscriptViewModel {
         didSet { selectFileIfNeeded() }
     }
     public private(set) var selectedSegmentID: TranscriptSegment.ID?
-    public private(set) var exportOutcomes: [TranscriptExportOutcome] = []
-    public private(set) var exportMessage: TranscriptExportMessage?
+    public let toastCenter = TranscriptToastCenter()
+    public private(set) var exportOutcomes: [TranscriptExportOutcome] = [] {
+        didSet { if !exportOutcomes.isEmpty { announceExportOutcomes() } }
+    }
+    public private(set) var exportMessage: TranscriptExportMessage? {
+        didSet {
+            if let exportMessage {
+                toastCenter.post(exportMessage.text, kind: exportMessage.isFailure ? .failure : .result)
+            }
+        }
+    }
 
     /// People available to the speaker picker, refreshed from the library.
     public private(set) var people: [SpeakerPersonRef] = []
-    public private(set) var speakerActionMessage: TranscriptSpeakerActionMessage?
+    public private(set) var speakerActionMessage: TranscriptSpeakerActionMessage? {
+        didSet {
+            if let speakerActionMessage {
+                toastCenter.post(speakerActionMessage.text,
+                                 kind: speakerActionMessage.isFailure ? .failure : .result,
+                                 action: speakerActionMessage.isFailure ? nil : nextToastAction)
+            }
+            nextToastAction = nil
+        }
+    }
+    @ObservationIgnored private var nextToastAction: TranscriptToast.Action?
     /// Speaker-count reprocess confirmation and progress sheet, when one is open.
     public private(set) var reprocessSession: TranscriptReprocessSession?
     /// Candidate excerpts for the in-progress "Remember this voice" action.
@@ -72,6 +91,7 @@ public final class TranscriptViewModel {
     public private(set) var importMessage: TranscriptSpeakerActionMessage?
     /// True while dropped files are being probed and queued.
     public private(set) var isImporting = false
+    @ObservationIgnored private var importToastID: UUID?
 
     /// What the host found for the send sheet, or nil until it has been asked.
     public private(set) var agentEnvironment: TranscriptAgentEnvironment?
@@ -259,20 +279,21 @@ public final class TranscriptViewModel {
         chronologicalSegments.filter(\.needsReview).count
     }
 
-    /// A one-line account of the recording: turns, paragraphs, speakers, and length.
-    public var reviewSummary: String? {
+    /// The recording's length for the header chip: minutes and seconds, with
+    /// hours only when the source runs past an hour.
+    public var lengthText: String? {
         guard let transcript = selectedTranscript else { return nil }
-        let turns = transcript.segments.count
-        let paragraphs = chronologicalParagraphs.count
-        let speakers = transcript.speakers.count
-        var parts = [
-            "\(turns) turn\(turns == 1 ? "" : "s")",
-            "\(paragraphs) paragraph\(paragraphs == 1 ? "" : "s")",
-            "\(speakers) speaker\(speakers == 1 ? "" : "s")",
-            TranscriptTimecode.string(fromMilliseconds: transcript.source.durationMs).replacingOccurrences(of: #"\.\d{3}$"#, with: "", options: .regularExpression),
-        ]
-        if transcript.title != nil { parts.append(transcript.source.filename) }
-        return parts.joined(separator: " · ")
+        return TranscriptReviewFile.lengthLabel(milliseconds: transcript.source.durationMs)
+    }
+
+    public var speakerCountText: String? {
+        guard let speakers = selectedTranscript?.speakers.count else { return nil }
+        return "\(speakers) speaker\(speakers == 1 ? "" : "s")"
+    }
+
+    /// Shows only the turns that need review: the header's "N to review" chip.
+    public func showTurnsNeedingReview() {
+        reviewFilter = .needsReview
     }
 
     /// Case- and accent-insensitive comparison key for search.
@@ -283,12 +304,35 @@ public final class TranscriptViewModel {
 
     public var languageDescription: String? {
         guard let transcript = selectedTranscript else { return nil }
-        let provenance: String = switch transcript.languageSource {
+        return "Language: \(transcript.language) (\(Self.provenance(of: transcript.languageSource)))"
+    }
+
+    /// The language by name ("English"), falling back to the stored code when
+    /// the system has no name for it.
+    public var languageName: String? {
+        guard let transcript = selectedTranscript else { return nil }
+        let code = transcript.language.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !code.isEmpty else { return nil }
+        return Locale.current.localizedString(forIdentifier: code) ?? code
+    }
+
+    /// Where the language came from, for the language chip's tooltip.
+    public var languageHelp: String? {
+        guard let transcript = selectedTranscript else { return nil }
+        let origin: String = switch transcript.languageSource {
+        case .detected: "Detected from the recording"
+        case .userProvided: "Chosen before transcription"
+        case .unknown: "Source unknown"
+        }
+        return "\(origin) (\(transcript.language))"
+    }
+
+    private static func provenance(of source: TranscriptLanguageSource) -> String {
+        switch source {
         case .detected: "detected"
         case .userProvided: "user-provided"
         case .unknown: "unknown"
         }
-        return "Language: \(transcript.language) (\(provenance))"
     }
 
     public var timingLimitation: String? {
@@ -664,13 +708,37 @@ public final class TranscriptViewModel {
     public func importFiles(at urls: [URL]) async {
         guard let fileImporter, !urls.isEmpty else { return }
         isImporting = true
+        let toastID = toastCenter.post("Queuing \(urls.count) \(urls.count == 1 ? "file" : "files")…", kind: .progress)
+        importToastID = toastID
         defer { isImporting = false }
         let outcome = await fileImporter.importFiles(at: urls)
         importMessage = TranscriptSpeakerActionMessage(text: outcome.summary, isFailure: outcome.isFailure)
+        toastCenter.finish(toastID, text: outcome.summary, failure: outcome.isFailure)
     }
 
     public func dismissImportMessage() {
         importMessage = nil
+        if let importToastID { toastCenter.dismiss(importToastID) }
+        importToastID = nil
+    }
+
+    private func announceExportOutcomes() {
+        let successes = exportOutcomes.filter(\.succeeded)
+        let failures = exportOutcomes.filter { !$0.succeeded }
+        let text: String
+        if failures.isEmpty {
+            let formats = successes.map { $0.format.rawValue.uppercased() }.joined(separator: ", ")
+            text = "Exported \(formats)."
+        } else if successes.isEmpty {
+            text = failures.count == 1
+                ? "\(failures[0].format.rawValue.uppercased()) export failed: \(failures[0].errorMessage ?? "Unknown error")"
+                : "\(failures.count) exports failed."
+        } else {
+            text = "Exported \(successes.count) format\(successes.count == 1 ? "" : "s"); \(failures.count) failed."
+        }
+        let finderURL = successes.first?.destinationURL
+        toastCenter.post(text, kind: failures.isEmpty ? .result : .failure,
+                         action: finderURL.map { .showInFinder($0) })
     }
 
     /// Exports each requested format separately so an SRT failure does not lose valid TXT/JSON.
@@ -987,6 +1055,7 @@ public final class TranscriptViewModel {
               let previous = undoStacks[fileID]?.popLast() else { return }
         redoStacks[fileID, default: []].append(current)
         replaceSelectedTranscript(previous.asRevision(current.revision + 1))
+        nextToastAction = .redo
         speakerActionMessage = TranscriptSpeakerActionMessage(text: "Undid the last edit.", isFailure: false)
     }
 
@@ -995,6 +1064,7 @@ public final class TranscriptViewModel {
               let next = redoStacks[fileID]?.popLast() else { return }
         undoStacks[fileID, default: []].append(current)
         replaceSelectedTranscript(next.asRevision(current.revision + 1))
+        nextToastAction = .undo
         speakerActionMessage = TranscriptSpeakerActionMessage(text: "Redid the last edit.", isFailure: false)
     }
 
@@ -1205,6 +1275,7 @@ public final class TranscriptViewModel {
             undoStacks[fileID, default: []].append(transcript)
             redoStacks[fileID] = []
             replaceSelectedTranscript(revised)
+            nextToastAction = .undo
             speakerActionMessage = TranscriptSpeakerActionMessage(text: success(revised), isFailure: false)
         } catch {
             speakerActionMessage = TranscriptSpeakerActionMessage(text: Self.describe(error), isFailure: true)
@@ -1234,6 +1305,7 @@ public final class TranscriptViewModel {
     }
 
     private func selectFileIfNeeded() {
+        toastCenter.clearReversibleActions()
         cancelRememberingVoice()
         stopPlayback()
         speakerFilterID = nil

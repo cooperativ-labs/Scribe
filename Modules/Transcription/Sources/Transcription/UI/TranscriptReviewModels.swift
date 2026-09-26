@@ -75,6 +75,45 @@ public struct TranscriptReviewFile: Identifiable, Equatable, Sendable {
         transcript?.title ?? filename
     }
 
+    /// Queued or still running: the sidebar shows "Transcribing" instead of a date.
+    public var isInProgress: Bool {
+        switch jobState {
+        case .queued, .processing: true
+        case .ready, .complete, .completeWithWarnings, .noSpeech, .failed: false
+        }
+    }
+
+    /// The sidebar's second line: day and length ("Wed 24 Sep · 42:17") once a
+    /// transcript exists, otherwise the job state.
+    public func sidebarDetail(locale: Locale = .current, timeZone: TimeZone = .current) -> String {
+        guard let transcript else { return jobState.displayName }
+        var parts: [String] = []
+        if let date = Self.parsedDate(transcript.createdAt) {
+            let formatter = DateFormatter()
+            formatter.locale = locale
+            formatter.timeZone = timeZone
+            formatter.setLocalizedDateFormatFromTemplate("EEEdMMM")
+            parts.append(formatter.string(from: date))
+        }
+        if transcript.source.durationMs > 0 {
+            parts.append(Self.lengthLabel(milliseconds: transcript.source.durationMs))
+        }
+        return parts.isEmpty ? jobState.displayName : parts.joined(separator: " · ")
+    }
+
+    /// Minutes and seconds with hours only past the hour: "42:17", "1:02:05".
+    public static func lengthLabel(milliseconds: Int) -> String {
+        TranscriptSpeakerTimeline.timeLabel(milliseconds, includeHours: milliseconds >= 3_600_000)
+    }
+
+    private static func parsedDate(_ text: String) -> Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: text) { return date }
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: text)
+    }
+
     /// Replaces the stored transcript with a newer revision, keeping identity and job state.
     public func replacingTranscript(_ transcript: CanonicalTranscript) -> TranscriptReviewFile {
         TranscriptReviewFile(
