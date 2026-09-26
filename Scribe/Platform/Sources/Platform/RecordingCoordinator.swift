@@ -191,7 +191,6 @@ public enum SystemSettingsPane: String, Equatable, Sendable, CaseIterable, Ident
     case screenRecording
     case microphone
     case accessibility
-    case inputMonitoring
 
     public var id: String { rawValue }
 
@@ -200,7 +199,6 @@ public enum SystemSettingsPane: String, Equatable, Sendable, CaseIterable, Ident
         case .screenRecording: "Screen & System Audio Recording"
         case .microphone: "Microphone"
         case .accessibility: "Accessibility"
-        case .inputMonitoring: "Input Monitoring"
         }
     }
 
@@ -212,8 +210,6 @@ public enum SystemSettingsPane: String, Equatable, Sendable, CaseIterable, Ident
             URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!
         case .accessibility:
             URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
-        case .inputMonitoring:
-            URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")!
         }
     }
 }

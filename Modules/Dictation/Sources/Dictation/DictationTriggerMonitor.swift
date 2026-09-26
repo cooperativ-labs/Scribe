@@ -1,5 +1,7 @@
 import AppKit
 import Carbon.HIToolbox
+import IOKit.hidsystem
+import Platform
 
 /// AppKit is the preferred event source from the feasibility spike. Its global
 /// callbacks are observe-only; the focused application's keys remain untouched.
@@ -7,13 +9,12 @@ import Carbon.HIToolbox
 public final class DictationTriggerMonitor {
     public var onEvent: (@MainActor (DictationTriggerEvent) -> Void)?
     public var onSecureInputChange: (@MainActor (Bool) -> Void)?
-    public var onRightCommandObserved: (@MainActor () -> Void)?
+    public var onActivationKeyObserved: (@MainActor () -> Void)?
     public var state = DictationTriggerState()
     private var flagsMonitor: Any?
     private var keyMonitor: Any?
     private var localMonitor: Any?
     private var timer: Timer?
-    private var rightDown = false
     private var secureInputBlocked = false
 
     public init() {}
@@ -52,7 +53,6 @@ public final class DictationTriggerMonitor {
         localMonitor = nil
         timer?.invalidate()
         timer = nil
-        rightDown = false
         if secureInputBlocked {
             secureInputBlocked = false
             onSecureInputChange?(false)
@@ -61,13 +61,20 @@ public final class DictationTriggerMonitor {
     }
 
     private func handleFlags(_ event: NSEvent) {
-        guard event.keyCode == 54 else { return }
-        onRightCommandObserved?()
-        // The general .command flag stays set if left Command is also down.
-        // Track keycode-54 edges instead; keyState returned false during held
-        // physical keys in the signed macOS 27 feasibility probe.
-        rightDown.toggle()
-        handle(keyCode: event.keyCode, isDown: rightDown, time: event.timestamp)
+        guard event.keyCode == state.activationKey.keyCode else { return }
+        onActivationKeyObserved?()
+        // Side-specific flags distinguish right release while the left key is
+        // still held. Reading each event also recovers after a missed edge or
+        // changing the selection while a key is held; blindly toggling cannot.
+        handle(
+            keyCode: event.keyCode,
+            isDown: state.activationKey.isPressed(in: event.modifierFlags),
+            time: event.timestamp
+        )
+    }
+
+    public func setActivationKey(_ key: DictationActivationKey) {
+        emit(state.setActivationKey(key))
     }
 
     private func handleKey(_ event: NSEvent) {
@@ -107,5 +114,15 @@ public final class DictationTriggerMonitor {
 
     private func emit(_ events: [DictationTriggerEvent]) {
         for event in events { onEvent?(event) }
+    }
+}
+
+extension DictationActivationKey {
+    func isPressed(in flags: NSEvent.ModifierFlags) -> Bool {
+        switch self {
+        case .rightCommand: flags.rawValue & UInt(NX_DEVICERCMDKEYMASK) != 0
+        case .rightShift: flags.rawValue & UInt(NX_DEVICERSHIFTKEYMASK) != 0
+        case .function: flags.contains(.function)
+        }
     }
 }

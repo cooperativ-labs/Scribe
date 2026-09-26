@@ -34,3 +34,27 @@ The physical trace also showed a device-specific right-Command flag bit (`NX_DEV
 Keep `DictationTriggerMonitor` behind a small event-source protocol. Use `NSEvent` global monitors for `flagsChanged` and `keyDown` with an AppKit event loop: both delivered physical right-Command and chord events. Keep a listen-only `CGEventTap` as a fallback, also demonstrated to deliver these events. Track keycode 54 press/release edges (and consider the `NX_DEVICERCMDKEYMASK` bit); **remove the proposal's reliance on `CGEventSource.keyState`**, which returned false even during a sustained physical hold. Check `IsSecureEventInputEnabled()` and suppress dictation when true; modifier events may still arrive. On macOS 27, direct users to the observed **Device Control and Data Access** pane and check both `AXIsProcessTrusted()` and `CGPreflightListenEventAccess()` before enabling the respective path. Treat the permission as combined on this OS until a separated grant/deny combination can be tested.
 
 The production path should include a small on-device diagnostic for missing event delivery, because a successfully installed global monitor is not proof of permission or delivered keys.
+
+## Implementation update: selectable dictation key
+
+The production AppKit path now requests and gates on Microphone and Accessibility
+only. It does not call the listen-event permission APIs or install a CGEvent tap.
+This follows [Apple's global monitor contract](https://developer.apple.com/documentation/appkit/nsevent/addglobalmonitorforevents%28matching%3Ahandler%3A%29),
+which specifies Accessibility trust for key events. The combined grant observed
+in the original macOS 27 probe is not evidence that a separate Input Monitoring
+grant is required; the earlier recommendation to gate both has been removed from
+the implementation.
+
+The saved selector supports right Command (54), right Shift (60), and Fn / Globe
+(63). The monitor reads the SDK's side-specific modifier masks for right Command
+and right Shift, and the function flag for Fn. This avoids inverted press/release
+state if monitoring starts with a key held. Hold, double-tap, chord cancellation,
+and Secure Keyboard Entry blocking continue through the same trigger state.
+Changing keys cancels the current trigger before switching.
+
+Physical validation still needs the signed app with Accessibility granted and
+Input Monitoring disabled: exercise each key in another app, hold both sides of
+Command/Shift and release the right side first, change keys during a hold, and
+enter/leave Secure Keyboard Entry. Fn should be tried with the macOS Keyboard
+‘Press Fn/Globe key to’ action set to ‘Do Nothing’; hardware that handles Fn only
+in firmware cannot provide the event. Unit tests do not establish TCC delivery.

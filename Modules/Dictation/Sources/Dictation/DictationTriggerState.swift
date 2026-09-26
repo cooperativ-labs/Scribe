@@ -12,6 +12,7 @@ public struct DictationKeyEvent: Sendable {
 }
 
 import Foundation
+import Platform
 
 public enum DictationTriggerMode: Sendable, Equatable { case hold, doubleTap }
 public enum DictationCancellation: Sendable, Equatable { case shortTap, chord, maximumDuration, secureInput, stopped }
@@ -35,7 +36,18 @@ public struct DictationTriggerState: Sendable {
     private var toggleKeyDown = false
     private var suppressUntilRelease = false
 
-    public init() {}
+    public private(set) var activationKey: DictationActivationKey
+
+    public init(activationKey: DictationActivationKey = .rightCommand) {
+        self.activationKey = activationKey
+    }
+
+    public mutating func setActivationKey(_ key: DictationActivationKey) -> [DictationTriggerEvent] {
+        guard key != activationKey else { return [] }
+        let events = cancel(.stopped)
+        activationKey = key
+        return events
+    }
 
     public var isToggleActive: Bool { toggledAt != nil }
 
@@ -51,9 +63,9 @@ public struct DictationTriggerState: Sendable {
     public mutating func handle(_ input: DictationKeyEvent, secureInput: Bool = false) -> [DictationTriggerEvent] {
         if secureInput {
             let events = cancel(.secureInput)
-            return events + (input.keyCode == 54 && input.isDown ? [.secureInputBlocked] : [])
+            return events + (input.keyCode == activationKey.keyCode && input.isDown ? [.secureInputBlocked] : [])
         }
-        guard input.keyCode == 54 else {
+        guard input.keyCode == activationKey.keyCode else {
             if input.isDown, downAt != nil {
                 suppressUntilRelease = true
                 return cancel(.chord, preserveSuppression: true)

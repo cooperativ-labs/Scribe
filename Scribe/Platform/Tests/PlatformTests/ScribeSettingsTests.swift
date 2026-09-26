@@ -28,6 +28,29 @@ private final class MockLoginItemManager: LoginItemManaging {
 
 @MainActor
 final class ScribeSettingsTests: XCTestCase {
+    func testDictationKeyPersistsAndUnknownValuesFallBackToRightCommand() throws {
+        let suiteName = "ScribeSettingsTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent(suiteName, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let settings = ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: folder)
+        XCTAssertEqual(settings.dictationActivationKey, .rightCommand)
+        for key in DictationActivationKey.allCases {
+            settings.dictationActivationKey = key
+            let relaunched = ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: folder)
+            XCTAssertEqual(relaunched.dictationActivationKey, key)
+        }
+        settings.noteDictationKey()
+        XCTAssertTrue(settings.dictationKeyObserved)
+        settings.dictationActivationKey = .rightShift
+        XCTAssertFalse(settings.dictationKeyObserved)
+        defaults.set("unknown", forKey: "scribe.settings.dictation.activationKey")
+        let recovered = ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: folder)
+        XCTAssertEqual(recovered.dictationActivationKey, .rightCommand)
+    }
+
     func testConnectedAgentFoldersSurviveRelaunchMostRecentFirst() throws {
         let suiteName = "ScribeSettingsTests-\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))

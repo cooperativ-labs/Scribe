@@ -7,12 +7,15 @@ finished results. It also offers system-wide dictation into focused text fields.
 ## Dictation
 
 Install the transcription model in **Settings → Dictation**, then enable
-dictation and grant Microphone and Accessibility access. On macOS 27, keyboard
-monitoring may be listed alongside Accessibility under **Device Control and
-Data Access**. Scribe shows the required permission rows in the Dictation tab.
+dictation and grant Microphone and Accessibility access. Input Monitoring is
+not required: Scribe uses AppKit event monitors authorized by Accessibility.
 
-Hold the **right Command** key while speaking and release it to insert. Or
-double-tap right Command to keep listening, then tap it again to finish.
+Choose **Right Command** (the default), **Right Shift**, or **Fn / Globe** in
+**Settings → Dictation → Dictation key**. Hold the selected key while speaking
+and release it to insert. Or double-tap it to keep listening, then tap it again
+to finish. For Fn / Globe, set **System Settings → Keyboard → Press Fn (🌐) key
+to → Do Nothing** to avoid also triggering the macOS action. Some external
+keyboards handle Fn internally and do not expose it to macOS.
 Press Escape or use the indicator's Cancel control to discard a hands-free
 dictation. The indicator appears near the focused field, and insertion follows
 the field currently focused when transcription finishes. Settings let you

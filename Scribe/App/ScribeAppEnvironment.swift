@@ -178,10 +178,10 @@ final class ScribeAppEnvironment: ObservableObject {
             self?.settings.setDictationSecureInputBlocked(blocked)
             self?.dictationCoordinator?.setSecureInputBlocked(blocked)
         }
-        dictationMonitor.onRightCommandObserved = { [weak self] in
-            self?.settings.noteDictationRightCommand()
+        dictationMonitor.onActivationKeyObserved = { [weak self] in
+            self?.settings.noteDictationKey()
         }
-        dictationSettingsObservation = settings.$dictationEnabled.sink { [weak self] _ in
+        dictationSettingsObservation = settings.$dictationEnabled.combineLatest(settings.$dictationActivationKey).sink { [weak self] _ in
             Task { @MainActor [weak self] in self?.syncDictationMonitor() }
         }
         dictationPermissionTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
@@ -229,6 +229,7 @@ final class ScribeAppEnvironment: ObservableObject {
             restoreClipboard: settings.dictationRestoreClipboard
         )
         dictationCoordinator.setEnabled(true)
+        dictationMonitor.setActivationKey(settings.dictationActivationKey)
         dictationMonitor.state.holdThreshold = Double(settings.dictationHoldThresholdMs) / 1_000
         dictationMonitor.state.doubleTapInterval = Double(settings.dictationDoubleTapMs) / 1_000
         dictationMonitor.state.maximumDuration = Double(min(settings.dictationMaxDictationMinutes, 5)) * 60

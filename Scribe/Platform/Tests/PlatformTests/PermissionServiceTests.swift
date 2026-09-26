@@ -2,6 +2,12 @@ import Foundation
 import Testing
 @testable import Platform
 
+@Test func dictationRequiresMicrophoneAndAccessibility() {
+    #expect(DictationAccess(microphone: .granted, accessibility: true).isReady)
+    #expect(!DictationAccess(microphone: .denied, accessibility: true).isReady)
+    #expect(!DictationAccess(microphone: .granted, accessibility: false).isReady)
+}
+
 /// A permission provider whose answers the test controls, so the service's
 /// decisions are exercised without a TCC database or a real System Settings pane.
 private final class StubPermissions: RecordingPermissionProviding, @unchecked Sendable {

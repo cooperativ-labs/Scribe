@@ -84,7 +84,7 @@ public extension PermissionSnapshot {
         switch pane {
         case .screenRecording: screenAndSystemAudio
         case .microphone: microphone
-        case .accessibility, .inputMonitoring: .denied // Dictation access is tracked separately.
+        case .accessibility: .denied // Dictation access is tracked separately.
         }
     }
 
@@ -114,8 +114,6 @@ public extension PermissionSnapshot {
             "Microphone access was declined, so Scribe cannot record your voice."
         case (.accessibility, _):
             "Accessibility access is needed for dictation."
-        case (.inputMonitoring, _):
-            "Keyboard monitoring access is needed for dictation."
         }
     }
 }
@@ -190,7 +188,6 @@ public final class PermissionService: RecordingPermissionProviding, @unchecked S
             let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
             _ = AXIsProcessTrustedWithOptions(options)
         }
-        if !CGPreflightListenEventAccess() { _ = CGRequestListenEventAccess() }
         if AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined {
             _ = await AVCaptureDevice.requestAccess(for: .audio)
         }
@@ -248,9 +245,10 @@ public final class PermissionService: RecordingPermissionProviding, @unchecked S
 public struct DictationAccess: Equatable, Sendable {
     public let microphone: PermissionStatus
     public let accessibility: Bool
-    public let keyboardListening: Bool
-
-    public var isReady: Bool { microphone == .granted && accessibility && keyboardListening }
+    // AppKit's global keyboard monitors use Accessibility trust, which is also
+    // required for text insertion. Listen-event access is a separate permission
+    // and must not gate this path or cause an Input Monitoring prompt.
+    public var isReady: Bool { microphone == .granted && accessibility }
 
     public static func current() -> Self {
         let microphone: PermissionStatus = switch AVCaptureDevice.authorizationStatus(for: .audio) {
@@ -258,6 +256,6 @@ public struct DictationAccess: Equatable, Sendable {
         case .notDetermined: .notDetermined
         default: .denied
         }
-        return Self(microphone: microphone, accessibility: AXIsProcessTrusted(), keyboardListening: CGPreflightListenEventAccess())
+        return Self(microphone: microphone, accessibility: AXIsProcessTrusted())
     }
 }

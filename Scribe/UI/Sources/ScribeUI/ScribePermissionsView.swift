@@ -35,9 +35,6 @@ public struct ScribePermissionsView: View {
                     if !access.accessibility {
                         Button("Open Accessibility Settings") { permissions.openSystemSettings(.accessibility) }
                     }
-                    if !access.keyboardListening {
-                        Button("Open Input Monitoring Settings") { permissions.openSystemSettings(.inputMonitoring) }
-                    }
                     if !access.isReady {
                         Button("Request Dictation Access") {
                             Task { _ = await permissions.requestDictationAccess() }
@@ -48,7 +45,7 @@ public struct ScribePermissionsView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Label("Optional: Dictation", systemImage: "waveform")
                         .font(.headline)
-                    Text("Hold or double-tap right Command to dictate into other apps. Audio and text stay on this Mac.")
+                    Text("Hold or double-tap \(settings.dictationActivationKey.displayName) to dictate into other apps. Audio and text stay on this Mac.")
                         .font(.footnote).foregroundStyle(.secondary)
                     if modelInstaller.state == .installed {
                         Button("Enable Dictation") {

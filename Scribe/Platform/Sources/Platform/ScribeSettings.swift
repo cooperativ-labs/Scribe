@@ -88,16 +88,20 @@ public final class ScribeSettings: ObservableObject {
         didSet { defaults.set(dictationEnabled, forKey: Key.dictationEnabled) }
     }
     @Published public private(set) var dictationSecureInputBlocked = false
-    @Published public private(set) var dictationRightCommandObserved: Bool {
-        didSet { defaults.set(dictationRightCommandObserved, forKey: Key.dictationRightCommandObserved) }
+    @Published public var dictationActivationKey: DictationActivationKey {
+        didSet {
+            defaults.set(dictationActivationKey.rawValue, forKey: Key.dictationActivationKey)
+            if oldValue != dictationActivationKey { dictationKeyObserved = false }
+        }
     }
+    @Published public private(set) var dictationKeyObserved = false
 
     public func setDictationSecureInputBlocked(_ blocked: Bool) {
         dictationSecureInputBlocked = blocked
     }
 
-    public func noteDictationRightCommand() {
-        if !dictationRightCommandObserved { dictationRightCommandObserved = true }
+    public func noteDictationKey() {
+        if !dictationKeyObserved { dictationKeyObserved = true }
     }
     @Published public var dictationLeadingSpace: Bool {
         didSet { defaults.set(dictationLeadingSpace, forKey: Key.dictationLeadingSpace) }
@@ -196,7 +200,8 @@ public final class ScribeSettings: ObservableObject {
         meetingDomains = defaults.stringArray(forKey: Key.meetingDomains) ?? MeetingDomain.defaults
         useCalendarMeetingNames = defaults.object(forKey: Key.useCalendarMeetingNames) as? Bool ?? false
         dictationEnabled = defaults.object(forKey: Key.dictationEnabled) as? Bool ?? false
-        dictationRightCommandObserved = defaults.bool(forKey: Key.dictationRightCommandObserved)
+        dictationActivationKey = defaults.string(forKey: Key.dictationActivationKey)
+            .flatMap(DictationActivationKey.init(rawValue:)) ?? .rightCommand
         dictationLeadingSpace = defaults.object(forKey: Key.dictationLeadingSpace) as? Bool ?? true
         dictationTrailingSpace = defaults.object(forKey: Key.dictationTrailingSpace) as? Bool ?? false
         dictationRestoreClipboard = defaults.object(forKey: Key.dictationRestoreClipboard) as? Bool ?? true
@@ -416,7 +421,7 @@ public final class ScribeSettings: ObservableObject {
         static let meetingDomains = "scribe.settings.meetingDomains"
         static let useCalendarMeetingNames = "scribe.settings.useCalendarMeetingNames"
         static let dictationEnabled = "scribe.settings.dictation.enabled"
-        static let dictationRightCommandObserved = "scribe.settings.dictation.rightCommandObserved"
+        static let dictationActivationKey = "scribe.settings.dictation.activationKey"
         static let dictationLeadingSpace = "scribe.settings.dictation.leadingSpace"
         static let dictationTrailingSpace = "scribe.settings.dictation.trailingSpace"
         static let dictationRestoreClipboard = "scribe.settings.dictation.restoreClipboard"

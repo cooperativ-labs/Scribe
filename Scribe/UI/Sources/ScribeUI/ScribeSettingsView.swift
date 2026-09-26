@@ -313,11 +313,6 @@ public struct ScribeSettingsView: View {
                     .font(.footnote).foregroundStyle(.secondary)
                 permissionRow("Microphone", allowed: dictationAccess.microphone == .granted, pane: .microphone)
                 permissionRow("Accessibility", allowed: dictationAccess.accessibility, pane: .accessibility)
-                if !dictationAccess.keyboardListening {
-                    permissionRow("Keyboard monitoring", allowed: false, pane: .inputMonitoring)
-                    Text("On macOS 27 this access may appear with Accessibility under Device Control and Data Access.")
-                        .font(.footnote).foregroundStyle(.secondary)
-                }
                 if !dictationAccess.isReady && settings.dictationEnabled {
                     Text("Dictation will start when access is granted.")
                         .font(.footnote).foregroundStyle(.secondary)
@@ -326,8 +321,8 @@ public struct ScribeSettingsView: View {
                     Text("Dictation is paused while Secure Keyboard Entry is on")
                         .foregroundStyle(.orange)
                 }
-                if settings.dictationEnabled && !settings.dictationRightCommandObserved {
-                    Text("No right Command key event has been detected. If you remapped that key, restore its right Command mapping to use dictation.")
+                if settings.dictationEnabled && !settings.dictationKeyObserved {
+                    Text("Press \(settings.dictationActivationKey.displayName) to check the dictation key. If it is not detected, check your keyboard’s modifier-key mapping.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
                 if modelInstaller.state != .installed {
@@ -339,8 +334,17 @@ public struct ScribeSettingsView: View {
 
             TranscriptionModelSettingsView(settings: settings, installer: settings.modelInstaller)
 
-            Section("How it works") {
-                Text("Hold right ⌘ and speak; release to insert. Double-tap right ⌘ to keep listening; tap again to insert. Escape cancels.")
+            Section("Dictation key") {
+                Picker("Dictation key", selection: $settings.dictationActivationKey) {
+                    ForEach(DictationActivationKey.allCases) { key in
+                        Text(key.displayName).tag(key)
+                    }
+                }
+                if settings.dictationActivationKey == .function {
+                    Text("In System Settings → Keyboard, set ‘Press Fn (🌐) key to’ to ‘Do Nothing’ to avoid also opening emoji, switching input sources, or starting Apple Dictation. Some external keyboards handle Fn internally and do not send it to macOS.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                Text("Hold \(settings.dictationActivationKey.displayName) and speak; release to insert. Double-tap to keep listening; tap again to insert. Escape cancels.")
                     .foregroundStyle(.secondary)
             }
             Section("Insertion") {
