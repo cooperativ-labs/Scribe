@@ -258,13 +258,13 @@ h1 { font-size: 44px; line-height: 1.08; letter-spacing: -0.022em; font-weight: 
 .assist dl { margin: 20px 0 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 14px; font-size: 13.5px; max-width: 34em; }
 .assist dt { font-weight: 600; }
 .assist dd { margin: 0; color: var(--secondary); }
-.assist .panel { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.assist .panel { margin: 0; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
 .assist .msg { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 0 10px; font-size: 13.5px; }
 .assist .msg .avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--blue); color: #fff; display: grid; place-items: center; font-size: 12px; font-weight: 600; }
 .assist .msg .from { font-weight: 600; font-size: 13px; }
 .assist .msg .from span { font-weight: 400; color: var(--secondary); margin-left: 6px; font-size: 12px; }
 .assist .msg p { margin: 2px 0 0; }
-.assist .reply { background: var(--field); border: 0.5px solid var(--hairline); border-radius: 8px; padding: 10px 12px; font-size: 13.5px; position: relative; box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.22); margin-top: 16px; }
+.assist .reply { background: var(--field); border: 0.5px solid var(--hairline); border-radius: 8px; padding: 20px 12px 10px; font-size: 13.5px; position: relative; box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.22); margin-top: 16px; }
 .assist .reply p { margin: 0; }
 .assist .reply p + p { margin-top: 6px; }
 .assist .reply .indicator { position: absolute; right: 10px; top: -15px; display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px 5px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 500; }
