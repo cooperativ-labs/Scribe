@@ -102,9 +102,7 @@ struct TranscriptionModelInstallerTests {
         let manifest = try TranscriptionModelManifest.load(from: repo.appendingPathComponent("Workers/TranscriptionWorker/model_manifest.json"))
         let downloader = TranscriptionModelDownloader()
         let directory = URL(fileURLWithPath: path, isDirectory: true)
-        try await downloader.install(manifest: manifest, directory: directory) { completed, total, file in
-            print("Model install: \(completed)/\(total) \(file)")
-        }
+        try await downloader.install(manifest: manifest, directory: directory) { _, _, _ in }
         #expect(try await downloader.isInstalled(manifest: manifest, directory: directory))
     }
 }

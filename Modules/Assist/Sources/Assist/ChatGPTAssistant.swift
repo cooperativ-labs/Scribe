@@ -44,8 +44,7 @@ public struct ChatGPTAssistant: TextAssistant {
             transport: transport
         )
         let result = try await client.respond(model: model, instructions: instructions, input: input)
-        guard !result.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw AssistError.emptyResponse }
-        return AssistResponse(text: result.text, model: result.model, usage: result.usage)
+        return try result.validatedAssistResponse()
     }
 
     static func map(_ error: ResponsesError, model: String, now: Date = .now) -> AssistError {

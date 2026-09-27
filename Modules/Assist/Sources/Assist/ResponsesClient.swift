@@ -89,6 +89,13 @@ public struct ResponsesResult: Sendable, Equatable {
     public var text: String
     public var model: String
     public var usage: AssistUsage?
+
+    func validatedAssistResponse() throws -> AssistResponse {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw AssistError.emptyResponse
+        }
+        return AssistResponse(text: text, model: model, usage: usage)
+    }
 }
 
 public enum ResponsesError: Error, Equatable, Sendable {

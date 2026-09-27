@@ -30,9 +30,7 @@ public struct OpenAIKeyAssistant: TextAssistant {
                 instructions: AssistPrompt.system(template: systemPrompt, applicationName: request.applicationName),
                 input: AssistPrompt.input(for: request)
             )
-            let text = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !text.isEmpty else { throw AssistError.emptyResponse }
-            return AssistResponse(text: result.text, model: result.model, usage: result.usage)
+            return try result.validatedAssistResponse()
         } catch let error as ResponsesError {
             throw Self.map(error, model: model)
         }

@@ -81,6 +81,8 @@ test('the relay serves the page at its root and redirects /download to the lates
   assert.equal(mark.status, 200); assert.equal(mark.headers.get('content-type'), 'image/png');
   assert.match(html, /src="\/site\/mark\.png"/);
   assert.match(html, /Parakeet TDT 0\.6B v3[\s\S]*pyannote segmentation 3\.0[\s\S]*WeSpeaker/);
+  assert.match(html, /id="assist-heading"[\s\S]*Never sent<\/dt><dd>Audio, screenshots/, 'the Voice Assistant section says what is and is not sent');
+  assert.doesNotMatch(html, /only thing that ever leaves your Mac/, 'the privacy line allows for Voice Assistant requests');
   const logo = await fetch(relay.origin + '/site/logo.png');
   assert.equal(logo.status, 200); assert.equal(logo.headers.get('content-type'), 'image/png');
   assert.match(logo.headers.get('cache-control'), /max-age=86400/);

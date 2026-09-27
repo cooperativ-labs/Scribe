@@ -115,9 +115,6 @@ struct EchoCancellerTests {
         let reductionDB = 10 * log10(inputEnergy / max(outputEnergy, .leastNormalMagnitude))
         #expect(reductionDB > 10,
                 "expected clear echo reduction on a far-end-only fixture, got \(reductionDB) dB")
-        print("far-end-only echo reduction: \(reductionDB) dB; " +
-              "ERLE: \(String(describing: metrics.echoReturnLossEnhancement)); " +
-              "delay estimate: \(String(describing: metrics.delayMilliseconds)) ms")
     }
 
     @Test("Rejects a block that is not exactly 10 ms")

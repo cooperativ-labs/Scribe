@@ -121,7 +121,7 @@ export function renderSite({ release, releases }) {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Scribe for Mac</title>
-<meta name="description" content="Scribe records the meeting you're in and transcribes it on your Mac, with speakers, timestamps and search. Dictate anywhere with one key. Nothing is uploaded.">
+<meta name="description" content="Scribe records the meeting you're in and transcribes it on your Mac, with speakers, timestamps and search. Dictate anywhere with one key, or hold another and ask ChatGPT to write the reply for you.">
 <meta name="color-scheme" content="light dark">
 <meta property="og:title" content="Scribe for Mac">
 <meta property="og:description" content="Meetings and dictation, transcribed on your Mac. Nothing is uploaded.">
@@ -235,7 +235,7 @@ h1 { font-size: 44px; line-height: 1.08; letter-spacing: -0.022em; font-weight: 
 
 /* A focused field mid-dictation, with the indicator beside it. */
 .field { width: 100%; max-width: 300px; background: var(--field); border: 0.5px solid var(--hairline); border-radius: 8px; padding: 9px 12px; font-size: 13.5px; position: relative; box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.22); }
-.field .caret { display: inline-block; width: 1.5px; height: 1em; background: var(--accent); vertical-align: -0.15em; margin-left: 1px; }
+.field .caret, .assist .caret { display: inline-block; width: 1.5px; height: 1em; background: var(--accent); vertical-align: -0.15em; margin-left: 1px; }
 .field .indicator { position: absolute; right: -10px; top: -18px; display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px 5px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 500; }
 .field .indicator .wave { display: inline-flex; align-items: center; gap: 2px; height: 12px; }
 .field .indicator .wave i { display: block; width: 2px; border-radius: 1px; background: var(--accent); }
@@ -248,6 +248,31 @@ h1 { font-size: 44px; line-height: 1.08; letter-spacing: -0.022em; font-weight: 
 .ask .hosts { display: flex; gap: 6px; flex-wrap: wrap; }
 
 /* The open models the pipeline runs, in the order audio passes through them. */
+/* The Voice Assistant: the message on screen, the reply field it writes into,
+   and the indicator while the request is out. */
+.assist { border-top: 0.5px solid var(--hairline); padding-block: 56px 84px; display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 40px 48px; align-items: center; }
+.assist h2 { font-size: 26px; line-height: 1.2; letter-spacing: -0.018em; font-weight: 600; margin: 0 0 12px; text-wrap: balance; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", system-ui, sans-serif; }
+.assist .intro > p { margin: 0; color: var(--secondary); max-width: 34em; }
+.assist .intro > p + p { margin-top: 10px; }
+.assist .new { display: inline-block; font-size: 11.5px; font-weight: 600; color: var(--accent); background: var(--playing-fill); border-radius: 999px; padding: 3px 9px; margin-bottom: 12px; }
+.assist dl { margin: 20px 0 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 14px; font-size: 13.5px; max-width: 34em; }
+.assist dt { font-weight: 600; }
+.assist dd { margin: 0; color: var(--secondary); }
+.assist .panel { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.assist .msg { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 0 10px; font-size: 13.5px; }
+.assist .msg .avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--blue); color: #fff; display: grid; place-items: center; font-size: 12px; font-weight: 600; }
+.assist .msg .from { font-weight: 600; font-size: 13px; }
+.assist .msg .from span { font-weight: 400; color: var(--secondary); margin-left: 6px; font-size: 12px; }
+.assist .msg p { margin: 2px 0 0; }
+.assist .reply { background: var(--field); border: 0.5px solid var(--hairline); border-radius: 8px; padding: 10px 12px; font-size: 13.5px; position: relative; box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.22); margin-top: 16px; }
+.assist .reply p { margin: 0; }
+.assist .reply p + p { margin-top: 6px; }
+.assist .reply .indicator { position: absolute; right: 10px; top: -15px; display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px 5px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 500; }
+.assist .reply .indicator .label { color: var(--secondary); }
+.assist .reply .indicator .spin { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--hairline); border-top-color: var(--accent); }
+.assist .said { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12.5px; color: var(--secondary); }
+.assist .said q { color: var(--text); font-style: italic; }
+
 .models { border-top: 0.5px solid var(--hairline); padding-block: 56px 84px; display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 32px 48px; align-items: start; }
 .models h2 { font-size: 26px; line-height: 1.2; letter-spacing: -0.018em; font-weight: 600; margin: 0 0 12px; text-wrap: balance; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", system-ui, sans-serif; }
 .models .intro p { margin: 0; color: var(--secondary); max-width: 34em; }
@@ -279,6 +304,8 @@ footer .made { margin-left: auto; }
   .figure { height: auto; min-height: 72px; margin-bottom: 16px; }
   .privacy p { font-size: 22px; }
   .privacy { padding-bottom: 64px; }
+  .assist { grid-template-columns: 1fr; gap: 32px; padding-block: 44px 64px; }
+  .assist h2 { font-size: 22px; }
   .models { grid-template-columns: 1fr; gap: 24px; padding-block: 44px 64px; }
   .models h2 { font-size: 22px; }
   .models li { grid-template-columns: 1fr; }
@@ -406,6 +433,34 @@ footer .made { margin-left: auto; }
       </div>
     </section>
 
+    <section class="assist" aria-labelledby="assist-heading">
+      <div class="intro">
+        <span class="new">New</span>
+        <h2 id="assist-heading">Say what you want written, and it appears where you type</h2>
+        <p>Hold a second key, right Shift unless you pick another, and say something like "reply that Thursday works but pricing waits". Scribe reads what is in front of you, asks ChatGPT, and types the answer into the field you are in. Select a paragraph first and say "make this shorter" to rewrite it in place, or copy text from anywhere and say what to do with it.</p>
+        <p>Sign in with your ChatGPT account, which uses your plan's Codex allowance, or add an OpenAI API key. Your instruction is transcribed on your Mac by the dictation model, and Escape cancels a request at any point.</p>
+        <dl>
+          <dt>Sent</dt><dd>The instruction you spoke, your selection, text you copied since the last request, and the text in the front app's windows. Each source has its own switch.</dd>
+          <dt>Never sent</dt><dd>Audio, screenshots, other apps, and password fields.</dd>
+          <dt>Kept by Scribe</dt><dd>Nothing. Requests go straight from your Mac to the account you chose, sent with storage turned off.</dd>
+        </dl>
+      </div>
+
+      <figure class="panel" aria-label="The Voice Assistant writing a reply in Messages">
+        <div class="msg">
+          <span class="avatar" aria-hidden="true">M</span>
+          <div><div class="from">Maya <span>Messages, 16:05</span></div>
+          <p>Can we still ship Thursday? And does the pricing change go out at the same time?</p></div>
+        </div>
+        <div class="reply">
+          <span class="indicator glass" aria-hidden="true"><span class="spin"></span>Asking ChatGPT…<span class="label">GPT-6 Luna</span></span>
+          <p>Thursday works, as long as the notarized build clears tonight.</p>
+          <p>Pricing waits until after launch so we are not explaining two changes at once.<span class="caret"></span></p>
+        </div>
+        <div class="said" aria-hidden="true"><span class="key">Hold right ⇧</span><q>Reply that Thursday works but pricing waits</q></div>
+      </figure>
+    </section>
+
     <section class="models" aria-labelledby="models-heading">
       <div class="intro">
         <h2 id="models-heading">Built on open models</h2>
@@ -433,8 +488,8 @@ footer .made { margin-left: auto; }
     </section>
 
     <section class="privacy">
-      <p>Recording, transcription and dictation all happen on your Mac. There is no account to create and no cloud to trust.</p>
-      <small>Once the models are installed, Scribe works with the network off. The only thing that ever leaves your Mac is an answer to an assistant you connected yourself.</small>
+      <p>Recording, transcription and dictation all happen on your Mac. There is no Scribe account to create and no cloud to trust.</p>
+      <small>Once the models are installed, Scribe works with the network off. Text leaves your Mac only when you ask for it: an answer to an assistant you connected yourself, or a Voice Assistant request sent to the ChatGPT or OpenAI account you signed in with. Audio never does.</small>
     </section>
   </main>
 

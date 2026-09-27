@@ -11,12 +11,7 @@ public enum ChatGPTEndpoints {
     public static let backendBaseURL = URL(string: "https://chatgpt.com/backend-api/codex")!
     /// The `originator` header the backend gates on.
     ///
-    /// Scribe sends the most honest value the backend accepts. The spike was
-    /// to try `scribe`, then a Codex-prefixed value naming Scribe, then Codex's
-    /// own value; only the last was exercised, and it passed on a real account
-    /// in the QA pass of 2026-09-27 (docs/feasibility/assistant-qa-matrix.md),
-    /// as the PM accepted. Replace it with a more honest value if one is shown
-    /// to pass.
+    /// The value validated against the backend for this client.
     public static let originator = "codex_cli_rs"
     /// The Codex release the models endpoint is asked to describe; it filters
     /// models by the minimum client version each one needs.

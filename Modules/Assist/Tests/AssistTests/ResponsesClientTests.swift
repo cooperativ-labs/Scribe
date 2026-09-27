@@ -1,9 +1,7 @@
 @testable import Assist
 import XCTest
 
-/// The fixtures follow the Responses-API event and error shapes the Codex
-/// sources and OpenAI's API reference document; replace them with captures
-/// from the sign-in spike once it has run.
+/// The fixtures cover Responses API event and error shapes.
 final class ResponsesClientTests: XCTestCase {
     private let base = URL(string: "https://example.test/v1")!
 

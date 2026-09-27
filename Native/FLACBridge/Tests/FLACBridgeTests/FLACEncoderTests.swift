@@ -226,7 +226,6 @@ struct FLACEncoderTests {
             }
         }
         try int32Encoder.write(int32Buffer)
-        print("DBG int32 temp size", (try? FileManager.default.attributesOfItem(atPath: int32Encoder.temporaryURL.path)[.size]) ?? "none", int32Encoder.temporaryURL.lastPathComponent)
         let int32Result = try int32Encoder.finish()
         #expect(int32Result.frameCount == Int64(frames))
 
@@ -241,7 +240,6 @@ struct FLACEncoderTests {
             }
         }
         try int16Encoder.write(int16Buffer)
-        print("DBG int16 temp size", (try? FileManager.default.attributesOfItem(atPath: int16Encoder.temporaryURL.path)[.size]) ?? "none", int16Encoder.temporaryURL.lastPathComponent)
         let int16Result = try int16Encoder.finish()
         #expect(int16Result.frameCount == Int64(frames))
 

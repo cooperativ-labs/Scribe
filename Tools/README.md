@@ -11,22 +11,11 @@ These tools exercise current product code or maintain reproducible quality gates
 | `DiarizationAnalysis` | Saved-artifact replay, transcription benchmarks, and controlled quality comparisons |
 | `ScribeProcess` | Standalone production audio processing |
 | `ScribeVocabulary` | Shared vocabulary command line |
-| `AssistantFeasibility` | Throwaway spike and QA harness for the voice assistant: ChatGPT device-code sign-in and Responses trials (`chatgpt-signin`), the read-only seven-app window-text probe (`window-text-probe`), and the seven-app QA pass through the production collector and inserter (`assistant-qa`); reports in `docs/feasibility/assistant-window-text.md` and `docs/feasibility/assistant-qa-matrix.md` |
 
 The worker's ASR, diarization, and short-turn benchmark executables remain inputs
 to the quality tools. Speaker enrollment calibration remains available for
 evaluating matcher thresholds against new recordings. These are development
 executables; the app packages only `TranscriptionWorker`.
-
-Completed feasibility probes were retired in coo:1071:
-
-| Removed tool | Current coverage / replacement |
-| --- | --- |
-| `CaptureHarness` | `Scribe/Capture` and `Scribe/Processing` regression tests, plus `CaptureIntegration` for live capture |
-| `AECHarness` | `Scribe/Processing` echo-cancellation tests and `TimelineHarness` mixdown gates |
-| `DictationFeasibility` | `Modules/Dictation` and worker dictation tests; permission handling in `Scribe/Platform` |
-| `DictationIndicatorHarness` | Production `DictationIndicatorView`; historical screenshots remain in `docs/feasibility/dictation-indicator` |
-| `Native/FLACBridge`'s `FLACProbe` | FLAC encoder round-trip tests across sample rates, channel counts, and bit depths |
 
 Reports in `docs/feasibility` retain historical observations. Commands naming
 retired tools describe those original runs and are no longer current commands.
