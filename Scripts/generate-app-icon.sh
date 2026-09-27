@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
-# Regenerate the app and menu-bar icons from their source artwork.
+# Regenerate the app icon, menu-bar icon and MCP/plugin/connector icon from
+# their source artwork.
 #
 # Assets/scribe-logo.png supplies the dark-background app icon.
 # Assets/scribe-menubar.png supplies the transparent monochrome menu-bar mark.
-# Rerun this after either source changes rather than editing catalog PNGs.
-# Assets/scribe-transparent.png is retained for other branding uses.
+# Assets/scribe-transparent.png supplies the transparent logo mark used as the
+# MCP server icon, the plugin's composer icon and the connector's favicon
+# (Integrations/scribe/assets/icon.png), so that image sits on any host
+# background rather than carrying its own dark square.
+# Rerun this after any source changes rather than editing the generated PNGs.
 #
 #   Scripts/generate-app-icon.sh
 #
@@ -16,14 +20,17 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source_logo="$repo_root/Assets/scribe-logo.png"
 source_menu="$repo_root/Assets/scribe-menubar.png"
+source_transparent="$repo_root/Assets/scribe-transparent.png"
 catalog="$repo_root/Scribe/App/Resources/Assets.xcassets"
+plugin_assets="$repo_root/Integrations/scribe/assets"
 
 [[ -f "$source_logo" ]] || { echo "error: missing $source_logo" >&2; exit 1; }
 [[ -f "$source_menu" ]] || { echo "error: missing $source_menu" >&2; exit 1; }
+[[ -f "$source_transparent" ]] || { echo "error: missing $source_transparent" >&2; exit 1; }
 
 app_icon="$catalog/AppIcon.appiconset"
 menu_icon="$catalog/MenuBarIcon.imageset"
-mkdir -p "$app_icon" "$menu_icon"
+mkdir -p "$app_icon" "$menu_icon" "$plugin_assets"
 
 emit() { # emit <destination> <pixel size> <source>
   sips --setProperty format png --resampleHeightWidth "$2" "$2" "$3" \
@@ -39,4 +46,7 @@ done
 emit "$menu_icon/menubar_18.png" 18 "$source_menu"
 emit "$menu_icon/menubar_36.png" 36 "$source_menu"
 
-echo "Regenerated $app_icon from $source_logo and $menu_icon from $source_menu"
+# 128x128 matches the size the MCP server declares in serverInfo.icons.
+emit "$plugin_assets/icon.png" 128 "$source_transparent"
+
+echo "Regenerated $app_icon from $source_logo, $menu_icon from $source_menu, and $plugin_assets/icon.png from $source_transparent"

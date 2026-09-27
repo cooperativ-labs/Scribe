@@ -1,0 +1,20 @@
+{
+  "name": "scribe",
+  "version": "0.1.0",
+  "description": "Find recent Scribe meetings, search transcripts, and turn timestamped conversations into notes and action items.",
+  "author": {
+    "name": "Cooperativ Labs",
+    "url": "https://scribe.ovld.ai/"
+  },
+  "homepage": "https://scribe.ovld.ai/",
+  "repository": "https://github.com/cooperativ-labs/Scribe",
+  "license": "UNLICENSED",
+  "keywords": [
+    "scribe",
+    "transcripts",
+    "meetings",
+    "mcp"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.cursor-plugin/mcp.json"
+}

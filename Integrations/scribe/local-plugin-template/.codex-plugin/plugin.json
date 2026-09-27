@@ -1,0 +1,41 @@
+{
+  "name": "scribe",
+  "version": "0.1.0",
+  "description": "Find recent Scribe meetings, search transcripts, and turn timestamped conversations into notes and action items.",
+  "author": {
+    "name": "Cooperativ Labs",
+    "url": "https://scribe.ovld.ai/"
+  },
+  "homepage": "https://scribe.ovld.ai/",
+  "repository": "https://github.com/cooperativ-labs/Scribe",
+  "license": "UNLICENSED",
+  "keywords": [
+    "scribe",
+    "transcripts",
+    "meetings",
+    "mcp"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./mcp.json",
+  "interface": {
+    "displayName": "Scribe",
+    "shortDescription": "Read your Scribe meetings",
+    "longDescription": "Find recent meetings recorded with Scribe for Mac, search transcripts by topic or speaker, and turn timestamped conversations into summaries, decisions and action items.\n\nThe plugin runs the read-only transcript server inside Scribe.app on this Mac. It cannot change or delete transcripts, and recording audio is never exposed. When the assistant reads a transcript, its text goes to the assistant's service like anything else in the chat. Requires Scribe for Mac.",
+    "developerName": "Cooperativ Labs",
+    "category": "Productivity",
+    "capabilities": [
+      "Read"
+    ],
+    "websiteURL": "https://scribe.ovld.ai/",
+    "privacyPolicyURL": "https://scribe.ovld.ai/privacy",
+    "termsOfServiceURL": "https://scribe.ovld.ai/terms",
+    "supportURL": "https://scribe.ovld.ai/support",
+    "defaultPrompt": [
+      "Summarize my most recent Scribe meeting with decisions and action items.",
+      "Search my Scribe transcripts for what we decided about the launch date."
+    ],
+    "brandColor": "#5B6CF9",
+    "composerIcon": "./assets/icon.png",
+    "logo": "./assets/icon.png"
+  }
+}

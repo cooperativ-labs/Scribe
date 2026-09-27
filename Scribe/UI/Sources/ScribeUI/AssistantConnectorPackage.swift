@@ -1,100 +1,123 @@
 import Foundation
+import ScribeMCPCore
 
 /// The connector package that ships inside Scribe.app, and installing it.
 ///
 /// The build copies Integrations/scribe's packaged Claude marketplace into the
-/// app's resources. It is staged into Application Support before use rather
-/// than referenced in place: Claude Code loads a directory plugin from where
-/// it lies, and an app bundle moves on update, translocation, or a drag to the
-/// Trash. The same staged copy provides `cli.mjs` for the relay connection (or
-/// the self-hosted HTTP server) that ChatGPT and Claude reach.
+/// app's resources. Its `plugins/scribe` is the one local plugin every desktop
+/// harness installs (see `AssistantPluginInstaller`); it runs Scribe.app's
+/// `scribe-mcp-launcher`. The relay URL in relay/connector.json is metadata only.
 @MainActor
 public final class AssistantConnectorPackage: ObservableObject {
-    public enum InstallState: Equatable, Sendable {
-        case idle
-        case installing
-        case installed(note: String?)
-        case failed(String)
+    /// One harness's install button: what is installed, and the last outcome.
+    public struct PluginState: Equatable, Sendable {
+        public var status: AssistantPluginInstaller.Status = .notInstalled
+        public var isDetected = false
+        public var isWorking = false
+        /// Warnings from the last install or removal, or why it failed.
+        public var message: String?
+        public var failed = false
     }
 
-    @Published public private(set) var installState: InstallState = .idle
+    @Published public private(set) var plugins: [AssistantHarness: PluginState] = [:]
 
     /// Absent in a build that did not bundle the package (a bare Xcode build).
     public let bundledMarketplace: URL?
-    public let stagedMarketplace: URL
+    private let environment: AssistantPluginEnvironment
 
-    public nonisolated static let defaultStagedMarketplace = FileManager.default
-        .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        .appending(path: "Scribe/Integrations/claude", directoryHint: .isDirectory)
-
-    public init(bundle: Bundle = .main, stagedMarketplace: URL = AssistantConnectorPackage.defaultStagedMarketplace) {
+    public init(
+        bundle: Bundle = .main,
+        environment: AssistantPluginEnvironment = .live
+    ) {
         let candidate = bundle.resourceURL?.appending(path: "AssistantConnector/claude", directoryHint: .isDirectory)
         self.bundledMarketplace = candidate.map(Self.isMarketplace) == true ? candidate : nil
-        self.stagedMarketplace = stagedMarketplace
+        self.environment = environment
     }
 
     public var isAvailable: Bool { bundledMarketplace != nil }
-
-    /// The server entry point inside the staged plugin.
-    public var stagedCLI: URL {
-        stagedMarketplace.appending(path: "plugins/scribe/dist/cli.mjs")
-    }
 
     /// The relay this build's ChatGPT plugin names, from the packaged
     /// `connector.json`; absent when the build was packaged without one.
     public var packagedRelay: AssistantServerAddress? {
         guard let bundledMarketplace,
-              let data = try? Data(contentsOf: bundledMarketplace.appending(path: "plugins/scribe/connector.json")),
+              let data = try? Data(contentsOf: bundledMarketplace.appending(path: "relay/connector.json")),
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let url = object["connector_url"] as? String else { return nil }
         return try? AssistantServerAddress.parse(url).get()
     }
 
-    /// Replaces the staged copy with the one in this build of the app.
-    @discardableResult
-    public func stage() throws -> URL {
-        guard let bundledMarketplace else { throw PackageError.notBundled }
-        let fileManager = FileManager.default
-        try fileManager.createDirectory(at: stagedMarketplace.deletingLastPathComponent(), withIntermediateDirectories: true)
-        // Copy beside the destination first, so a failed copy never leaves
-        // Claude Code pointing at half a plugin.
-        let incoming = stagedMarketplace.deletingLastPathComponent()
-            .appending(path: ".claude-incoming-\(UUID().uuidString)", directoryHint: .isDirectory)
-        try fileManager.copyItem(at: bundledMarketplace, to: incoming)
-        if fileManager.fileExists(atPath: stagedMarketplace.path) {
-            _ = try fileManager.replaceItemAt(stagedMarketplace, withItemAt: incoming)
-        } else {
-            try fileManager.moveItem(at: incoming, to: stagedMarketplace)
-        }
-        return stagedMarketplace
+    // MARK: - Local plugins
+
+    public func installer(for harness: AssistantHarness) -> AssistantPluginInstaller? {
+        bundledMarketplace.map { AssistantPluginInstaller(harness: harness, bundledMarketplace: $0, environment: environment) }
     }
 
-    /// Stages the package and registers it with the `claude` command.
-    ///
-    /// Both CLI steps are idempotent: adding the marketplace again repoints it
-    /// at the staged copy, and installing an installed plugin is a no-op.
-    public func installInClaudeCode() async {
-        guard installState != .installing else { return }
-        installState = .installing
-        let marketplace: URL
+    public func plugin(_ harness: AssistantHarness) -> PluginState {
+        plugins[harness] ?? PluginState()
+    }
+
+    /// Reads each harness's install record and whether it is on this Mac.
+    public func refreshPlugins() {
+        for harness in AssistantHarness.allCases {
+            var state = plugin(harness)
+            if let installer = installer(for: harness) {
+                state.status = installer.status()
+                state.isDetected = installer.isDetected
+            }
+            plugins[harness] = state
+        }
+    }
+
+    /// Installs or updates the plugin for one harness.
+    public func install(_ harness: AssistantHarness) async {
+        await perform(harness) { try await $0.install() }
+    }
+
+    /// Removes the plugin and its marketplace or config entries.
+    public func remove(_ harness: AssistantHarness) async {
+        await perform(harness) { try await $0.remove() }
+    }
+
+    private func perform(
+        _ harness: AssistantHarness,
+        _ action: @escaping @Sendable (AssistantPluginInstaller) async throws -> AssistantPluginInstaller.Report
+    ) async {
+        guard let installer = installer(for: harness), !plugin(harness).isWorking else { return }
+        plugins[harness, default: PluginState()].isWorking = true
+        var state = plugin(harness)
         do {
-            marketplace = try stage()
+            let report = try await Task.detached { try await action(installer) }.value
+            state.message = report.warnings.isEmpty ? nil : report.warnings.joined(separator: "\n")
+            state.failed = false
         } catch {
-            installState = .failed(error.localizedDescription)
-            return
+            state.message = error.localizedDescription
+            state.failed = true
         }
-        let result = await Self.runInstall(marketplace: marketplace)
-        installState = result
+        state.isWorking = false
+        state.status = installer.status()
+        state.isDetected = installer.isDetected
+        plugins[harness] = state
     }
 
-    /// Runs one relay command of the staged connector (`code`, `grants`,
-    /// `revoke --all`, `unlink`) and returns what it printed on stdout.
-    ///
-    /// These act on this Mac's own relay link, authenticated by the private
-    /// `relay.json` beside the owner key; none of them touch another library.
+    // MARK: - Relay
+
+    public func relayClient() -> RelayClient {
+        let directory = ProcessInfo.processInfo.environment["SCRIBE_TRANSCRIPTS_DIR"].map { URL(filePath: $0) }
+            ?? FileManager.default.homeDirectoryForCurrentUser.appending(path: "Meeting Transcripts")
+        return RelayClient(credentials: RelayCredentialsStore(file: AssistantRelayAgent.linkURL),
+                           transcriptDirectory: directory)
+    }
+
+    /// Settings actions on this Mac's relay account.
     public func runRelayCommand(_ arguments: [String]) async throws -> String {
-        let cli = try stage().appending(path: "plugins/scribe/dist/cli.mjs")
-        return try await Self.runNode(cli: cli, arguments: arguments)
+        let client = relayClient()
+        switch arguments {
+        case ["code"]: return try await client.linkCode()
+        case ["grants"]: return try await client.grants()
+        case ["revoke", "--all"]: try await client.revoke(); return ""
+        case ["unlink"]: try await client.unlink(); return ""
+        default: throw CommandError(message: "Unknown relay action.")
+        }
     }
 
     struct CommandError: LocalizedError {
@@ -102,85 +125,7 @@ public final class AssistantConnectorPackage: ObservableObject {
         var errorDescription: String? { message }
     }
 
-    private nonisolated static func runNode(cli: URL, arguments: [String]) async throws -> String {
-        let script = """
-        export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
-        if ! command -v node >/dev/null 2>&1; then
-          echo "Node.js was not found. Install Node.js 22 or newer." >&2
-          exit 127
-        fi
-        exec node "$@"
-        """
-        return try await Task.detached {
-            let process = Process()
-            process.executableURL = URL(filePath: "/bin/zsh")
-            process.arguments = ["-lc", script, "zsh", cli.path] + arguments
-            process.standardInput = FileHandle.nullDevice
-            let output = Pipe(), errors = Pipe()
-            process.standardOutput = output
-            process.standardError = errors
-            try process.run()
-            let data = output.fileHandleForReading.readDataToEndOfFile()
-            let errorData = errors.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
-            guard process.terminationStatus == 0 else {
-                let message = String(decoding: errorData, as: UTF8.self)
-                    .split(whereSeparator: \.isNewline).last.map(String.init)?
-                    .replacingOccurrences(of: "Scribe MCP: ", with: "")
-                throw CommandError(message: message ?? "The Scribe connector failed (exit \(process.terminationStatus)).")
-            }
-            return String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-        }.value
-    }
-
-    enum PackageError: LocalizedError {
-        case notBundled
-
-        var errorDescription: String? {
-            "This build of Scribe does not include the connector package. Build it with Scripts/build-app.sh, or install it from Integrations/scribe."
-        }
-    }
-
     private nonisolated static func isMarketplace(_ url: URL) -> Bool {
         FileManager.default.fileExists(atPath: url.appending(path: ".claude-plugin/marketplace.json").path)
-    }
-
-    /// Runs in a login shell because an app launched from the Dock does not
-    /// inherit the PATH a terminal has, which is where `claude` and `node` live.
-    private nonisolated static func runInstall(marketplace: URL) async -> InstallState {
-        let script = """
-        export PATH="$HOME/.local/bin:$HOME/.claude/local:/opt/homebrew/bin:/usr/local/bin:$PATH"
-        if ! command -v claude >/dev/null 2>&1; then
-          echo "The claude command was not found. Install Claude Code, then try again." >&2
-          exit 127
-        fi
-        claude plugin marketplace add "$1" || exit $?
-        claude plugin install \(AssistantConnectorCommands.pluginID) || exit $?
-        command -v node >/dev/null 2>&1 || echo "NODE_MISSING"
-        """
-        return await Task.detached {
-            let process = Process()
-            process.executableURL = URL(filePath: "/bin/zsh")
-            process.arguments = ["-lc", script, "zsh", marketplace.path]
-            process.standardInput = FileHandle.nullDevice
-            let output = Pipe()
-            process.standardOutput = output
-            process.standardError = output
-            do {
-                try process.run()
-            } catch {
-                return .failed(error.localizedDescription)
-            }
-            let data = output.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
-            let text = String(decoding: data, as: UTF8.self)
-            guard process.terminationStatus == 0 else {
-                let lastLine = text.split(whereSeparator: \.isNewline).last.map(String.init)
-                return .failed(lastLine ?? "Claude Code could not install the plugin (exit \(process.terminationStatus)).")
-            }
-            return .installed(note: text.contains("NODE_MISSING")
-                ? "Node.js was not found. Install Node.js 22 or newer so Claude Code can start the Scribe server."
-                : nil)
-        }.value
     }
 }

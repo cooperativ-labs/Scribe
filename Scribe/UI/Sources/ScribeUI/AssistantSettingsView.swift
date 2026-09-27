@@ -1,21 +1,19 @@
 import AppKit
 import SwiftUI
 
-/// The Settings tab that adds Scribe to ChatGPT, Claude, and Claude Code.
+/// The Settings tab that adds Scribe to assistants.
 ///
-/// Each "Add to…" button does the part Scribe can do itself (copy the
-/// connector URL and open the right page, or install the Claude Code plugin)
-/// and lists the steps that only the person can do in the other app, such as
-/// approving the connection. ChatGPT and Claude connect from their own cloud,
-/// so both depend on a public HTTPS address: a Scribe relay this Mac links to
-/// (no tunnel), or the person's own tunnel to a local server.
+/// "On this Mac" installs the local plugin into ChatGPT desktop and Codex,
+/// Claude Code and Claude Desktop, and Cursor; each runs the transcript server
+/// inside Scribe.app and needs nothing else. "From anywhere" links this Mac to
+/// a Scribe relay, which gives ChatGPT and Claude on the web, which connect
+/// from their own cloud, one public HTTPS address without a tunnel. Each "Add
+/// to…" button does the part Scribe can do itself (copy the connector URL and
+/// open the right page) and lists the steps only the person can do there.
 public struct AssistantSettingsView: View {
     @ObservedObject private var package: AssistantConnectorPackage
     @ObservedObject private var relayAgent: AssistantRelayAgent
-    @AppStorage("scribe.settings.assistantConnectionMode") private var mode = AssistantConnectionMode.relay
     @AppStorage(AssistantRelayAgent.relayAddressKey) private var relayText = ""
-    @AppStorage("scribe.settings.assistantServerAddress") private var addressText = ""
-    @AppStorage("scribe.settings.assistantChatGPTCallback") private var chatGPTCallback = ""
     /// What was last put on the clipboard, confirmed beside the button.
     @State private var copied: String?
     /// Why the last copy failed, shown in the section whose button was pressed.
@@ -27,18 +25,15 @@ public struct AssistantSettingsView: View {
     @State private var relayStatus: String?
     @State private var relayBusy = false
     @State private var confirmingUnlink = false
+    @State private var confirmingRemoval: AssistantHarness?
 
-    private enum CopySource { case server, claudeCode }
-
-    private static let ownerKeyURL = FileManager.default
-        .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        .appending(path: "Scribe/MCP/owner-key")
+    private enum CopySource { case server }
 
     private var address: Result<AssistantServerAddress, AssistantServerAddress.Problem> {
-        AssistantServerAddress.parse(mode == .relay ? relayText : addressText)
+        AssistantServerAddress.parse(relayText)
     }
 
-    /// The connector URL clients are given, for whichever mode is chosen.
+    /// The connector URL web clients are given.
     private var validAddress: AssistantServerAddress? {
         try? address.get()
     }
@@ -50,35 +45,99 @@ public struct AssistantSettingsView: View {
 
     public var body: some View {
         Form {
-            // Claude Code first: it runs on this Mac and needs nothing else.
-            claudeCodeSection
-            Section {
-                Picker("Connect through", selection: $mode) {
-                    ForEach(AssistantConnectionMode.allCases) { Text($0.name).tag($0) }
-                }
-                .pickerStyle(.segmented)
-            } header: {
-                Text("ChatGPT and Claude")
-            } footer: {
-                Text(mode == .relay
-                    ? "This Mac links to a Scribe relay, which gives your library one stable HTTPS address. Scribe only connects out, so no tunnel or open port is needed. Assistants read only this library, only after you approve them with a link code, and you can disconnect them here."
-                    : "Run Scribe’s server on this Mac behind your own HTTPS tunnel or proxy.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-            if mode == .relay { relaySection } else { serverSection }
-            clientSection(.chatGPT) {
-                if mode == .selfHosted {
-                    TextField("ChatGPT callback", text: $chatGPTCallback, prompt: Text("Optional, from ChatGPT"))
-                }
-            }
-            clientSection(.claude) { EmptyView() }
+            localSection
+            relaySection
+            clientSection(.chatGPT)
+            clientSection(.claude)
         }
         .formStyle(.grouped)
         .onAppear {
             // A build packaged for a relay offers it, the same one its ChatGPT plugin
             // names; otherwise Scribe's own relay.
             if relayText.isEmpty { relayText = package.packagedRelay?.origin ?? AssistantRelayAgent.defaultRelayOrigin }
+            package.refreshPlugins()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            // An assistant may have been installed or its plugin removed meanwhile.
+            package.refreshPlugins()
+        }
+    }
+
+    // MARK: - On this Mac
+
+    private var localSection: some View {
+        Section {
+            ForEach(AssistantHarness.allCases) { pluginRow($0) }
+            unavailableNote
+        } header: {
+            Text("On this Mac")
+        } footer: {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Restart the assistant after installing, updating, or removing its plugin.")
+                Text("The plugin runs the read-only transcript server inside Scribe.app, so updating Scribe needs no plugin update. When an assistant reads a transcript, its text is sent to that assistant’s cloud service, like anything else in the chat.")
+            }
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    private func pluginRow(_ harness: AssistantHarness) -> some View {
+        let state = package.plugin(harness)
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(harness.name).font(.headline)
+                    if let covers = harness.covers {
+                        Text(covers).font(.callout).foregroundStyle(.secondary)
+                    }
+                    Label(
+                        state.isDetected ? "Detected on this Mac" : "Not detected on this Mac",
+                        systemImage: state.isDetected ? "checkmark.circle" : "questionmark.circle"
+                    )
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 12)
+                if state.isWorking { ProgressView().controlSize(.small) }
+                if state.status != .notInstalled {
+                    Button("Remove", role: .destructive) { confirmingRemoval = harness }
+                        .disabled(state.isWorking)
+                }
+                pluginButton(harness, state: state)
+            }
+            if let message = state.message {
+                Text(message)
+                    .font(.footnote)
+                    .foregroundStyle(state.failed ? .red : .orange)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+            }
+        }
+        .padding(.vertical, 4)
+        .confirmationDialog(
+            "Remove the Scribe plugin from \(harness.name)?",
+            isPresented: Binding(get: { confirmingRemoval == harness }, set: { if !$0 { confirmingRemoval = nil } })
+        ) {
+            Button("Remove", role: .destructive) { Task { await package.remove(harness) } }
+        } message: {
+            Text("Scribe deletes the plugin files it installed and its entries in \(harness.covers ?? harness.name). Files you changed are kept.")
+        }
+    }
+
+    @ViewBuilder
+    private func pluginButton(_ harness: AssistantHarness, state: AssistantConnectorPackage.PluginState) -> some View {
+        switch state.status {
+        case .notInstalled:
+            Button("Install \(harness.name) Plugin") { Task { await package.install(harness) } }
+                .buttonStyle(.borderedProminent)
+                .disabled(!package.isAvailable || state.isWorking)
+        case .updateAvailable:
+            Button("Update") { Task { await package.install(harness) } }
+                .buttonStyle(.borderedProminent)
+                .disabled(!package.isAvailable || state.isWorking)
+        case .installed:
+            Button {} label: { Label("Installed", systemImage: "checkmark.circle.fill") }
+                .disabled(true)
         }
     }
 
@@ -98,7 +157,7 @@ public struct AssistantSettingsView: View {
                     Spacer()
                     if relayBusy { ProgressView().controlSize(.small) }
                 }
-                .disabled(relayBusy || !package.isAvailable)
+                .disabled(relayBusy)
                 .confirmationDialog("Unlink this Mac from the relay?", isPresented: $confirmingUnlink) {
                     Button("Unlink", role: .destructive) {
                         relayAgent.stop()
@@ -123,20 +182,14 @@ public struct AssistantSettingsView: View {
                     .disabled(AssistantRelayAgent.isLinked)
                     .help(AssistantRelayAgent.isLinked ? "Unlink this Mac to change relays." : "")
                 addressDetail
-                HStack {
-                    Text("To serve from Terminal instead of Scribe, copy the connect command.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    confirmation(for: ["connect command"])
-                    Button("Copy Connect Command") { copyRelayCommand() }
-                        .disabled(validAddress == nil || !package.isAvailable)
-                }
             }
         } header: {
-            Text("Scribe Relay")
+            VStack(alignment: .leading, spacing: 2) {
+                Text("From anywhere")
+                Text("Scribe Relay").font(.subheadline).foregroundStyle(.secondary)
+            }
         } footer: {
-            Text("Transcripts pass through the relay only while an assistant is reading them. The relay never stores them.")
+            Text("For ChatGPT and Claude on the web, which connect from their own cloud. Transcripts pass through the relay only while an assistant is reading them. The relay never stores them.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
@@ -171,7 +224,7 @@ public struct AssistantSettingsView: View {
                     if let relay = validAddress { relayAgent.start(package: package, relay: relay) }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(validAddress == nil || !package.isAvailable)
+                .disabled(validAddress == nil)
             } else {
                 Button("Disconnect") { relayAgent.stop() }
             }
@@ -241,7 +294,7 @@ public struct AssistantSettingsView: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(relayBusy || !package.isAvailable)
+                .disabled(relayBusy)
             }
             TimelineView(.everyMinute) { context in
                 if let linkCode, let linkCodeExpiry, linkCodeExpiry > context.date {
@@ -294,17 +347,6 @@ public struct AssistantSettingsView: View {
         }
     }
 
-    private func copyRelayCommand() {
-        guard let relay = validAddress else { return }
-        do {
-            try package.stage()
-        } catch {
-            copyFailure = (.server, error.localizedDescription)
-            return
-        }
-        copy(AssistantConnectorCommands.relayConnectCommand(cli: package.stagedCLI, relay: relay), label: "connect command")
-    }
-
     @ViewBuilder
     private var addressDetail: some View {
         switch address {
@@ -319,7 +361,7 @@ public struct AssistantSettingsView: View {
                 }
             }
         case .failure(let problem):
-            if !(mode == .relay ? relayText : addressText).isEmpty {
+            if !relayText.isEmpty {
                 Text(AssistantServerAddress.problemDescription(problem))
                     .font(.footnote)
                     .foregroundStyle(.red)
@@ -336,109 +378,37 @@ public struct AssistantSettingsView: View {
         }
     }
 
-    // MARK: - Server
-
-    private var serverSection: some View {
-        Section {
-            TextField("Public address", text: $addressText, prompt: Text("https://scribe.example.com"))
-                .textContentType(.URL)
-                .autocorrectionDisabled()
-            addressDetail
-            HStack {
-                Button("Copy Server Command") { copyServerCommand() }
-                    .disabled(validAddress == nil || !package.isAvailable)
-                Button("Copy Owner Key") { copyOwnerKey() }
-                Spacer()
-                confirmation(for: ["server command", "owner key"])
-            }
-            Text("ChatGPT and Claude reach Scribe from the internet, never from this Mac directly. Run the server command in Terminal and keep this Mac awake, then forward an HTTPS tunnel or proxy (for example `ngrok http 8766`) to port 8766 and enter its address above. The first run creates your owner key; paste it only into Scribe’s own consent page, never into a chat.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            failure(in: .server)
-            unavailableNote
-        } header: {
-            Text("Your own server")
-        }
-    }
-
     // MARK: - ChatGPT and Claude
 
-    private func clientSection<Extra: View>(_ client: AssistantClient, @ViewBuilder extra: () -> Extra) -> some View {
-        Section(client.name) {
+    private func clientSection(_ client: AssistantClient) -> some View {
+        Section(client.addTitle) {
             HStack {
-                Button("Add to \(client.name)…") { add(to: client) }
+                Button("\(client.addTitle)…") { add(to: client) }
                     .buttonStyle(.borderedProminent)
                     .disabled(validAddress == nil)
                 Spacer()
                 confirmation(for: ["\(client.name) URL"])
             }
             if validAddress == nil {
-                Text(mode == .relay ? "Enter the relay address above first." : "Enter your public address above first.")
+                Text("Enter the relay address in Relay Settings above first.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
-            extra()
             steps(for: client)
         }
     }
 
     private func add(to client: AssistantClient) {
-        guard let server = validAddress, let page = client.setupPage else { return }
+        guard let server = validAddress else { return }
         copy(server.endpoint, label: "\(client.name) URL")
-        NSWorkspace.shared.open(page)
-    }
-
-    // MARK: - Claude Code
-
-    private var claudeCodeSection: some View {
-        Section(AssistantClient.claudeCode.name) {
-            HStack {
-                Button("Add to Claude Code") {
-                    Task { await package.installInClaudeCode() }
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(!package.isAvailable || package.installState == .installing)
-                Button("Copy Commands") { copyClaudeCodeCommands() }
-                    .disabled(!package.isAvailable)
-                Spacer()
-                installStatus
-                confirmation(for: ["Claude Code commands"])
-            }
-            switch package.installState {
-            case .installed(let note?):
-                Text(note).font(.footnote).foregroundStyle(.orange)
-            case .failed(let message):
-                Text(message).font(.footnote).foregroundStyle(.red).textSelection(.enabled)
-            default:
-                EmptyView()
-            }
-            failure(in: .claudeCode)
-            steps(for: .claudeCode)
-            Text("Claude Code runs Scribe on this Mac and reads your transcripts directly, so it needs no server or public address. It requires Node.js 22 or newer.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    @ViewBuilder
-    private var installStatus: some View {
-        switch package.installState {
-        case .installing:
-            ProgressView().controlSize(.small)
-        case .installed:
-            Label("Installed", systemImage: "checkmark.circle.fill")
-                .foregroundStyle(.green)
-                .font(.callout)
-        default:
-            EmptyView()
-        }
+        NSWorkspace.shared.open(client.setupPage)
     }
 
     // MARK: - Shared pieces
 
     private func steps(for client: AssistantClient) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            ForEach(Array(client.steps(mode: mode).enumerated()), id: \.offset) { index, step in
+            ForEach(Array(client.steps.enumerated()), id: \.offset) { index, step in
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text("\(index + 1).")
                         .monospacedDigit()
@@ -484,37 +454,5 @@ public struct AssistantSettingsView: View {
             try? await Task.sleep(for: .seconds(4))
             if copied == label { withAnimation { copied = nil } }
         }
-    }
-
-    private func copyServerCommand() {
-        guard let server = validAddress else { return }
-        do {
-            try package.stage()
-        } catch {
-            copyFailure = (.server, error.localizedDescription)
-            return
-        }
-        copy(
-            AssistantConnectorCommands.serverCommand(cli: package.stagedCLI, address: server, chatGPTCallback: chatGPTCallback),
-            label: "server command"
-        )
-    }
-
-    private func copyClaudeCodeCommands() {
-        do {
-            try package.stage()
-        } catch {
-            copyFailure = (.claudeCode, error.localizedDescription)
-            return
-        }
-        copy(AssistantConnectorCommands.claudeCodeInstallCommand(marketplace: package.stagedMarketplace), label: "Claude Code commands")
-    }
-
-    private func copyOwnerKey() {
-        guard let key = try? String(contentsOf: Self.ownerKeyURL, encoding: .utf8) else {
-            copyFailure = (.server, "No owner key yet. Run the server command once to create it.")
-            return
-        }
-        copy(key.trimmingCharacters(in: .whitespacesAndNewlines), label: "owner key")
     }
 }

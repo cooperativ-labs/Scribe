@@ -145,6 +145,7 @@ final class ModuleIntegrationTests: XCTestCase {
                 ]),
                 "nearest_interval": .object([
                     "maximum_distance_ms": .number(250),
+                    "segment_distance_aggregation": .string("maximum_word_distance"),
                     "attribution_source": .string("inferred"),
                     "rejects_competing_intervals": .boolean(true),
                 ]),

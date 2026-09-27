@@ -92,7 +92,8 @@ try {
     console.error('Unlinked. The relay forgot this library and every connection to it.');
   } else if (command === 'help' || command === '--help') {
     console.log(`Scribe MCP: node cli.mjs <command>
-  stdio              Serve this Mac's library to a local client (Claude Code)
+  stdio              Serve this Mac's library over stdio (development; Scribe.app
+                     ships Contents/Helpers/scribe-mcp for installed plugins)
   link <relay>       Link this Mac's library to a Scribe relay
   connect [relay]    Serve this library through the relay (links first if needed)
   code               Print a one-time link code for the relay consent page

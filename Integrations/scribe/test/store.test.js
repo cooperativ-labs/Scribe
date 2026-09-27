@@ -29,7 +29,7 @@ test('complete pagination and revision checks, deletion, corrupt files and path 
   const current = await add({ text: 'A😀long meeting '.repeat(4000) });
   const library = new TranscriptLibrary(root);
   let offset = 0, combined = '';
-  do { const result = await library.get({ id: current.id, offset, max_chars: 1234, revision: 1 }); combined += result.text; offset = result.next_offset; } while (offset !== null);
+  do { const result = await library.get({ id: current.id, offset, max_chars: 1234, revision: 1 }); assert.doesNotMatch(result.text, /[\uD800-\uDBFF]$/); combined += result.text; offset = result.next_offset; } while (offset !== null);
   assert.equal(combined, (await library.get({ id: current.id, max_chars: 100000 })).text);
   await writeFile(path.join(current.dir, 'canonical-transcript.json'), JSON.stringify({ ...current.data, revision: 2 }));
   await assert.rejects(library.get({ id: current.id, revision: 1 }), /changed/);

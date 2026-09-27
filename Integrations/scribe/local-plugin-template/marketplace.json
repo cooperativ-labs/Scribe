@@ -1,0 +1,17 @@
+{
+  "name": "scribe-local",
+  "metadata": {
+    "description": "Local Scribe meeting transcript integration."
+  },
+  "owner": {
+    "name": "Cooperativ"
+  },
+  "plugins": [
+    {
+      "name": "scribe",
+      "source": "./plugins/scribe",
+      "description": "Local Scribe transcript retrieval over MCP.",
+      "version": "0.1.0"
+    }
+  ]
+}

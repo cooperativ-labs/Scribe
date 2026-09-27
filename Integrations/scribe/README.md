@@ -18,37 +18,65 @@ API keys. The assistant performs the requested analysis on retrieved text.
 
 ## From the Scribe app
 
-Settings → **Assistants** does the setup below from buttons, with the
-remaining steps listed beside each one:
+Settings → **Assistants** does the setup below from buttons, in two sections.
 
-- **Add to Claude Code** stages the bundled plugin marketplace in
-  `~/Library/Application Support/Scribe/Integrations/claude` and runs
-  `claude plugin marketplace add` and `claude plugin install scribe@scribe-local`
-  in a login shell. **Copy Commands** copies the same two commands instead.
-- **Connect through → Scribe Relay** (the default) opens with the connection
-  status and one button. **Connect This Mac** runs the bundled connector from
-  Scribe itself: it links this Mac on first use, keeps an outbound connection
-  open while Scribe runs, and reconnects at launch until you press
-  **Disconnect**. The connector exits with Scribe. Once connected, **Get Link
+**On this Mac** installs the local plugin, which runs the read-only server
+inside Scribe.app through `scribe-mcp-launcher` and needs no Node. Each button
+reads **Install**, **Update** (the app carries a newer or different plugin
+than the one installed), or **Installed**, with **Remove** beside it, and says
+whether the harness was detected on this Mac:
+
+- **Install ChatGPT Plugin** (ChatGPT desktop and Codex) copies the plugin to
+  `~/.codex/plugins/scribe`, upserts a `scribe` entry (local source
+  `./.codex/plugins/scribe`, installation `AVAILABLE`, authentication
+  `ON_INSTALL`, category Productivity) into `~/.agents/plugins/marketplace.json`
+  while keeping every other entry, then runs `codex plugin add
+  scribe@<marketplace>` in a login shell when `codex` is on the PATH. Codex
+  names personal plugins after that file's own `name`, so an existing
+  marketplace keeps its name (for example `overlord-local`); Scribe creates it
+  as `scribe-local` only when it is missing.
+- **Install Claude Plugin** (Claude Code and Claude Desktop) keeps the plugin
+  marketplace in `~/Library/Application Support/Scribe/Integrations/claude`,
+  runs `claude plugin marketplace add` and `claude plugin install
+  scribe@scribe-local` in a login shell, and, when Claude Desktop is installed,
+  adds a `scribe` server running that marketplace's `scribe-mcp-launcher` to
+  `mcpServers` in `~/Library/Application Support/Claude/claude_desktop_config.json`,
+  keeping every other key.
+- **Install Cursor Plugin** copies the plugin to `~/.cursor/plugins/local/scribe`.
+
+Each install records the package version and the SHA-256 of every file it
+wrote in `~/Library/Application Support/Scribe/Integrations/state/<harness>.json`
+(`codex`, `claude`, `cursor`). A second install changes nothing; an update
+deletes files the package no longer ships; a file you edited after Scribe
+wrote it is kept, with a warning, on update and on removal. **Remove** also
+takes out the marketplace entry, Claude Desktop's `scribe` server and the CLI
+registration. Restart the assistant after any of these. Updating Scribe itself
+needs no plugin update, because the launcher finds Scribe.app at every start.
+
+**From anywhere** is for ChatGPT and Claude on the web, which connect from
+their own cloud:
+
+- **Scribe Relay** opens with the connection status and one button. **Connect
+  This Mac** runs the native relay connection in Scribe itself: it links this Mac on first use, keeps an outbound
+  connection open while Scribe runs, and reconnects at launch until you press
+  **Disconnect**. The connection exits with Scribe. Once connected, **Get Link
   Code** shows a one-time code, large enough to read across a room, with the
   time it expires; type it on the consent page. **Disconnect All Assistants**
   revokes every grant, and **Unlink This Mac…** makes the relay forget this
   library. **Relay Settings** holds the relay address (Scribe's own
   `https://scribe.ovld.ai` unless the build was packaged for another), the
-  connector URL (`https://<relay>/mcp`, the same for every owner), and **Copy
-  Connect Command**, the same `node … connect <relay>` for a Terminal.
-- **Connect through → Your own tunnel** keeps the self-hosted setup.
-  **Public address** takes your HTTPS tunnel or proxy origin. **Copy Server
-  Command** creates the owner key on first run and starts the HTTP bridge. It
-  allows Claude's callback, ChatGPT's stable callback, and any
-  connection-specific ChatGPT callback you entered. **Copy Owner Key** copies
-  the key for Scribe's consent page.
-- **Add to ChatGPT…** and **Add to Claude…** copy the connector URL and open
-  `chatgpt.com/plugins` or `claude.ai/customize/connectors` for pasting.
+  connector URL (`https://<relay>/mcp`, the same for every owner).
+- **Add to ChatGPT web…** and **Add to Claude.ai…** copy the connector URL and
+  open `chatgpt.com/plugins` or `claude.ai/customize/connectors` for pasting.
+
+The app no longer offers the self-hosted tunnel; run `init` and `http` from the
+CLI for that (see [ChatGPT and Claude web through your own tunnel](#chatgpt-and-claude-web-through-your-own-tunnel) below).
 
 `Scripts/build-app.sh` and `Scripts/package-app.sh` embed the package through
-`Scripts/embed-assistant-connector.sh` (a release requires npm; a development
-build skips it without npm, and the tab then says so). The embedded package
+`Scripts/embed-assistant-connector.sh` without npm. It runs after
+`Scripts/embed-mcp-helper.sh` and embeds the local plugin with the app's own
+`Contents/Helpers/scribe-mcp-launcher`. The app contains no Node relay CLI.
+The embedded package
 names the hosted relay, `https://scribe.ovld.ai/mcp`, so the tab's relay address
 defaults to it; set `SCRIBE_CONNECTOR_URL` to another relay's `/mcp` URL, or to
 an empty string for no default.
@@ -61,7 +89,7 @@ Node.js 22 or newer is required. From this directory:
 npm ci
 npm test
 npm run build
-npm run package
+npm run package -- --launcher ../../Workers/ScribeMCP/.build/debug/scribe-mcp-launcher
 ```
 
 Tests use synthetic transcripts and the official MCP client across both
@@ -75,32 +103,136 @@ each token reads only its own owner's library, that link codes work once, that
 one Mac cannot answer another's calls, that unknown or widened calls are
 refused, and that the relay handles an offline Mac, grant revocation and
 unlink. No private
-meeting text is needed. `npm run build` bundles dependencies into `dist/cli.mjs`;
-`npm run package` creates a self-contained Claude marketplace at
-`dist/packages/claude`, including dependency notices, and with `--url` the
-ChatGPT marketplace described below. Keep its `ui/` directory
-beside `dist/`. Do not run `npm install` inside a plugin cache.
+meeting text is needed. `npm run build` bundles dependencies into `dist/cli.mjs`.
+`npm run package -- --launcher <path>` writes:
 
-## Claude Code
+- `dist/packages/claude/plugins/scribe`, the [local plugin](#local-plugin-claude-code-codex-and-chatgpt-desktop-cursor)
+  that every desktop harness installs, inside a Claude Code marketplace
+  (`dist/packages/claude`);
+- `dist/packages/relay`, the Node relay service CLI with its
+  `connector.json` and dependency notices, for server deployment only;
+- with `--url`, the ChatGPT marketplace and submission archive described below.
 
-For a temporary local session after building:
+Pass `--launcher <path to scribe-mcp-launcher>` to build the local plugin.
+The app build embeds its native plugin from `local-plugin-template/` without
+using npm. Do not run
+`npm install` inside a plugin cache.
+
+## Local MCP server in Scribe.app
+
+Scribe.app ships the local server as a native helper, so a local plugin needs
+neither Node nor a copy of the server:
+
+- `Contents/Helpers/scribe-mcp` serves the same stdio MCP surface as
+  `node dist/cli.mjs stdio`: the same tools, input and output schemas, paging,
+  prompt, viewer resource and icon. It reads the library through Scribe's own
+  `TranscriptStore` (`Modules/Transcription`), within the same filesystem
+  boundary as `src/store.js`, honors `SCRIBE_TRANSCRIPTS_DIR` with the same
+  `~/Meeting Transcripts` default, and is read-only.
+- `Contents/Helpers/scribe-mcp-launcher` is what plugin manifests run. At every
+  start it finds Scribe.app through LaunchServices by bundle identifier
+  (`com.scribe.app`), never a stored path, so moving or updating the app cannot
+  break a plugin, then execs the helper with stdin, stdout, stderr, arguments
+  and environment untouched. Without Scribe installed it exits with status 69
+  and one line on stderr. `SCRIBE_MCP_HELPER` names a helper to run instead,
+  for development builds and tests.
+
+Both are built from `Workers/ScribeMCP` (the official Swift MCP SDK plus
+Scribe's transcript store) by `Scripts/embed-mcp-helper.sh`, which
+`Scripts/build-app.sh` and `Scripts/package-app.sh` run; they are signed and
+notarized with the app. To work on them:
 
 ```sh
-claude --plugin-dir /absolute/path/to/Scribe/Integrations/scribe
+cd Workers/ScribeMCP
+swift build && swift test
+SCRIBE_MCP_HELPER=.build/debug/scribe-mcp SCRIBE_TRANSCRIPTS_DIR=… .build/debug/scribe-mcp-launcher
 ```
 
-For a persistent install of the packaged plugin:
+`test/conformance.test.js` drives both servers with the official MCP client
+over stdio against one synthetic library, the Swift one through the launcher
+on a `PATH` without Node, and requires identical tool lists, schemas, prompts,
+resources and results. It runs whenever `Workers/ScribeMCP/.build/debug` holds
+both executables (or `SCRIBE_MCP_BIN_DIR` names a directory that does), and is
+skipped otherwise, so build the Swift package before relying on `npm test`.
+
+**The Node `stdio` command is now for development only.** It remains the quick
+way to try a change to the tools before porting it, and the conformance test
+keeps it honest, but installed plugins run the launcher. Change both
+servers together, including `Workers/ScribeMCP/Sources/ScribeMCPCore/Resources/tools.json`,
+which holds the tool definitions exactly as the Node server lists them.
+
+## Local plugin (Claude Code, Codex and ChatGPT desktop, Cursor)
+
+One plugin directory installs in every desktop harness. It holds no server
+code: each harness runs `scribe-mcp-launcher`, which finds Scribe.app at start
+and execs its helper, so the plugin needs no Node and survives app moves and
+updates. With the launcher it contains only:
+
+```text
+plugins/scribe/
+├── .claude-plugin/plugin.json   Claude Code manifest
+├── .mcp.json                    Claude Code server: ${CLAUDE_PLUGIN_ROOT}/scribe-mcp-launcher
+├── .codex-plugin/plugin.json    Codex / ChatGPT desktop manifest (interface: Scribe, Read)
+├── mcp.json                     Codex server: ./scribe-mcp-launcher with cwd ./
+├── .cursor-plugin/plugin.json   Cursor manifest
+├── .cursor-plugin/mcp.json      Cursor server: ${CURSOR_PLUGIN_ROOT}/scribe-mcp-launcher
+├── skills/scribe-transcripts/SKILL.md
+├── ui/transcripts.html
+├── assets/icon.png              server icon, composer icon and logo
+└── scribe-mcp-launcher
+```
+
+That is about 100 KB. The three server configs differ because the harnesses
+start a plugin's server differently, as checked against Codex CLI 0.157 and
+cursor-agent 2026.09.23:
+
+- Claude Code starts it in the user's project and expands
+  `${CLAUDE_PLUGIN_ROOT}`.
+- Codex (and the ChatGPT desktop app, which embeds it) reads
+  `.codex-plugin/plugin.json` in its own shape: the listing is a top-level
+  `interface` (it ignores `extensions.com.openai` there) and the server config
+  must be named by `mcpServers`. It expands neither variable in a named config
+  and starts the server in the project unless `cwd` is set, so `mcp.json` runs
+  `./scribe-mcp-launcher` with `cwd: "./"`, which it resolves under the plugin.
+  `mcp.json` is also a valid Agent Plugins 1.0.0 MCP document.
+- Cursor starts it in the project, ignores a relative `cwd`, and expands
+  `${CURSOR_PLUGIN_ROOT}`.
+
+`test/package.test.js` checks that the tree holds the three manifests and only
+the files above, no JavaScript, under 200 KB; that every config reaches the
+launcher inside the tree under those rules; and that the Codex manifest, read
+back in Agent Plugins form, validates against the Agent Plugins 1.0.0 schema
+(`test/schemas/`) and OpenAI's listing limits.
+
+A launcher is required. The app build copies checked-in plugin manifests from
+`local-plugin-template/` and checks them against package output in the Node suite.
+
+Scribe's Settings → Assistants → **On this Mac** installs, updates and removes
+it for each harness (see [From the Scribe app](#from-the-scribe-app)). To
+install a packaged plugin by hand:
 
 ```sh
-claude plugin marketplace add /absolute/path/to/Scribe/Integrations/scribe/dist/packages/claude
+npm run package -- --launcher /Applications/Scribe.app/Contents/Helpers/scribe-mcp-launcher
+# Claude Code
+claude plugin marketplace add "$PWD/dist/packages/claude"
 claude plugin install scribe@scribe-local
+# Codex: add a marketplace whose .agents/plugins/marketplace.json lists
+# ./plugins/scribe (see "ChatGPT plugin package" for the shape), then
+codex plugin add scribe@<marketplace>
+# Cursor
+cp -R dist/packages/claude/plugins/scribe ~/.cursor/plugins/local/scribe
 ```
 
-Restart Claude Code, run `/mcp`, and verify `scribe` is connected. Ask for your
-most recent transcript or use `/scribe:scribe-transcripts`. The plugin includes
-the MCP server and the transcript workflow skill. Its only runtime dependency
-is Node; the packaged artifact can also be distributed through a compatible
-marketplace. No Overlord source or marketplace was changed.
+Restart the harness and check that `scribe` is connected (`/mcp` in Claude
+Code, `codex mcp list`, Cursor's MCP settings). Ask for your most recent
+transcript or use the `scribe-transcripts` skill. For a temporary Claude Code
+session from a checkout, `claude --plugin-dir /absolute/path/to/Scribe/Integrations/scribe`
+is a development-only Node server path.
+
+Overlord's marketplace keeps a copy of this plugin at
+`Overlord/marketplace/plugins/scribe`. Regenerate it from this package
+(`npm run package -- --launcher …`, then copy `dist/packages/claude/plugins/scribe`)
+rather than editing it by hand.
 
 The default library is `~/Meeting Transcripts`, matching Scribe. Set
 `SCRIBE_TRANSCRIPTS_DIR` in the launching environment to use another Scribe
@@ -120,35 +252,24 @@ The relay is a hosted service (`node dist/cli.mjs relay`, see
 owner uses its one connector URL, `https://RELAY/mcp`.
 
 On the Mac that holds the transcripts, press **Connect This Mac** in Settings
-→ Assistants, or keep this running in a shell:
-
-```sh
-node dist/cli.mjs connect https://RELAY
-```
-
-Without an address, `connect` and `link` use the relay the package was built
-for (`connector.json`). The first run links the Mac. It stores an owner ID and agent secret in
-`~/Library/Application Support/Scribe/MCP/relay.json` with mode 0600. After
-that, the command only connects out over HTTPS, and nothing listens on the Mac.
-The Mac must stay awake. While it is asleep or offline, tools return "Your
-Scribe Mac is not connected."
+→ Assistants. The first connection links the Mac and stores an owner ID and
+agent secret in `~/Library/Application Support/Scribe/MCP/relay.json` with mode
+0600. Scribe reconnects at launch, makes outbound HTTPS requests only, and
+stops polling when it exits. Nothing listens on the Mac. The Mac must stay
+awake; while it is asleep or offline, tools return "Your Scribe Mac is not
+connected."
 
 In **ChatGPT**, turn on developer mode under Settings → Security and login.
 Then add `https://RELAY/mcp` from the Plugins page with OAuth. In **Claude
 web or Desktop**, add the same URL as a custom connector. When the consent
-page asks for a link code, get one from **Get Link Code** in Scribe, or run
-`node dist/cli.mjs code`. Each code works once and expires after ten minutes.
+page asks for a link code, get one from **Get Link Code** in Scribe. Each code works once and expires after ten minutes.
 **Never paste a link code into a chat.** The grant binds the client to this
 Mac's library only.
 
-Manage connections from the Mac:
-
-```sh
-node dist/cli.mjs grants          # connected assistants and whether this Mac is online
-node dist/cli.mjs revoke <id>     # disconnect one assistant
-node dist/cli.mjs revoke --all    # disconnect every assistant
-node dist/cli.mjs unlink          # relay forgets this library and all its grants
-```
+Manage connections in Settings → Assistants. **Disconnect All Assistants**
+revokes every grant, and **Unlink This Mac** removes this Mac and all its
+grants from the relay. The Swift client also supports listing and revoking
+individual grants for callers using it directly.
 
 ## ChatGPT and Claude web through your own tunnel
 
@@ -192,7 +313,7 @@ submit anything to a public app directory.
 ## ChatGPT plugin package
 
 ```sh
-npm run package -- --url https://RELAY/mcp \
+npm run package -- --launcher <path-to-scribe-mcp-launcher> --url https://RELAY/mcp \
   [--website-url URL] [--privacy-url URL] [--terms-url URL] [--support-url URL]
 ```
 
@@ -340,7 +461,7 @@ After installing in each real client:
 7. In ChatGPT Developer mode, install the ChatGPT package (or add
    `https://RELAY/mcp` with OAuth), approve it with a link code, and ask for
    the latest meeting. Then disconnect it in ChatGPT and confirm that
-   `node dist/cli.mjs grants` no longer lists it.
+   Settings → Assistants shows it disconnected.
 
 For public submission, see [docs/directory-submission.md](docs/directory-submission.md).
 It holds every portal field, the reviewer demo library (synthetic meetings reached

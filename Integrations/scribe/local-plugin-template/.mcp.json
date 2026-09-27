@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "scribe": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/scribe-mcp-launcher"
+    }
+  }
+}

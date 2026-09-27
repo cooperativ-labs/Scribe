@@ -1,9 +1,10 @@
 import { readFileSync } from 'node:fs';
 
-// The Scribe app icon, shipped beside the server as assets/icon.png in every
-// package. Clients show it for the MCP server (serverInfo.icons), browsers for
-// the consent page, and connector UIs that look up a domain's favicon for the
-// relay. Absent from a checkout without assets, which only drops the icon.
+// The Scribe logo mark, on a transparent background, shipped beside the server
+// as assets/icon.png in every package. Clients show it for the MCP server
+// (serverInfo.icons), browsers for the consent page, and connector UIs that
+// look up a domain's favicon for the relay. Absent from a checkout without
+// assets, which only drops the icon.
 export const ICON_PATH = '/icon.png';
 export const WEBSITE_URL = 'https://scribe.ovld.ai';
 let icon;

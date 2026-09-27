@@ -144,12 +144,105 @@ public struct TranscriptStore: Sendable {
             options: [.skipsHiddenFiles]
         )) ?? []
         return contents.compactMap { runDirectory in
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
             guard let data = try? Data(contentsOf: runDirectory.appending(path: "job.json")),
-                  let job = try? decoder.decode(TranscriptionJob.self, from: data) else { return nil }
+                  let job = try? Self.decodeJob(data) else { return nil }
             return StoredTranscriptRun(job: job, transcript: transcript(forRunAt: runDirectory))
         }
+    }
+
+    private static func decodeJob(_ data: Data) throws -> TranscriptionJob {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(TranscriptionJob.self, from: data)
+    }
+}
+
+// MARK: - Confined reading
+
+/// A completed run read through `TranscriptStore.confinedCompletedRuns()`,
+/// with the meeting directory it was found in. Only `meeting`, the job's
+/// run ID and dates, and the transcript are trustworthy: the URLs recorded
+/// inside job.json are never followed.
+public struct ConfinedTranscriptRun: Sendable {
+    public let meeting: String
+    public let job: TranscriptionJob
+    public let transcript: CanonicalTranscript
+}
+
+public enum ConfinedTranscriptStoreError: Error, Equatable, Sendable {
+    case unavailable
+    case tooManyRuns
+}
+
+public extension TranscriptStore {
+    /// Every completed run, read the way a process serving the library to other
+    /// programs must: only Scribe's own layout is walked, symlinks must resolve
+    /// inside the store, files are opened without following a final symlink and
+    /// capped in size, and paths recorded in job.json are ignored. Runs that are
+    /// unfinished, unreadable or outside those rules are counted, not returned.
+    /// Newest run first; ties by lowercase run ID.
+    func confinedCompletedRuns(
+        maximumRuns: Int = 10_000,
+        maximumFileBytes: Int = 32 * 1024 * 1024
+    ) throws -> (runs: [ConfinedTranscriptRun], skipped: Int) {
+        guard let root = Self.realPath(storeDirectoryURL.path), Self.isDirectory(root),
+              let meetings = try? FileManager.default.contentsOfDirectory(atPath: root) else {
+            throw ConfinedTranscriptStoreError.unavailable
+        }
+        var runs: [ConfinedTranscriptRun] = []
+        var skipped = 0, count = 0
+        for meeting in meetings.sorted()
+        where meeting.hasPrefix(SourceSnapshotService.meetingDirectoryPrefix) && Self.isDirectory("\(root)/\(meeting)") {
+            let folder = "\(root)/\(meeting)/runs"
+            guard let resolved = Self.realPath(folder), resolved.hasPrefix(root + "/"),
+                  let entries = try? FileManager.default.contentsOfDirectory(atPath: folder) else {
+                skipped += 1
+                continue
+            }
+            for entry in entries.sorted() where !entry.hasPrefix(".") && Self.isDirectory("\(folder)/\(entry)") {
+                count += 1
+                if count > maximumRuns { throw ConfinedTranscriptStoreError.tooManyRuns }
+                // The directory name must look like a run; job.runID stays the
+                // identity, since historical stores name the directory differently.
+                guard UUID(uuidString: entry) != nil,
+                      let jobData = Self.readConfined("\(folder)/\(entry)/job.json", root: root, limit: maximumFileBytes),
+                      let job = try? Self.decodeJob(jobData),
+                      let data = Self.readConfined("\(folder)/\(entry)/\(TranscriptRunArtifact.canonicalTranscript)", root: root, limit: maximumFileBytes),
+                      let transcript = try? CanonicalTranscriptCodec.decode(data) else {
+                    skipped += 1
+                    continue
+                }
+                runs.append(ConfinedTranscriptRun(meeting: meeting, job: job, transcript: transcript))
+            }
+        }
+        runs.sort {
+            $0.job.createdAt != $1.job.createdAt
+                ? $0.job.createdAt > $1.job.createdAt
+                : $0.job.runID.uuidString.lowercased() < $1.job.runID.uuidString.lowercased()
+        }
+        return (runs, skipped)
+    }
+
+    private static func realPath(_ path: String) -> String? {
+        guard let resolved = realpath(path, nil) else { return nil }
+        defer { free(resolved) }
+        return String(cString: resolved)
+    }
+
+    /// A real directory, not a symlink to one.
+    private static func isDirectory(_ path: String) -> Bool {
+        var info = stat()
+        return lstat(path, &info) == 0 && (info.st_mode & S_IFMT) == S_IFDIR
+    }
+
+    private static func readConfined(_ path: String, root: String, limit: Int) -> Data? {
+        guard let resolved = realPath(path), resolved.hasPrefix(root + "/") else { return nil }
+        let descriptor = open(path, O_RDONLY | O_NOFOLLOW)
+        guard descriptor >= 0 else { return nil }
+        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+        var info = stat()
+        guard fstat(descriptor, &info) == 0, (info.st_mode & S_IFMT) == S_IFREG, info.st_size <= limit else { return nil }
+        return try? handle.readToEnd() ?? Data()
     }
 }
 

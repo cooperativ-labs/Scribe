@@ -9,7 +9,8 @@
 # and the only way to exercise either is to remember four environment
 # variables. Populating the bundle instead means a development run takes the
 # same lookup path as the shipped one, rather than a special case that only
-# developers hit.
+# developers hit. The MCP helper and its launcher go to Contents/Helpers, as in
+# a release, through Scripts/embed-mcp-helper.sh.
 #
 #   Scripts/build-app.sh                 # build, and populate the helpers
 #   Scripts/build-app.sh --no-helpers    # build only; the first worker build is slow
@@ -103,7 +104,8 @@ fi
 
 ditto "$worker_path" "$helpers_dir/TranscriptionWorker"
 bash "$repo_root/Scripts/embed-ffmpeg-runtime.sh" "$ffmpeg_path" "$ffprobe_path" "$helpers_dir" "$frameworks_dir"
-bash "$repo_root/Scripts/embed-assistant-connector.sh" --optional "$app_path"
+bash "$repo_root/Scripts/embed-mcp-helper.sh" "$app_path" "$repo_root/build/dev/ScribeMCP"
+bash "$repo_root/Scripts/embed-assistant-connector.sh" "$app_path"
 
 # Xcode has already signed the bundle, and adding files to Contents invalidates
 # that seal. Re-sign ad hoc, leaves first, preserving the identifier and
@@ -120,6 +122,7 @@ cat <<EOF
 
 Built $app_path
   helper:  $(basename "$worker_path")  <- $worker_path
+  mcp:     Contents/Helpers/scribe-mcp, scribe-mcp-launcher
   ffmpeg:  $ffmpeg_path
   ffprobe: $ffprobe_path
 

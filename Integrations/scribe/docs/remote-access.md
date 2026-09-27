@@ -24,8 +24,8 @@ ChatGPT / Claude ──HTTPS──▶  Scribe relay (hosted)  ◀──HTTPS lon
 | OAuth provider | `src/auth.js` | DCR, S256 PKCE, `/mcp` audience, `transcripts.read`, rotating refresh, RFC 9207 `iss`. Every grant carries an `ownerId`. |
 | Owner directory | `OwnerDirectory` | Linked owners (random UUID plus a hashed agent secret), and one-time link codes (in memory). |
 | Agent hub | `AgentHub` | Per-owner request queue, waiting long-polls, and pending calls with timeouts. |
-| Mac agent | `src/agent.js`, `node cli.mjs connect` | Makes outbound HTTPS requests only and never listens on a port. It answers the relay's `list`/`get` calls from the local library after validating them again. |
-| Mac app | Settings → Assistants → Scribe Relay, `AssistantRelayAgent` | **Connect This Mac** runs the agent while Scribe runs and reconnects at launch. The agent exits with Scribe (`SCRIBE_EXIT_WITH_PARENT`). Also **Get Link Code**, **Disconnect All Assistants** and **Unlink This Mac**. |
+| Mac agent | `Workers/ScribeMCP/Sources/ScribeMCPCore/RelayClient.swift` | Makes outbound HTTPS requests only and never listens on a port. It revalidates the relay's read-only `list`/`get` calls and answers through the same Swift transcript library as the local plugin. |
+| Mac app | Settings → Assistants → Scribe Relay, `AssistantRelayAgent` | **Connect This Mac** runs the agent while Scribe runs and reconnects at launch. The in-process client stops when Scribe exits. Also **Get Link Code**, **Disconnect All Assistants** and **Unlink This Mac**. |
 | ChatGPT package | `scripts/chatgpt-package.js` | One portable plugin and marketplace for every owner. It points at the relay's `/mcp` and has no app ID. |
 
 The self-hosted bridge (`init` + `http`) and local stdio (Claude Code) remain
@@ -33,13 +33,13 @@ available. They use the same OAuth provider with one fixed owner.
 
 ## Flows
 
-**Link (once per Mac).** `connect <relay>` calls `POST /agent/register`. The
+**Link (once per Mac).** **Connect This Mac** calls `POST /agent/register`. The
 relay creates an owner and returns `owner_id` and a 256-bit `agent_secret`. It
 stores only `sha256(agent_secret)`. The Mac writes both values to
 `~/Library/Application Support/Scribe/MCP/relay.json` with mode 0600. Every
 later agent call authenticates with `Authorization: Bearer <agent_secret>`.
 
-**Serve.** The agent loops on `POST /agent/poll`, and the relay holds each poll
+**Serve.** The Swift client loops on `POST /agent/poll`, and the relay holds each poll
 for up to 25 s. When a tool call arrives for that owner, the relay puts
 `{id, method, args}` on that owner's queue, which releases the waiting poll. The
 agent answers with `POST /agent/responses {id, result|error}`. The relay accepts

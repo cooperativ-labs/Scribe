@@ -240,7 +240,7 @@ export function renderSupport(config) {
     <h2>Connect ChatGPT to Scribe</h2>
     <ol>
       <li>Install Scribe on the Mac that holds your transcripts (<a href="/download">download</a>).</li>
-      <li>In Scribe → Settings → Assistants, choose <strong>Scribe Relay</strong> and press <strong>Connect This Mac</strong>.</li>
+      <li>In Scribe → Settings → Assistants, under <strong>From anywhere</strong>, press <strong>Connect This Mac</strong>.</li>
       <li>In ChatGPT, add the Scribe plugin from the Plugins Directory and choose Connect.</li>
       <li>On the Scribe consent page, type the link code from Scribe → Settings → Assistants → <strong>Get Link Code</strong>, then press Allow transcript access.</li>
       <li>Ask ChatGPT something like "Summarize my most recent Scribe meeting".</li>

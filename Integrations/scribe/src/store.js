@@ -115,8 +115,11 @@ export class TranscriptLibrary {
     if (revision !== undefined && revision !== run.transcript.revision) throw new StoreError('Transcript changed. Restart retrieval at offset 0 with its new revision.');
     const text = transcriptText(run.transcript);
     if (offset > text.length) throw new StoreError('Offset is beyond the end of this transcript.');
-    return { ...summary(run), text: text.slice(offset, offset + max_chars), offset,
-      total_chars: text.length, next_offset: offset + max_chars < text.length ? offset + max_chars : null,
+    // Never end a page between the two halves of a surrogate pair.
+    let end = Math.min(offset + max_chars, text.length);
+    if (end < text.length && /[\uD800-\uDBFF]/.test(text[end - 1])) end--;
+    return { ...summary(run), text: text.slice(offset, end), offset,
+      total_chars: text.length, next_offset: end < text.length ? end : null,
       warnings: run.transcript.warnings };
   }
 }

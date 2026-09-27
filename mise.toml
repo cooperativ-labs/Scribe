@@ -26,13 +26,17 @@ run = "Scripts/vocab.sh"
 [tasks.test-vocabulary]
 description = "Run the Vocabulary module and scribe-vocab tests"
 run = """
-cd Modules/Vocabulary && swift test
-cd Tools/ScribeVocabulary && swift test
+(cd Modules/Vocabulary && swift test)
+(cd Tools/ScribeVocabulary && swift test)
 """
 
 [tasks.test-integrations]
-description = "Test Scribe MCP, OAuth, and transcript retrieval (Node.js 22+)"
-run = "npm --prefix Integrations/scribe test"
+description = "Test Scribe MCP (Swift helper and Node), OAuth, and transcript retrieval (Node.js 22+)"
+# The Node suite drives the Swift helper too, from this debug build.
+run = """
+(cd Workers/ScribeMCP && swift build && swift test)
+npm --prefix Integrations/scribe test
+"""
 
 [tasks.build-integrations]
 description = "Bundle the Scribe ChatGPT and Claude MCP bridge"

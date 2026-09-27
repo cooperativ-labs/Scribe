@@ -1,49 +1,35 @@
 #!/usr/bin/env bash
-# Packages Integrations/scribe and copies its Claude marketplace into the app,
-# where Settings → Assistants finds it to install the Claude Code plugin and to
-# serve the connector for ChatGPT and Claude.
-#
-#   Scripts/embed-assistant-connector.sh <Scribe.app>             # required
-#   Scripts/embed-assistant-connector.sh --optional <Scribe.app>  # skip without npm
-#
-# A development build passes --optional, so a machine without Node still
-# builds; Settings then says the package is missing. A release requires it.
-#
-# The package names Scribe's hosted relay, so Settings → Assistants and the
-# bundled CLI default to it. Set SCRIBE_CONNECTOR_URL to another relay's /mcp
-# URL, or to an empty string to bundle no default relay.
+# Embed the static local plugin with the Swift launcher already built into Scribe.app.
+# npm is only needed when packaging the separate Node relay service or remote plugin.
 set -euo pipefail
-
-optional=0
-if [[ "${1:-}" == "--optional" ]]; then optional=1; shift; fi
 if (($# != 1)); then
-  echo "usage: $(basename "$0") [--optional] <Scribe.app>" >&2
+  echo "usage: $(basename "$0") <Scribe.app>" >&2
   exit 2
 fi
-
 app_path="$1"
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-integration_dir="$repo_root/Integrations/scribe"
+source_dir="$repo_root/Integrations/scribe"
 destination="$app_path/Contents/Resources/AssistantConnector/claude"
-
-die() { echo "error: $*" >&2; exit 1; }
-
-[[ -d "$app_path/Contents" ]] || die "not an app bundle: $app_path"
-if ! command -v npm >/dev/null 2>&1; then
-  ((optional)) || die "npm is required to package the assistant connector (Node.js 22 or newer)."
-  echo "note: npm not found; this build omits the assistant connector and Settings → Assistants cannot install it."
-  exit 0
-fi
-
-echo "Packaging the assistant connector…"
-# `npm ci` keeps the bundle's dependencies exactly the locked ones.
-npm --prefix "$integration_dir" ci --no-audit --no-fund >/dev/null
-SCRIBE_CONNECTOR_URL="${SCRIBE_CONNECTOR_URL-https://scribe.ovld.ai/mcp}" \
-  npm --prefix "$integration_dir" run --silent package >/dev/null
-source_dir="$integration_dir/dist/packages/claude"
-[[ -f "$source_dir/.claude-plugin/marketplace.json" ]] || die "packaging did not produce $source_dir"
-
+launcher="$app_path/Contents/Helpers/scribe-mcp-launcher"
+[[ -d "$app_path/Contents" && -x "$launcher" ]] || { echo "error: embed the MCP helper first" >&2; exit 1; }
 rm -rf "$destination"
-mkdir -p "$(dirname "$destination")"
-ditto "$source_dir" "$destination"
-echo "Embedded the assistant connector in $destination"
+plugin="$destination/plugins/scribe"
+mkdir -p "$plugin/assets" "$destination/.claude-plugin" "$destination/relay"
+for folder in .claude-plugin .codex-plugin .cursor-plugin; do
+  ditto "$source_dir/local-plugin-template/$folder" "$plugin/$folder"
+done
+for name in .mcp.json mcp.json; do
+  cp "$source_dir/local-plugin-template/$name" "$plugin/$name"
+done
+cp "$source_dir/local-plugin-template/marketplace.json" "$destination/.claude-plugin/marketplace.json"
+ditto "$source_dir/skills" "$plugin/skills"
+ditto "$source_dir/ui" "$plugin/ui"
+cp "$source_dir/assets/icon.png" "$plugin/assets/icon.png"
+cp "$launcher" "$plugin/scribe-mcp-launcher"
+chmod 755 "$plugin/scribe-mcp-launcher"
+relay_url="${SCRIBE_CONNECTOR_URL-https://scribe.ovld.ai/mcp}"
+if [[ -n "$relay_url" ]]; then
+  [[ "$relay_url" != *'"'* && "$relay_url" != *'\\'* ]] || { echo "error: invalid SCRIBE_CONNECTOR_URL" >&2; exit 1; }
+  printf '{"connector_url":"%s"}\n' "$relay_url" > "$destination/relay/connector.json"
+fi
+echo "Embedded the native assistant connector in $destination"

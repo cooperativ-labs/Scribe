@@ -1,0 +1,9 @@
+{
+  "name": "scribe",
+  "version": "0.1.0",
+  "description": "Find recent Scribe meetings, search transcripts, and turn timestamped conversations into notes and action items.",
+  "author": { "name": "Cooperativ" },
+  "repository": "https://github.com/cooperativ-labs/scribe",
+  "license": "UNLICENSED",
+  "keywords": ["scribe", "transcripts", "meetings", "mcp"]
+}

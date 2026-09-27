@@ -11,11 +11,12 @@ let package = Package(
         // editor, the way the speaker library is; Settings only hosts it.
         .package(path: "../../Modules/Vocabulary"),
         .package(path: "../../Modules/Dictation"),
+        .package(path: "../../Workers/ScribeMCP"),
     ],
     targets: [
         .target(
             name: "ScribeUI",
-            dependencies: ["Platform", .product(name: "Vocabulary", package: "Vocabulary"), .product(name: "Dictation", package: "Dictation")]
+            dependencies: ["Platform", .product(name: "ScribeMCPCore", package: "ScribeMCP"), .product(name: "Vocabulary", package: "Vocabulary"), .product(name: "Dictation", package: "Dictation")]
         ),
         .testTarget(name: "ScribeUITests", dependencies: [
             "ScribeUI", "Platform",
