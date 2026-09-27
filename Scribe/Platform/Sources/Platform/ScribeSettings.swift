@@ -58,6 +58,11 @@ public final class ScribeSettings: ObservableObject {
     }
     @Published public private(set) var launchAtLogin: Bool
     @Published public private(set) var launchAtLoginError: String?
+    /// True once the person has been through the first-run setup window. The
+    /// window covers more than permissions (model download, Login Items), so it
+    /// is shown once even when macOS already granted everything, and afterwards
+    /// only when a permission is missing.
+    @Published public private(set) var hasCompletedFirstRunSetup: Bool
 
     // MARK: Meeting detection
 
@@ -200,6 +205,7 @@ public final class ScribeSettings: ObservableObject {
         )
         launchAtLogin = loginItemManager.status == .enabled
         launchAtLoginError = nil
+        hasCompletedFirstRunSetup = defaults.bool(forKey: Key.firstRunSetupCompleted)
         meetingDetectionEnabled = defaults.object(forKey: Key.meetingDetectionEnabled) as? Bool ?? true
         stopRecordingWhenMeetingEnds = defaults.object(forKey: Key.stopRecordingWhenMeetingEnds) as? Bool ?? false
         disabledMeetingApplicationIDs = Set(defaults.stringArray(forKey: Key.disabledMeetingApplicationIDs) ?? [])
@@ -277,6 +283,13 @@ public final class ScribeSettings: ObservableObject {
     /// Re-reads the system state after returning from Login Items settings.
     public func refreshLaunchAtLoginStatus() {
         launchAtLogin = loginItemManager.status == .enabled
+    }
+
+    /// Records that the first-run setup window was dismissed. Skipped steps are
+    /// still reachable from Settings, so dismissing is enough to count.
+    public func markFirstRunSetupCompleted() {
+        hasCompletedFirstRunSetup = true
+        defaults.set(true, forKey: Key.firstRunSetupCompleted)
     }
 
     public var launchAtLoginStatusMessage: String {
@@ -445,6 +458,7 @@ public final class ScribeSettings: ObservableObject {
         static let dictationMaxDictationMinutes = "scribe.settings.dictation.maxDictationMinutes"
         static let dictationSilenceAutoStop = "scribe.settings.dictation.silenceAutoStop"
         static let agentFolderBookmarks = "scribe.settings.agentFolderBookmarks"
+        static let firstRunSetupCompleted = "scribe.settings.firstRunSetupCompleted"
     }
 
     private let defaults: UserDefaults

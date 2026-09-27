@@ -362,14 +362,22 @@ final class ScribeAppEnvironment: ObservableObject {
         }
     }
 
-    /// Shows the first-run permission window when either permission is missing.
-    /// After a denial macOS stops prompting, so the window's real job is to hand
-    /// over the System Settings route.
+    /// Shows the first-run setup window: once per install, so the model
+    /// download and Login Items are offered alongside the permission requests,
+    /// and after that whenever a permission is missing. After a denial macOS
+    /// stops prompting, so the window's job then is to hand over the System
+    /// Settings route.
     func presentFirstRunPermissionsIfNeeded() {
         let recordingReady = permissions.currentStatus().isReadyToRecord
         let dictationReady = !settings.dictationEnabled || permissions.dictationAccess().isReady
-        guard !recordingReady || !dictationReady else { return }
-        coordinator.submit(.requestPermissions)
+        guard FirstRunSetup.shouldPresent(
+            recordingReady: recordingReady,
+            dictationReady: dictationReady,
+            setupCompleted: settings.hasCompletedFirstRunSetup
+        ) else { return }
+        if !recordingReady {
+            coordinator.submit(.requestPermissions)
+        }
 
         if let firstRunWindow {
             firstRunWindow.makeKeyAndOrderFront(nil)
@@ -379,6 +387,7 @@ final class ScribeAppEnvironment: ObservableObject {
 
         let window = NSWindow(contentViewController: NSHostingController(
             rootView: ScribePermissionsView(model: menuModel, settings: settings, permissions: permissions) { [weak self] in
+                self?.settings.markFirstRunSetupCompleted()
                 self?.firstRunWindow?.close()
             }
         ))

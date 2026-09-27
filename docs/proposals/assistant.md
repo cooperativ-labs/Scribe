@@ -13,7 +13,7 @@ the person's own ChatGPT subscription, reached the way the Codex CLI reaches
 it, with a device-code sign-in inside Scribe Settings.
 
 This document is the proposal only. Section 12 breaks it into objectives and
-section 13 lists the decisions still open.
+section 13 lists the two decisions still open.
 
 **Decisions (2026-09-27):**
 
@@ -29,6 +29,13 @@ section 13 lists the decisions still open.
   Messages, WhatsApp, Signal, Slack, Apple Mail, Notion and Bear.
 - The default assistant model is **GPT-6 Luna (light)**; the picker still
   offers whatever the account's model list returns.
+- The ChatGPT subscription route ships. If the backend accepts only a Codex
+  `originator`, Scribe sends one (7.3). The API-key provider still ships
+  alongside it.
+- Settings live in the existing **Assistants** tab, which becomes two
+  clearly labelled groups: **Voice Assistant** (this feature: Scribe sends
+  your text to a model) and **Transcript Access** (the existing MCP
+  connector: assistants read your transcripts). Section 10.
 
 ## 1. Goals and non-goals
 
@@ -85,7 +92,8 @@ needs. The survey found these pieces and gaps.
 | Target field | `FocusedFieldLocator`: focused AX element, role, caret bounds, `AXSelectedText` settability, read-back, manual-AX for Electron, `window(of:)` | Yes. The window lookup and the Electron manual-accessibility switch are the starting point for reading window text (section 6). |
 | Insertion | `DictationTextInserter` + `KeystrokeTextInserter`: AX set with read-back, ⌘V paste with clipboard save/restore, copy-only fallback | Yes, with a second shaping rule: generated text keeps its own paragraphs and capitalisation. |
 | Indicator | `DictationIndicatorController` / `DictationIndicatorView`: non-activating panel above the caret, states idle → warming → listening → transcribing → inserted / copied / error | Yes, with a new *thinking* state and a mode label. |
-| Settings | `ScribeSettings` (UserDefaults, `scribe.settings.dictation.*` keys), Dictation tab in `ScribeSettingsView`, `SettingsSection` deep links | Yes. New keys and a new section. |
+| Settings | `ScribeSettings` (UserDefaults, `scribe.settings.dictation.*` keys), Dictation tab in `ScribeSettingsView`, `SettingsSection` deep links | Yes. New keys and a new group in the Assistants tab. |
+| Assistants tab | `AssistantSettingsView` (commits 95ca881, 30c1652 on 2026-09-27): Claude Code plugin install, ChatGPT and Claude connectors through a Scribe relay (`AssistantRelayAgent`) or a self-hosted server, link codes, "Add to…" buttons with numbered steps | Yes, as the home for this feature. Its status-row and link-code card patterns are reused for the sign-in card. Its own keys use `@AppStorage`; the voice assistant uses `ScribeSettings` like dictation so the app environment can observe them. |
 | Network | `URLSession` is used by `ApplicationUpdater` (GitHub releases) and `TranscriptionModelInstaller` (model download). Nothing else in the app talks to the network; the worker declares networking disabled. | The HTTP client is new code. Keep it out of the worker. |
 | Secrets | Nothing in the app uses the Keychain. The MCP bridge (`Integrations/scribe`, Node) keeps its OAuth state in a mode-0600 JSON file. | Keychain wrapper is new code (small). |
 | Agent hand-off | `LatchAgentDispatcher` locates `claude`, `codex`, `gemini`, `cursor-agent` on the Mac and launches a Latch session with the transcript | Not for the request itself (it opens a terminal session), but its tool locator is reused if the `codex exec` fallback in 7.4 is built. |
@@ -540,32 +548,35 @@ What the spike has to establish (objective 1 in section 12):
    and return the documented token shape.
 2. Which `originator` values the Responses endpoint accepts, in this order:
    an honest `scribe`; a `Codex`-prefixed value that still names Scribe (the
-   reported allowlist accepts the prefix); and, last, the verbatim Codex
-   value. Only the first two are values Scribe could ship without the PM
-   deciding otherwise (question 1 in section 13).
+   reported allowlist accepts the prefix); and the verbatim Codex value.
+   Scribe ships the most honest value that passes; the PM has accepted
+   sending the verbatim Codex value if nothing else does (decision of
+   2026-09-27). The value is a single constant so it can be changed in one
+   place if OpenAI's behaviour changes.
 3. Whether a plain "rewrite this" request with no tools is accepted on the
    Codex path, and the latency to first token and to completion for a
    typical email reply on the tester's plan.
 4. The exact 429 body, the model-list response, and whether the SSE
-   fallback is still served. The findings decide whether 7.3 ships as the
-   default, ships behind a "use my ChatGPT sign-in (experimental, unofficial)"
-   label, or is dropped in favour of 7.4.
+   fallback is still served. The findings decide the originator constant,
+   the model default fallback, and the wording of the "unofficial" footnote;
+   the route itself is decided.
 
 ### 7.4 Alternatives and fallbacks
 
 | Route | Auth work | Cost to the person | Latency | Terms | Verdict |
 | --- | --- | --- | --- | --- | --- |
-| **7.3 Codex device sign-in** | Device flow + Keychain + refresh (~400 lines) | Included in ChatGPT Free/Plus/Pro/Business | ~1–3 s to first token | Undocumented for third parties; publicly tolerated for coding harnesses; gated by `originator` | Primary, pending the spike and question 1 |
+| **7.3 Codex device sign-in** | Device flow + Keychain + refresh (~400 lines) | Included in ChatGPT Free/Plus/Pro/Business | ~1–3 s to first token | Undocumented for third parties; publicly tolerated for coding harnesses; gated by `originator`, which Scribe will satisfy | Primary; ships opt-in with an "unofficial" footnote |
 | **OpenAI API key** | Paste key into settings, Keychain | Pay per token (a reply costs well under a cent on `gpt-5-mini`) | Same | Fully supported | Ship alongside 7.3 from day one; it is the same client with a different base URL |
 | **`codex exec` subprocess** | None: reuses whatever `codex login` did | Included | ~3–6 s (process start, agent loop) | Codex's own client makes the call with its own originator, so unarguable | The clean subscription route if 7.3 is refused or feels wrong; reuses `AgentToolLocator`; needs `codex` installed and signed in |
 | **Anthropic API key** | Same shape as OpenAI | Pay per token | Same | Fully supported; the subscription sign-in is explicitly forbidden | Follow-up, see 7.5 |
 | **Local model (Apple Foundation Models, MLX)** | None | Free | 2–10 s on Apple Silicon, quality well below | Fully offline | Follow-up; the `TextAssistant` protocol leaves room |
 
-The recommendation is to build the API-key provider unconditionally, run the
-spike, and then build 7.3 as an opt-in path labelled "experimental,
-unofficial" if the spike passes with an originator the PM is willing to send.
-If it does not, `codex exec` is the subscription route: slower, and it needs
-the Codex CLI installed, but it is Codex itself making the call.
+The plan is to build the API-key provider and 7.3 together, with the spike
+first to pin the originator constant and the request shape. 7.3 is the
+default account type in the picker, opt-in by virtue of the sign-in, with a
+one-sentence footnote that it uses the ChatGPT account the way Codex does and
+is not an OpenAI-documented integration. `codex exec` stays on the list as
+the fallback if OpenAI closes the route later.
 
 ### 7.5 Adding a second provider later
 
@@ -616,7 +627,7 @@ The same panel, with a mode label so the two gestures never look alike:
 | transcribing | "Transcribing…" | "Transcribing…" |
 | thinking (new) | — | "Asking ChatGPT…" with the model name; Cancel control stays live and aborts the request |
 | inserted | "Inserted" (app name if focus moved) | same |
-| error | message | message; 429 shows the reset time; 401 offers "Sign in" which deep-links to the settings section |
+| error | message | message; 429 shows the reset time; 401 offers "Sign in" which opens Settings → Assistants → Voice Assistant |
 
 Escape during *thinking* cancels the HTTP task through the existing
 generation counter; nothing is inserted. The start and stop sounds are
@@ -624,36 +635,87 @@ reused; a third short cue on *inserted* is optional and off by default.
 
 ## 10. Settings
 
-A new **Assistant** section in the Dictation tab (it shares the model,
-permissions and microphone rows) with its own `SettingsSection.assistant`
-deep link:
+The **Assistants** tab already exists (`AssistantSettingsView`, sparkles
+icon) and today it is entirely about the opposite direction: letting Claude
+Code, ChatGPT and Claude *read Scribe's transcripts* through the MCP
+connector, with a relay, link codes and "Add to…" buttons. The voice
+assistant belongs in the same tab, because that is where a person will look
+for anything with "AI" in it, but the two must not blur: one sends the
+person's own text out to a model on their account; the other lets a model in
+to read their meeting library. The tab therefore becomes two labelled groups.
 
-- **Enable Assistant** toggle, off by default, with the sentence: "Sends the
-  instruction you speak, your selection or copied text, and the text visible
-  in the front app's windows to the account below. Audio never leaves your
-  Mac, and nothing is kept."
-- **Assistant key** picker from the list in 5.1, greying out the dictation
-  key, with the detection hint row. The Dictation section's picker gains the
-  same list and greys out the assistant key.
-- **Account**: a segmented choice of *ChatGPT account* / *OpenAI API key*.
-  ChatGPT shows *Sign in…* which opens a sheet with the user code, a *Copy
-  code* button and *Open openai.com*; on success it shows the email or plan
-  and *Sign out*. API key shows a secure field and a *Test* button.
-- **Model** picker filled from the provider's model list at sign-in (for
-  ChatGPT, whatever the plan offers: the GPT-6 family, GPT-5.5, GPT-5.4
-  Mini at the time of writing), defaulting to **GPT-6 Luna (light)** when
-  the list contains it and to the first listed model otherwise.
-- **Result**: *Insert into the focused field* (default) / *Copy to clipboard
-  only*.
-- **Sources**: three toggles, all on by default: *Selection*, *Copied text*,
-  *Text on screen*. Turning off *Text on screen* returns the feature to the
-  copy-first behaviour for people who want the narrower exposure.
-- **Advanced** disclosure: system prompt editor with *Reset*, source size
-  cap.
+### 10.1 Two groups, one tab
 
-`ScribeSettings` gains `scribe.settings.assistant.*` keys for the enable flag,
-key, provider choice, model, result mode, cap and prompt. Tokens and the API
-key are Keychain-only; settings hold nothing secret.
+The tab opens with a segmented control directly under the tab bar:
+
+```
+[ Voice Assistant ]  [ Transcript Access ]
+```
+
+with a one-line description under whichever is selected:
+
+- **Voice Assistant.** "Hold a key, say what you want, and Scribe writes it
+  where your cursor is, using the text in front of you."
+- **Transcript Access.** "Let Claude Code, ChatGPT and Claude read your
+  meeting transcripts."
+
+A segmented control rather than two stacked groups because the existing
+Transcript Access content is already five sections long, and because each
+side has its own status row at the top that reads best as the first thing on
+screen. The selection is remembered. The existing content moves under
+Transcript Access unchanged. `SettingsSection` gains `.assistant`;
+`SettingsTab(containing:)` maps it to the Assistants tab and the tab selects
+the Voice Assistant segment before scrolling, so the indicator's "Sign in"
+link and the menu bar item land on the right pane.
+
+### 10.2 The Voice Assistant pane
+
+Sections in order, following the tab's existing patterns (a status row with
+an icon, a headline and one sentence, then the single action; footnotes for
+consequences):
+
+1. **Status row.** Icon, "Voice Assistant is off" or "Hold Right ⇧ and
+   speak", and the enable control. Under it the sentence: "Sends the
+   instruction you speak, your selection or copied text, and the text visible
+   in the front app's windows to the account below. Audio never leaves your
+   Mac, and nothing is kept." The row also reports the two gates the feature
+   shares with dictation (model installed, Microphone and Accessibility
+   granted) with the same permission rows the Dictation tab uses.
+2. **Assistant key.** The greying picker from 5.3 and the "press the key to
+   check it is detected" row. A footnote names the dictation key ("Dictation
+   uses Right ⌘. Change it in Dictation.") so the person understands why one
+   entry is greyed. The Dictation tab's picker gets the mirror footnote.
+3. **Account.** A segmented choice, *ChatGPT account* / *OpenAI API key*.
+   - *ChatGPT account* shows a card in the style of the relay link-code card:
+     before sign-in, a *Sign in with ChatGPT…* button; during sign-in, the
+     user code in large monospaced type with *Copy* and *Open openai.com*,
+     and the expiry time; after sign-in, the plan and account, *Sign Out*,
+     and the footnote: "Uses your ChatGPT account the way the Codex CLI does.
+     Usage counts against your ChatGPT plan's Codex limits. This is not an
+     OpenAI-documented integration."
+   - *OpenAI API key* shows a secure field, *Test*, and the result line.
+4. **Model.** Picker filled from the account's model list, default GPT-6
+   Luna (light); refreshes on sign-in and on demand.
+5. **Sources.** *Selection*, *Copied text*, *Text on screen* toggles, all on,
+   with the one-line explanation of each.
+6. **Result.** *Insert where the cursor is* (default) / *Copy to the
+   clipboard only*.
+7. **Advanced** disclosure: system prompt editor with *Reset*, source size
+   cap.
+
+`ScribeSettings` gains `scribe.settings.assistant.*` keys for the enable
+flag, key, account type, model, source toggles, result mode, cap, prompt and
+the remembered segment. Tokens and the API key are Keychain-only; settings
+hold nothing secret. The existing pane keeps its `@AppStorage` keys; nothing
+there changes except its position under the segment.
+
+### 10.3 What the person sees first
+
+On first opening the tab after the update, Voice Assistant is selected, off,
+and its status row says what it does in one sentence. Nothing is sent until
+they turn it on and sign in, and the sign-in card is the only prominent
+button until they do. A person who came for the connector finds Transcript
+Access one click away with its content exactly as before.
 
 ## 11. Permissions and privacy
 
@@ -711,16 +773,19 @@ Proposed objectives for this mission, in order. Each is one agent prompt.
    with intent-tagged events and synthetic-event tests (hold, double-tap,
    cross-key chord cancel, the chord's synthetic down/up in both orders,
    Escape); `ScribeSettings` assistant keys with the distinct-key rule and
-   load-time normalisation; the two greying pickers; the Assistant section
-   with the key picker and detection row; `syncTriggerMonitors` in
-   `ScribeAppEnvironment`. Everything else in the section is disabled until
-   objective 3.
+   load-time normalisation; the two greying pickers; the Assistants tab split
+   into the Voice Assistant and Transcript Access segments (10.1) with the
+   status row, key picker and detection row in the new pane and the existing
+   content unchanged under the other; `SettingsSection.assistant`;
+   `syncTriggerMonitors` in `ScribeAppEnvironment`. Account, model and
+   sources rows are placeholders until objective 3.
 3. **`Modules/Assist`**: `TextAssistant`, `AssistRequest`, the prompt builder
    with tests; `ResponsesClient` with a streaming parser tested against
    recorded SSE fixtures; `KeychainStore`; `OpenAIKeyAssistant`; and, if
-   objective 1 said go, `ChatGPTSession` (device flow, refresh, sign-out) and
-   `ChatGPTAssistant`. The account rows and model picker in Settings, with
-   the sign-in sheet.
+   `ChatGPTSession` (device flow, refresh, sign-out, the originator constant
+   from objective 1) and `ChatGPTAssistant`. The Account, Model, Sources,
+   Result and Advanced sections of the Voice Assistant pane (10.2), with the
+   sign-in card in the style of the relay link-code card.
 4. **Sources, coordinator, insertion and indicator**: `SourceTextCollector`
    with the selection read, the clipboard `changeCount` rule and the
    Accessibility window reader (budget, skip rules, Electron switch, noise
@@ -745,19 +810,12 @@ kept for one "redo with a different instruction".
 
 ## 13. Questions for the PM
 
-1. **Terms risk on the ChatGPT sign-in.** Are you comfortable shipping a
-   subscription route that OpenAI tolerates for coding harnesses in public
-   statements but has not licensed, and, specifically, if the spike shows
-   the backend only accepts a Codex `originator`, are you willing for Scribe
-   to send one? The proposal builds the API-key provider alongside it either
-   way, so the answer changes the default, the label and the wording, not
-   the architecture; a "no" keeps `codex exec` as the subscription route.
-2. **Where the answer goes**: inserted at the caret, replacing any
+1. **Where the answer goes**: inserted at the caret, replacing any
    selection (proposed), or offered in a preview panel with *Insert* / *Copy*
    / *Retry* first? The preview is safer for long replies and for in-place
    edits but adds a click to every use; it could be an option rather than
    the default.
-3. **Window text on by default?** The proposal says yes, with a toggle,
+2. **Window text on by default?** The proposal says yes, with a toggle,
    because the reply case is the point of the feature. The alternative is off
    by default with a first-use prompt that explains what will be read.
 

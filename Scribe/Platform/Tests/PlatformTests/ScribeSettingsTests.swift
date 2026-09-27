@@ -216,4 +216,20 @@ final class ScribeSettingsTests: XCTestCase {
         XCTAssertFalse(settings.launchAtLogin)
         XCTAssertEqual(settings.launchAtLoginError, "Registration failed")
     }
+
+    func testFirstRunSetupCompletionPersistsAcrossLaunches() throws {
+        let suiteName = "ScribeSettingsTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let folder = FileManager.default.temporaryDirectory
+
+        let firstLaunch = ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: folder, loginItemManager: MockLoginItemManager())
+        XCTAssertFalse(firstLaunch.hasCompletedFirstRunSetup)
+
+        firstLaunch.markFirstRunSetupCompleted()
+        XCTAssertTrue(firstLaunch.hasCompletedFirstRunSetup)
+
+        let secondLaunch = ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: folder, loginItemManager: MockLoginItemManager())
+        XCTAssertTrue(secondLaunch.hasCompletedFirstRunSetup)
+    }
 }
