@@ -5,12 +5,18 @@ import Platform
 
 /// AppKit is the preferred event source from the feasibility spike. Its global
 /// callbacks are observe-only; the focused application's keys remain untouched.
+///
+/// One monitor serves both modes: it holds a `DictationTriggerRouter` with a
+/// state per assigned key, and every event names the mode it belongs to.
 @MainActor
 public final class DictationTriggerMonitor {
     public var onEvent: (@MainActor (DictationTriggerEvent) -> Void)?
     public var onSecureInputChange: (@MainActor (Bool) -> Void)?
-    public var onActivationKeyObserved: (@MainActor () -> Void)?
-    public var state = DictationTriggerState()
+    public var onActivationKeyObserved: (@MainActor (DictationIntent) -> Void)?
+    /// Escape, whether or not a mode is listening, so a request that is
+    /// already past the key (the assistant thinking) can be cancelled too.
+    public var onEscape: (@MainActor () -> Void)?
+    public private(set) var router = DictationTriggerRouter()
     private var flagsMonitor: Any?
     private var keyMonitor: Any?
     private var localMonitor: Any?
@@ -18,6 +24,8 @@ public final class DictationTriggerMonitor {
     private var secureInputBlocked = false
 
     public init() {}
+
+    public var isRunning: Bool { flagsMonitor != nil }
 
     public func start() {
         guard flagsMonitor == nil else { return }
@@ -39,7 +47,7 @@ public final class DictationTriggerMonitor {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 self.refreshSecureInput()
-                self.emit(self.state.advance(to: ProcessInfo.processInfo.systemUptime))
+                self.emit(self.router.advance(to: ProcessInfo.processInfo.systemUptime))
             }
         }
     }
@@ -57,48 +65,45 @@ public final class DictationTriggerMonitor {
             secureInputBlocked = false
             onSecureInputChange?(false)
         }
-        emit(state.cancel(.stopped))
+        emit(router.cancelAll(.stopped))
+    }
+
+    /// The key each enabled mode listens on. Settings never assign one key to both.
+    public func setKeys(_ keys: [DictationIntent: DictationActivationKey]) {
+        emit(router.setKeys(keys))
+    }
+
+    public func setTiming(holdThreshold: TimeInterval, doubleTapInterval: TimeInterval, maximumDuration: TimeInterval) {
+        router.holdThreshold = holdThreshold
+        router.doubleTapInterval = doubleTapInterval
+        router.maximumDuration = maximumDuration
     }
 
     private func handleFlags(_ event: NSEvent) {
-        guard event.keyCode == state.activationKey.keyCode else { return }
-        onActivationKeyObserved?()
-        // Side-specific flags distinguish right release while the left key is
-        // still held. Reading each event also recovers after a missed edge or
-        // changing the selection while a key is held; blindly toggling cannot.
-        handle(
-            keyCode: event.keyCode,
-            isDown: state.activationKey.isPressed(in: event.modifierFlags),
-            time: event.timestamp
-        )
-    }
-
-    public func setActivationKey(_ key: DictationActivationKey) {
-        emit(state.setActivationKey(key))
+        let secure = currentSecureInput()
+        let result = router.flagsChanged(keyCode: event.keyCode, flags: event.modifierFlags, time: event.timestamp, secureInput: secure)
+        for intent in result.observed { onActivationKeyObserved?(intent) }
+        emit(result.events)
     }
 
     private func handleKey(_ event: NSEvent) {
-        if event.keyCode == 53, state.isToggleActive {
-            emit(state.cancel(.stopped))
-            return
-        }
-        handle(keyCode: event.keyCode, isDown: true, time: event.timestamp)
+        let secure = currentSecureInput()
+        emit(router.keyDown(keyCode: event.keyCode, time: event.timestamp, secureInput: secure))
+        if event.keyCode == DictationTriggerRouter.escapeKeyCode { onEscape?() }
     }
 
     public func stopToggle() {
-        guard state.isToggleActive else { return }
-        emit(state.finishToggle())
+        emit(router.stopToggle())
     }
 
     public func cancelToggle() {
-        guard state.isToggleActive else { return }
-        emit(state.cancel(.stopped))
+        emit(router.cancelToggle())
     }
 
-    private func handle(keyCode: UInt16, isDown: Bool, time: TimeInterval) {
+    private func currentSecureInput() -> Bool {
         let secure = IsSecureEventInputEnabled()
         if secure != secureInputBlocked { refreshSecureInput() }
-        emit(state.handle(DictationKeyEvent(time: time, keyCode: keyCode, isDown: isDown), secureInput: secure))
+        return secure
     }
 
     private func refreshSecureInput() {
@@ -107,7 +112,7 @@ public final class DictationTriggerMonitor {
         secureInputBlocked = blocked
         onSecureInputChange?(blocked)
         if blocked {
-            emit(state.cancel(.secureInput))
+            emit(router.cancelAll(.secureInput))
             emit([.secureInputBlocked])
         }
     }
@@ -123,6 +128,11 @@ extension DictationActivationKey {
         case .rightCommand: flags.rawValue & UInt(NX_DEVICERCMDKEYMASK) != 0
         case .rightShift: flags.rawValue & UInt(NX_DEVICERSHIFTKEYMASK) != 0
         case .function: flags.contains(.function)
+        case .rightOption: flags.rawValue & UInt(NX_DEVICERALTKEYMASK) != 0
+        case .rightControl: flags.rawValue & UInt(NX_DEVICERCTLKEYMASK) != 0
+        case .leftControl: flags.rawValue & UInt(NX_DEVICELCTLKEYMASK) != 0
+        case .leftOption: flags.rawValue & UInt(NX_DEVICELALTKEYMASK) != 0
+        case .functionControl: flags.contains(.function) && flags.contains(.control)
         }
     }
 }

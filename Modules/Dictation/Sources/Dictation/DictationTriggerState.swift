@@ -16,11 +16,21 @@ import Platform
 
 public enum DictationTriggerMode: Sendable, Equatable { case hold, doubleTap }
 public enum DictationCancellation: Sendable, Equatable { case shortTap, chord, maximumDuration, secureInput, stopped }
+/// What a trigger key is for: inserting what was said, or asking the assistant.
+public enum DictationIntent: Sendable, Hashable, CaseIterable { case dictation, assistant }
 public enum DictationTriggerEvent: Sendable, Equatable {
-    case listeningStarted(DictationTriggerMode)
-    case listeningEnded
-    case cancelled(DictationCancellation)
+    case listeningStarted(DictationTriggerMode, DictationIntent)
+    case listeningEnded(DictationIntent)
+    case cancelled(DictationCancellation, DictationIntent)
     case secureInputBlocked
+
+    /// The mode the event belongs to; nil for the monitor-wide secure-input notice.
+    public var intent: DictationIntent? {
+        switch self {
+        case .listeningStarted(_, let intent), .listeningEnded(let intent), .cancelled(_, let intent): intent
+        case .secureInputBlocked: nil
+        }
+    }
 }
 
 /// A second short tap opens toggle mode; a later tap closes it. A hold starts
@@ -37,9 +47,11 @@ public struct DictationTriggerState: Sendable {
     private var suppressUntilRelease = false
 
     public private(set) var activationKey: DictationActivationKey
+    public let intent: DictationIntent
 
-    public init(activationKey: DictationActivationKey = .rightCommand) {
+    public init(activationKey: DictationActivationKey = .rightCommand, intent: DictationIntent = .dictation) {
         self.activationKey = activationKey
+        self.intent = intent
     }
 
     public mutating func setActivationKey(_ key: DictationActivationKey) -> [DictationTriggerEvent] {
@@ -57,7 +69,7 @@ public struct DictationTriggerState: Sendable {
         toggleKeyDown = false
         openingTapReleased = false
         closingTap = false
-        return [.listeningEnded]
+        return [.listeningEnded(intent)]
     }
 
     public mutating func handle(_ input: DictationKeyEvent, secureInput: Bool = false) -> [DictationTriggerEvent] {
@@ -85,11 +97,11 @@ public struct DictationTriggerState: Sendable {
                 openingTapReleased = false
                 closingTap = false
                 toggleKeyDown = true
-                return [.listeningStarted(.doubleTap)]
+                return [.listeningStarted(.doubleTap, intent)]
             }
             previousTapAt = nil
             downAt = input.time
-            return [.listeningStarted(.hold)]
+            return [.listeningStarted(.hold, intent)]
         }
         if suppressUntilRelease {
             suppressUntilRelease = false
@@ -103,7 +115,7 @@ public struct DictationTriggerState: Sendable {
                     toggledAt = nil
                     closingTap = false
                     openingTapReleased = false
-                    return [.listeningEnded]
+                    return [.listeningEnded(intent)]
                 }
                 openingTapReleased = true
             }
@@ -113,10 +125,10 @@ public struct DictationTriggerState: Sendable {
         downAt = nil
         if input.time - start < holdThreshold {
             previousTapAt = input.time
-            return [.cancelled(.shortTap)]
+            return [.cancelled(.shortTap, intent)]
         }
         previousTapAt = nil
-        return [.listeningEnded]
+        return [.listeningEnded(intent)]
     }
 
     private var openingTapReleased = false
@@ -137,6 +149,6 @@ public struct DictationTriggerState: Sendable {
         openingTapReleased = false
         closingTap = false
         if !preserveSuppression { suppressUntilRelease = false }
-        return wasListening ? [.cancelled(reason)] : []
+        return wasListening ? [.cancelled(reason, intent)] : []
     }
 }

@@ -2,7 +2,8 @@
 
 Scribe records meeting audio and transcribes it locally on macOS. Its menu-bar
 controls manage capture and processing, while the Transcripts window keeps the
-finished results. It also offers system-wide dictation into focused text fields.
+finished results. It also offers system-wide dictation into focused text fields
+and a voice assistant that writes what you ask for where your cursor is.
 
 ## Dictation
 
@@ -10,8 +11,11 @@ Install the transcription model in **Settings → Dictation**, then enable
 dictation and grant Microphone and Accessibility access. Input Monitoring is
 not required: Scribe uses AppKit event monitors authorized by Accessibility.
 
-Choose **Right Command** (the default), **Right Shift**, or **Fn / Globe** in
-**Settings → Dictation → Dictation key**. Hold the selected key while speaking
+Choose the key in **Settings → Dictation → Dictation key**: **Right Command**
+(the default), **Right Shift**, **Fn / Globe**, **Right Option**, **Right
+Control**, **Left Control**, **Left Option** or the **Fn + Control** chord. The
+key the voice assistant holds is greyed out there, and the two are never the
+same. Hold the selected key while speaking
 and release it to insert. Or double-tap it to keep listening, then tap it again
 to finish. For Fn / Globe, set **System Settings → Keyboard → Press Fn (🌐) key
 to → Do Nothing** to avoid also triggering the macOS action. Some external
@@ -26,6 +30,39 @@ and it keeps no dictation history. Audio is held in memory during capture; a
 temporary WAV given to the local worker is removed after transcription.
 Text goes directly into the focused field when possible, with a paste fallback
 for apps that do not support Accessibility insertion.
+
+## Voice Assistant
+
+Hold a second key, say what you want, and Scribe writes the answer where your
+cursor is: a reply to the message in front of you, a shorter version of the
+paragraph you selected, or a rewrite of what you just copied. Turn it on in
+**Settings → Assistants → Voice Assistant**, pick the key (Right Shift by
+default; it is never the same key as dictation), and sign in with your ChatGPT
+account or add an OpenAI API key. Your spoken instruction is transcribed
+offline by the dictation model, so the model needs to be installed. Hold the
+key and speak, release it to send, or double-tap it to keep listening. Escape,
+or the indicator's Cancel control, discards the request, including one that is
+already in flight.
+
+Each request sends exactly four things to the account you chose, and nothing
+else: the instruction you spoke; the text selected in the field you are typing
+in; the text you copied, only when it is new since your last request; and the
+text visible in the front app's windows, read through Accessibility. Audio never
+leaves your Mac. No screenshot or pixels are taken. No other app is read, and
+password fields and Scribe's own windows are never read. Each of the three text
+sources has its own switch in Settings, and the indicator names the sources it
+is using while you speak. Scribe keeps nothing: the instruction, the source text
+and the answer are held in memory for the request and then dropped, and every
+request is sent with `store: false` so OpenAI's API does not retain it either
+(subscription traffic is subject to OpenAI's own policy).
+
+The ChatGPT account route uses your plan the way the Codex CLI does and counts
+against its Codex limits; it is not an OpenAI-documented integration, and the
+sign-in card says so. The API-key route bills your OpenAI Platform account at
+API rates. Tokens and keys are kept only in your Keychain and are removed when
+you sign out. The answer goes into the focused field through the same
+Accessibility-then-paste path as dictation, replacing your selection when there
+was one, or onto the clipboard if you choose **Copy to the clipboard only**.
 
 ## ChatGPT and Claude
 

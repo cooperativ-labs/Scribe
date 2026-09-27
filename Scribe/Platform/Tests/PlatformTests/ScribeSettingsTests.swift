@@ -65,6 +65,124 @@ final class ScribeSettingsTests: XCTestCase {
         XCTAssertEqual(recovered.dictationActivationKey, .rightCommand)
     }
 
+    func testAssistantDefaultsOffOnRightShiftAndPersists() throws {
+        let suiteName = "ScribeSettingsTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(suiteName, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let settings = ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: folder)
+        XCTAssertFalse(settings.assistantEnabled)
+        XCTAssertEqual(settings.assistantActivationKey, .rightShift)
+        XCTAssertEqual(settings.assistantsPane, .voiceAssistant)
+        XCTAssertFalse(settings.assistantKeyWasMoved)
+
+        settings.assistantEnabled = true
+        settings.assistantActivationKey = .functionControl
+        settings.assistantsPane = .transcriptAccess
+        let relaunched = ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: folder)
+        XCTAssertTrue(relaunched.assistantEnabled)
+        XCTAssertEqual(relaunched.assistantActivationKey, .functionControl)
+        XCTAssertEqual(relaunched.assistantsPane, .transcriptAccess)
+
+        settings.noteAssistantKey()
+        XCTAssertTrue(settings.assistantKeyObserved)
+        settings.assistantActivationKey = .leftOption
+        XCTAssertFalse(settings.assistantKeyObserved)
+    }
+
+    func testAssistantAccountSourcesAndPromptDefaultsPersist() throws {
+        let suiteName = "ScribeSettingsTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(suiteName, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let settings = ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: folder)
+        XCTAssertEqual(settings.assistantAccountType, .chatGPT)
+        XCTAssertNil(settings.assistantChatGPTModel)
+        XCTAssertEqual(settings.assistantAPIKeyModel, "gpt-5-mini")
+        XCTAssertTrue(settings.assistantUsesSelection)
+        XCTAssertTrue(settings.assistantUsesCopiedText)
+        XCTAssertTrue(settings.assistantUsesScreenText)
+        XCTAssertEqual(settings.assistantResultMode, .insert)
+        XCTAssertEqual(settings.assistantSourceCharacterLimit, 40_000)
+        XCTAssertNil(settings.assistantSystemPrompt)
+
+        settings.assistantAccountType = .apiKey
+        settings.assistantChatGPTModel = "gpt-6-luna-light"
+        settings.assistantChatGPTModelName = "GPT-6 Luna (light)"
+        settings.assistantAPIKeyModel = "gpt-6-luna"
+        settings.assistantUsesScreenText = false
+        settings.assistantResultMode = .copyOnly
+        settings.assistantSourceCharacterLimit = 1_000_000
+        XCTAssertEqual(settings.assistantSourceCharacterLimit, 200_000)
+        settings.assistantSystemPrompt = "Be brief."
+
+        let relaunched = ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: folder)
+        XCTAssertEqual(relaunched.assistantAccountType, .apiKey)
+        XCTAssertEqual(relaunched.assistantChatGPTModel, "gpt-6-luna-light")
+        XCTAssertEqual(relaunched.assistantChatGPTModelName, "GPT-6 Luna (light)")
+        XCTAssertEqual(relaunched.assistantAPIKeyModel, "gpt-6-luna")
+        XCTAssertFalse(relaunched.assistantUsesScreenText)
+        XCTAssertEqual(relaunched.assistantResultMode, .copyOnly)
+        XCTAssertEqual(relaunched.assistantSourceCharacterLimit, 200_000)
+        XCTAssertEqual(relaunched.assistantSystemPrompt, "Be brief.")
+
+        // Nothing secret is ever written to the settings domain.
+        let stored = defaults.persistentDomain(forName: suiteName) ?? [:]
+        XCTAssertFalse(stored.keys.contains { $0.localizedCaseInsensitiveContains("token") || $0.localizedCaseInsensitiveContains("secret") })
+    }
+
+    func testAssistantKeyNeverMatchesTheDictationKey() throws {
+        let suiteName = "ScribeSettingsTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(suiteName, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let settings = ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: folder)
+
+        // Choosing the dictation key for the assistant is refused.
+        settings.assistantActivationKey = .rightCommand
+        XCTAssertEqual(settings.assistantActivationKey, .rightShift)
+        XCTAssertNotEqual(defaults.string(forKey: "scribe.settings.assistant.activationKey"), "rightCommand")
+
+        // Moving dictation onto the assistant key moves the assistant to the first free entry.
+        settings.dictationActivationKey = .rightShift
+        XCTAssertEqual(settings.assistantActivationKey, .rightCommand)
+        XCTAssertTrue(settings.assistantKeyWasMoved)
+        settings.dismissAssistantKeyNotice()
+        XCTAssertFalse(settings.assistantKeyWasMoved)
+        let relaunched = ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: folder)
+        XCTAssertEqual(relaunched.dictationActivationKey, .rightShift)
+        XCTAssertEqual(relaunched.assistantActivationKey, .rightCommand)
+    }
+
+    func testStoredClashMovesTheAssistantKeyOnLoad() throws {
+        let suiteName = "ScribeSettingsTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(suiteName, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        // An older build whose dictation key is Right Shift, and no assistant key
+        // stored: the default starts on the first free entry without a notice.
+        defaults.set("rightShift", forKey: "scribe.settings.dictation.activationKey")
+        let upgraded = ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: folder)
+        XCTAssertEqual(upgraded.assistantActivationKey, .rightCommand)
+        XCTAssertFalse(upgraded.assistantKeyWasMoved)
+
+        // An edited plist that stores the same key for both: dictation keeps
+        // it, the assistant moves, and the move is kept and reported.
+        defaults.set("rightCommand", forKey: "scribe.settings.dictation.activationKey")
+        defaults.set("rightCommand", forKey: "scribe.settings.assistant.activationKey")
+        let clashed = ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: folder)
+        XCTAssertEqual(clashed.dictationActivationKey, .rightCommand)
+        XCTAssertEqual(clashed.assistantActivationKey, .rightShift)
+        XCTAssertTrue(clashed.assistantKeyWasMoved)
+        XCTAssertEqual(defaults.string(forKey: "scribe.settings.assistant.activationKey"), "rightShift")
+        XCTAssertFalse(ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: folder).assistantKeyWasMoved)
+    }
+
     func testConnectedAgentFoldersSurviveRelaunchMostRecentFirst() throws {
         let suiteName = "ScribeSettingsTests-\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))

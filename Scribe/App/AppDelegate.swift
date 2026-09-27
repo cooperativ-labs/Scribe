@@ -60,7 +60,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 position: { [environment] in environment.settings.dictationIndicatorPosition },
                 stop: { [environment] in environment.stopToggleDictation() },
                 cancel: { [environment] in environment.cancelToggleDictation() },
-                openSettings: { [weak self] in self?.openDictationSettings() }
+                openSettings: { [weak self] in self?.openDictationSettings() },
+                openAssistantSettings: { [weak self] in self?.openAssistantSettings() }
             )
             dictationStateObservation = dictation.$state.sink { [weak self, weak menuBar] state in
                 let listening: Bool
@@ -176,6 +177,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func openDictationSettings() {
         environment.settingsFocus.request(.dictation)
+        openSettings()
+    }
+
+    /// Settings → Assistants → Voice Assistant, for the indicator's Sign in.
+    private func openAssistantSettings() {
+        environment.settingsFocus.request(.assistant)
         openSettings()
     }
 }

@@ -103,6 +103,13 @@ else
 fi
 
 ditto "$worker_path" "$helpers_dir/TranscriptionWorker"
+# The helper aborts at launch without its SwiftPM resource bundle beside it
+# ("unable to find bundle named TranscriptionWorker_TranscriptionWorkerSupport"),
+# which the release packaging already copies; the assistant QA pass found the
+# development build without it.
+worker_resources="$(dirname "$worker_path")/TranscriptionWorker_TranscriptionWorkerSupport.bundle"
+[[ -d "$worker_resources" ]] || die "the helper's resource bundle is missing beside the worker: $worker_resources"
+ditto "$worker_resources" "$helpers_dir/TranscriptionWorker_TranscriptionWorkerSupport.bundle"
 bash "$repo_root/Scripts/embed-ffmpeg-runtime.sh" "$ffmpeg_path" "$ffprobe_path" "$helpers_dir" "$frameworks_dir"
 bash "$repo_root/Scripts/embed-mcp-helper.sh" "$app_path" "$repo_root/build/dev/ScribeMCP"
 bash "$repo_root/Scripts/embed-assistant-connector.sh" "$app_path"

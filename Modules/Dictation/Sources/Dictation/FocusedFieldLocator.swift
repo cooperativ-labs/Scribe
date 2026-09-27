@@ -25,6 +25,8 @@ public protocol FocusedFieldAXClient: Sendable {
     func string(_ attribute: String, of element: AXUIElement) -> String?
     func valueLength(of element: AXUIElement) -> Int?
     func selectedRange(of element: AXUIElement) -> CFRange?
+    /// The selected text, through whichever attribute the field answers.
+    func selectedText(of element: AXUIElement) -> String?
     func isSettable(_ attribute: String, on element: AXUIElement) -> Bool
     func setSelectedText(_ text: String, on element: AXUIElement) -> Bool
     func precedingCharacter(of element: AXUIElement, range: CFRange) -> String?
@@ -33,10 +35,45 @@ public protocol FocusedFieldAXClient: Sendable {
     func window(of element: AXUIElement) -> AXUIElement?
     /// Asks a Chromium/Electron app to build its accessibility tree. Returns true when the app accepted it.
     func enableManualAccessibility(pid: pid_t) -> Bool
+    /// The application's windows (`kAXWindowsAttribute`), minimised ones included.
+    func windows(ofApplication pid: pid_t) -> [AXUIElement]
+    /// Role, text and children of one element in a single round trip, for the window-text walk.
+    func walkAttributes(of element: AXUIElement) -> AXWalkAttributes?
 }
 
 public extension FocusedFieldAXClient {
+    func selectedText(of element: AXUIElement) -> String? { string(kAXSelectedTextAttribute as String, of: element) }
     func enableManualAccessibility(pid: pid_t) -> Bool { false }
+    func windows(ofApplication pid: pid_t) -> [AXUIElement] { [] }
+    func walkAttributes(of element: AXUIElement) -> AXWalkAttributes? { nil }
+}
+
+/// What the window-text walk reads from one element. The spike measured six
+/// separate reads per element as too slow for WebKit and AppKit tables, so the
+/// system client fetches these with one `AXUIElementCopyMultipleAttributeValues`.
+public struct AXWalkAttributes: @unchecked Sendable {
+    public var role: String?
+    public var subrole: String?
+    public var value: String?
+    public var title: String?
+    public var description: String?
+    public var children: [AXUIElement]
+    /// Top-left screen coordinates, as AX reports them.
+    public var frame: CGRect?
+    public var isMinimized: Bool
+
+    public init(role: String?, subrole: String? = nil, value: String? = nil, title: String? = nil,
+                description: String? = nil, children: [AXUIElement] = [], frame: CGRect? = nil,
+                isMinimized: Bool = false) {
+        self.role = role
+        self.subrole = subrole
+        self.value = value
+        self.title = title
+        self.description = description
+        self.children = children
+        self.frame = frame
+        self.isMinimized = isMinimized
+    }
 }
 
 public struct SystemFocusedFieldAXClient: FocusedFieldAXClient {
@@ -91,6 +128,31 @@ public struct SystemFocusedFieldAXClient: FocusedFieldAXClient {
               CFGetTypeID(value) == AXValueGetTypeID() else { return nil }
         var range = CFRange(location: 0, length: 0)
         return AXValueGetValue(value as! AXValue, .cfRange, &range) ? range : nil
+    }
+    /// `AXSelectedText` first. WebKit web areas (Mail's viewer and compose
+    /// body) answer neither it nor `AXSelectedTextRange`, but expose the
+    /// selection through their text-marker attributes; Chromium fields answer
+    /// the range and `AXStringForRange`. The QA pass measured both
+    /// (docs/feasibility/assistant-qa-matrix.md).
+    public func selectedText(of element: AXUIElement) -> String? {
+        if let text = string(kAXSelectedTextAttribute as String, of: element) { return text }
+        if let range = selectedRange(of: element), range.length > 0,
+           let text = parameterized(kAXStringForRangeParameterizedAttribute as String, of: element, parameter: rangeValue(range)) as? String {
+            return text
+        }
+        guard let markerRange = attribute("AXSelectedTextMarkerRange", of: element) else { return nil }
+        return parameterized("AXStringForTextMarkerRange", of: element, parameter: markerRange) as? String
+    }
+    private func rangeValue(_ range: CFRange) -> CFTypeRef {
+        var mutable = range
+        return AXValueCreate(.cfRange, &mutable)!
+    }
+    private func parameterized(_ name: String, of element: AXUIElement, parameter: CFTypeRef) -> CFTypeRef? {
+        onOwner(of: element) {
+            var value: CFTypeRef?
+            guard AXUIElementCopyParameterizedAttributeValue(timed(element), name as CFString, parameter, &value) == .success else { return nil }
+            return value
+        }
     }
     public func isSettable(_ name: String, on element: AXUIElement) -> Bool {
         onOwner(of: element) {
@@ -148,6 +210,49 @@ public struct SystemFocusedFieldAXClient: FocusedFieldAXClient {
             let app = timed(AXUIElementCreateApplication(pid))
             return AXUIElementSetAttributeValue(app, "AXManualAccessibility" as CFString, kCFBooleanTrue) == .success
         }
+    }
+    public func windows(ofApplication pid: pid_t) -> [AXUIElement] {
+        let app = timed(AXUIElementCreateApplication(pid))
+        guard let value = attribute(kAXWindowsAttribute as String, of: app) as? [AnyObject] else { return [] }
+        // With no window open, some apps list the application element itself.
+        return value.compactMap { item in
+            guard CFGetTypeID(item) == AXUIElementGetTypeID() else { return nil }
+            let window = item as! AXUIElement
+            return CFEqual(window, app) ? nil : timed(window)
+        }
+    }
+    private static let walkAttributeNames = [
+        kAXRoleAttribute, kAXSubroleAttribute, kAXValueAttribute, kAXTitleAttribute,
+        kAXDescriptionAttribute, kAXChildrenAttribute, kAXPositionAttribute, kAXSizeAttribute,
+        kAXMinimizedAttribute,
+    ] as CFArray
+    public func walkAttributes(of element: AXUIElement) -> AXWalkAttributes? {
+        let values: [AnyObject]? = onOwner(of: element) {
+            var result: CFArray?
+            guard AXUIElementCopyMultipleAttributeValues(timed(element), Self.walkAttributeNames, [], &result) == .success else { return nil }
+            return result as [AnyObject]?
+        }
+        guard let values, values.count == 9 else { return nil }
+        // Missing attributes come back as AXValue errors in their slots.
+        func text(_ index: Int) -> String? { values[index] as? String }
+        func axValue(_ index: Int, _ type: AXValueType) -> AXValue? {
+            let item = values[index]
+            guard CFGetTypeID(item) == AXValueGetTypeID(), AXValueGetType(item as! AXValue) == type else { return nil }
+            return (item as! AXValue)
+        }
+        let children = (values[5] as? [AnyObject])?.compactMap { child -> AXUIElement? in
+            CFGetTypeID(child) == AXUIElementGetTypeID() ? timed(child as! AXUIElement) : nil
+        } ?? []
+        var frame: CGRect?
+        var origin = CGPoint.zero
+        var size = CGSize.zero
+        if let position = axValue(6, .cgPoint), let dimensions = axValue(7, .cgSize),
+           AXValueGetValue(position, .cgPoint, &origin), AXValueGetValue(dimensions, .cgSize, &size) {
+            frame = CGRect(origin: origin, size: size)
+        }
+        return AXWalkAttributes(role: text(0), subrole: text(1), value: text(2), title: text(3),
+                                description: text(4), children: children, frame: frame,
+                                isMinimized: (values[8] as? Bool) ?? false)
     }
 }
 
@@ -222,11 +327,17 @@ public actor FocusedFieldLocator {
         let before = client.valueLength(of: snapshot.element)
         let range = client.selectedRange(of: snapshot.element)
         guard client.setSelectedText(text, on: snapshot.element) else { return false }
+        // Writing AXSelectedText replaces the selected range. With a selection
+        // the length alone cannot tell a replacement from a silent failure when
+        // the two texts are the same length, so that case relies on the caret.
+        let replaced = range?.length ?? 0
         for attempt in 0..<3 {
             let after = client.valueLength(of: snapshot.element)
             let selection = client.selectedRange(of: snapshot.element)
-            if let before, let after,
+            if replaced == 0, let before, let after,
                after >= before + text.utf16.count { return true }
+            if replaced > 0, replaced != text.utf16.count, let before, let after,
+               after == before - replaced + text.utf16.count { return true }
             if let range, let selection,
                selection.location >= range.location + text.utf16.count { return true }
             if attempt < 2 { try? await Task.sleep(for: .milliseconds(75)) }

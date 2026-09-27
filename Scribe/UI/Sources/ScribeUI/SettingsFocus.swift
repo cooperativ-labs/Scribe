@@ -5,6 +5,8 @@ import Foundation
 public enum SettingsSection: String, Hashable, Sendable {
     case vocabulary
     case dictation
+    /// The Voice Assistant segment of the Assistants tab.
+    case assistant
 }
 
 /// Carries "open Settings at the vocabulary" from the transcript window to the

@@ -1,0 +1,6 @@
+event: response.created
+data: {"type":"response.created","response":{"id":"resp_0c3","status":"in_progress","model":"gpt-6-luna","output":[]}}
+
+event: response.failed
+data: {"type":"response.failed","response":{"id":"resp_0c3","status":"failed","model":"gpt-6-luna","output":[],"error":{"code":"server_error","message":"The model produced invalid content."}}}
+

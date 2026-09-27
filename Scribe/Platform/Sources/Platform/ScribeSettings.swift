@@ -97,6 +97,12 @@ public final class ScribeSettings: ObservableObject {
         didSet {
             defaults.set(dictationActivationKey.rawValue, forKey: Key.dictationActivationKey)
             if oldValue != dictationActivationKey { dictationKeyObserved = false }
+            // The Settings pickers grey out the other mode's key, so this only
+            // runs for a programmatic change; the assistant yields either way.
+            if dictationActivationKey == assistantActivationKey {
+                assistantActivationKey = Self.firstFreeKey(avoiding: dictationActivationKey)
+                assistantKeyWasMoved = true
+            }
         }
     }
     @Published public private(set) var dictationKeyObserved = false
@@ -149,6 +155,111 @@ public final class ScribeSettings: ObservableObject {
     }
     @Published public var dictationSilenceAutoStop: Bool {
         didSet { defaults.set(dictationSilenceAutoStop, forKey: Key.dictationSilenceAutoStop) }
+    }
+
+    // MARK: Voice assistant
+
+    /// Holding the assistant key sends a spoken instruction to the chosen
+    /// account. Off by default: nothing is sent until the person turns it on.
+    @Published public var assistantEnabled: Bool {
+        didSet { defaults.set(assistantEnabled, forKey: Key.assistantEnabled) }
+    }
+    /// Never the dictation key. A choice that would match it is refused, and
+    /// a stored clash is resolved on load by moving this key, not dictation's.
+    @Published public var assistantActivationKey: DictationActivationKey {
+        didSet {
+            if assistantActivationKey == dictationActivationKey {
+                assistantActivationKey = oldValue
+                return
+            }
+            defaults.set(assistantActivationKey.rawValue, forKey: Key.assistantActivationKey)
+            if oldValue != assistantActivationKey {
+                assistantKeyObserved = false
+                assistantKeyWasMoved = false
+            }
+        }
+    }
+    @Published public private(set) var assistantKeyObserved = false
+    /// True after Scribe moved the assistant key off the dictation key, until
+    /// the person picks a key or dismisses the notice.
+    @Published public private(set) var assistantKeyWasMoved = false
+    /// The Assistants tab's segment, remembered between openings.
+    @Published public var assistantsPane: AssistantsPane {
+        didSet { defaults.set(assistantsPane.rawValue, forKey: Key.assistantsPane) }
+    }
+
+    /// Which account the assistant sends to. Its secrets (tokens, API key)
+    /// live in the Keychain; settings hold nothing secret.
+    @Published public var assistantAccountType: AssistantAccountType {
+        didSet { defaults.set(assistantAccountType.rawValue, forKey: Key.assistantAccountType) }
+    }
+    /// The ChatGPT model slug, nil until the account's model list first loads
+    /// and picks the default (GPT-6 Luna (light) when offered).
+    @Published public var assistantChatGPTModel: String? {
+        didSet { defaults.set(assistantChatGPTModel, forKey: Key.assistantChatGPTModel) }
+    }
+    /// The chosen ChatGPT model's display name, shown before the list reloads.
+    @Published public var assistantChatGPTModelName: String? {
+        didSet { defaults.set(assistantChatGPTModelName, forKey: Key.assistantChatGPTModelName) }
+    }
+    /// The model used with an OpenAI API key.
+    @Published public var assistantAPIKeyModel: String {
+        didSet { defaults.set(assistantAPIKeyModel, forKey: Key.assistantAPIKeyModel) }
+    }
+    /// The signed-in ChatGPT plan and account, cached for display only.
+    @Published public var assistantChatGPTPlan: String? {
+        didSet { defaults.set(assistantChatGPTPlan, forKey: Key.assistantChatGPTPlan) }
+    }
+    @Published public var assistantChatGPTAccountLabel: String? {
+        didSet { defaults.set(assistantChatGPTAccountLabel, forKey: Key.assistantChatGPTAccountLabel) }
+    }
+    /// The three sources, all on by default.
+    @Published public var assistantUsesSelection: Bool {
+        didSet { defaults.set(assistantUsesSelection, forKey: Key.assistantUsesSelection) }
+    }
+    @Published public var assistantUsesCopiedText: Bool {
+        didSet { defaults.set(assistantUsesCopiedText, forKey: Key.assistantUsesCopiedText) }
+    }
+    @Published public var assistantUsesScreenText: Bool {
+        didSet { defaults.set(assistantUsesScreenText, forKey: Key.assistantUsesScreenText) }
+    }
+    @Published public var assistantResultMode: AssistantResultMode {
+        didSet { defaults.set(assistantResultMode.rawValue, forKey: Key.assistantResultMode) }
+    }
+    /// The cap on the three source blocks together, in characters.
+    @Published public var assistantSourceCharacterLimit: Int {
+        didSet {
+            let clamped = Self.clampedSourceLimit(assistantSourceCharacterLimit)
+            if clamped != assistantSourceCharacterLimit {
+                assistantSourceCharacterLimit = clamped
+                return
+            }
+            defaults.set(assistantSourceCharacterLimit, forKey: Key.assistantSourceCharacterLimit)
+        }
+    }
+    /// The person's edited system prompt; nil sends the built-in one.
+    @Published public var assistantSystemPrompt: String? {
+        didSet { defaults.set(assistantSystemPrompt, forKey: Key.assistantSystemPrompt) }
+    }
+
+    public nonisolated static let defaultSourceCharacterLimit = 40_000
+    public nonisolated static let sourceCharacterLimitRange = 4_000...200_000
+
+    nonisolated static func clampedSourceLimit(_ value: Int) -> Int {
+        min(max(value, sourceCharacterLimitRange.lowerBound), sourceCharacterLimitRange.upperBound)
+    }
+
+    public func noteAssistantKey() {
+        if !assistantKeyObserved { assistantKeyObserved = true }
+    }
+
+    public func dismissAssistantKeyNotice() {
+        assistantKeyWasMoved = false
+    }
+
+    /// The first entry in list order that is not `key`.
+    public nonisolated static func firstFreeKey(avoiding key: DictationActivationKey) -> DictationActivationKey {
+        DictationActivationKey.allCases.first { $0 != key } ?? .rightShift
     }
 
     // MARK: Calendar
@@ -212,8 +323,9 @@ public final class ScribeSettings: ObservableObject {
         meetingDomains = defaults.stringArray(forKey: Key.meetingDomains) ?? MeetingDomain.defaults
         useCalendarMeetingNames = defaults.object(forKey: Key.useCalendarMeetingNames) as? Bool ?? false
         dictationEnabled = defaults.object(forKey: Key.dictationEnabled) as? Bool ?? false
-        dictationActivationKey = defaults.string(forKey: Key.dictationActivationKey)
+        let dictationKey = defaults.string(forKey: Key.dictationActivationKey)
             .flatMap(DictationActivationKey.init(rawValue:)) ?? .rightCommand
+        dictationActivationKey = dictationKey
         dictationLeadingSpace = defaults.object(forKey: Key.dictationLeadingSpace) as? Bool ?? true
         dictationTrailingSpace = defaults.object(forKey: Key.dictationTrailingSpace) as? Bool ?? false
         dictationRestoreClipboard = defaults.object(forKey: Key.dictationRestoreClipboard) as? Bool ?? true
@@ -228,11 +340,39 @@ public final class ScribeSettings: ObservableObject {
         dictationHoldThresholdMs = defaults.object(forKey: Key.dictationHoldThresholdMs) as? Int ?? 300
         dictationMaxDictationMinutes = min(max(defaults.object(forKey: Key.dictationMaxDictationMinutes) as? Int ?? 5, 1), 5)
         dictationSilenceAutoStop = defaults.object(forKey: Key.dictationSilenceAutoStop) as? Bool ?? false
+        assistantEnabled = defaults.object(forKey: Key.assistantEnabled) as? Bool ?? false
+        let storedAssistantKey = defaults.string(forKey: Key.assistantActivationKey).flatMap(DictationActivationKey.init(rawValue:))
+        var assistantKey = storedAssistantKey ?? .rightShift
+        var movedStoredAssistantKey = false
+        if assistantKey == dictationKey {
+            assistantKey = Self.firstFreeKey(avoiding: dictationKey)
+            // Only a key the person (or an old build) stored is worth a notice;
+            // the default simply starts somewhere free.
+            if storedAssistantKey != nil {
+                defaults.set(assistantKey.rawValue, forKey: Key.assistantActivationKey)
+                movedStoredAssistantKey = true
+            }
+        }
+        assistantActivationKey = assistantKey
+        assistantsPane = defaults.string(forKey: Key.assistantsPane).flatMap(AssistantsPane.init(rawValue:)) ?? .voiceAssistant
+        assistantAccountType = defaults.string(forKey: Key.assistantAccountType).flatMap(AssistantAccountType.init(rawValue:)) ?? .chatGPT
+        assistantChatGPTModel = defaults.string(forKey: Key.assistantChatGPTModel)
+        assistantChatGPTModelName = defaults.string(forKey: Key.assistantChatGPTModelName)
+        assistantAPIKeyModel = defaults.string(forKey: Key.assistantAPIKeyModel) ?? "gpt-5-mini"
+        assistantChatGPTPlan = defaults.string(forKey: Key.assistantChatGPTPlan)
+        assistantChatGPTAccountLabel = defaults.string(forKey: Key.assistantChatGPTAccountLabel)
+        assistantUsesSelection = defaults.object(forKey: Key.assistantUsesSelection) as? Bool ?? true
+        assistantUsesCopiedText = defaults.object(forKey: Key.assistantUsesCopiedText) as? Bool ?? true
+        assistantUsesScreenText = defaults.object(forKey: Key.assistantUsesScreenText) as? Bool ?? true
+        assistantResultMode = defaults.string(forKey: Key.assistantResultMode).flatMap(AssistantResultMode.init(rawValue:)) ?? .insert
+        assistantSourceCharacterLimit = Self.clampedSourceLimit(defaults.object(forKey: Key.assistantSourceCharacterLimit) as? Int ?? Self.defaultSourceCharacterLimit)
+        assistantSystemPrompt = defaults.string(forKey: Key.assistantSystemPrompt)
         // A folder that has been moved or deleted is dropped from the list
         // rather than resolved to something else: the send sheet offers what is
         // still there, and connecting it again is one button away.
         agentFolderURLs = Self.resolveBookmarks(from: defaults, key: Key.agentFolderBookmarks)
         agentFolderError = nil
+        assistantKeyWasMoved = movedStoredAssistantKey
 
         recordingsFolderURL = defaultRecordingsFolderURL
         modelInstaller.refresh(directory: modelsFolderURL)
@@ -457,6 +597,21 @@ public final class ScribeSettings: ObservableObject {
         static let dictationHoldThresholdMs = "scribe.settings.dictation.holdThresholdMs"
         static let dictationMaxDictationMinutes = "scribe.settings.dictation.maxDictationMinutes"
         static let dictationSilenceAutoStop = "scribe.settings.dictation.silenceAutoStop"
+        static let assistantEnabled = "scribe.settings.assistant.enabled"
+        static let assistantActivationKey = "scribe.settings.assistant.activationKey"
+        static let assistantsPane = "scribe.settings.assistant.pane"
+        static let assistantAccountType = "scribe.settings.assistant.accountType"
+        static let assistantChatGPTModel = "scribe.settings.assistant.chatGPTModel"
+        static let assistantChatGPTModelName = "scribe.settings.assistant.chatGPTModelName"
+        static let assistantAPIKeyModel = "scribe.settings.assistant.apiKeyModel"
+        static let assistantChatGPTPlan = "scribe.settings.assistant.chatGPTPlan"
+        static let assistantChatGPTAccountLabel = "scribe.settings.assistant.chatGPTAccount"
+        static let assistantUsesSelection = "scribe.settings.assistant.source.selection"
+        static let assistantUsesCopiedText = "scribe.settings.assistant.source.copiedText"
+        static let assistantUsesScreenText = "scribe.settings.assistant.source.screenText"
+        static let assistantResultMode = "scribe.settings.assistant.resultMode"
+        static let assistantSourceCharacterLimit = "scribe.settings.assistant.sourceCharacterLimit"
+        static let assistantSystemPrompt = "scribe.settings.assistant.systemPrompt"
         static let agentFolderBookmarks = "scribe.settings.agentFolderBookmarks"
         static let firstRunSetupCompleted = "scribe.settings.firstRunSetupCompleted"
     }
@@ -529,6 +684,30 @@ public final class ScribeSettings: ObservableObject {
         }
         return url
     }
+}
+
+/// The two halves of the Assistants tab: the voice assistant, which sends the
+/// person's own text out to a model, and the connector, which lets a model in
+/// to read their transcripts.
+public enum AssistantsPane: String, CaseIterable, Sendable {
+    case voiceAssistant
+    case transcriptAccess
+}
+
+/// Where the voice assistant sends its request.
+public enum AssistantAccountType: String, CaseIterable, Sendable {
+    /// The person's ChatGPT plan, through the Codex sign-in.
+    case chatGPT
+    /// The person's OpenAI API key, billed at API rates.
+    case apiKey
+}
+
+/// What happens to the assistant's answer.
+public enum AssistantResultMode: String, CaseIterable, Sendable {
+    /// Written where the cursor is, replacing a selection.
+    case insert
+    /// Left on the clipboard for the person to paste.
+    case copyOnly
 }
 
 /// A settings-layer representation kept independent of the transcription

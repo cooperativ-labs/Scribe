@@ -12,6 +12,19 @@ final class DictationTextShaperTests: XCTestCase {
         XCTAssertEqual(DictationTextShaper.shape("hello world", preceding: nil, fieldIsEmpty: true, options: options), "hello world ")
         XCTAssertEqual(DictationTextShaper.shape("hello world", preceding: nil, fieldIsEmpty: false, options: options), " hello world ")
     }
+    func testGeneratedTextKeepsParagraphsAndCapitalisation() {
+        let options = DictationTextOptions(leadingSpace: true, trailingSpace: true)
+        let reply = "\n  Hi Sam,\n\nThursday works. friday does not.\n\nBest,\nJake \n"
+        XCTAssertEqual(DictationTextShaper.shapeGenerated(reply, preceding: "x", options: options),
+                       "Hi Sam,\n\nThursday works. friday does not.\n\nBest,\nJake")
+        XCTAssertEqual(DictationTextShaper.shapeGenerated(" sounds good ", preceding: "Yes,", options: options), " sounds good")
+        XCTAssertEqual(DictationTextShaper.shapeGenerated("sounds good", preceding: " ", options: options), "sounds good")
+        XCTAssertEqual(DictationTextShaper.shapeGenerated("sounds good", preceding: nil, options: options), "sounds good")
+        XCTAssertEqual(DictationTextShaper.shapeGenerated("sounds good", preceding: "x",
+                                                         options: DictationTextOptions(leadingSpace: false)), "sounds good")
+        XCTAssertEqual(DictationTextShaper.shapeGenerated("a", preceding: nil, options: options), "a")
+        XCTAssertNil(DictationTextShaper.shapeGenerated(" \n ", preceding: nil, options: options))
+    }
     func testDropsNoise() {
         XCTAssertNil(DictationTextShaper.shape(" .!? ", preceding: nil, fieldIsEmpty: true, options: .init()))
         XCTAssertNil(DictationTextShaper.shape("a", preceding: nil, fieldIsEmpty: true, options: .init()))
@@ -23,6 +36,7 @@ private final class FakeAX: FocusedFieldAXClient, @unchecked Sendable {
     let targetPID: pid_t = 1234
     var value = "before"
     var range = CFRange(location: 6, length: 0)
+    var preceding: String? = " "
     var directWorks = false
     var textRole = true
     var electron = false
@@ -36,10 +50,13 @@ private final class FakeAX: FocusedFieldAXClient, @unchecked Sendable {
     func selectedRange(of element: AXUIElement) -> CFRange? { range }
     func isSettable(_ attribute: String, on element: AXUIElement) -> Bool { true }
     func setSelectedText(_ text: String, on element: AXUIElement) -> Bool {
-        if directWorks { value += text; range.location += text.utf16.count }
+        if directWorks {
+            value = (value as NSString).replacingCharacters(in: NSRange(location: range.location, length: range.length), with: text)
+            range = CFRange(location: range.location + text.utf16.count, length: 0)
+        }
         return true
     }
-    func precedingCharacter(of element: AXUIElement, range: CFRange) -> String? { " " }
+    func precedingCharacter(of element: AXUIElement, range: CFRange) -> String? { preceding }
     func frame(of element: AXUIElement) -> CGRect? { nil }
     func caretFrame(of element: AXUIElement, range: CFRange) -> CGRect? { nil }
     func window(of element: AXUIElement) -> AXUIElement? { nil }
@@ -107,5 +124,75 @@ final class DictationTextInserterTests: XCTestCase {
         _ = await locator.locate(frontmostPID: ax.targetPID, screenTop: 100, screens: [])
         _ = await locator.locate(frontmostPID: ax.targetPID, screenTop: 100, screens: [])
         XCTAssertEqual(ax.manualAccessibilityRequests, 1)
+    }
+}
+
+final class DictationGeneratedInsertionTests: XCTestCase {
+    @MainActor func testReplacesTheSelectionThroughAccessibility() async {
+        let ax = FakeAX()
+        ax.value = "Please make this shorter, thanks"
+        ax.range = CFRange(location: 7, length: 17)
+        ax.preceding = " "
+        ax.directWorks = true
+        let paste = FakePaste()
+        let inserter = DictationTextInserter(locator: FocusedFieldLocator(client: ax), paste: paste)
+        let outcome = await inserter.insertGenerated("  shorten this\n", frontmostPID: ax.targetPID, screenTop: 100,
+                                                     screens: [], currentPID: { ax.targetPID })
+        XCTAssertEqual(outcome, .accessibility)
+        XCTAssertEqual(ax.value, "Please shorten this, thanks")
+        XCTAssertNil(paste.pasted)
+    }
+    @MainActor func testSilentAXFailureOverASelectionFallsBackToPaste() async {
+        let ax = FakeAX()
+        ax.value = "Hello world"
+        ax.range = CFRange(location: 6, length: 5)
+        ax.directWorks = false
+        let paste = FakePaste()
+        let inserter = DictationTextInserter(locator: FocusedFieldLocator(client: ax), paste: paste)
+        let outcome = await inserter.insertGenerated("there", frontmostPID: ax.targetPID, screenTop: 100,
+                                                     screens: [], currentPID: { ax.targetPID })
+        XCTAssertEqual(outcome, .pasted)
+        XCTAssertEqual(paste.pasted, "there")
+    }
+    @MainActor func testMultiParagraphAnswerPastesVerbatimAfterText() async {
+        let ax = FakeAX()
+        ax.preceding = "e"
+        let paste = FakePaste()
+        let inserter = DictationTextInserter(locator: FocusedFieldLocator(client: ax), paste: paste)
+        let outcome = await inserter.insertGenerated("Hi Sam,\n\nThursday works.", frontmostPID: ax.targetPID,
+                                                     screenTop: 100, screens: [], currentPID: { ax.targetPID })
+        XCTAssertEqual(outcome, .pasted)
+        XCTAssertEqual(paste.pasted, "Hi Sam,\n\nThursday works.")
+    }
+    @MainActor func testSingleLineGetsALeadingSpaceAfterText() async {
+        let ax = FakeAX()
+        ax.preceding = "e"
+        let paste = FakePaste()
+        let inserter = DictationTextInserter(locator: FocusedFieldLocator(client: ax), paste: paste)
+        _ = await inserter.insertGenerated("Thursday works.", frontmostPID: ax.targetPID,
+                                           screenTop: 100, screens: [], currentPID: { ax.targetPID })
+        XCTAssertEqual(paste.pasted, " Thursday works.")
+    }
+    @MainActor func testCopyOnlyNeverTouchesTheField() async {
+        let ax = FakeAX()
+        ax.directWorks = true
+        let paste = FakePaste()
+        let inserter = DictationTextInserter(locator: FocusedFieldLocator(client: ax), paste: paste)
+        let outcome = await inserter.insertGenerated(" Reply text \n", copyOnly: true, frontmostPID: ax.targetPID,
+                                                     screenTop: 100, screens: [], currentPID: { ax.targetPID })
+        XCTAssertEqual(outcome, .copied)
+        XCTAssertEqual(paste.copied, "Reply text")
+        XCTAssertEqual(ax.value, "before")
+        XCTAssertNil(paste.pasted)
+    }
+    @MainActor func testAnswerIsCopiedWhenFocusMoved() async {
+        let ax = FakeAX()
+        let paste = FakePaste()
+        let inserter = DictationTextInserter(locator: FocusedFieldLocator(client: ax), paste: paste)
+        let outcome = await inserter.insertGenerated("Reply text", frontmostPID: ax.targetPID,
+                                                     screenTop: 100, screens: [], currentPID: { 999 })
+        XCTAssertEqual(outcome, .copied)
+        XCTAssertEqual(paste.copied, "Reply text")
+        XCTAssertNil(paste.pasted)
     }
 }

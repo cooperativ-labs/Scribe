@@ -1,0 +1,7 @@
+event: response.created
+data: {"type":"response.created","response":{"id":"resp_0b2","status":"in_progress","model":"gpt-5-mini","output":[]}}
+
+event: response.completed
+data: {"type":"response.completed","response":{"id":"resp_0b2","status":"completed","model":"gpt-5-mini-2026-08-07","output":[{"type":"reasoning","summary":[]},{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Please send me the report by Monday."}]}],"usage":{"input_tokens":212,"output_tokens":9,"total_tokens":221}}}
+
+data: [DONE]

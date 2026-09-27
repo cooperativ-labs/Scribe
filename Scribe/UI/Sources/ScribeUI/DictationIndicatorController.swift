@@ -16,9 +16,11 @@ public final class DictationIndicatorController {
     private let stop: () -> Void
     private let cancel: () -> Void
     private let openSettings: () -> Void
+    private let openAssistantSettings: () -> Void
     private let panel: NSPanel
     private let host: NSHostingController<DictationIndicatorView>
     private var previewObservation: AnyCancellable?
+    private var hintObservation: AnyCancellable?
     private var observation: AnyCancellable?
     private var mode: DictationTriggerMode = .hold
     private var generation = 0
@@ -31,12 +33,14 @@ public final class DictationIndicatorController {
 
     public init(coordinator: DictationCoordinator, position: @escaping () -> String,
                 stop: @escaping () -> Void, cancel: @escaping () -> Void,
-                openSettings: @escaping () -> Void) {
+                openSettings: @escaping () -> Void,
+                openAssistantSettings: @escaping () -> Void = {}) {
         self.coordinator = coordinator
         self.position = position
         self.stop = stop
         self.cancel = cancel
         self.openSettings = openSettings
+        self.openAssistantSettings = openAssistantSettings
         host = NSHostingController(rootView: DictationIndicatorView(state: .idle))
         host.sizingOptions = []
         panel = NonKeyDictationPanel(contentRect: NSRect(x: 0, y: 0, width: 140, height: 52),
@@ -56,6 +60,13 @@ public final class DictationIndicatorController {
             guard let self, self.visible, case .listening = self.coordinator.state else { return }
             self.render(self.coordinator.state, preview: preview)
         }
+        hintObservation = coordinator.$assistantHint.dropFirst().sink { [weak self] _ in
+            // Published before the value changes; render on the next turn.
+            Task { @MainActor [weak self] in
+                guard let self, self.visible, case .listening = self.coordinator.state else { return }
+                self.render(self.coordinator.state)
+            }
+        }
         observation = coordinator.$state.sink { [weak self] state in self?.apply(state) }
     }
 
@@ -72,6 +83,16 @@ public final class DictationIndicatorController {
             delayTask?.cancel(); delayTask = nil
             showLabel = false
             scheduleLabel()
+        case .thinking:
+            // The request can take seconds; it is always shown, with Cancel.
+            delayTask?.cancel(); delayTask = nil
+            dismissalTask?.cancel(); dismissalTask = nil
+            visible = true
+        case .nothingToWorkWith, .signInRequired:
+            delayTask?.cancel(); delayTask = nil
+            if !visible { beginAnchor() }
+            visible = true
+            scheduleDismissal(for: state)
         case .inserted, .copied, .error:
             delayTask?.cancel(); delayTask = nil
             scheduleDismissal(for: state)
@@ -88,14 +109,29 @@ public final class DictationIndicatorController {
     }
 
     private func beginSession() {
+        mode = coordinator.triggerMode
+        showLabel = false
+        visible = mode == .doubleTap
+        beginAnchor()
+        let session = generation
+        if !visible {
+            delayTask = Task { [weak self] in
+                try? await Task.sleep(for: .milliseconds(300))
+                guard let self, !Task.isCancelled, self.generation == session,
+                      case .listening = self.coordinator.state else { return }
+                self.visible = true
+                self.render(self.coordinator.state)
+            }
+        }
+    }
+
+    /// A new session: anchors the panel to the field that has focus now.
+    private func beginAnchor() {
         generation += 1
         let session = generation
         dismissalTask?.cancel(); dismissalTask = nil
-        mode = coordinator.triggerMode
-        showLabel = false
         anchor = nil
         targetScreen = nil
-        visible = mode == .doubleTap
         let screenTop = NSScreen.screens.first?.frame.maxY ?? 0
         let screens = NSScreen.screens.map(\.frame)
         if let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier {
@@ -104,15 +140,6 @@ public final class DictationIndicatorController {
                 guard let self, self.generation == session else { return }
                 self.lockAnchor(snapshot)
                 if self.visible { self.render(self.coordinator.state) }
-            }
-        }
-        if !visible {
-            delayTask = Task { [weak self] in
-                try? await Task.sleep(for: .milliseconds(300))
-                guard let self, !Task.isCancelled, self.generation == session,
-                      case .listening = self.coordinator.state else { return }
-                self.visible = true
-                self.render(self.coordinator.state)
             }
         }
     }
@@ -147,6 +174,7 @@ public final class DictationIndicatorController {
         switch state {
         case .inserted: duration = 600
         case .copied: duration = 3_000
+        case .signInRequired: duration = 6_000
         default: duration = 4_000
         }
         let session = generation
@@ -164,9 +192,11 @@ public final class DictationIndicatorController {
         if case .listening = state { livePreview = preview ?? coordinator.livePreview }
         else { livePreview = nil }
         guard position() != "off" || livePreview != nil else { panel.orderOut(nil); return }
+        let intent = coordinator.intent
         host.rootView = DictationIndicatorView(
             state: state, livePreview: livePreview, showsToggleControls: mode == .doubleTap, showsTranscribingLabel: showLabel,
-            stop: stop, cancel: cancel, openSettings: openSettings
+            intent: intent, assistantHint: coordinator.assistantHint,
+            stop: stop, cancel: cancel, openSettings: intent == .assistant ? openAssistantSettings : openSettings
         )
         let fit = host.sizeThatFits(in: NSSize(width: 700, height: 240))
         guard fit.width.isFinite, fit.height.isFinite, fit.width > 0, fit.height > 0 else { return }

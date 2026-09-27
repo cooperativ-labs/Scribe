@@ -8,26 +8,46 @@ public struct DictationIndicatorView: View {
     public let state: DictationState
     public let showsToggleControls: Bool
     public let showsTranscribingLabel: Bool
+    /// Which mode the session belongs to; the assistant is labelled so the two
+    /// gestures never look alike.
+    public let intent: DictationIntent
+    /// "Using copied text and what is on screen in Mail", once gathering finishes.
+    public let assistantHint: String?
     public var stop: () -> Void = {}
     public var cancel: () -> Void = {}
     public var openSettings: () -> Void = {}
 
     public init(state: DictationState, livePreview: String? = nil, showsToggleControls: Bool = false,
-                showsTranscribingLabel: Bool = false,
+                showsTranscribingLabel: Bool = false, intent: DictationIntent = .dictation,
+                assistantHint: String? = nil,
                 stop: @escaping () -> Void = {}, cancel: @escaping () -> Void = {},
                 openSettings: @escaping () -> Void = {}) {
         self.livePreview = livePreview
         self.state = state
         self.showsToggleControls = showsToggleControls
         self.showsTranscribingLabel = showsTranscribingLabel
+        self.intent = intent
+        self.assistantHint = assistantHint
         self.stop = stop
         self.cancel = cancel
         self.openSettings = openSettings
     }
 
+    private var isAssistantListening: Bool {
+        if intent == .assistant, case .listening = state { return true }
+        return false
+    }
+
     public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             status
+            if isAssistantListening, let assistantHint {
+                Text(assistantHint)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .frame(maxWidth: 300, alignment: .leading)
+            }
             if let livePreview {
                 Text("Live Preview · Recent speech")
                     .font(.caption2).foregroundStyle(.secondary)
@@ -42,10 +62,34 @@ public struct DictationIndicatorView: View {
         .font(.system(size: 12, weight: .medium))
         .padding(.horizontal, 13)
         .padding(.vertical, 9)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: livePreview == nil ? 26 : 16))
-        .overlay(RoundedRectangle(cornerRadius: livePreview == nil ? 26 : 16).strokeBorder(.white.opacity(0.2)))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
+        .overlay(RoundedRectangle(cornerRadius: cornerRadius).strokeBorder(.white.opacity(0.2)))
         .padding(9)
         .fixedSize()
+    }
+
+    private var cornerRadius: CGFloat {
+        livePreview == nil && !(isAssistantListening && assistantHint != nil) ? 26 : 16
+    }
+
+    private var shimmerBar: some View {
+        Capsule()
+            .fill(LinearGradient(colors: [.secondary.opacity(0.25), .primary, .secondary.opacity(0.25)],
+                                 startPoint: shimmer ? .trailing : .leading,
+                                 endPoint: shimmer ? .leading : .trailing))
+            .frame(width: 28, height: 5)
+            .onAppear {
+                withAnimation(.linear(duration: 0.9).repeatForever(autoreverses: true)) {
+                    shimmer = true
+                }
+            }
+    }
+
+    private func link(_ title: String, action: @escaping () -> Void) -> some View {
+        Text(title)
+            .foregroundStyle(.tint)
+            .onTapGesture(perform: action)
+            .accessibilityAddTraits(.isButton)
     }
 
     private var status: some View {
@@ -67,6 +111,9 @@ public struct DictationIndicatorView: View {
                             .frame(width: 3, height: 5 + CGFloat(min(1, max(0, level)) * Float(10 + index * 3)))
                     }
                 }.frame(height: 24)
+                if intent == .assistant {
+                    Text("Assistant").foregroundStyle(.secondary)
+                }
                 if showsToggleControls {
                     Text("Stop")
                         .foregroundStyle(.tint)
@@ -75,21 +122,34 @@ public struct DictationIndicatorView: View {
                     Image(systemName: "xmark")
                         .foregroundStyle(.secondary)
                         .onTapGesture(perform: cancel)
-                        .accessibilityLabel("Cancel dictation")
+                        .accessibilityLabel(intent == .assistant ? "Cancel assistant" : "Cancel dictation")
                         .accessibilityAddTraits(.isButton)
                 }
             case .transcribing:
-                Capsule()
-                    .fill(LinearGradient(colors: [.secondary.opacity(0.25), .primary, .secondary.opacity(0.25)],
-                                         startPoint: shimmer ? .trailing : .leading,
-                                         endPoint: shimmer ? .leading : .trailing))
-                    .frame(width: 28, height: 5)
-                    .onAppear {
-                        withAnimation(.linear(duration: 0.9).repeatForever(autoreverses: true)) {
-                            shimmer = true
-                        }
-                    }
+                shimmerBar
                 if showsTranscribingLabel { Text("Transcribing…") }
+            case .thinking(let assistant, let model):
+                Image(systemName: "sparkles")
+                    .symbolEffect(.pulse, options: .repeating)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Asking \(assistant)…")
+                    if let model {
+                        Text(model).font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+                Image(systemName: "xmark")
+                    .foregroundStyle(.secondary)
+                    .onTapGesture(perform: cancel)
+                    .accessibilityLabel("Cancel request")
+                    .accessibilityAddTraits(.isButton)
+            case .nothingToWorkWith(let application):
+                Image(systemName: "text.badge.xmark").foregroundStyle(.secondary)
+                Text(application.map { "Nothing to work with in \($0)" } ?? "Nothing to work with")
+                    .lineLimit(1).frame(maxWidth: 280)
+            case .signInRequired(let message):
+                Image(systemName: "person.crop.circle.badge.exclamationmark").foregroundStyle(.orange)
+                Text(message).lineLimit(1).frame(maxWidth: 280)
+                link("Sign in", action: openSettings)
             case .inserted(let application):
                 Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
                 if let application { Text("Inserted in \(application)") }
@@ -99,10 +159,7 @@ public struct DictationIndicatorView: View {
             case .error(let message):
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
                 Text(message).lineLimit(1).frame(maxWidth: 280)
-                Text("Settings")
-                    .foregroundStyle(.tint)
-                    .onTapGesture(perform: openSettings)
-                    .accessibilityAddTraits(.isButton)
+                link("Settings", action: openSettings)
             }
         }
     }

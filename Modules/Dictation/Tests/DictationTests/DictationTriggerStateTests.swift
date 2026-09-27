@@ -8,14 +8,14 @@ final class DictationTriggerStateTests: XCTestCase {
         for activationKey in DictationActivationKey.allCases {
             var state = DictationTriggerState(activationKey: activationKey)
             let code = activationKey.keyCode
-            XCTAssertEqual(state.handle(key(1, true, code: code)), [.listeningStarted(.hold)])
-            XCTAssertEqual(state.handle(key(1.4, false, code: code)), [.listeningEnded])
+            XCTAssertEqual(state.handle(key(1, true, code: code)), [.listeningStarted(.hold, .dictation)])
+            XCTAssertEqual(state.handle(key(1.4, false, code: code)), [.listeningEnded(.dictation)])
             _ = state.handle(key(2, true, code: code))
             _ = state.handle(key(2.1, false, code: code))
-            XCTAssertEqual(state.handle(key(2.2, true, code: code)), [.listeningStarted(.doubleTap)])
+            XCTAssertEqual(state.handle(key(2.2, true, code: code)), [.listeningStarted(.doubleTap, .dictation)])
             XCTAssertEqual(state.handle(key(2.3, false, code: code)), [])
             _ = state.handle(key(3, true, code: code))
-            XCTAssertEqual(state.handle(key(3.1, false, code: code)), [.listeningEnded])
+            XCTAssertEqual(state.handle(key(3.1, false, code: code)), [.listeningEnded(.dictation)])
         }
     }
 
@@ -27,7 +27,7 @@ final class DictationTriggerStateTests: XCTestCase {
                 XCTAssertEqual(state.handle(key(0.1, false, code: other.keyCode)), [])
             }
             _ = state.handle(key(1, true, code: activationKey.keyCode))
-            XCTAssertEqual(state.handle(key(1.1, true, code: 8)), [.cancelled(.chord)])
+            XCTAssertEqual(state.handle(key(1.1, true, code: 8)), [.cancelled(.chord, .dictation)])
             XCTAssertEqual(state.handle(key(1.5, false, code: activationKey.keyCode)), [])
             XCTAssertEqual(state.handle(key(2, true, code: activationKey.keyCode), secureInput: true), [.secureInputBlocked])
         }
@@ -36,14 +36,14 @@ final class DictationTriggerStateTests: XCTestCase {
     func testSwitchingKeysCancelsCaptureAndClearsPendingDoubleTap() {
         var state = DictationTriggerState()
         _ = state.handle(key(1, true))
-        XCTAssertEqual(state.setActivationKey(.rightShift), [.cancelled(.stopped)])
+        XCTAssertEqual(state.setActivationKey(.rightShift), [.cancelled(.stopped, .dictation)])
         XCTAssertEqual(state.handle(key(1.4, false)), [])
         // A release without a press must not start a new capture.
         XCTAssertEqual(state.handle(key(1.5, false, code: 60)), [])
-        XCTAssertEqual(state.handle(key(2, true, code: 60)), [.listeningStarted(.hold)])
+        XCTAssertEqual(state.handle(key(2, true, code: 60)), [.listeningStarted(.hold, .dictation)])
         _ = state.handle(key(2.1, false, code: 60))
         _ = state.setActivationKey(.function)
-        XCTAssertEqual(state.handle(key(2.2, true, code: 63)), [.listeningStarted(.hold)])
+        XCTAssertEqual(state.handle(key(2.2, true, code: 63)), [.listeningStarted(.hold, .dictation)])
     }
 
     func testRightModifierReleaseWhileLeftModifierRemainsHeld() {
@@ -59,6 +59,23 @@ final class DictationTriggerStateTests: XCTestCase {
         XCTAssertFalse(DictationActivationKey.rightShift.isPressed(in: leftShift))
         XCTAssertTrue(DictationActivationKey.function.isPressed(in: .function))
         XCTAssertFalse(DictationActivationKey.function.isPressed(in: []))
+        // Left/right Control = 0x0001/0x2000, left/right Option = 0x20/0x40.
+        let bothControl = NSEvent.ModifierFlags.control.union(.init(rawValue: 0x2001))
+        let leftControl = NSEvent.ModifierFlags.control.union(.init(rawValue: 0x0001))
+        let rightControl = NSEvent.ModifierFlags.control.union(.init(rawValue: 0x2000))
+        XCTAssertTrue(DictationActivationKey.rightControl.isPressed(in: bothControl))
+        XCTAssertFalse(DictationActivationKey.rightControl.isPressed(in: leftControl))
+        XCTAssertTrue(DictationActivationKey.leftControl.isPressed(in: bothControl))
+        XCTAssertFalse(DictationActivationKey.leftControl.isPressed(in: rightControl))
+        let leftOption = NSEvent.ModifierFlags.option.union(.init(rawValue: 0x20))
+        let rightOption = NSEvent.ModifierFlags.option.union(.init(rawValue: 0x40))
+        XCTAssertTrue(DictationActivationKey.rightOption.isPressed(in: rightOption))
+        XCTAssertFalse(DictationActivationKey.rightOption.isPressed(in: leftOption))
+        XCTAssertTrue(DictationActivationKey.leftOption.isPressed(in: leftOption))
+        XCTAssertFalse(DictationActivationKey.leftOption.isPressed(in: rightOption))
+        XCTAssertTrue(DictationActivationKey.functionControl.isPressed(in: [.function, .control]))
+        XCTAssertFalse(DictationActivationKey.functionControl.isPressed(in: .function))
+        XCTAssertFalse(DictationActivationKey.functionControl.isPressed(in: .control))
     }
 
     private func key(_ time: Double, _ down: Bool, code: UInt16 = 54) -> DictationKeyEvent {
@@ -67,38 +84,38 @@ final class DictationTriggerStateTests: XCTestCase {
 
     func testHoldStartsImmediatelyAndEndsOnRelease() {
         var state = DictationTriggerState()
-        XCTAssertEqual(state.handle(key(1, true)), [.listeningStarted(.hold)])
-        XCTAssertEqual(state.handle(key(1.4, false)), [.listeningEnded])
+        XCTAssertEqual(state.handle(key(1, true)), [.listeningStarted(.hold, .dictation)])
+        XCTAssertEqual(state.handle(key(1.4, false)), [.listeningEnded(.dictation)])
     }
 
     func testShortTapIsDiscarded() {
         var state = DictationTriggerState()
-        XCTAssertEqual(state.handle(key(1, true)), [.listeningStarted(.hold)])
-        XCTAssertEqual(state.handle(key(1.1, false)), [.cancelled(.shortTap)])
+        XCTAssertEqual(state.handle(key(1, true)), [.listeningStarted(.hold, .dictation)])
+        XCTAssertEqual(state.handle(key(1.1, false)), [.cancelled(.shortTap, .dictation)])
     }
 
     func testDoubleTapOpensAndNextTapCloses() {
         var state = DictationTriggerState()
         _ = state.handle(key(1, true))
         _ = state.handle(key(1.1, false))
-        XCTAssertEqual(state.handle(key(1.3, true)), [.listeningStarted(.doubleTap)])
+        XCTAssertEqual(state.handle(key(1.3, true)), [.listeningStarted(.doubleTap, .dictation)])
         XCTAssertEqual(state.handle(key(1.35, false)), [])
         XCTAssertEqual(state.handle(key(2, true)), [])
-        XCTAssertEqual(state.handle(key(2.1, false)), [.listeningEnded])
+        XCTAssertEqual(state.handle(key(2.1, false)), [.listeningEnded(.dictation)])
     }
 
     func testChordCancelsAndReleaseDoesNotRestart() {
         var state = DictationTriggerState()
         _ = state.handle(key(1, true))
-        XCTAssertEqual(state.handle(key(1.2, true, code: 8)), [.cancelled(.chord)])
+        XCTAssertEqual(state.handle(key(1.2, true, code: 8)), [.cancelled(.chord, .dictation)])
         XCTAssertEqual(state.handle(key(1.4, false)), [])
     }
 
     func testLeftCommandDoesNotChangeRightCommandState() {
         var state = DictationTriggerState()
         XCTAssertEqual(state.handle(key(0, true, code: 55)), [])
-        XCTAssertEqual(state.handle(key(1, true)), [.listeningStarted(.hold)])
-        XCTAssertEqual(state.handle(key(1.4, false)), [.listeningEnded])
+        XCTAssertEqual(state.handle(key(1, true)), [.listeningStarted(.hold, .dictation)])
+        XCTAssertEqual(state.handle(key(1.4, false)), [.listeningEnded(.dictation)])
         XCTAssertEqual(state.handle(key(1.5, false, code: 55)), [])
     }
 
@@ -106,7 +123,7 @@ final class DictationTriggerStateTests: XCTestCase {
         var state = DictationTriggerState()
         state.maximumDuration = 5
         _ = state.handle(key(1, true))
-        XCTAssertEqual(state.advance(to: 6), [.cancelled(.maximumDuration)])
+        XCTAssertEqual(state.advance(to: 6), [.cancelled(.maximumDuration, .dictation)])
     }
 
     func testToggleCanOpenAgainAfterClosing() {
@@ -116,10 +133,10 @@ final class DictationTriggerStateTests: XCTestCase {
         _ = state.handle(key(1.2, true))
         _ = state.handle(key(1.3, false))
         _ = state.handle(key(2, true))
-        XCTAssertEqual(state.handle(key(2.1, false)), [.listeningEnded])
+        XCTAssertEqual(state.handle(key(2.1, false)), [.listeningEnded(.dictation)])
         _ = state.handle(key(3, true))
         _ = state.handle(key(3.1, false))
-        XCTAssertEqual(state.handle(key(3.2, true)), [.listeningStarted(.doubleTap)])
+        XCTAssertEqual(state.handle(key(3.2, true)), [.listeningStarted(.doubleTap, .dictation)])
         XCTAssertEqual(state.handle(key(3.3, false)), [])
     }
 
@@ -135,9 +152,9 @@ final class DictationTriggerStateTests: XCTestCase {
         _ = state.handle(key(1.2, true))
         _ = state.handle(key(1.3, false))
         XCTAssertTrue(state.isToggleActive)
-        XCTAssertEqual(state.finishToggle(), [.listeningEnded])
+        XCTAssertEqual(state.finishToggle(), [.listeningEnded(.dictation)])
         XCTAssertFalse(state.isToggleActive)
-        XCTAssertEqual(state.handle(key(2, true)), [.listeningStarted(.hold)])
+        XCTAssertEqual(state.handle(key(2, true)), [.listeningStarted(.hold, .dictation)])
     }
 
     func testPanelCancelDiscardsToggle() {
@@ -145,7 +162,7 @@ final class DictationTriggerStateTests: XCTestCase {
         _ = state.handle(key(1, true))
         _ = state.handle(key(1.1, false))
         _ = state.handle(key(1.2, true))
-        XCTAssertEqual(state.cancel(.stopped), [.cancelled(.stopped)])
+        XCTAssertEqual(state.cancel(.stopped), [.cancelled(.stopped, .dictation)])
         XCTAssertFalse(state.isToggleActive)
     }
 }

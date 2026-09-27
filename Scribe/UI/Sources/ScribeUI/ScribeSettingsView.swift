@@ -107,7 +107,13 @@ public struct ScribeSettingsView: View {
             case .recording: recordingTab
             case .transcription: transcriptionTab
             case .dictation: dictationTab
-            case .assistants: AssistantSettingsView(package: assistantConnector)
+            case .assistants:
+                AssistantSettingsView(
+                    settings: settings,
+                    package: assistantConnector,
+                    permissions: permissions,
+                    showDictation: { withAnimation(.snappy) { selectedTab = .dictation } }
+                )
             }
         }
     }
@@ -314,8 +320,8 @@ public struct ScribeSettingsView: View {
                     }
                 Text("Requires Microphone and Accessibility access. Your speech stays on this Mac.")
                     .font(.footnote).foregroundStyle(.secondary)
-                permissionRow("Microphone", allowed: dictationAccess.microphone == .granted, pane: .microphone)
-                permissionRow("Accessibility", allowed: dictationAccess.accessibility, pane: .accessibility)
+                PermissionStatusRow(name: "Microphone", allowed: dictationAccess.microphone == .granted, pane: .microphone, permissions: permissions)
+                PermissionStatusRow(name: "Accessibility", allowed: dictationAccess.accessibility, pane: .accessibility, permissions: permissions)
                 if !dictationAccess.isReady && settings.dictationEnabled {
                     Text("Dictation will start when access is granted.")
                         .font(.footnote).foregroundStyle(.secondary)
@@ -337,17 +343,21 @@ public struct ScribeSettingsView: View {
 
             TranscriptionModelSettingsView(settings: settings, installer: settings.modelInstaller)
 
-            Section("Dictation key") {
-                Picker("Dictation key", selection: $settings.dictationActivationKey) {
-                    ForEach(DictationActivationKey.allCases) { key in
-                        Text(key.displayName).tag(key)
-                    }
-                }
-                if settings.dictationActivationKey == .function {
-                    Text("In System Settings → Keyboard, set ‘Press Fn (🌐) key to’ to ‘Do Nothing’ to avoid also opening emoji, switching input sources, or starting Apple Dictation. Some external keyboards handle Fn internally and do not send it to macOS.")
-                        .font(.footnote).foregroundStyle(.secondary)
-                }
+            Section {
+                ActivationKeyPicker(
+                    title: "Dictation key",
+                    selection: $settings.dictationActivationKey,
+                    heldKey: settings.assistantActivationKey,
+                    heldBy: "assistant"
+                )
+                ActivationKeyNotes(key: settings.dictationActivationKey, otherKey: settings.assistantActivationKey)
                 Text("Hold \(settings.dictationActivationKey.displayName) and speak; release to insert. Double-tap to keep listening; tap again to insert. Escape cancels.")
+                    .foregroundStyle(.secondary)
+            } header: {
+                Text("Dictation key")
+            } footer: {
+                Text("Voice Assistant uses \(settings.assistantActivationKey.displayName). Change it in Assistants.")
+                    .font(.footnote)
                     .foregroundStyle(.secondary)
             }
             Section("Insertion") {
@@ -399,16 +409,6 @@ public struct ScribeSettingsView: View {
         }
     }
 
-    private func permissionRow(_ name: String, allowed: Bool, pane: SystemSettingsPane) -> some View {
-        HStack {
-            Label("\(name): \(allowed ? "Allowed" : "Not allowed")", systemImage: allowed ? "checkmark.circle.fill" : "exclamationmark.circle")
-            Spacer()
-            if !allowed {
-                Button("Open System Settings") { permissions?.openSystemSettings(pane) }
-            }
-        }
-    }
-
     /// Scrolls to whatever asked to be shown and marks it briefly.
     ///
     /// The mark matters more than the scroll: a person who pressed "Vocabulary"
@@ -418,8 +418,13 @@ public struct ScribeSettingsView: View {
         guard let section = focus.section else { return }
         focus.clear()
         let tab = SettingsTab(containing: section)
-        let switchesTab = selectedTab != tab
+        var switchesTab = selectedTab != tab
         selectedTab = tab
+        // The assistant's rows live in one segment of their tab; pick it first.
+        if section == .assistant, settings.assistantsPane != .voiceAssistant {
+            settings.assistantsPane = .voiceAssistant
+            switchesTab = true
+        }
         highlightedSection = section
         Task {
             // A tab that was not showing has to lay out before its rows exist
@@ -476,6 +481,7 @@ enum SettingsTab: Hashable, CaseIterable {
         switch section {
         case .vocabulary: self = .transcription
         case .dictation: self = .dictation
+        case .assistant: self = .assistants
         }
     }
 }

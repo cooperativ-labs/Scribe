@@ -54,9 +54,10 @@ final class ScribeAppEnvironment: ObservableObject {
     private var transcriptWindow: NSWindow?
     private var speakersWindow: NSWindow?
 
-    private let dictationMonitor = DictationTriggerMonitor()
+    private let triggerMonitor = DictationTriggerMonitor()
     private(set) var dictationCoordinator: DictationCoordinator?
-    private var dictationSettingsObservation: AnyCancellable?
+    private var triggerSettingsObservation: AnyCancellable?
+    private var assistantAccountObservation: AnyCancellable?
     nonisolated(unsafe) private var dictationPermissionTimer: Timer?
     private let hotkeys: HotkeyService
     private var firstRunWindow: NSWindow?
@@ -171,23 +172,48 @@ final class ScribeAppEnvironment: ObservableObject {
             self?.meetingChipModel.meetingWasDetected(meeting)
         }
         meetingDetector.start()
-        dictationMonitor.onEvent = { [weak self] event in
+        triggerMonitor.onEvent = { [weak self] event in
             self?.dictationCoordinator?.consume(event)
         }
-        dictationMonitor.onSecureInputChange = { [weak self] blocked in
+        // Escape reaches an assistant request after its key is released too.
+        triggerMonitor.onEscape = { [weak self] in
+            self?.dictationCoordinator?.cancelAssistantRequest()
+        }
+        dictationCoordinator?.assistantAvailability = { [weak self] in
+            self?.assistantAvailability() ?? .needsAccount("Voice Assistant is not available.")
+        }
+        // The sign-in state is read from the Keychain once, when the assistant
+        // is on, so the first press after launch already knows the account.
+        assistantAccountObservation = settings.$assistantEnabled
+            .removeDuplicates()
+            .filter { $0 }
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    await VoiceAssistantAccount.shared.load(settings: self.settings)
+                }
+            }
+        triggerMonitor.onSecureInputChange = { [weak self] blocked in
             self?.settings.setDictationSecureInputBlocked(blocked)
             self?.dictationCoordinator?.setSecureInputBlocked(blocked)
         }
-        dictationMonitor.onActivationKeyObserved = { [weak self] in
-            self?.settings.noteDictationKey()
+        triggerMonitor.onActivationKeyObserved = { [weak self] intent in
+            switch intent {
+            case .dictation: self?.settings.noteDictationKey()
+            case .assistant: self?.settings.noteAssistantKey()
+            }
         }
-        dictationSettingsObservation = settings.$dictationEnabled.combineLatest(settings.$dictationActivationKey, settings.$dictationLivePreview).sink { [weak self] _ in
-            Task { @MainActor [weak self] in self?.syncDictationMonitor() }
-        }
+        triggerSettingsObservation = settings.$dictationEnabled
+            .combineLatest(settings.$dictationActivationKey, settings.$dictationLivePreview)
+            .map { _ in () }
+            .merge(with: settings.$assistantEnabled.combineLatest(settings.$assistantActivationKey).map { _ in () })
+            .sink { [weak self] in
+                Task { @MainActor [weak self] in self?.syncTriggerMonitors() }
+            }
         dictationPermissionTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.syncDictationMonitor() }
+            MainActor.assumeIsolated { self?.syncTriggerMonitors() }
         }
-        syncDictationMonitor()
+        syncTriggerMonitors()
     }
 
     deinit {
@@ -196,26 +222,30 @@ final class ScribeAppEnvironment: ObservableObject {
         dictationPermissionTimer?.invalidate()
     }
 
-    private func syncDictationMonitor() {
+    /// Installs the dictation key and the assistant key for whichever of the
+    /// two is on. Both need the dictation model and the same permissions, so
+    /// the model stays warm while either is enabled.
+    private func syncTriggerMonitors() {
         var modelUnavailable = false
-        if settings.dictationEnabled {
+        if settings.dictationEnabled || settings.assistantEnabled {
             switch settings.modelInstaller.state {
             case .notInstalled, .failed:
                 settings.dictationEnabled = false
+                settings.assistantEnabled = false
                 modelUnavailable = true
             case .checking, .installing, .installed:
                 break
             }
         }
-        guard settings.dictationEnabled, settings.modelInstaller.state == .installed,
+        guard settings.dictationEnabled || settings.assistantEnabled, settings.modelInstaller.state == .installed,
               permissions.dictationAccess().isReady else {
-            dictationMonitor.stop()
+            triggerMonitor.stop()
             dictationCoordinator?.setEnabled(false)
             if modelUnavailable { dictationCoordinator?.showModelUnavailable() }
             return
         }
         guard let dictationCoordinator else {
-            dictationMonitor.stop()
+            triggerMonitor.stop()
             NSLog("Dictation is enabled but the transcription worker is unavailable")
             return
         }
@@ -230,15 +260,51 @@ final class ScribeAppEnvironment: ObservableObject {
             restoreClipboard: settings.dictationRestoreClipboard
         )
         dictationCoordinator.setEnabled(true)
-        dictationMonitor.setActivationKey(settings.dictationActivationKey)
-        dictationMonitor.state.holdThreshold = Double(settings.dictationHoldThresholdMs) / 1_000
-        dictationMonitor.state.doubleTapInterval = Double(settings.dictationDoubleTapMs) / 1_000
-        dictationMonitor.state.maximumDuration = Double(min(settings.dictationMaxDictationMinutes, 5)) * 60
-        dictationMonitor.start()
+        var keys: [DictationIntent: DictationActivationKey] = [:]
+        if settings.dictationEnabled { keys[.dictation] = settings.dictationActivationKey }
+        if settings.assistantEnabled { keys[.assistant] = settings.assistantActivationKey }
+        triggerMonitor.setKeys(keys)
+        triggerMonitor.setTiming(
+            holdThreshold: Double(settings.dictationHoldThresholdMs) / 1_000,
+            doubleTapInterval: Double(settings.dictationDoubleTapMs) / 1_000,
+            maximumDuration: Double(min(settings.dictationMaxDictationMinutes, 5)) * 60
+        )
+        triggerMonitor.start()
     }
 
-    func stopToggleDictation() { dictationMonitor.stopToggle() }
-    func cancelToggleDictation() { dictationMonitor.cancelToggle() }
+    func stopToggleDictation() { triggerMonitor.stopToggle() }
+
+    /// The indicator's Cancel: an assistant request in flight, else a toggled session.
+    func cancelToggleDictation() {
+        if dictationCoordinator?.cancelAssistantRequest() == true { return }
+        triggerMonitor.cancelToggle()
+    }
+
+    /// What the assistant key does right now, resolved at each press so a
+    /// change in Settings applies to the next request.
+    private func assistantAvailability() -> AssistantAvailability {
+        guard let assistant = VoiceAssistantAccount.shared.makeAssistant(settings: settings) else {
+            switch settings.assistantAccountType {
+            case .chatGPT: return .needsAccount("Sign in to ChatGPT to use Voice Assistant.")
+            case .apiKey: return .needsAccount("Add an OpenAI API key to use Voice Assistant.")
+            }
+        }
+        let modelName: String? = switch settings.assistantAccountType {
+        case .chatGPT: settings.assistantChatGPTModelName ?? settings.assistantChatGPTModel
+        case .apiKey: settings.assistantAPIKeyModel
+        }
+        return .ready(AssistantConfiguration(
+            assistant: assistant,
+            modelName: modelName,
+            sources: SourceTextOptions(
+                usesSelection: settings.assistantUsesSelection,
+                usesCopiedText: settings.assistantUsesCopiedText,
+                usesScreenText: settings.assistantUsesScreenText,
+                characterLimit: settings.assistantSourceCharacterLimit
+            ),
+            copyOnly: settings.assistantResultMode == .copyOnly
+        ))
+    }
 
     func toggleDictation() {
         if !settings.dictationEnabled, settings.modelInstaller.state != .installed {
@@ -334,7 +400,7 @@ final class ScribeAppEnvironment: ObservableObject {
     /// Applies whatever changed while the Settings window was open. Shortcut
     /// conflicts are shown in the menu; the menu commands are never affected.
     func settingsWindowDidClose() {
-        syncDictationMonitor()
+        syncTriggerMonitors()
         coordinator.setRecordingsFolder(settings.recordingsFolderURL)
         coordinator.reportShortcutRegistration(
             hotkeys.register(
