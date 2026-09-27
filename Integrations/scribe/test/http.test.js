@@ -37,10 +37,14 @@ test('HTTP OAuth consent, PKCE, scopes, resource binding, persistence, refresh a
   }
   assert.equal((await consent('allow', 'wrong')).status, 403);
   assert.equal((await consent('allow', config.ownerKey, 'https://attacker.test')).status, 403);
-  assert.match((await consent('deny')).headers.get('location'), /error=access_denied/);
-  assert.equal((await authorize({ resource: 'https://attacker.test/mcp' })).status, 302); // SDK redirects OAuth errors to the validated callback
+  assert.equal(oauth.authorization_response_iss_parameter_supported, true);
+  const denied = new URL((await consent('deny')).headers.get('location'));
+  assert.equal(denied.searchParams.get('error'), 'access_denied'); assert.equal(denied.searchParams.get('iss'), oauth.issuer);
+  const rejected = await authorize({ resource: 'https://attacker.test/mcp' });
+  assert.equal(rejected.status, 302); // SDK redirects OAuth errors to the validated callback
+  assert.equal(new URL(rejected.headers.get('location')).searchParams.get('iss'), oauth.issuer);
   const approved = await consent('allow'); const location = new URL(approved.headers.get('location'));
-  assert.equal(location.searchParams.get('state'), 'bound-state');
+  assert.equal(location.searchParams.get('state'), 'bound-state'); assert.equal(location.searchParams.get('iss'), origin + '/');
   const values = { grant_type: 'authorization_code', client_id: clientInfo.client_id, code: location.searchParams.get('code'), code_verifier: verifier, redirect_uri: redirect, resource: origin + '/mcp' };
   assert.equal((await form('/token', { ...values, code_verifier: 'invalid' })).status, 400);
   const tokenResponse = await form('/token', values); assert.equal(tokenResponse.status, 200); const tokens = await tokenResponse.json();

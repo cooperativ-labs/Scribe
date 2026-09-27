@@ -6,10 +6,15 @@ including reviewed titles and speaker labels. It provides recent meetings,
 literal text search, revision-aware paged retrieval, research `search`/`fetch`,
 a meeting-notes prompt, and a transcript viewer for MCP Apps hosts.
 
-This is a **single-user bridge to a local Scribe library**. Claude Code can start
-it directly over stdio. ChatGPT and Claude web connect over Streamable HTTP and
-OAuth. It does not call a model API or require OpenAI/Anthropic API keys. The
-assistant performs the requested analysis on retrieved text.
+Transcripts never leave the owner's Mac except as answers to that owner's
+approved assistants. Claude Code starts the service directly over stdio.
+ChatGPT and Claude web connect over Streamable HTTP and OAuth, normally through
+the **Scribe relay**: one stable HTTPS endpoint shared by every Scribe owner.
+Each Mac connects out to the relay, so no tunnel or per-user URL is needed. The
+relay routes each token only to the library of the owner who approved it. See
+[docs/remote-access.md](docs/remote-access.md) for the architecture and privacy
+boundary. The service does not call a model API or require OpenAI or Anthropic
+API keys. The assistant performs the requested analysis on retrieved text.
 
 ## From the Scribe app
 
@@ -20,12 +25,22 @@ remaining steps listed beside each one:
   `~/Library/Application Support/Scribe/Integrations/claude` and runs
   `claude plugin marketplace add` and `claude plugin install scribe@scribe-local`
   in a login shell. **Copy Commands** copies the same two commands instead.
-- **Public address** takes your HTTPS tunnel/proxy origin and shows the
-  connector URL (`…/mcp`). **Copy Server Command** copies a command that
-  creates the owner key on first run and starts the HTTP bridge from the staged
-  copy, allowing Claude's callback (`https://claude.ai/api/mcp/auth_callback`)
-  and the ChatGPT callback, if one was entered. **Copy Owner Key** copies the
-  key for Scribe's consent page.
+- **Connect through → Scribe Relay** (the default) takes the relay address
+  (prefilled when the build was packaged for a relay) and shows the connector
+  URL (`https://<relay>/mcp`), which is the same for every owner. **Connect
+  This Mac** runs the bundled connector from Scribe itself: it links this Mac
+  on first use, keeps an outbound connection open while Scribe runs, and
+  reconnects at launch until you press **Disconnect This Mac**. The connector
+  exits with Scribe. **Copy Connect Command** copies the same `node … connect
+  <relay>` for a Terminal instead. **Get Link Code** shows a one-time code for
+  the consent page. **Disconnect All Assistants** revokes every grant, and
+  **Unlink This Mac…** makes the relay forget this library.
+- **Connect through → Your own tunnel** keeps the self-hosted setup.
+  **Public address** takes your HTTPS tunnel or proxy origin. **Copy Server
+  Command** creates the owner key on first run and starts the HTTP bridge. It
+  allows Claude's callback, ChatGPT's stable callback, and any
+  connection-specific ChatGPT callback you entered. **Copy Owner Key** copies
+  the key for Scribe's consent page.
 - **Add to ChatGPT…** and **Add to Claude…** copy the connector URL and open
   `chatgpt.com/plugins` or `claude.ai/customize/connectors` for pasting.
 
@@ -45,11 +60,20 @@ npm run package
 ```
 
 Tests use synthetic transcripts and the official MCP client across both
-transports. They include OAuth consent, PKCE, resource binding, token refresh
-and revocation, filesystem boundaries, edits, search and pagination. No private
+transports. A marketplace-install test follows ChatGPT's path from the
+packaged `mcp.json` URL through discovery, CIMD client identity, link-code
+consent, token exchange, profile and retrieval, refresh, and disconnect for
+two owners. They cover OAuth consent, PKCE, resource binding, RFC 9207 `iss`,
+token refresh and revocation, filesystem boundaries, edits, search and
+pagination. Relay tests run two linked Macs against one relay. They check that
+each token reads only its own owner's library, that link codes work once, that
+one Mac cannot answer another's calls, that unknown or widened calls are
+refused, and that the relay handles an offline Mac, grant revocation and
+unlink. No private
 meeting text is needed. `npm run build` bundles dependencies into `dist/cli.mjs`;
 `npm run package` creates a self-contained Claude marketplace at
-`dist/packages/claude`, including dependency notices. Keep its `ui/` directory
+`dist/packages/claude`, including dependency notices, and with `--url` the
+ChatGPT marketplace described below. Keep its `ui/` directory
 beside `dist/`. Do not run `npm install` inside a plugin cache.
 
 ## Claude Code
@@ -84,14 +108,50 @@ claude mcp add --transport http scribe https://YOUR-DOMAIN/mcp
 Use `/mcp` to authenticate. Add the exact callback shown by that client to the
 server's redirect allowlist before authorizing it.
 
-## ChatGPT and Claude web
+## ChatGPT and Claude web through the Scribe relay
 
-The Mac must stay awake and the bridge must remain running. Remote clients
-cannot read a localhost URL. Provide an HTTPS reverse proxy/tunnel to
-`127.0.0.1:8766`, preserving the public `Host` header. For a development tunnel,
-for example, `ngrok http 8766` produces an HTTPS origin. Public distribution
-requires a stable deployment and the host's publisher review; a development
-tunnel is only for private testing.
+The relay is a hosted service (`node dist/cli.mjs relay`, see
+[docs/remote-access.md](docs/remote-access.md#operating-the-relay)). Every
+owner uses its one connector URL, `https://RELAY/mcp`.
+
+On the Mac that holds the transcripts, press **Connect This Mac** in Settings
+→ Assistants, or keep this running in a shell:
+
+```sh
+node dist/cli.mjs connect https://RELAY
+```
+
+Without an address, `connect` and `link` use the relay the package was built
+for (`connector.json`). The first run links the Mac. It stores an owner ID and agent secret in
+`~/Library/Application Support/Scribe/MCP/relay.json` with mode 0600. After
+that, the command only connects out over HTTPS, and nothing listens on the Mac.
+The Mac must stay awake. While it is asleep or offline, tools return "Your
+Scribe Mac is not connected."
+
+In **ChatGPT**, turn on developer mode under Settings → Security and login.
+Then add `https://RELAY/mcp` from the Plugins page with OAuth. In **Claude
+web or Desktop**, add the same URL as a custom connector. When the consent
+page asks for a link code, get one from **Get Link Code** in Scribe, or run
+`node dist/cli.mjs code`. Each code works once and expires after ten minutes.
+**Never paste a link code into a chat.** The grant binds the client to this
+Mac's library only.
+
+Manage connections from the Mac:
+
+```sh
+node dist/cli.mjs grants          # connected assistants and whether this Mac is online
+node dist/cli.mjs revoke <id>     # disconnect one assistant
+node dist/cli.mjs revoke --all    # disconnect every assistant
+node dist/cli.mjs unlink          # relay forgets this library and all its grants
+```
+
+## ChatGPT and Claude web through your own tunnel
+
+To avoid a shared relay, run the bridge yourself. The Mac must stay awake and
+the bridge must keep running. Remote clients cannot read a localhost URL.
+Provide an HTTPS reverse proxy or tunnel to `127.0.0.1:8766`, and preserve the
+public `Host` header. For a development tunnel, for example, `ngrok http 8766`
+produces an HTTPS origin.
 
 Create the private owner key once:
 
@@ -99,45 +159,85 @@ Create the private owner key once:
 node dist/cli.mjs init
 ```
 
-It creates `~/Library/Application Support/Scribe/MCP/owner-key` with mode 0600,
-refusing to overwrite an existing key. Read that file locally when the consent
-page asks for the key. **Do not paste it in a chat or into plugin manifests.**
+This creates `~/Library/Application Support/Scribe/MCP/owner-key` with mode
+0600, and never overwrites an existing key. Read that file locally when the
+consent page asks for the key. **Do not paste it in a chat or into plugin
+manifests.**
 
-Set the public origin and exact allowed OAuth callback URLs. Copy each callback
-from that client's connection setup; do not use wildcard hosts or guessed URLs.
-For ChatGPT, callback URLs can be specific to a connection. This server uses
-dynamic registration, not CIMD, and does not advertise RFC 9207 issuer support.
+Set the public origin and the exact allowed OAuth callback URLs. Because the
+server returns RFC 9207 `iss`, ChatGPT uses its stable callback
+`https://chatgpt.com/connector_platform_oauth_redirect`. If ChatGPT shows you a
+connection-specific callback, add that exact URL too. Do not use wildcard hosts
+or guessed URLs. The server uses dynamic registration, not CIMD.
 
 ```sh
 export SCRIBE_PUBLIC_URL='https://YOUR-DOMAIN'
-export SCRIBE_OAUTH_REDIRECT_URIS='["EXACT-HTTPS-CALLBACK-FROM-CHATGPT","EXACT-HTTPS-CALLBACK-FROM-CLAUDE"]'
+export SCRIBE_OAUTH_REDIRECT_URIS='["https://chatgpt.com/connector_platform_oauth_redirect","https://claude.ai/api/mcp/auth_callback"]'
 node dist/cli.mjs http
 ```
 
-Use actual callback URLs in that JSON array and omit clients you are not
-connecting. HTTP startup refuses missing/unsafe configuration. It binds only
-to loopback, rejects unexpected Host/Origin headers, and authenticates every MCP
-request. The local stdio transport uses the OS user's existing file permissions.
+HTTP startup refuses missing or unsafe configuration. The bridge binds only to
+loopback, rejects unexpected Host and Origin headers, and authenticates every
+MCP request. The local stdio transport uses the OS user's existing file
+permissions. Add the endpoint to ChatGPT and Claude as above, and approve with
+the owner key instead of a link code. Account or organization policy may
+control access to custom connectors. The build and packaging commands do not
+submit anything to a public app directory.
 
-In **ChatGPT**, enable developer mode under Settings → Security and login, then
-add the HTTPS `/mcp` endpoint from the Plugins page with OAuth authentication.
-Complete Scribe's consent page and select the plugin in a new conversation.
-In **Claude web/Desktop**, add the same URL as a custom connector in Settings →
-Connectors and complete OAuth. Account/organization policy may control access
-to custom connectors. No public app-directory submission is performed by the
-build or packaging commands.
-
-For a portable ChatGPT plugin package, run:
+## ChatGPT plugin package
 
 ```sh
-npm run package -- --url https://YOUR-DOMAIN/mcp
+npm run package -- --url https://RELAY/mcp \
+  [--website-url URL] [--privacy-url URL] [--terms-url URL]
 ```
 
-This writes `dist/packages/chatgpt/scribe` with the portable plugin manifest,
-remote MCP configuration, and workflow skill. If ChatGPT has assigned a
-registered `plugin_asdk_app...` ID, add `--app-id <actual-id>` to generate the
-OpenAI registered-app mapping. Packaging alone does not register the service or
-install it in an account. Refresh the client connection after tool changes.
+This writes a plugin marketplace at `dist/packages/chatgpt`:
+
+```
+dist/packages/chatgpt/
+├── .agents/plugins/marketplace.json   # one entry, authentication ON_INSTALL
+└── plugins/scribe/
+    ├── plugin.json                    # Agent Plugins 1.0.0 + OpenAI interface metadata
+    ├── mcp.json                       # streamable-http → https://RELAY/mcp
+    ├── skills/scribe-transcripts/
+    └── assets/icon.png, logo.png
+```
+
+One package serves every owner. It names only the relay's shared endpoint,
+so nobody hand-builds a manifest, and it carries no `.app.json` or
+account-specific `plugin_asdk_app…` ID. The library a connection reads is
+decided on the consent page by the owner's link code. On install, ChatGPT
+authorizes as its published client
+(`https://chatgpt.com/oauth/client.json`, a Client ID Metadata Document), so no
+per-user registration is needed either. The relay fetches only that exact URL,
+caches it, keeps only allowlisted callbacks, and accepts only public-client
+(PKCE) token exchange. Dynamic registration still works for Claude and older
+clients. `scribe_profile` (marked `openai/profile`) returns an opaque ID per
+library, so ChatGPT can tell two connected Macs apart and recognize one after
+reconnecting.
+
+Packaging validates the result: schema fields, `./` asset paths inside the
+plugin, a remote HTTPS `/mcp` server with no embedded headers, skill front
+matter, and no app ID. The same `--url` writes `connector.json` into the Claude
+package, so the bundled CLI and Scribe's Settings default to the same relay.
+Omit `--url` and neither is produced. The link and listing URLs are optional;
+unset ones are left out.
+
+To install it for testing, add the marketplace and install from it:
+
+```sh
+codex plugin marketplace add ./dist/packages/chatgpt
+codex plugin add scribe@scribe
+```
+
+The ChatGPT desktop app then lists **Scribe** under that marketplace in the
+Plugins Directory. It signs in as its native client
+(`https://chatgpt.com/oauth/codex/client.json`) with a loopback callback, which
+the relay also accepts. Removing Scribe in ChatGPT may not revoke the grant on
+the relay; use **Disconnect All Assistants** in Scribe to be sure. ChatGPT on the web adds the same endpoint in Developer mode
+(Plugins → + → `https://RELAY/mcp`, OAuth). Either way, the consent page asks
+for a link code from **Get Link Code**. Publishing to the public directory is
+a separate review step. Refresh the client connection after tool changes.
 
 ## Tools and data behavior
 
@@ -177,15 +277,17 @@ callback URLs, authorization code + S256 PKCE, explicit password-protected owner
 consent, `transcripts.read` scope, `/mcp` audience binding, one-hour access
 tokens, rotating 30-day refresh tokens, and family revocation at `/revoke`.
 Codes and consent requests expire after five minutes. Tokens survive a restart;
-pending consent and codes do not. The service is for one library owner, with no
-multi-user account routing. Use a separate instance, origin and state directory
-for each owner. Run one process per state directory.
+pending consent and codes do not. Every grant is bound at consent time to exactly
+one owner's library: the self-hosted bridge's single owner, or the relay owner
+whose link code was entered. Run one process per state directory.
 
 State is stored in mode-0600 `oauth-state.json` beside the owner key. Access and
 refresh tokens are hashed; registered confidential-client credentials, when
-used, are private state. Back up/protect that directory as credentials. To
-disconnect every client, stop the bridge, remove `oauth-state.json`, then restart
-and reconnect clients. Rotate the owner key separately if it was exposed.
+used, are private state. Back up and protect that directory as credentials. On
+the relay, the owner revokes from the Mac (`revoke`, `unlink`, or the Settings
+buttons), and this takes effect on the next request. For the self-hosted bridge,
+to disconnect every client, stop the bridge, remove `oauth-state.json`, then
+restart and reconnect clients. Rotate the owner key separately if it was exposed.
 Client-side disconnect may not call revocation; deleting server state is the
 definitive all-client revocation procedure. Do not log proxy request bodies,
 Authorization headers, or transcript responses.
@@ -197,13 +299,16 @@ Configuration:
 | `SCRIBE_TRANSCRIPTS_DIR` | `~/Meeting Transcripts` |
 | `SCRIBE_MCP_STATE_DIR` | `~/Library/Application Support/Scribe/MCP` |
 | `SCRIBE_MCP_PORT` | `8766` (loopback only) |
-| `SCRIBE_PUBLIC_URL` | Required canonical HTTPS origin for HTTP |
-| `SCRIBE_OAUTH_REDIRECT_URIS` | Required JSON array of exact approved OAuth callback URLs |
+| `SCRIBE_PUBLIC_URL` | Required canonical HTTPS origin for `http` and `relay` |
+| `SCRIBE_OAUTH_REDIRECT_URIS` | JSON array of exact approved OAuth callback URLs (required for `http`; `relay` defaults to ChatGPT's and Claude's stable callbacks) |
+| `SCRIBE_RELAY_URL` | Relay origin for `connect` and `link` when it is not given as an argument |
+| `SCRIBE_RELAY_STATE_DIR`, `SCRIBE_BIND_HOST`, `SCRIBE_TRUST_PROXY` | Relay operation; see docs/remote-access.md |
 
 `GET /health` reports process liveness without revealing library information.
 Unauthenticated `/mcp` must return 401 with protected-resource discovery. Proxy
-forwarded headers are deliberately not trusted; per-IP rate limits are shared
-behind a tunnel, appropriate for this single-user bridge.
+forwarded headers are not trusted by default. Per-IP rate limits are therefore
+shared behind a tunnel, which suits a single-owner bridge. A relay sets
+`SCRIBE_TRUST_PROXY` to its proxy hop count.
 
 ## Acceptance checks and publication
 
@@ -217,6 +322,14 @@ After installing in each real client:
    errors. Confirm the model can work without widget support in Claude Code.
 5. Deny OAuth once, reconnect successfully, then disconnect/revoke and confirm
    the old token cannot read transcripts.
+6. Through the relay: link two Macs (or two state directories). Confirm each
+   assistant sees only the library whose link code approved it. Put one Mac to
+   sleep and confirm the "not connected" error. Unlink it and confirm that
+   its connections stop.
+7. In ChatGPT Developer mode, install the ChatGPT package (or add
+   `https://RELAY/mcp` with OAuth), approve it with a link code, and ask for
+   the latest meeting. Then disconnect it in ChatGPT and confirm that
+   `node dist/cli.mjs grants` no longer lists it.
 
 Public submission additionally needs an actual HTTPS deployment, publisher
 identity, published privacy policy/terms, sample reviewer library, brand assets,

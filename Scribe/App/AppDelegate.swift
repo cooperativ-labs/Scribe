@@ -103,11 +103,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         chipVisibilityObservation = environment.meetingChipModel.$presentation.sink { [weak menuBar] presentation in
             menuBar?.isMeetingChipVisible = presentation.isVisible
         }
+        // Reconnects the library to the Scribe relay if it was left connected.
+        AssistantRelayAgent.shared.resumeIfEnabled(package: AssistantConnectorPackage())
         environment.presentFirstRunPermissionsIfNeeded()
         environment.checkForUpdates()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        AssistantRelayAgent.shared.halt()
         environment.cleanUpPendingUpdateOnTermination()
     }
 

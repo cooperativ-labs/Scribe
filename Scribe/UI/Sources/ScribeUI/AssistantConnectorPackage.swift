@@ -6,8 +6,8 @@ import Foundation
 /// app's resources. It is staged into Application Support before use rather
 /// than referenced in place: Claude Code loads a directory plugin from where
 /// it lies, and an app bundle moves on update, translocation, or a drag to the
-/// Trash. The same staged copy provides `cli.mjs` for the HTTP server that
-/// ChatGPT and Claude reach through a tunnel.
+/// Trash. The same staged copy provides `cli.mjs` for the relay connection (or
+/// the self-hosted HTTP server) that ChatGPT and Claude reach.
 @MainActor
 public final class AssistantConnectorPackage: ObservableObject {
     public enum InstallState: Equatable, Sendable {
@@ -38,6 +38,16 @@ public final class AssistantConnectorPackage: ObservableObject {
     /// The server entry point inside the staged plugin.
     public var stagedCLI: URL {
         stagedMarketplace.appending(path: "plugins/scribe/dist/cli.mjs")
+    }
+
+    /// The relay this build's ChatGPT plugin names, from the packaged
+    /// `connector.json`; absent when the build was packaged without one.
+    public var packagedRelay: AssistantServerAddress? {
+        guard let bundledMarketplace,
+              let data = try? Data(contentsOf: bundledMarketplace.appending(path: "plugins/scribe/connector.json")),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let url = object["connector_url"] as? String else { return nil }
+        return try? AssistantServerAddress.parse(url).get()
     }
 
     /// Replaces the staged copy with the one in this build of the app.
@@ -75,6 +85,52 @@ public final class AssistantConnectorPackage: ObservableObject {
         }
         let result = await Self.runInstall(marketplace: marketplace)
         installState = result
+    }
+
+    /// Runs one relay command of the staged connector (`code`, `grants`,
+    /// `revoke --all`, `unlink`) and returns what it printed on stdout.
+    ///
+    /// These act on this Mac's own relay link, authenticated by the private
+    /// `relay.json` beside the owner key; none of them touch another library.
+    public func runRelayCommand(_ arguments: [String]) async throws -> String {
+        let cli = try stage().appending(path: "plugins/scribe/dist/cli.mjs")
+        return try await Self.runNode(cli: cli, arguments: arguments)
+    }
+
+    struct CommandError: LocalizedError {
+        let message: String
+        var errorDescription: String? { message }
+    }
+
+    private nonisolated static func runNode(cli: URL, arguments: [String]) async throws -> String {
+        let script = """
+        export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+        if ! command -v node >/dev/null 2>&1; then
+          echo "Node.js was not found. Install Node.js 22 or newer." >&2
+          exit 127
+        fi
+        exec node "$@"
+        """
+        return try await Task.detached {
+            let process = Process()
+            process.executableURL = URL(filePath: "/bin/zsh")
+            process.arguments = ["-lc", script, "zsh", cli.path] + arguments
+            process.standardInput = FileHandle.nullDevice
+            let output = Pipe(), errors = Pipe()
+            process.standardOutput = output
+            process.standardError = errors
+            try process.run()
+            let data = output.fileHandleForReading.readDataToEndOfFile()
+            let errorData = errors.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else {
+                let message = String(decoding: errorData, as: UTF8.self)
+                    .split(whereSeparator: \.isNewline).last.map(String.init)?
+                    .replacingOccurrences(of: "Scribe MCP: ", with: "")
+                throw CommandError(message: message ?? "The Scribe connector failed (exit \(process.terminationStatus)).")
+            }
+            return String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        }.value
     }
 
     enum PackageError: LocalizedError {

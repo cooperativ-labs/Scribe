@@ -1,11 +1,30 @@
 import Foundation
 
+/// How ChatGPT and Claude, which connect from their own cloud, reach this Mac.
+public enum AssistantConnectionMode: String, CaseIterable, Identifiable, Sendable {
+    /// This Mac links to a shared Scribe relay and keeps an outbound connection
+    /// open. Every owner uses the relay's one address; no tunnel is needed.
+    case relay
+    /// The person runs the HTTP bridge behind their own HTTPS tunnel or proxy.
+    case selfHosted
+
+    public var id: String { rawValue }
+
+    public var name: String {
+        switch self {
+        case .relay: "Scribe Relay"
+        case .selfHosted: "Your own tunnel"
+        }
+    }
+}
+
 /// The public address ChatGPT and Claude use to reach Scribe's connector.
 ///
 /// Both services connect from their own cloud, never from this Mac, so the
-/// address has to be an HTTPS origin that a tunnel or reverse proxy forwards to
-/// the local bridge. A person may paste the bare host, the origin, or the full
-/// `/mcp` endpoint a client showed them; all three name the same server.
+/// address has to be an HTTPS origin: a Scribe relay, or a tunnel or reverse
+/// proxy that forwards to the local bridge. A person may paste the bare host,
+/// the origin, or the full `/mcp` endpoint a client showed them; all three name
+/// the same server.
 public struct AssistantServerAddress: Equatable, Sendable {
     /// `https://host[:port]`, with no trailing slash.
     public let origin: String
@@ -39,7 +58,7 @@ public struct AssistantServerAddress: Equatable, Sendable {
 
     public static func problemDescription(_ problem: Problem) -> String {
         switch problem {
-        case .empty: "Enter the HTTPS address of your tunnel or proxy."
+        case .empty: "Enter an HTTPS address."
         case .notHTTPS: "ChatGPT and Claude only connect to HTTPS addresses."
         case .invalid: "Use an address like https://scribe.example.com, with no other path."
         }
@@ -72,27 +91,32 @@ public enum AssistantClient: String, CaseIterable, Identifiable, Sendable {
     }
 
     /// The step-by-step instructions shown beside the button.
-    public var steps: [String] {
+    public func steps(mode: AssistantConnectionMode = .relay) -> [String] {
+        let approve = mode == .relay
+            ? "On Scribe’s consent page, enter a link code from Get Link Code above. Each code works once."
+            : "Approve the connection on Scribe’s consent page with your owner key."
+        let start = mode == .relay
+            ? "In Scribe Relay above, press Connect This Mac and keep this Mac awake."
+            : "Start Scribe’s connector server and your HTTPS tunnel."
         switch self {
         case .chatGPT:
-            [
-                "Start Scribe’s connector server and your HTTPS tunnel.",
+            return [
+                start,
                 "In ChatGPT, turn on Developer mode in Settings → Security and login.",
                 "On the Plugins page, press +, paste the connector URL, name it Scribe, choose OAuth, and create it.",
-                "If ChatGPT shows a callback URL, paste it under ChatGPT callback and restart the server with the new command.",
-                "Approve the connection on Scribe’s consent page with your owner key.",
+                approve,
                 "In a new chat, press + → More → Scribe, then ask for your latest transcript.",
             ]
         case .claude:
-            [
-                "Start Scribe’s connector server and your HTTPS tunnel. Claude’s callback is already allowed.",
+            return [
+                start,
                 "In Claude, open Customize → Connectors, press +, then Add custom connector.",
                 "Paste the connector URL, name it Scribe, press Add, then Connect.",
-                "Approve the connection on Scribe’s consent page with your owner key.",
+                approve,
                 "In a chat, press + → Connectors and turn on Scribe. It works in Claude Desktop and mobile too.",
             ]
         case .claudeCode:
-            [
+            return [
                 "Press Add to Claude Code. Scribe installs its plugin with the claude command.",
                 "Restart Claude Code and run /mcp to check that scribe is connected.",
                 "Ask for your latest transcript, or use /scribe:scribe-transcripts.",
@@ -105,16 +129,17 @@ public enum AssistantClient: String, CaseIterable, Identifiable, Sendable {
 public enum AssistantConnectorCommands {
     /// Claude's documented OAuth callback for custom connectors.
     public static let claudeCallback = "https://claude.ai/api/mcp/auth_callback"
+    /// ChatGPT's stable callback, which it uses because Scribe's OAuth server
+    /// names its issuer in every authorization response (RFC 9207).
+    public static let chatGPTCallback = "https://chatgpt.com/connector_platform_oauth_redirect"
     public static let marketplaceName = "scribe-local"
     public static let pluginID = "scribe@scribe-local"
 
-    /// The callbacks the server allows: Claude's, plus ChatGPT's once known.
-    ///
-    /// ChatGPT's callback can be specific to one connection, so it is never
-    /// guessed; it is whatever the person copied out of ChatGPT.
-    public static func redirectURIs(chatGPTCallback: String) -> [String] {
-        var uris = [claudeCallback]
-        let callback = chatGPTCallback.trimmingCharacters(in: .whitespacesAndNewlines)
+    /// The callbacks a self-hosted server allows: Claude's and ChatGPT's stable
+    /// callbacks, plus a connection-specific one a person copied out of ChatGPT.
+    public static func redirectURIs(chatGPTCallback custom: String) -> [String] {
+        var uris = [claudeCallback, chatGPTCallback]
+        let callback = custom.trimmingCharacters(in: .whitespacesAndNewlines)
         if let url = URL(string: callback), url.scheme == "https", url.host != nil, !uris.contains(callback) {
             uris.append(callback)
         }
@@ -129,6 +154,15 @@ public enum AssistantConnectorCommands {
         SCRIBE_CLI=\(shellQuoted(cli.path))
         [ -f "$HOME/Library/Application Support/Scribe/MCP/owner-key" ] || node "$SCRIBE_CLI" init
         SCRIBE_PUBLIC_URL=\(shellQuoted(address.origin)) SCRIBE_OAUTH_REDIRECT_URIS=\(shellQuoted("[\(uris)]")) node "$SCRIBE_CLI" http
+        """
+    }
+
+    /// Links this Mac to the relay on first run, then serves its library over
+    /// an outbound connection until stopped. Nothing listens on this Mac.
+    public static func relayConnectCommand(cli: URL, relay: AssistantServerAddress) -> String {
+        """
+        SCRIBE_CLI=\(shellQuoted(cli.path))
+        node "$SCRIBE_CLI" connect \(shellQuoted(relay.origin))
         """
     }
 
