@@ -537,8 +537,8 @@ extension ScribeAppEnvironment {
         guard let transcription else { return }
         let model = transcription.makeOrRefreshReviewModel()
         if let transcriptWindow {
-            transcriptWindow.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
+            transcriptWindow.makeKeyAndOrderFront(nil)
             return
         }
         // The hosting controller must not publish a preferred content size:
