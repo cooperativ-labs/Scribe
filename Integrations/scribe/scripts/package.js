@@ -2,17 +2,22 @@ import { cp, mkdir, writeFile, readdir, readFile, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
-import { writeChatGPTPackage } from './chatgpt-package.js';
+import { writeChatGPTPackage, writeSubmissionArchive } from './chatgpt-package.js';
 await import('./build.js');
 const { values } = parseArgs({ options: { url: { type: 'string', default: process.env.SCRIBE_CONNECTOR_URL }, output: { type: 'string' },
-  'website-url': { type: 'string' }, 'privacy-url': { type: 'string' }, 'terms-url': { type: 'string' } } });
+  'website-url': { type: 'string' }, 'privacy-url': { type: 'string' }, 'terms-url': { type: 'string' }, 'support-url': { type: 'string' } } });
 const root = fileURLToPath(new URL('..', import.meta.url));
 const output = values.output ? path.resolve(values.output) : path.join(root, 'dist/packages');
 const claude = path.join(output, 'claude/plugins/scribe');
 const json = (file, value) => writeFile(file, JSON.stringify(value, null, 2) + '\n');
 await mkdir(path.join(claude, 'dist'), { recursive: true });
-for (const name of ['.claude-plugin', '.mcp.json', 'skills', 'ui', 'docs', 'README.md']) await cp(path.join(root, name), path.join(claude, name), { recursive: true });
+// Directory listing material (screenshots, submission notes) is for the portal, not the plugin.
+const forPortal = new Set([path.join(root, 'docs/listing'), path.join(root, 'docs/directory-submission.md')]);
+for (const name of ['.claude-plugin', '.mcp.json', 'skills', 'ui', 'docs', 'README.md']) await cp(path.join(root, name), path.join(claude, name), { recursive: true, filter: source => !forPortal.has(source) });
 await cp(path.join(root, 'dist/cli.mjs'), path.join(claude, 'dist/cli.mjs'));
+// The MCP server inlines this icon in serverInfo.
+await mkdir(path.join(claude, 'assets'), { recursive: true });
+await cp(path.join(root, 'assets/icon.png'), path.join(claude, 'assets/icon.png'));
 // Bundle dependency notices with the distributable, including transitive packages.
 const licenses = [];
 async function collect(directory) {
@@ -34,6 +39,12 @@ await json(path.join(output, 'claude/.claude-plugin/marketplace.json'), { name: 
 const connector = path.join(claude, 'connector.json');
 if (values.url) await json(connector, { connector_url: new URL(values.url).href });
 else await rm(connector, { force: true });
-if (values.url) console.log(`ChatGPT marketplace: ${path.join(output, 'chatgpt')} (plugin ${await writeChatGPTPackage({ root, output: path.join(output, 'chatgpt'), url: values.url,
-  links: { website: values['website-url'], privacy: values['privacy-url'], terms: values['terms-url'] } })})`);
+if (values.url) {
+  const plugin = await writeChatGPTPackage({ root, output: path.join(output, 'chatgpt'), url: values.url,
+    links: { website: values['website-url'], privacy: values['privacy-url'], terms: values['terms-url'], support: values['support-url'] } });
+  const { version } = JSON.parse(await readFile(path.join(plugin, 'plugin.json'), 'utf8'));
+  // The same plugin, zipped for the Plugins Directory submission portal.
+  const archive = await writeSubmissionArchive({ plugin, file: path.join(output, `submission/scribe-${version}.zip`) });
+  console.log(`ChatGPT marketplace: ${path.join(output, 'chatgpt')} (plugin ${plugin})\nDirectory submission archive: ${archive}`);
+}
 console.log(`Claude marketplace: ${path.join(output, 'claude')}`);

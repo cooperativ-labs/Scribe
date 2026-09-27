@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync, renameSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
+import { consentPage, consentProblemPage } from './consent.js';
 import { InvalidClientMetadataError, InvalidGrantError, InvalidScopeError, InvalidTargetError, InvalidTokenError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 
 export const SCOPE = 'transcripts.read';
@@ -9,10 +10,9 @@ export const LOCAL_OWNER = 'local';
 const secret = () => randomBytes(32).toString('base64url');
 export const hash = value => createHash('sha256').update(value).digest('hex');
 const now = () => Math.floor(Date.now() / 1000);
-const escape = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 // Browsers apply form-action to the redirect that follows the consent POST, so the
 // policy names the one validated callback origin this request returns to.
-const consentCSP = callback => `default-src 'none'; style-src 'unsafe-inline'; form-action 'self' ${new URL(callback).origin}; frame-ancestors 'none'; base-uri 'none'`;
+const consentCSP = callback => `default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; form-action 'self' ${new URL(callback).origin}; frame-ancestors 'none'; base-uri 'none'`;
 // ChatGPT's Client ID Metadata Document: one stable client identity for every
 // ChatGPT user, so marketplace installs need no dynamic registration.
 export const CHATGPT_CLIENT_METADATA = 'https://chatgpt.com/oauth/client.json';
@@ -144,25 +144,36 @@ export class ScribeOAuthProvider {
     for (const [key, value] of this.pending) if (value.expiresAt <= now()) this.pending.delete(key);
     if (this.pending.size >= 100) throw new InvalidGrantError('Too many pending consent requests.');
     const request = secret();
-    this.pending.set(request, { client, params, expiresAt: now() + 300 });
-    const credential = this.owners
-      ? `<p>On your Mac, open Scribe → Settings → Assistants and press <strong>Get Link Code</strong>. The code names your library, works once, and expires after ten minutes.</p><details><summary>No link code yet?</summary><ol><li>Open Scribe on the Mac that holds your transcripts.</li><li>In Settings → Assistants, choose <strong>Scribe Relay</strong> and press <strong>Connect This Mac</strong>. Keep the Mac awake while assistants use it.</li><li>Press <strong>Get Link Code</strong> and type the code here. Never paste it into a chat.</li></ol></details><label>Scribe link code <input name="link_code" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" required></label>`
-      : `<label>Scribe owner key <input type="password" name="owner_key" autocomplete="off" required></label>`;
+    this.pending.set(request, { client, params, attempts: 0, expiresAt: now() + 300 });
+    this.renderConsent(res, request, { client, params });
+  }
+  renderConsent(res, request, { client, params }, error) {
     // same-origin, not no-referrer: under no-referrer a browser submits the form with
     // `Origin: null`, which the consent origin check must refuse. Other sites still get no referrer.
     res.set({ 'Cache-Control': 'no-store', 'Content-Security-Policy': consentCSP(params.redirectUri), 'Referrer-Policy': 'same-origin' });
-    res.type('html').send(`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Connect Scribe</title><style>body{font:16px/1.5 system-ui,sans-serif;max-width:34rem;margin:2rem auto;padding:0 1rem}label,button{display:block;margin:.75rem 0}input{font:inherit;padding:.4rem;width:100%;box-sizing:border-box}</style><h1>Connect to your Scribe library</h1><p><strong>${escape(client.client_name || 'MCP client')}</strong> requests read access to all transcripts in your Scribe library.</p><p>Return to: ${escape(params.redirectUri)}</p><p>Transcript text and speaker names can be sent to this client. Audio and editing are not available. You can disconnect it from Scribe at any time.</p><form method="post" action="/consent"><input type="hidden" name="request" value="${request}">${credential}<button name="decision" value="allow">Allow transcript access</button><button name="decision" value="deny" formnovalidate>Deny</button></form></html>`);
+    res.type('html').send(consentPage({ clientName: client.client_name, redirectUri: params.redirectUri, request, relay: Boolean(this.owners), error }));
   }
   consent(req, res) {
     // A random, single-use request ID plus strict Origin validation binds the form.
-    if (req.get('origin') !== this.origin) return res.status(403).send('Invalid consent origin.');
+    const problem = (status, heading, detail) => res.status(status).set('Content-Security-Policy', "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'")
+      .type('html').send(consentProblemPage(heading, detail));
+    if (req.get('origin') !== this.origin) return problem(403, 'This request did not come from Scribe', 'For your safety, Scribe only accepts approvals made on its own page. Start connecting again from your assistant.');
     const pending = this.pending.get(req.body.request);
-    this.pending.delete(req.body.request);
-    if (!pending || pending.expiresAt <= now()) return res.status(400).send('Consent expired. Start connecting again.');
+    if (!pending || pending.expiresAt <= now() || !['allow', 'deny'].includes(req.body.decision)) {
+      this.pending.delete(req.body.request);
+      return problem(400, 'This request has expired', 'Connection requests last five minutes and can be answered once. Start connecting again from your assistant.');
+    }
     const { client, params } = pending;
-    if (req.body.decision === 'deny') return res.redirect(303, this.callback(params.redirectUri, { error: 'access_denied', state: params.state }));
-    const ownerId = req.body.decision === 'allow' ? this.consentingOwner(req.body) : undefined;
-    if (!ownerId) return res.status(403).send(this.owners ? 'Invalid or expired link code. Get a new code from Scribe and start connecting again.' : 'Invalid owner key. Start connecting again.');
+    if (req.body.decision === 'deny') { this.pending.delete(req.body.request); return res.redirect(303, this.callback(params.redirectUri, { error: 'access_denied', state: params.state })); }
+    const ownerId = this.consentingOwner(req.body);
+    // A mistyped code or key gets the form back, a few times per request; the
+    // /consent rate limit and single-use codes still bound guessing.
+    if (!ownerId && ++pending.attempts < 3) return this.renderConsent(res.status(403), req.body.request, pending,
+      this.owners ? 'That code didn’t work. Check it against Scribe, or press Get Link Code for a new one.' : 'That owner key didn’t work.');
+    this.pending.delete(req.body.request);
+    if (!ownerId) return this.owners
+      ? problem(403, 'That link code didn’t work', 'Link codes work once and expire after ten minutes. In Scribe, press Get Link Code for a new one, then start connecting again from your assistant.')
+      : problem(403, 'That owner key didn’t work', 'Check the key in Scribe → Settings → Assistants, then start connecting again from your assistant.');
     const code = secret();
     for (const [key, value] of this.codes) if (value.expiresAt <= now()) this.codes.delete(key);
     this.codes.set(hash(code), { clientId: client.client_id, ownerId, ...params, expiresAt: now() + 300 });
@@ -191,7 +202,7 @@ export class ScribeOAuthProvider {
     if (!this.ownerExists(ownerId)) throw new InvalidGrantError('This Scribe library is no longer linked.');
     const refresh = Object.values(this.state.refresh);
     const families = new Set(refresh.filter(grant => this.ownerOf(grant) === ownerId && grant.family !== family).map(grant => grant.family));
-    if (refresh.length >= this.limits.grants || families.size >= this.limits.grantsPerOwner) throw new InvalidGrantError('Token limit reached. Disconnect an existing connection in Scribe.');
+    if (refresh.length >= this.limits.grants || families.size >= (this.limits.grantsPerOwnerFor?.[ownerId] ?? this.limits.grantsPerOwner)) throw new InvalidGrantError('Token limit reached. Disconnect an existing connection in Scribe.');
     const access = secret(), refreshToken = secret();
     const common = { clientId, ownerId, scopes: [SCOPE], resource: this.resource, family, grantedAt };
     this.state.access[hash(access)] = { ...common, expiresAt: now() + 3600 };

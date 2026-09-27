@@ -99,7 +99,10 @@ export class TranscriptLibrary {
         const match = run.transcript.segments.find(s => s.text.toLocaleLowerCase().includes(needle));
         if (match) {
           const index = match.text.toLocaleLowerCase().indexOf(needle);
-          result.excerpt = match.text.slice(Math.max(0, index - 80), index + 200);
+          // Start and end on word boundaries, with an ellipsis where text was cut.
+          const start = index <= 80 ? 0 : match.text.indexOf(' ', index - 80) + 1 || index;
+          const end = index + 200 >= match.text.length ? match.text.length : match.text.lastIndexOf(' ', index + 200) > index + needle.length ? match.text.lastIndexOf(' ', index + 200) : index + 200;
+          result.excerpt = `${start > 0 ? '…' : ''}${match.text.slice(start, end)}${end < match.text.length ? '…' : ''}`;
         }
       }
       return result;

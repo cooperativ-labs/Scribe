@@ -1,4 +1,4 @@
-import { randomBytes, randomInt, randomUUID } from 'node:crypto';
+import { randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync, renameSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import express from 'express';
@@ -6,6 +6,8 @@ import { rateLimit } from 'express-rate-limit';
 import { createHTTPApp } from './http.js';
 import { CHATGPT_CLIENT_METADATA, CODEX_CLIENT_METADATA, hash } from './auth.js';
 import { createSiteRouter } from './site.js';
+import { createLegalRouter } from './legal.js';
+import { DEMO_OWNER, DemoLibrary } from './demo.js';
 import { StoreError } from './store.js';
 
 // The Scribe relay gives every Scribe library one stable HTTPS MCP endpoint without
@@ -28,9 +30,15 @@ const now = () => Math.floor(Date.now() / 1000);
 export const normalizeLinkCode = code => code.toUpperCase().replace(/[\s-]/g, '').replace(/O/g, '0').replace(/[IL]/g, '1');
 
 // Linked owners and their agent secrets (hashed). Link codes live only in memory.
+// With a reviewer code, the directory also knows one extra owner, the synthetic
+// demo library, reached by typing that code where a link code goes. Unlike a link
+// code it is reusable, because reviewers connect again on every surface they test.
 export class OwnerDirectory {
-  constructor({ stateFile, maxOwners = 10000, linkCodeTTL = 600 } = {}) {
+  constructor({ stateFile, maxOwners = 10000, linkCodeTTL = 600, reviewerCode } = {}) {
     this.stateFile = stateFile; this.maxOwners = maxOwners; this.linkCodeTTL = linkCodeTTL;
+    if (reviewerCode !== undefined && normalizeLinkCode(reviewerCode).length < 20) throw new Error('SCRIBE_REVIEWER_CODE must have at least 20 characters.');
+    // Normalized like a link code, and longer than any, so the two never collide.
+    this.reviewerHash = reviewerCode === undefined ? undefined : hash(normalizeLinkCode(reviewerCode));
     this.state = stateFile && existsSync(stateFile) ? JSON.parse(readFileSync(stateFile, 'utf8')) : { owners: {} };
     if (!this.state.owners) throw new Error('Invalid Scribe relay owner state.');
     this.secrets = new Map(Object.entries(this.state.owners).map(([id, owner]) => [owner.secretHash, id]));
@@ -51,10 +59,10 @@ export class OwnerDirectory {
     this.save();
     return { ownerId, agentSecret };
   }
-  has(ownerId) { return Object.hasOwn(this.state.owners, ownerId); }
+  has(ownerId) { return Object.hasOwn(this.state.owners, ownerId) || (ownerId === DEMO_OWNER && this.reviewerHash !== undefined); }
   authenticate(agentSecret) {
     const ownerId = typeof agentSecret === 'string' ? this.secrets.get(hash(agentSecret)) : undefined;
-    return ownerId && this.has(ownerId) ? ownerId : undefined;
+    return ownerId && Object.hasOwn(this.state.owners, ownerId) ? ownerId : undefined;
   }
   remove(ownerId) {
     const owner = this.state.owners[ownerId];
@@ -78,6 +86,7 @@ export class OwnerDirectory {
   redeemLinkCode(code) {
     this.prune();
     const key = hash(normalizeLinkCode(code));
+    if (this.reviewerHash !== undefined && timingSafeEqual(Buffer.from(key), Buffer.from(this.reviewerHash))) return DEMO_OWNER;
     const entry = this.linkCodes.get(key);
     this.linkCodes.delete(key);
     return entry && entry.expiresAt > now() && this.has(entry.ownerId) ? entry.ownerId : undefined;
@@ -154,7 +163,8 @@ export class RemoteLibrary {
 }
 
 export function createRelayApp(config) {
-  const owners = config.owners ?? new OwnerDirectory({ stateFile: config.ownersFile, maxOwners: config.maxOwners });
+  const owners = config.owners ?? new OwnerDirectory({ stateFile: config.ownersFile, maxOwners: config.maxOwners, reviewerCode: config.reviewerCode });
+  const demo = config.demoLibrary ?? new DemoLibrary();
   const hub = config.hub ?? new AgentHub(config.hubOptions);
   const routes = (app, provider) => {
     const agent = express.Router();
@@ -187,13 +197,16 @@ export function createRelayApp(config) {
     // Unlinking forgets the owner, every grant, and any call in flight.
     agent.delete('/owner', (req, res) => { provider.revokeOwner(req.ownerId); hub.disconnect(req.ownerId); owners.remove(req.ownerId); res.status(204).end(); });
     app.use('/agent', agent);
+    // OpenAI's directory proves domain ownership by fetching this exact token.
+    app.get('/.well-known/openai-apps-challenge', (_req, res) => config.appsChallenge ? res.type('text/plain').send(config.appsChallenge) : res.status(404).end());
+    app.use(createLegalRouter({ host: new URL(config.origin).host, ...config.legal }));
     // The relay's origin is also Scribe's public address: the page and the
     // download button live at the root, where no relay route ever goes.
     app.use(createSiteRouter(config.site));
   };
-  const { app, provider } = createHTTPApp(ownerId => new RemoteLibrary(hub, ownerId), {
+  const { app, provider } = createHTTPApp(ownerId => ownerId === DEMO_OWNER ? demo : new RemoteLibrary(hub, ownerId), {
     clientMetadataDocuments: [CHATGPT_CLIENT_METADATA, CODEX_CLIENT_METADATA], ...config, owners, routes, largeBodies: new Set(['/agent/responses']),
-    limits: { clients: 100000, grants: 200000, grantsPerOwner: 50, ...config.limits },
+    limits: { clients: 100000, grants: 200000, grantsPerOwner: 50, grantsPerOwnerFor: { [DEMO_OWNER]: 2000 }, ...config.limits },
   });
   return { app, provider, owners, hub };
 }

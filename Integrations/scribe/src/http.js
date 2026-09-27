@@ -5,6 +5,7 @@ import { requireBearerAuth } from '@modelcontextprotocol/sdk/server/auth/middlew
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { createScribeServer } from './server.js';
 import { hash, SCOPE, ScribeOAuthProvider } from './auth.js';
+import { ICON_PATH, iconPNG } from './brand.js';
 
 // Serves OAuth and MCP for Scribe libraries. `library` is either one library (a
 // self-hosted bridge) or a function from the token's owner to that owner's library
@@ -48,6 +49,12 @@ export function createHTTPApp(library, config) {
   });
   app.use(mcpAuthRouter({ provider, issuerUrl: origin, resourceServerUrl: new URL('/mcp', origin), scopesSupported: [SCOPE], resourceName: 'Scribe transcripts' }));
   app.get('/.well-known/oauth-protected-resource', (_req, res) => res.json({ resource: provider.resource, authorization_servers: [origin.href], scopes_supported: [SCOPE] }));
+  // The icon the MCP server names, and the favicon connector UIs look up for this domain.
+  app.get([ICON_PATH, '/favicon.ico'], (_req, res, next) => {
+    const png = iconPNG();
+    if (!png) return next();
+    res.set('Cache-Control', 'public, max-age=86400').type('png').send(png);
+  });
   app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'scribe-mcp' }));
   config.routes?.(app, provider);
   app.use('/mcp', rateLimit({ windowMs: 60000, limit: 120 }), requireBearerAuth({ verifier: provider, requiredScopes: [SCOPE], resourceMetadataUrl: `${origin.origin}/.well-known/oauth-protected-resource/mcp` }));
@@ -55,7 +62,7 @@ export function createHTTPApp(library, config) {
     const { ownerId } = req.auth.extra;
     // Stable per library on this server and never reused: owner IDs are random and never reassigned.
     const profile = { id: hash(`scribe-profile|${provider.issuer}|${ownerId}`).slice(0, 32), name: 'Scribe library' };
-    const server = createScribeServer(libraryFor(ownerId), { authenticated: true, profile });
+    const server = createScribeServer(libraryFor(ownerId), { authenticated: true, profile, origin: origin.origin });
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     res.on('close', () => { void transport.close(); void server.close(); });
     try { await server.connect(transport); await transport.handleRequest(req, res, req.body); }

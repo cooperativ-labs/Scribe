@@ -24,6 +24,16 @@ public final class AssistantRelayAgent: ObservableObject {
     /// Whether this Mac should stay connected; read at launch.
     public static let enabledKey = "scribe.settings.assistantRelayConnected"
     public static let relayAddressKey = "scribe.settings.assistantRelayAddress"
+    /// Scribe's own relay, used when neither the person nor the build names another.
+    public static let defaultRelayOrigin = "https://scribe.ovld.ai"
+
+    /// Where the connector keeps this Mac's relay link (owner ID and agent secret).
+    public static let linkURL = FileManager.default
+        .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        .appending(path: "Scribe/MCP/relay.json")
+
+    /// Whether this Mac has linked to a relay, whether or not it is connected now.
+    public static var isLinked: Bool { FileManager.default.fileExists(atPath: linkURL.path) }
 
     @Published public private(set) var state: State = .stopped
 
@@ -41,8 +51,8 @@ public final class AssistantRelayAgent: ObservableObject {
 
     /// Reconnects at launch when the person left this Mac connected.
     public func resumeIfEnabled(package: AssistantConnectorPackage) {
+        let text = defaults.string(forKey: Self.relayAddressKey) ?? package.packagedRelay?.origin ?? Self.defaultRelayOrigin
         guard isEnabled, state == .stopped,
-              let text = defaults.string(forKey: Self.relayAddressKey) ?? package.packagedRelay?.origin,
               let relay = try? AssistantServerAddress.parse(text).get() else { return }
         start(package: package, relay: relay)
     }

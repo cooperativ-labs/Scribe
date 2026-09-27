@@ -164,3 +164,55 @@ test('hub times out an unresponsive Mac and bounds queued calls', async () => {
   await assert.rejects(hub.call('owner', 'list', {}), /busy/);
   await assert.rejects(first, /did not answer/);
 });
+
+test('a mistyped link code shows the form again, a few times per request, and the right code still links', async t => {
+  const { root } = await fixture(t);
+  const relay = await startRelay(t, root);
+  const mac = await startMac(t, relay.origin, 'Alice');
+  const client = await (await fetch(relay.origin + '/register', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ client_name: 'ChatGPT <b>', redirect_uris: [CALLBACK], token_endpoint_auth_method: 'none' }) })).json();
+  const challenge = createHash('sha256').update(randomBytes(32).toString('base64url')).digest('base64url');
+  const start = async () => {
+    const html = await (await fetch(relay.origin + '/authorize?' + new URLSearchParams({ client_id: client.client_id, redirect_uri: CALLBACK, response_type: 'code',
+      code_challenge: challenge, code_challenge_method: 'S256', scope: 'transcripts.read', state: 's', resource: relay.origin + '/mcp' }))).text();
+    assert.match(html, /<h1>Connect ChatGPT &lt;b&gt; to Scribe<\/h1>/, 'the client name is escaped');
+    assert.match(html, /you return to chatgpt\.com\./);
+    return html.match(/name="request" value="([^"]+)"/)[1];
+  };
+  const submit = (request, link_code) => fetch(relay.origin + '/consent', { method: 'POST', redirect: 'manual', headers: { Origin: relay.origin },
+    body: new URLSearchParams({ request, decision: 'allow', link_code }) });
+  let request = await start();
+  const retry = await submit(request, 'ABCDE-FGHJK');
+  assert.equal(retry.status, 403);
+  const again = await retry.text();
+  assert.match(again, /role="alert">That code didn’t work/);
+  assert.equal(again.match(/name="request" value="([^"]+)"/)[1], request, 'the same request continues');
+  const { code } = await mac.account.linkCode();
+  assert.equal((await submit(request, code)).status, 303);
+  // The third wrong code ends the request, which then cannot be approved.
+  request = await start();
+  for (let i = 0; i < 2; i++) assert.match(await (await submit(request, 'ABCDE-FGHJK')).text(), /role="alert"/);
+  const ended = await submit(request, 'ABCDE-FGHJK');
+  assert.equal(ended.status, 403); assert.match(await ended.text(), /<h1>That link code didn’t work<\/h1>/);
+  const { code: fresh } = await mac.account.linkCode();
+  const expired = await submit(request, fresh);
+  assert.equal(expired.status, 400); assert.match(await expired.text(), /This request has expired/);
+});
+
+test('the relay names the Scribe icon in serverInfo and serves it, also as the favicon', async t => {
+  const { root } = await fixture(t);
+  const relay = await startRelay(t, root);
+  const mac = await startMac(t, relay.origin, 'Alice');
+  const { tokens } = await connect(relay, mac);
+  const client = await mcp(t, relay, tokens.access_token);
+  const info = client.getServerVersion();
+  assert.equal(info.title, 'Scribe');
+  assert.deepEqual(info.icons, [{ src: relay.origin + '/icon.png', mimeType: 'image/png', sizes: ['128x128'] }]);
+  const icon = await readFile(new URL('../assets/icon.png', import.meta.url));
+  for (const route of ['/icon.png', '/favicon.ico']) {
+    const response = await fetch(relay.origin + route);
+    assert.equal(response.status, 200); assert.equal(response.headers.get('content-type'), 'image/png');
+    assert.match(response.headers.get('cache-control'), /public/);
+    assert.deepEqual(Buffer.from(await response.arrayBuffer()), icon);
+  }
+});

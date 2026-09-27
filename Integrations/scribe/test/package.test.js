@@ -21,7 +21,12 @@ test('one portable ChatGPT package and marketplace serve every owner through the
   assert.equal(plugin.$schema, 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json');
   const ui = plugin.extensions['com.openai'].interface;
   assert.equal(ui.displayName, 'Scribe'); assert.equal(ui.privacyPolicyURL, 'https://scribe.example/privacy');
-  assert.equal(ui.termsOfServiceURL, undefined, 'unset listing links are omitted, not invented');
+  // Unset listing links are the relay's own public pages, which every relay serves.
+  assert.equal(ui.termsOfServiceURL, 'https://relay.example/terms'); assert.equal(ui.supportURL, 'https://relay.example/support');
+  assert.equal(ui.websiteURL, 'https://relay.example/');
+  // The directory submission archive holds exactly the plugin, at its root.
+  const { stdout } = await exec('unzip', ['-Z1', path.join(root, 'submission/scribe-0.1.0.zip')]);
+  assert.deepEqual(stdout.trim().split('\n').sort(), ['assets/icon.png', 'assets/logo.png', 'mcp.json', 'plugin.json', 'skills/scribe-transcripts/SKILL.md']);
   // Nothing per user or per account: no registered app mapping, no credentials, one shared endpoint.
   assert.equal(plugin.extensions['com.openai'].apps, undefined);
   await assert.rejects(access(path.join(root, 'chatgpt/plugins/scribe/.app.json')));
@@ -57,6 +62,14 @@ test('package validation rejects account-specific or unsafe packages', async t =
     ['plugin.json', value => { value.skills = './skills'; }, /unsupported fields/],
     ['mcp.json', value => { value.mcpServers.scribe.headers = { Authorization: 'Bearer x' }; }, /credentials/],
     ['mcp.json', value => { value.mcpServers.scribe = { type: 'stdio', command: 'node' }; }, /unsupported fields|streamable-http/],
+    // OpenAI's final directory limits.
+    ['plugin.json', value => { value.extensions['com.openai'].interface.shortDescription = 'Summarize all of your Scribe meetings'; }, /shortDescription is longer than 30/],
+    ['plugin.json', value => { value.extensions['com.openai'].interface.defaultPrompt.push('A fourth prompt'); }, /at most 3/],
+    ['plugin.json', value => { value.extensions['com.openai'].interface.defaultPrompt[1] = ' summarize my most recent Scribe meeting with decisions and action items. '; }, /unique/],
+    ['plugin.json', value => { delete value.extensions['com.openai'].interface.supportURL; }, /supportURL is required/],
+    ['plugin.json', value => { value.extensions['com.openai'].interface.category = 'Meetings'; }, /category must be one of/],
+    ['plugin.json', value => { value.extensions['com.openai'].interface.brandColor = '#F0F0F0'; }, /contrast/],
+    ['plugin.json', value => { value.extensions['com.openai'].interface.logo = './skills/scribe-transcripts/SKILL.md'; }, /PNG/],
   ];
   for (const [file, change, message] of cases) {
     await writeChatGPTPackage({ root: source, output: root, url: 'https://relay.example/mcp' });

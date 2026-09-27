@@ -8,6 +8,10 @@
 #
 # A development build passes --optional, so a machine without Node still
 # builds; Settings then says the package is missing. A release requires it.
+#
+# The package names Scribe's hosted relay, so Settings → Assistants and the
+# bundled CLI default to it. Set SCRIBE_CONNECTOR_URL to another relay's /mcp
+# URL, or to an empty string to bundle no default relay.
 set -euo pipefail
 
 optional=0
@@ -34,7 +38,8 @@ fi
 echo "Packaging the assistant connector…"
 # `npm ci` keeps the bundle's dependencies exactly the locked ones.
 npm --prefix "$integration_dir" ci --no-audit --no-fund >/dev/null
-npm --prefix "$integration_dir" run --silent package >/dev/null
+SCRIBE_CONNECTOR_URL="${SCRIBE_CONNECTOR_URL-https://scribe.ovld.ai/mcp}" \
+  npm --prefix "$integration_dir" run --silent package >/dev/null
 source_dir="$integration_dir/dist/packages/claude"
 [[ -f "$source_dir/.claude-plugin/marketplace.json" ]] || die "packaging did not produce $source_dir"
 

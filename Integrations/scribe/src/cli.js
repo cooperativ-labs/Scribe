@@ -55,7 +55,9 @@ try {
     const relayState = process.env.SCRIBE_RELAY_STATE_DIR;
     if (!relayState) throw new Error('Set SCRIBE_RELAY_STATE_DIR to a persistent, private directory.');
     const { app } = createRelayApp({ origin: process.env.SCRIBE_PUBLIC_URL, redirectURIs: redirectURIs(DEFAULT_RELAY_REDIRECT_URIS),
-      stateFile: path.join(relayState, 'oauth-state.json'), ownersFile: path.join(relayState, 'owners.json'), trustProxy: trustProxy() });
+      stateFile: path.join(relayState, 'oauth-state.json'), ownersFile: path.join(relayState, 'owners.json'), trustProxy: trustProxy(),
+      // Directory review: a reusable code for the synthetic demo library, and OpenAI's domain-verification token.
+      reviewerCode: process.env.SCRIBE_REVIEWER_CODE || undefined, appsChallenge: process.env.OPENAI_APPS_CHALLENGE?.trim() || undefined });
     listen(app, process.env.SCRIBE_BIND_HOST || '127.0.0.1', port(8767), 'Scribe relay');
   } else if (command === 'link') {
     const relay = relayArgument() || packagedRelay();

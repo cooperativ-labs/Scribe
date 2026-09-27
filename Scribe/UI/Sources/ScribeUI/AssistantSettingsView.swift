@@ -23,6 +23,7 @@ public struct AssistantSettingsView: View {
 
     /// The last one-time link code fetched from the relay, shown until used.
     @State private var linkCode: String?
+    @State private var linkCodeExpiry: Date?
     @State private var relayStatus: String?
     @State private var relayBusy = false
     @State private var confirmingUnlink = false
@@ -75,74 +76,69 @@ public struct AssistantSettingsView: View {
         }
         .formStyle(.grouped)
         .onAppear {
-            // A build packaged for a relay offers it, the same one its ChatGPT plugin names.
-            if relayText.isEmpty, let relay = package.packagedRelay { relayText = relay.origin }
+            // A build packaged for a relay offers it, the same one its ChatGPT plugin
+            // names; otherwise Scribe's own relay.
+            if relayText.isEmpty { relayText = package.packagedRelay?.origin ?? AssistantRelayAgent.defaultRelayOrigin }
         }
     }
 
     // MARK: - Relay
 
+    /// Status first, then the one thing to do in each state: connect, or get a
+    /// link code once connected. The relay address and the Terminal command are
+    /// for people running their own relay, so they sit under Relay Settings.
     private var relaySection: some View {
         Section {
-            TextField("Relay address", text: $relayText, prompt: Text("https://relay.example.com"))
-                .textContentType(.URL)
-                .autocorrectionDisabled()
-            addressDetail
-            HStack {
-                if relayAgent.state == .stopped || isFailed {
-                    Button("Connect This Mac") {
-                        if let relay = validAddress { relayAgent.start(package: package, relay: relay) }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(validAddress == nil || !package.isAvailable)
-                } else {
-                    Button("Disconnect This Mac") { relayAgent.stop() }
+            relayStatusRow
+            if relayAgent.state == .connected { linkCodeCard }
+            if AssistantRelayAgent.isLinked {
+                HStack {
+                    Button("Disconnect All Assistants") { runRelay(["revoke", "--all"]) { _ in relayStatus = "Every assistant was disconnected. Each one needs a new link code to reconnect." } }
+                    Button("Unlink This Mac…", role: .destructive) { confirmingUnlink = true }
+                    Spacer()
+                    if relayBusy { ProgressView().controlSize(.small) }
                 }
-                relayAgentStatus
-                Spacer()
-                Button("Copy Connect Command") { copyRelayCommand() }
-                    .disabled(validAddress == nil || !package.isAvailable)
-                confirmation(for: ["connect command"])
-            }
-            Text("Scribe keeps this Mac connected while it runs and reconnects when you open it again; keep the Mac awake. The first connection links this Mac to the relay. Transcripts pass through the relay only while an assistant is reading them. To serve from another shell instead, copy the connect command.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            HStack {
-                Button("Get Link Code") { runRelay(["code"]) { linkCode = $0 } }
-                Button("Disconnect All Assistants") { runRelay(["revoke", "--all"]) { _ in relayStatus = "Every assistant was disconnected." } }
-                Button("Unlink This Mac…") { confirmingUnlink = true }
-                if relayBusy { ProgressView().controlSize(.small) }
-            }
-            .disabled(relayBusy || !package.isAvailable)
-            .confirmationDialog("Unlink this Mac from the relay?", isPresented: $confirmingUnlink) {
-                Button("Unlink", role: .destructive) {
-                    relayAgent.stop()
-                    runRelay(["unlink"]) { _ in
-                        linkCode = nil
-                        relayStatus = "This Mac was unlinked. The relay forgot its connections."
+                .disabled(relayBusy || !package.isAvailable)
+                .confirmationDialog("Unlink this Mac from the relay?", isPresented: $confirmingUnlink) {
+                    Button("Unlink", role: .destructive) {
+                        relayAgent.stop()
+                        runRelay(["unlink"]) { _ in
+                            linkCode = nil
+                            relayStatus = "This Mac was unlinked. The relay forgot its connections."
+                        }
                     }
+                } message: {
+                    Text("Every assistant loses access, and the relay forgets this library. Connecting again links this Mac anew.")
                 }
-            } message: {
-                Text("Every assistant loses access, and the relay forgets this library. Connecting again links this Mac anew.")
-            }
-            if let linkCode {
-                LabeledContent("Link code") {
-                    HStack {
-                        Text(linkCode).font(.body.monospaced()).textSelection(.enabled)
-                        copyButton("Copy", value: linkCode, label: "link code")
-                    }
-                }
-                Text("Enter it only on Scribe’s consent page, never in a chat. It works once and expires in ten minutes.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
             }
             if let relayStatus {
                 Text(relayStatus).font(.footnote).foregroundStyle(.secondary).textSelection(.enabled)
             }
             failure(in: .server)
             unavailableNote
+            DisclosureGroup("Relay Settings") {
+                TextField("Relay address", text: $relayText, prompt: Text(AssistantRelayAgent.defaultRelayOrigin))
+                    .textContentType(.URL)
+                    .autocorrectionDisabled()
+                    .disabled(AssistantRelayAgent.isLinked)
+                    .help(AssistantRelayAgent.isLinked ? "Unlink this Mac to change relays." : "")
+                addressDetail
+                HStack {
+                    Text("To serve from Terminal instead of Scribe, copy the connect command.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    confirmation(for: ["connect command"])
+                    Button("Copy Connect Command") { copyRelayCommand() }
+                        .disabled(validAddress == nil || !package.isAvailable)
+                }
+            }
         } header: {
             Text("Scribe Relay")
+        } footer: {
+            Text("Transcripts pass through the relay only while an assistant is reading them. The relay never stores them.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -150,25 +146,135 @@ public struct AssistantSettingsView: View {
         if case .failed = relayAgent.state { true } else { false }
     }
 
+    private var relayHost: String {
+        validAddress.flatMap { URL(string: $0.origin)?.host() } ?? "the relay"
+    }
+
+    /// What the connection is doing, in words, with the button that changes it.
+    private var relayStatusRow: some View {
+        HStack(alignment: .center, spacing: 12) {
+            relayStatusIcon
+                .font(.title2)
+                .frame(width: 28)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(relayStatusTitle).font(.headline)
+                Text(relayStatusDetail)
+                    .font(.callout)
+                    .foregroundStyle(isFailed ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+            }
+            Spacer(minLength: 12)
+            if relayAgent.state == .stopped || isFailed {
+                Button(isFailed ? "Try Again" : "Connect This Mac") {
+                    relayStatus = nil
+                    if let relay = validAddress { relayAgent.start(package: package, relay: relay) }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(validAddress == nil || !package.isAvailable)
+            } else {
+                Button("Disconnect") { relayAgent.stop() }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
     @ViewBuilder
-    private var relayAgentStatus: some View {
+    private var relayStatusIcon: some View {
         switch relayAgent.state {
         case .stopped:
-            EmptyView()
+            Image(systemName: "bolt.horizontal.circle").foregroundStyle(.secondary)
         case .connecting:
             ProgressView().controlSize(.small)
         case .connected:
-            Label("Connected", systemImage: "checkmark.circle.fill")
-                .foregroundStyle(.green)
-                .font(.callout)
-        case .retrying(let reason):
-            Label("Reconnecting", systemImage: "arrow.clockwise")
-                .foregroundStyle(.orange)
-                .font(.callout)
-                .help(reason)
-        case .failed(let reason):
-            Text(reason).font(.footnote).foregroundStyle(.red).textSelection(.enabled)
+            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+        case .retrying:
+            Image(systemName: "arrow.triangle.2.circlepath.circle.fill").foregroundStyle(.orange)
+        case .failed:
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.red)
         }
+    }
+
+    private var relayStatusTitle: String {
+        switch relayAgent.state {
+        case .stopped: AssistantRelayAgent.isLinked ? "Not connected" : "Not connected yet"
+        case .connecting: "Connecting…"
+        case .connected: "Connected to \(relayHost)"
+        case .retrying: "Reconnecting…"
+        case .failed: "Couldn’t connect"
+        }
+    }
+
+    private var relayStatusDetail: String {
+        switch relayAgent.state {
+        case .stopped:
+            AssistantRelayAgent.isLinked
+                ? "Assistants can’t read this Mac’s transcripts until you connect again."
+                : "Connect this Mac so ChatGPT and Claude can read its transcripts after you approve them."
+        case .connecting:
+            "Linking this Mac to \(relayHost)."
+        case .connected:
+            "Scribe stays connected while it’s open. Keep this Mac awake while assistants use it."
+        case .retrying(let reason):
+            reason
+        case .failed(let reason):
+            reason
+        }
+    }
+
+    /// The one-time code a person types on Scribe's consent page to approve an assistant.
+    private var linkCodeCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Link code").font(.headline)
+                    Text("Approves one assistant for this library.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                if relayBusy { ProgressView().controlSize(.small) }
+                Button(linkCode == nil ? "Get Link Code" : "New Code") {
+                    runRelay(["code"]) { code in
+                        linkCode = code
+                        linkCodeExpiry = .now.addingTimeInterval(600)
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(relayBusy || !package.isAvailable)
+            }
+            TimelineView(.everyMinute) { context in
+                if let linkCode, let linkCodeExpiry, linkCodeExpiry > context.date {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(alignment: .center) {
+                            Text(linkCode)
+                                .font(.system(size: 26, weight: .semibold, design: .monospaced))
+                                .tracking(3)
+                                .textSelection(.enabled)
+                                .accessibilityLabel("Link code \(linkCode.map(String.init).joined(separator: " "))")
+                            Spacer()
+                            confirmation(for: ["link code"])
+                            Button("Copy") { copy(linkCode, label: "link code") }
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        Text("Type it on Scribe’s consent page when ChatGPT or Claude asks, never in a chat. It works once and expires at \(linkCodeExpiry.formatted(date: .omitted, time: .shortened)).")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                } else {
+                    Text(linkCode == nil
+                        ? "When an assistant opens Scribe’s consent page, get a code here and type it there."
+                        : "That code expired. Get a new one when an assistant asks.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .padding(.vertical, 4)
     }
 
     private func runRelay(_ arguments: [String], then done: @escaping (String) -> Void) {
@@ -180,7 +286,10 @@ public struct AssistantSettingsView: View {
             do {
                 done(try await package.runRelayCommand(arguments))
             } catch {
-                copyFailure = (.server, error.localizedDescription)
+                let message = error.localizedDescription
+                copyFailure = (.server, message.contains("not linked")
+                    ? "Connect this Mac first, then get a link code."
+                    : message.replacingOccurrences(of: "Scribe MCP: ", with: ""))
             }
         }
     }

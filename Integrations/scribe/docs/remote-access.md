@@ -53,7 +53,11 @@ Crockford base32 (50 bits), works once, and expires after 10 minutes. Each
 owner can have at most 5 unused codes, and `/consent` is rate limited. Entering
 the code and pressing **Allow** sends a code back to the client callback with
 `state` and `iss`. That code is bound to the owner who issued the link code. A
-typed code is consumed even when it is wrong, so it cannot be tried again.
+code that names no owner shows the form again with an error, so a typo does not
+send the person back to their assistant; the third wrong code ends that consent
+request, and the per-address `/consent` rate limit still applies. The page
+carries no script and shows the client's name, what it can and cannot read, and
+the host it returns to.
 
 **Install from a marketplace.** The ChatGPT package's `mcp.json` names only
 `https://<relay>/mcp`. ChatGPT reads the protected-resource and
@@ -124,7 +128,7 @@ while relaying a response, the same way any hosted MCP server does. End-to-end
 encryption to ChatGPT is not possible, because ChatGPT needs the text. The
 operator's controls are: no request or response logging, no persistence, a
 single-purpose service, and the Mac's refusal of anything beyond read-only
-calls. The privacy policy (objective `coo:1081.6n05`) must state this.
+calls. The public privacy policy (`/privacy`, rendered by `src/legal.js`) states this.
 
 ## Why this design
 
@@ -168,6 +172,9 @@ node dist/cli.mjs relay
 | `SCRIBE_BIND_HOST` | `127.0.0.1`. Use `0.0.0.0` behind a platform proxy. |
 | `SCRIBE_TRUST_PROXY` | The number of proxy hops whose `X-Forwarded-For` to trust for rate limiting. Unset means trust none. |
 | `GITHUB_TOKEN` | Optional. Raises GitHub's rate limit for the release lookup behind the public page's download button. |
+| `SCRIBE_REVIEWER_CODE` | Optional, at least 20 characters. Typed in place of a link code, it opens the synthetic demo library (`src/demo.js`) for directory reviewers. It is reusable and reaches nothing else. Unset, the demo library does not exist. |
+| `OPENAI_APPS_CHALLENGE` | Optional. The token OpenAI's portal issues for domain verification, served as plain text at `/.well-known/openai-apps-challenge`. |
+| `SCRIBE_PUBLISHER`, `SCRIBE_CONTACT_EMAIL` | The publisher named on `/privacy`, `/terms` and `/support` (default Cooperativ Labs), and their contact address (default: GitHub issues). |
 
 The relay's root is also Scribe's public page (`src/site.js`): what Scribe is,
 and a **Download for macOS** button. `/download` asks GitHub for the latest
@@ -177,6 +184,13 @@ ten minutes and kept through GitHub outages; with no answer at all the button
 falls back to the releases page. `/api/release` returns the same facts as JSON.
 The page is server-rendered with no script and serves only `assets/logo.png`
 and `assets/icon.png` under `/site/`.
+
+**Icon.** Every Scribe HTTP server (relay or self-hosted bridge) serves
+`assets/icon.png` at `/icon.png` and `/favicon.ico`, and names it in MCP
+`serverInfo.icons` with `title: "Scribe"`, so clients that show a server or
+domain icon show Scribe's. The stdio server inlines the same PNG as a `data:`
+URI; the Claude package ships `assets/icon.png` for it (the ChatGPT package
+already ships it as its composer icon).
 
 Run **one relay process per state directory**. The hub, pending consents,
 authorization codes and link codes live in that process's memory. A restart

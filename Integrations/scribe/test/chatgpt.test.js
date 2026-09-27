@@ -46,7 +46,7 @@ async function install(relay, mac, { clientID = CHATGPT_CLIENT_METADATA, callbac
   const html = await page.text();
   // Browsers send `Origin: null` on the consent POST under no-referrer, and the relay refuses that.
   assert.equal(page.headers.get('referrer-policy'), 'same-origin');
-  assert.match(html, new RegExp(`<strong>${name}</strong> requests read access`));
+  assert.match(html, new RegExp(`<h1>Connect ${name} to Scribe</h1>`));
   assert.match(html, /No link code yet\?/);
   const { code: linkCode } = await mac.account.linkCode();
   const approved = await fetch(relay.origin + '/consent', { method: 'POST', redirect: 'manual', headers: { Origin: relay.origin },

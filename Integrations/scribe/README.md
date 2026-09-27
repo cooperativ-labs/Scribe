@@ -25,16 +25,18 @@ remaining steps listed beside each one:
   `~/Library/Application Support/Scribe/Integrations/claude` and runs
   `claude plugin marketplace add` and `claude plugin install scribe@scribe-local`
   in a login shell. **Copy Commands** copies the same two commands instead.
-- **Connect through → Scribe Relay** (the default) takes the relay address
-  (prefilled when the build was packaged for a relay) and shows the connector
-  URL (`https://<relay>/mcp`), which is the same for every owner. **Connect
-  This Mac** runs the bundled connector from Scribe itself: it links this Mac
-  on first use, keeps an outbound connection open while Scribe runs, and
-  reconnects at launch until you press **Disconnect This Mac**. The connector
-  exits with Scribe. **Copy Connect Command** copies the same `node … connect
-  <relay>` for a Terminal instead. **Get Link Code** shows a one-time code for
-  the consent page. **Disconnect All Assistants** revokes every grant, and
-  **Unlink This Mac…** makes the relay forget this library.
+- **Connect through → Scribe Relay** (the default) opens with the connection
+  status and one button. **Connect This Mac** runs the bundled connector from
+  Scribe itself: it links this Mac on first use, keeps an outbound connection
+  open while Scribe runs, and reconnects at launch until you press
+  **Disconnect**. The connector exits with Scribe. Once connected, **Get Link
+  Code** shows a one-time code, large enough to read across a room, with the
+  time it expires; type it on the consent page. **Disconnect All Assistants**
+  revokes every grant, and **Unlink This Mac…** makes the relay forget this
+  library. **Relay Settings** holds the relay address (Scribe's own
+  `https://scribe.ovld.ai` unless the build was packaged for another), the
+  connector URL (`https://<relay>/mcp`, the same for every owner), and **Copy
+  Connect Command**, the same `node … connect <relay>` for a Terminal.
 - **Connect through → Your own tunnel** keeps the self-hosted setup.
   **Public address** takes your HTTPS tunnel or proxy origin. **Copy Server
   Command** creates the owner key on first run and starts the HTTP bridge. It
@@ -46,7 +48,10 @@ remaining steps listed beside each one:
 
 `Scripts/build-app.sh` and `Scripts/package-app.sh` embed the package through
 `Scripts/embed-assistant-connector.sh` (a release requires npm; a development
-build skips it without npm, and the tab then says so).
+build skips it without npm, and the tab then says so). The embedded package
+names the hosted relay, `https://scribe.ovld.ai/mcp`, so the tab's relay address
+defaults to it; set `SCRIBE_CONNECTOR_URL` to another relay's `/mcp` URL, or to
+an empty string for no default.
 
 ## Build and test
 
@@ -188,8 +193,13 @@ submit anything to a public app directory.
 
 ```sh
 npm run package -- --url https://RELAY/mcp \
-  [--website-url URL] [--privacy-url URL] [--terms-url URL]
+  [--website-url URL] [--privacy-url URL] [--terms-url URL] [--support-url URL]
 ```
+
+Listing links default to the relay's own public pages (`/`, `/privacy`, `/terms`,
+`/support`). The command also writes `dist/packages/submission/scribe-<version>.zip`,
+the archive the Plugins Directory portal takes. Packaging fails if the plugin
+breaks any of the directory's listing limits.
 
 This writes a plugin marketplace at `dist/packages/chatgpt`:
 
@@ -303,6 +313,7 @@ Configuration:
 | `SCRIBE_OAUTH_REDIRECT_URIS` | JSON array of exact approved OAuth callback URLs (required for `http`; `relay` defaults to ChatGPT's and Claude's stable callbacks) |
 | `SCRIBE_RELAY_URL` | Relay origin for `connect` and `link` when it is not given as an argument |
 | `SCRIBE_RELAY_STATE_DIR`, `SCRIBE_BIND_HOST`, `SCRIBE_TRUST_PROXY` | Relay operation; see docs/remote-access.md |
+| `SCRIBE_REVIEWER_CODE`, `OPENAI_APPS_CHALLENGE`, `SCRIBE_PUBLISHER`, `SCRIBE_CONTACT_EMAIL` | Plugins Directory review; see docs/directory-submission.md |
 
 `GET /health` reports process liveness without revealing library information.
 Unauthenticated `/mcp` must return 401 with protected-resource discovery. Proxy
@@ -331,10 +342,11 @@ After installing in each real client:
    the latest meeting. Then disconnect it in ChatGPT and confirm that
    `node dist/cli.mjs grants` no longer lists it.
 
-Public submission additionally needs an actual HTTPS deployment, publisher
-identity, published privacy policy/terms, sample reviewer library, brand assets,
-and screenshots. Never give directory reviewers access to a private meeting
-library. Those account/deployment steps cannot be supplied by a local bundle.
+For public submission, see [docs/directory-submission.md](docs/directory-submission.md).
+It holds every portal field, the reviewer demo library (synthetic meetings reached
+with `SCRIBE_REVIEWER_CODE`, never a real library), listing screenshots, the
+five positive and three negative test cases, and the steps only the publisher can
+complete: identity verification, legal review, the demo video and domain verification.
 
 The implementation follows Overlord's shared MCP + client-adapter pattern, tool
 annotations, OAuth discovery and presentation resources; it uses the official

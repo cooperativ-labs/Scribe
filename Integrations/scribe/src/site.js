@@ -443,6 +443,9 @@ footer .made { margin-left: auto; }
     <a href="${escape(notesURL)}">Release notes</a>
     <a href="${escape(repoURL)}">Source on GitHub</a>
     <a href="${escape(repoURL)}/blob/main/Integrations/scribe/README.md">Connecting an assistant</a>
+    <a href="/privacy">Privacy</a>
+    <a href="/terms">Terms</a>
+    <a href="/support">Support</a>
     <span class="made">Made by Cooperativ Labs</span>
   </footer>
 </div>
