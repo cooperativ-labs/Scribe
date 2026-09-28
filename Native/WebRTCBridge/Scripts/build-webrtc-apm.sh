@@ -66,7 +66,7 @@ STAMP_FILE="${PREFIX_DIR}/.build-stamp"
 
 # The stamp records every input that can change the output. If it still matches,
 # the prefix is already correct and rebuilding would only burn time.
-STAMP_VALUE="${WEBRTC_APM_VERSION}|${WEBRTC_APM_SHA256}|${ABSEIL_SHA256}|${ABSEIL_PATCH_SHA256}|${MESON_VERSION}|${NINJA_VERSION}|${MACOS_DEPLOYMENT_TARGET}|${ARCH}|v3"
+STAMP_VALUE="${WEBRTC_APM_VERSION}|${WEBRTC_APM_SHA256}|${ABSEIL_SHA256}|${ABSEIL_PATCH_SHA256}|${MESON_VERSION}|${NINJA_VERSION}|${MACOS_DEPLOYMENT_TARGET}|${ARCH}|v4"
 
 if [[ "${DO_CLEAN}" == "1" ]]; then
   log "removing ${WORK_DIR} and ${PREFIX_DIR}"
@@ -185,6 +185,9 @@ MESON_ARGS=(
   --buildtype release
   --default-library static
   --wrap-mode nodownload
+  # A newer system Abseil can satisfy Meson's version floor but break WebRTC's
+  # headers. Always use the checksummed release seeded in packagecache above.
+  --force-fallback-for abseil-cpp
   -Db_ndebug=true
   -Db_staticpic=true
   -Dcpp_std=c++17
