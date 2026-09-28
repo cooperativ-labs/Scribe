@@ -125,10 +125,10 @@ export function renderSite({ release, releases }) {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Scribe for Mac</title>
-<meta name="description" content="Scribe records the meeting you're in and transcribes it on your Mac, with speakers, timestamps and search. Dictate anywhere with one key, or hold another and ask ChatGPT to write the reply for you.">
+<meta name="description" content="Scribe records and transcribes meetings on your Mac. Dictate into any app, or use Voice Assistant with ChatGPT, your own model provider, or Apple's models.">
 <meta name="color-scheme" content="light dark">
 <meta property="og:title" content="Scribe for Mac">
-<meta property="og:description" content="Meetings and dictation, transcribed on your Mac. Nothing is uploaded.">
+<meta property="og:description" content="Meetings and dictation stay on your Mac. Choose where optional Voice Assistant requests go.">
 <meta property="og:image" content="/site/logo.png">
 <link rel="icon" href="/site/icon.png" type="image/png">
 <link rel="apple-touch-icon" href="/site/logo.png">
@@ -423,7 +423,7 @@ footer .made { margin-left: auto; }
         </div>
         <h2>Dictate into any app</h2>
         <p>Hold the right Command key, speak, and let go. The words land in whichever field has focus, in Mail, Slack, a browser or a terminal. Double-tap to keep listening hands-free.</p>
-        <p>Dictation is offline and keeps no history. Audio stays in memory and is gone once the text is inserted.</p>
+        <p>Dictation is offline and keeps no history. Audio is discarded after transcription, and the text goes straight into the focused field.</p>
       </div>
       <div class="feature">
         <div class="figure">
@@ -442,12 +442,13 @@ footer .made { margin-left: auto; }
       <div class="intro">
         <span class="new">New</span>
         <h2 id="assist-heading">Say what you want written, and it appears where you type</h2>
-        <p>Hold a second key, right Shift unless you pick another, and say something like "reply that Thursday works but pricing waits". Scribe reads what is in front of you, asks ChatGPT, and types the answer into the field you are in. Select a paragraph first and say "make this shorter" to rewrite it in place, or copy text from anywhere and say what to do with it.</p>
-        <p>Sign in with your ChatGPT account, which uses your plan's Codex allowance, or add an OpenAI API key. Your instruction is transcribed on your Mac by the dictation model, and Escape cancels a request at any point.</p>
+        <p>Hold a second key, right Shift unless you pick another, and say something like "reply that Thursday works but pricing waits". Scribe reads what is in front of you, asks the model you chose, and types the answer into the field you are in. Select a paragraph first and say "make this shorter" to rewrite it in place, or copy text from anywhere and say what to do with it.</p>
+        <p>In Settings → Assistants → Voice Assistant, sign in with your ChatGPT account, add an API key for OpenAI, Anthropic, Google Gemini, OpenRouter, Vercel AI Gateway, xAI, Groq, Mistral or DeepSeek, or connect a custom OpenAI-compatible endpoint such as Ollama or LM Studio.</p>
+        <p>You can also choose Apple's on-device model on macOS 26 or later. Apple Private Cloud Compute appears on macOS 27 or later, but needs an Apple-approved build before it can answer. ChatGPT uses your plan's Codex allowance; API providers bill your own account. Your spoken instruction is transcribed on your Mac, and Escape cancels a request at any point.</p>
         <dl>
           <dt>Sent</dt><dd>The instruction you spoke, your selection, text you copied since the last request, and the text in the front app's windows. Each source has its own switch.</dd>
           <dt>Never sent</dt><dd>Audio, screenshots, other apps, and password fields.</dd>
-          <dt>Kept by Scribe</dt><dd>Nothing. Requests go straight from your Mac to the account you chose, sent with storage turned off.</dd>
+          <dt>Kept by Scribe</dt><dd>Nothing after the answer is inserted. Requests go directly from your Mac to the provider or endpoint you choose; Apple's on-device model keeps them on your Mac. OpenAI API requests have storage turned off. Other providers apply their own policies.</dd>
         </dl>
       </div>
 
@@ -493,8 +494,8 @@ footer .made { margin-left: auto; }
     </section>
 
     <section class="privacy">
-      <p>Recording, transcription and dictation all happen on your Mac. There is no Scribe account to create and no cloud to trust.</p>
-      <small>Once the models are installed, Scribe works with the network off. Text leaves your Mac only when you ask for it: an answer to an assistant you connected yourself, or a Voice Assistant request sent to the ChatGPT or OpenAI account you signed in with. Audio never does.</small>
+      <p>Recording, transcription and dictation all happen on your Mac. There is no Scribe account to create.</p>
+      <small>Once the speech models are installed, recording, transcription and dictation work with the network off. Text leaves your Mac only when you ask for it: to an assistant you connected to your transcripts, or through a Voice Assistant request to your chosen provider or endpoint. Apple's on-device Voice Assistant keeps the request local; Private Cloud Compute sends it to Apple when available. Audio never leaves your Mac for these features.</small>
     </section>
   </main>
 
