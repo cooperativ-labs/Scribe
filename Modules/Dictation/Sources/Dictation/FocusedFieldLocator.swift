@@ -106,12 +106,17 @@ public struct SystemFocusedFieldAXClient: FocusedFieldAXClient {
     }
     private func focusedElementUnchecked(frontmostPID: pid_t) -> AXUIElement? {
         let system = timed(AXUIElementCreateSystemWide())
-        if let value = attribute(kAXFocusedUIElementAttribute as String, of: system),
-           CFGetTypeID(value) == AXUIElementGetTypeID() { return timed(value as! AXUIElement) }
+        let systemFocus = attribute(kAXFocusedUIElementAttribute as String, of: system).flatMap { value -> AXUIElement? in
+            CFGetTypeID(value) == AXUIElementGetTypeID() ? timed(value as! AXUIElement) : nil
+        }
+        if let systemFocus, pid(of: systemFocus) == frontmostPID { return systemFocus }
+
+        // Querying the requested app establishes which application owns focus.
+        // Its focused field may itself be hosted by a renderer/helper PID.
         let app = timed(AXUIElementCreateApplication(frontmostPID))
-        guard let value = attribute(kAXFocusedUIElementAttribute as String, of: app),
-              CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
-        return timed(value as! AXUIElement)
+        if let value = attribute(kAXFocusedUIElementAttribute as String, of: app),
+           CFGetTypeID(value) == AXUIElementGetTypeID() { return timed(value as! AXUIElement) }
+        return nil
     }
     public func pid(of element: AXUIElement) -> pid_t? {
         var result: pid_t = 0
@@ -264,9 +269,10 @@ public actor FocusedFieldLocator {
     private static let textRoles: Set<String> = ["AXTextField", "AXTextArea", "AXWebArea", "AXComboBox", "AXSearchField"]
 
     private func focusedElement(frontmostPID: pid_t) -> AXUIElement? {
-        guard let element = client.focusedElement(frontmostPID: frontmostPID),
-              client.pid(of: element) == frontmostPID else { return nil }
-        return element
+        // An application's AXFocusedUIElement may be hosted by a renderer or
+        // other helper process. The client obtains it through the requested
+        // application's AX element, so its own PID need not match the app PID.
+        client.focusedElement(frontmostPID: frontmostPID)
     }
 
     /// Electron apps expose only opaque groups until an AX client opts in. The

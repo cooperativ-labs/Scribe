@@ -34,15 +34,17 @@ final class DictationTextShaperTests: XCTestCase {
 private final class FakeAX: FocusedFieldAXClient, @unchecked Sendable {
     let element = AXUIElementCreateSystemWide()
     let targetPID: pid_t = 1234
+    var elementPID: pid_t = 1234
     var value = "before"
     var range = CFRange(location: 6, length: 0)
+    var caret = CGRect(x: 40, y: 20, width: 2, height: 16)
     var preceding: String? = " "
     var directWorks = false
     var textRole = true
     var electron = false
     var manualAccessibilityRequests = 0
     func focusedElement(frontmostPID: pid_t) -> AXUIElement? { frontmostPID == targetPID ? element : nil }
-    func pid(of element: AXUIElement) -> pid_t? { targetPID }
+    func pid(of element: AXUIElement) -> pid_t? { elementPID }
     func string(_ attribute: String, of element: AXUIElement) -> String? {
         attribute == kAXRoleAttribute as String ? (textRole ? "AXTextArea" : "AXButton") : nil
     }
@@ -58,7 +60,7 @@ private final class FakeAX: FocusedFieldAXClient, @unchecked Sendable {
     }
     func precedingCharacter(of element: AXUIElement, range: CFRange) -> String? { preceding }
     func frame(of element: AXUIElement) -> CGRect? { nil }
-    func caretFrame(of element: AXUIElement, range: CFRange) -> CGRect? { nil }
+    func caretFrame(of element: AXUIElement, range: CFRange) -> CGRect? { caret }
     func window(of element: AXUIElement) -> AXUIElement? { nil }
     func enableManualAccessibility(pid: pid_t) -> Bool {
         manualAccessibilityRequests += 1
@@ -116,6 +118,25 @@ final class DictationTextInserterTests: XCTestCase {
         XCTAssertEqual(paste.pasted, "hello")
         XCTAssertNil(paste.copied)
         XCTAssertEqual(ax.manualAccessibilityRequests, 1)
+    }
+    @MainActor func testFocusedFieldHostedByApplicationHelperStillAcceptsInsertion() async {
+        let ax = FakeAX()
+        ax.elementPID = 5678
+        let paste = FakePaste()
+        let locator = FocusedFieldLocator(client: ax)
+        let snapshot = await locator.locate(frontmostPID: ax.targetPID, screenTop: 100,
+                                            screens: [CGRect(x: 0, y: 0, width: 100, height: 100)])
+        XCTAssertNotNil(snapshot)
+        if let snapshot {
+            let stillFocused = await locator.stillFocused(snapshot, frontmostPID: ax.targetPID)
+            XCTAssertTrue(stillFocused)
+            XCTAssertEqual(snapshot.caretRect, CGRect(x: 40, y: 64, width: 2, height: 16))
+        }
+        let inserter = DictationTextInserter(locator: locator, paste: paste)
+        let outcome = await inserter.insertDictation("hello", frontmostPID: ax.targetPID, screenTop: 100,
+                                                    screens: [], currentPID: { ax.targetPID })
+        XCTAssertEqual(outcome, .pasted)
+        XCTAssertEqual(paste.pasted, "hello")
     }
     @MainActor func testManualAccessibilityRequestedOncePerProcess() async {
         let ax = FakeAX()
