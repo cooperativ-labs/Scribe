@@ -58,15 +58,15 @@ public struct ChatGPTAssistant: TextAssistant {
                 return .notAvailableForAccount
             case 429:
                 return .usageLimitReached(resetsAt: body?.resetDate(now: now) ?? Self.headerReset(headers, now: now))
-            case 400 where OpenAIKeyAssistant.isModelError(body), 404 where OpenAIKeyAssistant.isModelError(body):
+            case 400 where APIKeyErrors.isModelError(body), 404 where APIKeyErrors.isModelError(body):
                 return .modelUnavailable(model)
             default:
-                return .server(status: status, message: body?.message)
+                return .server(provider: "OpenAI", status: status, message: body?.message)
             }
         case .stream(let code, let message):
             if code == "usage_limit_reached" || code == "rate_limit_exceeded" { return .usageLimitReached(resetsAt: nil) }
             if code == "model_not_found" { return .modelUnavailable(model) }
-            return .server(status: 200, message: message ?? code)
+            return .server(provider: "OpenAI", status: 200, message: message ?? code)
         case .transport(let message):
             return .network(message)
         }

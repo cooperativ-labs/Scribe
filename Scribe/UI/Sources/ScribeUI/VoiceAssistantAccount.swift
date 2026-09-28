@@ -3,9 +3,10 @@ import Foundation
 import Platform
 
 /// The voice assistant's account as Settings shows it: the ChatGPT sign-in,
-/// the model list, and the OpenAI API key.
+/// the model list, the API key for each provider, and Apple's models on this
+/// Mac and on Private Cloud Compute.
 ///
-/// Secrets stay in the Keychain behind `ChatGPTSession` and the API-key store;
+/// Secrets stay in the Keychain behind `ChatGPTSession` and the API-key stores;
 /// settings cache only the plan, the account label and the chosen model, so
 /// opening Settings never reads a token.
 @MainActor
@@ -31,18 +32,26 @@ public final class VoiceAssistantAccount: ObservableObject {
     @Published public private(set) var models: [AssistModel] = []
     @Published public private(set) var modelsLoading = false
     @Published public private(set) var modelsError: String?
-    @Published public private(set) var hasAPIKey = false
-    @Published public private(set) var apiKeyStatus: APIKeyStatus = .untested
-    @Published public private(set) var apiModels: [AssistModel] = []
+    /// The providers with a key saved in the Keychain.
+    @Published public private(set) var providersWithKeys: Set<AssistProvider> = []
+    @Published public private(set) var apiKeyStatus: [AssistProvider: APIKeyStatus] = [:]
+    @Published public private(set) var apiModels: [AssistProvider: [AssistModel]] = [:]
+    @Published public private(set) var onDeviceStatus: OnDeviceModel.Status = .unsupportedSystem
+    @Published public private(set) var privateCloudStatus: PrivateCloudModel.Status = .unsupportedSystem
+    /// Whether the Private Cloud Compute quota is nearly used up.
+    @Published public private(set) var privateCloudApproachingLimit = false
+    /// Whether Apple offers a way to raise the Private Cloud Compute quota.
+    @Published public private(set) var privateCloudCanIncreaseLimit = false
 
     let session: ChatGPTSession
-    private let apiKeyStore: SecretStore
+    private let apiKeyStore: @Sendable (AssistProvider) -> SecretStore
     private var signInTask: Task<Void, Never>?
     private var loaded = false
+    private var customEndpointRevision = 0
 
     init(
         session: ChatGPTSession = ChatGPTSession(),
-        apiKeyStore: SecretStore = KeychainStore(service: KeychainStore.openAIService)
+        apiKeyStore: @escaping @Sendable (AssistProvider) -> SecretStore = { KeychainStore(service: $0.keychainService) }
     ) {
         self.session = session
         self.apiKeyStore = apiKeyStore
@@ -53,7 +62,9 @@ public final class VoiceAssistantAccount: ObservableObject {
     public func load(settings: ScribeSettings) async {
         if !loaded {
             loaded = true
-            hasAPIKey = (try? apiKeyStore.contains(OpenAIKeyAssistant.keychainAccount)) ?? false
+            providersWithKeys = Set(AssistProvider.allCases.filter {
+                (try? apiKeyStore($0).contains(OpenAIKeyAssistant.keychainAccount)) ?? false
+            })
             if case .signedOut = signIn, await session.isSignedIn() {
                 signIn = .signedIn
             } else if case .signedOut = signIn {
@@ -61,9 +72,23 @@ public final class VoiceAssistantAccount: ObservableObject {
                 settings.assistantChatGPTAccountLabel = nil
             }
         }
+        onDeviceStatus = OnDeviceModel.status
+        refreshPrivateCloudStatus()
         if signIn == .signedIn, models.isEmpty, !modelsLoading {
             await refreshModels(settings: settings)
         }
+    }
+
+    /// Checks Apple Intelligence again, e.g. after the person turns it on.
+    public func refreshOnDeviceStatus() {
+        onDeviceStatus = OnDeviceModel.status
+    }
+
+    /// Checks Private Cloud Compute again: availability, entitlement and quota.
+    public func refreshPrivateCloudStatus() {
+        privateCloudStatus = PrivateCloudModel.status
+        privateCloudApproachingLimit = privateCloudStatus == .available && PrivateCloudModel.isApproachingLimit
+        privateCloudCanIncreaseLimit = PrivateCloudModel.canIncreaseLimit
     }
 
     // MARK: ChatGPT sign-in
@@ -151,49 +176,127 @@ public final class VoiceAssistantAccount: ObservableObject {
         settings.assistantChatGPTModelName = models.first { $0.slug == slug }?.displayName ?? slug
     }
 
-    // MARK: OpenAI API key
+    // MARK: API keys
 
-    public func saveAPIKey(_ key: String, settings: ScribeSettings) async {
+    /// The provider the settings name, OpenAI when the stored value is unknown.
+    public static func provider(settings: ScribeSettings) -> AssistProvider {
+        AssistProvider(rawValue: settings.assistantAPIProvider) ?? .openAI
+    }
+
+    /// The model the provider is sent: the person's choice, else its default.
+    public static func apiModel(for provider: AssistProvider, settings: ScribeSettings) -> String {
+        settings.assistantAPIModels[provider.rawValue].flatMap { $0.isEmpty ? nil : $0 } ?? provider.defaultModel
+    }
+
+    public func chooseAPIModel(_ slug: String, for provider: AssistProvider, settings: ScribeSettings) {
+        settings.assistantAPIModels[provider.rawValue] = slug.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    public func hasAPIKey(for provider: AssistProvider) -> Bool {
+        providersWithKeys.contains(provider)
+    }
+
+    public func status(for provider: AssistProvider) -> APIKeyStatus {
+        apiKeyStatus[provider] ?? .untested
+    }
+
+    /// Stores the key and tests it. An empty key only tests the connection,
+    /// for a custom endpoint that needs none.
+    public func saveAPIKey(_ key: String, for provider: AssistProvider, settings: ScribeSettings) async {
         let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+        if trimmed.isEmpty {
+            guard provider.keyIsOptional else { return }
+            await testAPIKey(for: provider, settings: settings)
+            return
+        }
         do {
-            try apiKeyStore.write(Data(trimmed.utf8), for: OpenAIKeyAssistant.keychainAccount)
-            hasAPIKey = true
-            await testAPIKey(settings: settings)
+            try apiKeyStore(provider).write(Data(trimmed.utf8), for: OpenAIKeyAssistant.keychainAccount)
+            providersWithKeys.insert(provider)
+            await testAPIKey(for: provider, settings: settings)
         } catch {
-            apiKeyStatus = .failed(error.localizedDescription)
+            apiKeyStatus[provider] = .failed(error.localizedDescription)
         }
     }
 
-    public func removeAPIKey() {
+    public func removeAPIKey(for provider: AssistProvider) {
         do {
-            try apiKeyStore.delete(OpenAIKeyAssistant.keychainAccount)
-            hasAPIKey = false
-            apiKeyStatus = .untested
-            apiModels = []
+            try apiKeyStore(provider).delete(OpenAIKeyAssistant.keychainAccount)
+            providersWithKeys.remove(provider)
+            apiKeyStatus[provider] = nil
+            apiModels[provider] = nil
         } catch {
-            apiKeyStatus = .failed(error.localizedDescription)
+            apiKeyStatus[provider] = .failed(error.localizedDescription)
         }
     }
 
     /// Lists the key's models: proves the key works and fills the picker.
-    public func testAPIKey(settings: ScribeSettings) async {
-        guard let key = storedAPIKey() else {
-            apiKeyStatus = .failed("No API key is saved.")
+    /// When the person has not chosen a model and the provider no longer
+    /// lists its default, the first listed model is chosen instead.
+    public func testAPIKey(for provider: AssistProvider, settings: ScribeSettings) async {
+        guard let assistant = apiAssistant(for: provider, settings: settings) else {
+            apiKeyStatus[provider] = .failed(
+                provider.isCustom ? "Enter the endpoint’s base URL first, e.g. \(AssistProvider.custom.baseURL.absoluteString)." : "No API key is saved."
+            )
             return
         }
-        apiKeyStatus = .testing
+        let endpointRevision = customEndpointRevision
+        apiKeyStatus[provider] = .testing
         do {
-            let models = try await OpenAIKeyAssistant(apiKey: key, model: settings.assistantAPIKeyModel).availableModels()
-            apiModels = models
-            apiKeyStatus = .valid(modelCount: models.count)
+            let models = try await assistant.availableModels()
+            guard !provider.isCustom || endpointRevision == customEndpointRevision else { return }
+            apiModels[provider] = models
+            apiKeyStatus[provider] = .valid(modelCount: models.count)
+            if settings.assistantAPIModels[provider.rawValue] == nil,
+               !models.contains(where: { $0.slug == provider.defaultModel }),
+               let first = models.first {
+                chooseAPIModel(first.slug, for: provider, settings: settings)
+            }
         } catch {
-            apiKeyStatus = .failed(error.localizedDescription)
+            guard !provider.isCustom || endpointRevision == customEndpointRevision else { return }
+            apiKeyStatus[provider] = .failed(error.localizedDescription)
         }
     }
 
-    private func storedAPIKey() -> String? {
-        (try? apiKeyStore.read(OpenAIKeyAssistant.keychainAccount)).flatMap { String(data: $0, encoding: .utf8) }
+    private func storedAPIKey(for provider: AssistProvider) -> String? {
+        (try? apiKeyStore(provider).read(OpenAIKeyAssistant.keychainAccount)).flatMap { String(data: $0, encoding: .utf8) }
+    }
+
+    // MARK: Custom endpoint
+
+    /// The server the custom endpoint sends to, nil until a usable URL is typed.
+    public static func customEndpointURL(settings: ScribeSettings) -> URL? {
+        AssistProvider.customBaseURL(settings.assistantCustomEndpointURL)
+    }
+
+    /// Stores the typed URL. A different server has different models, so the
+    /// list, model choice, and last test result no longer apply.
+    public func setCustomEndpointURL(_ text: String, settings: ScribeSettings) {
+        guard text != settings.assistantCustomEndpointURL else { return }
+        customEndpointRevision += 1
+        settings.assistantCustomEndpointURL = text
+        settings.assistantAPIModels[AssistProvider.custom.rawValue] = nil
+        apiModels[.custom] = nil
+        apiKeyStatus[.custom] = nil
+    }
+
+    /// The API-key assistant the settings describe for `provider`: nil without
+    /// a key, or, for the custom endpoint, without a usable URL. Its model may
+    /// still be empty for a custom endpoint whose models are not listed yet.
+    private func apiAssistant(for provider: AssistProvider, settings: ScribeSettings) -> (any APIKeyAssistant)? {
+        guard let key = storedAPIKey(for: provider) ?? (provider.keyIsOptional ? "" : nil) else { return nil }
+        var baseURL: URL?
+        if provider.isCustom {
+            guard let url = Self.customEndpointURL(settings: settings) else { return nil }
+            baseURL = url
+        }
+        let model = Self.apiModel(for: provider, settings: settings)
+        return provider.makeAssistant(
+            apiKey: key,
+            model: model,
+            systemPrompt: settings.assistantSystemPrompt,
+            maxOutputTokens: apiModels[provider]?.first { $0.slug == model }?.maxOutputTokens,
+            baseURL: baseURL
+        )
     }
 
     // MARK: For the coordinator
@@ -206,16 +309,70 @@ public final class VoiceAssistantAccount: ObservableObject {
             guard signIn == .signedIn, let model = settings.assistantChatGPTModel else { return nil }
             return ChatGPTAssistant(session: session, model: model, systemPrompt: settings.assistantSystemPrompt)
         case .apiKey:
-            guard let key = storedAPIKey() else { return nil }
-            return OpenAIKeyAssistant(apiKey: key, model: settings.assistantAPIKeyModel, systemPrompt: settings.assistantSystemPrompt)
+            guard let assistant = apiAssistant(for: Self.provider(settings: settings), settings: settings), !assistant.model.isEmpty else { return nil }
+            return assistant
+        case .onDevice:
+            guard OnDeviceModel.status == .available else { return nil }
+            return AppleIntelligenceAssistant(systemPrompt: settings.assistantSystemPrompt)
+        case .privateCloud:
+            // A used-up quota still sends, so the answer is the system's own
+            // message and the request succeeds once the quota resets.
+            switch PrivateCloudModel.status {
+            case .available, .limitReached: return PrivateCloudAssistant(systemPrompt: settings.assistantSystemPrompt)
+            default: return nil
+            }
+        }
+    }
+
+    /// The model name the indicator shows for the chosen account.
+    public func modelName(settings: ScribeSettings) -> String? {
+        switch settings.assistantAccountType {
+        case .chatGPT:
+            return settings.assistantChatGPTModelName ?? settings.assistantChatGPTModel
+        case .apiKey:
+            let provider = Self.provider(settings: settings)
+            let slug = Self.apiModel(for: provider, settings: settings)
+            guard !slug.isEmpty else { return nil }
+            return apiModels[provider]?.first { $0.slug == slug }?.displayName ?? slug
+        case .onDevice:
+            return "Apple on-device model"
+        case .privateCloud:
+            return "Apple Private Cloud Compute"
+        }
+    }
+
+    /// Why the chosen account cannot take a request, for the indicator and Settings.
+    public func setupMessage(settings: ScribeSettings) -> String {
+        switch settings.assistantAccountType {
+        case .chatGPT:
+            return "Sign in to ChatGPT to use Voice Assistant."
+        case .apiKey:
+            let provider = Self.provider(settings: settings)
+            guard provider.isCustom else { return "Add your \(provider.displayName) API key to use Voice Assistant." }
+            if Self.customEndpointURL(settings: settings) == nil {
+                return "Enter your endpoint’s base URL to use Voice Assistant."
+            }
+            return "Choose a model on your endpoint to use Voice Assistant."
+        case .onDevice:
+            return OnDeviceModel.status.message
+        case .privateCloud:
+            return PrivateCloudModel.status.message
         }
     }
 
     /// Whether the chosen account can take a request, for the status row.
     func isReady(settings: ScribeSettings) -> Bool {
         switch settings.assistantAccountType {
-        case .chatGPT: signIn == .signedIn && settings.assistantChatGPTModel != nil
-        case .apiKey: hasAPIKey
+        case .chatGPT:
+            return signIn == .signedIn && settings.assistantChatGPTModel != nil
+        case .apiKey:
+            let provider = Self.provider(settings: settings)
+            guard provider.isCustom else { return hasAPIKey(for: provider) }
+            return Self.customEndpointURL(settings: settings) != nil && !Self.apiModel(for: provider, settings: settings).isEmpty
+        case .onDevice:
+            return onDeviceStatus == .available
+        case .privateCloud:
+            return privateCloudStatus == .available
         }
     }
 }

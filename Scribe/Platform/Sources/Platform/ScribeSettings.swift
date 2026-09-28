@@ -202,9 +202,20 @@ public final class ScribeSettings: ObservableObject {
     @Published public var assistantChatGPTModelName: String? {
         didSet { defaults.set(assistantChatGPTModelName, forKey: Key.assistantChatGPTModelName) }
     }
-    /// The model used with an OpenAI API key.
-    @Published public var assistantAPIKeyModel: String {
-        didSet { defaults.set(assistantAPIKeyModel, forKey: Key.assistantAPIKeyModel) }
+    /// The provider the API-key account sends to, e.g. "openai" or "anthropic"
+    /// (an `AssistProvider` raw value; each provider's key is its own Keychain item).
+    @Published public var assistantAPIProvider: String {
+        didSet { defaults.set(assistantAPIProvider, forKey: Key.assistantAPIProvider) }
+    }
+    /// The model chosen for each API-key provider, by provider. A provider
+    /// missing here uses its default model.
+    @Published public var assistantAPIModels: [String: String] {
+        didSet { defaults.set(assistantAPIModels, forKey: Key.assistantAPIModels) }
+    }
+    /// The base URL of the custom OpenAI-compatible endpoint, as typed
+    /// (e.g. "http://localhost:11434/v1" for Ollama). Empty until entered.
+    @Published public var assistantCustomEndpointURL: String {
+        didSet { storeOptionalString(assistantCustomEndpointURL, forKey: Key.assistantCustomEndpointURL) }
     }
     /// The signed-in ChatGPT plan and account, cached for display only.
     @Published public var assistantChatGPTPlan: String? {
@@ -358,7 +369,14 @@ public final class ScribeSettings: ObservableObject {
         assistantAccountType = defaults.string(forKey: Key.assistantAccountType).flatMap(AssistantAccountType.init(rawValue:)) ?? .chatGPT
         assistantChatGPTModel = defaults.string(forKey: Key.assistantChatGPTModel)
         assistantChatGPTModelName = defaults.string(forKey: Key.assistantChatGPTModelName)
-        assistantAPIKeyModel = defaults.string(forKey: Key.assistantAPIKeyModel) ?? "gpt-5-mini"
+        assistantAPIProvider = defaults.string(forKey: Key.assistantAPIProvider) ?? "openai"
+        if let models = defaults.dictionary(forKey: Key.assistantAPIModels) as? [String: String] {
+            assistantAPIModels = models
+        } else {
+            // Before there were providers, the one API-key model was OpenAI's.
+            assistantAPIModels = defaults.string(forKey: Key.legacyAssistantAPIKeyModel).map { ["openai": $0] } ?? [:]
+        }
+        assistantCustomEndpointURL = defaults.string(forKey: Key.assistantCustomEndpointURL) ?? ""
         assistantChatGPTPlan = defaults.string(forKey: Key.assistantChatGPTPlan)
         assistantChatGPTAccountLabel = defaults.string(forKey: Key.assistantChatGPTAccountLabel)
         assistantUsesSelection = defaults.object(forKey: Key.assistantUsesSelection) as? Bool ?? true
@@ -603,7 +621,10 @@ public final class ScribeSettings: ObservableObject {
         static let assistantAccountType = "scribe.settings.assistant.accountType"
         static let assistantChatGPTModel = "scribe.settings.assistant.chatGPTModel"
         static let assistantChatGPTModelName = "scribe.settings.assistant.chatGPTModelName"
-        static let assistantAPIKeyModel = "scribe.settings.assistant.apiKeyModel"
+        static let legacyAssistantAPIKeyModel = "scribe.settings.assistant.apiKeyModel"
+        static let assistantAPIProvider = "scribe.settings.assistant.apiProvider"
+        static let assistantAPIModels = "scribe.settings.assistant.apiModels"
+        static let assistantCustomEndpointURL = "scribe.settings.assistant.customEndpointURL"
         static let assistantChatGPTPlan = "scribe.settings.assistant.chatGPTPlan"
         static let assistantChatGPTAccountLabel = "scribe.settings.assistant.chatGPTAccount"
         static let assistantUsesSelection = "scribe.settings.assistant.source.selection"
@@ -698,8 +719,14 @@ public enum AssistantsPane: String, CaseIterable, Sendable {
 public enum AssistantAccountType: String, CaseIterable, Sendable {
     /// The person's ChatGPT plan, through the Codex sign-in.
     case chatGPT
-    /// The person's OpenAI API key, billed at API rates.
+    /// The person's own API key with the provider in `assistantAPIProvider`,
+    /// billed at that provider's API rates.
     case apiKey
+    /// Apple's on-device foundation model: nothing leaves the Mac.
+    case onDevice
+    /// Apple's server model on Private Cloud Compute (macOS 27): no key, a
+    /// per-person quota, and requests leave the Mac only for Apple's servers.
+    case privateCloud
 }
 
 /// What happens to the assistant's answer.

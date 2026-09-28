@@ -100,7 +100,9 @@ final class ScribeSettingsTests: XCTestCase {
         let settings = ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: folder)
         XCTAssertEqual(settings.assistantAccountType, .chatGPT)
         XCTAssertNil(settings.assistantChatGPTModel)
-        XCTAssertEqual(settings.assistantAPIKeyModel, "gpt-5-mini")
+        XCTAssertEqual(settings.assistantAPIProvider, "openai")
+        XCTAssertEqual(settings.assistantAPIModels, [:])
+        XCTAssertEqual(settings.assistantCustomEndpointURL, "")
         XCTAssertTrue(settings.assistantUsesSelection)
         XCTAssertTrue(settings.assistantUsesCopiedText)
         XCTAssertTrue(settings.assistantUsesScreenText)
@@ -111,7 +113,9 @@ final class ScribeSettingsTests: XCTestCase {
         settings.assistantAccountType = .apiKey
         settings.assistantChatGPTModel = "gpt-6-luna-light"
         settings.assistantChatGPTModelName = "GPT-6 Luna (light)"
-        settings.assistantAPIKeyModel = "gpt-6-luna"
+        settings.assistantAPIProvider = "anthropic"
+        settings.assistantAPIModels = ["openai": "gpt-6-luna", "anthropic": "claude-sonnet-5"]
+        settings.assistantCustomEndpointURL = "http://localhost:11434/v1"
         settings.assistantUsesScreenText = false
         settings.assistantResultMode = .copyOnly
         settings.assistantSourceCharacterLimit = 1_000_000
@@ -120,9 +124,14 @@ final class ScribeSettingsTests: XCTestCase {
 
         let relaunched = ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: folder)
         XCTAssertEqual(relaunched.assistantAccountType, .apiKey)
+        relaunched.assistantAccountType = .privateCloud
+        XCTAssertEqual(ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: folder).assistantAccountType, .privateCloud)
+        relaunched.assistantAccountType = .apiKey
         XCTAssertEqual(relaunched.assistantChatGPTModel, "gpt-6-luna-light")
         XCTAssertEqual(relaunched.assistantChatGPTModelName, "GPT-6 Luna (light)")
-        XCTAssertEqual(relaunched.assistantAPIKeyModel, "gpt-6-luna")
+        XCTAssertEqual(relaunched.assistantAPIProvider, "anthropic")
+        XCTAssertEqual(relaunched.assistantAPIModels, ["openai": "gpt-6-luna", "anthropic": "claude-sonnet-5"])
+        XCTAssertEqual(relaunched.assistantCustomEndpointURL, "http://localhost:11434/v1")
         XCTAssertFalse(relaunched.assistantUsesScreenText)
         XCTAssertEqual(relaunched.assistantResultMode, .copyOnly)
         XCTAssertEqual(relaunched.assistantSourceCharacterLimit, 200_000)
@@ -131,6 +140,22 @@ final class ScribeSettingsTests: XCTestCase {
         // Nothing secret is ever written to the settings domain.
         let stored = defaults.persistentDomain(forName: suiteName) ?? [:]
         XCTAssertFalse(stored.keys.contains { $0.localizedCaseInsensitiveContains("token") || $0.localizedCaseInsensitiveContains("secret") })
+    }
+
+    func testTheOpenAIKeyModelFromBeforeProvidersIsKept() throws {
+        let suiteName = "ScribeSettingsTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(suiteName, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        defaults.set("apiKey", forKey: "scribe.settings.assistant.accountType")
+        defaults.set("gpt-6-luna", forKey: "scribe.settings.assistant.apiKeyModel")
+
+        let settings = ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: folder)
+
+        XCTAssertEqual(settings.assistantAccountType, .apiKey)
+        XCTAssertEqual(settings.assistantAPIProvider, "openai")
+        XCTAssertEqual(settings.assistantAPIModels, ["openai": "gpt-6-luna"])
     }
 
     func testAssistantKeyNeverMatchesTheDictationKey() throws {

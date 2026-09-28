@@ -244,7 +244,7 @@ public actor ChatGPTSession {
             case 403:
                 throw AssistError.notAvailableForAccount
             default:
-                throw AssistError.server(status: response.statusCode, message: ResponsesErrorBody(json: String(decoding: data, as: UTF8.self))?.message)
+                throw AssistError.server(provider: "OpenAI", status: response.statusCode, message: ResponsesErrorBody(json: String(decoding: data, as: UTF8.self))?.message)
             }
         }
         throw AssistError.signInRequired
@@ -298,7 +298,7 @@ public actor ChatGPTSession {
                 try? store.delete(Self.tokensAccount)
                 throw AssistError.signInRequired
             }
-            throw AssistError.server(status: response.statusCode, message: body?.message)
+            throw AssistError.server(provider: "OpenAI", status: response.statusCode, message: body?.message)
         }
         let object = Self.object(data) ?? [:]
         var updated = tokens

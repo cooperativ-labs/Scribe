@@ -11,7 +11,7 @@
 
 import express from 'express';
 
-export const LEGAL_EFFECTIVE = '27 September 2026';
+export const LEGAL_EFFECTIVE = '28 September 2026';
 const REPO = 'https://github.com/cooperativ-labs/Scribe';
 const escape = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
@@ -130,7 +130,7 @@ export function renderPrivacy(config) {
 
     <h2>The Scribe app on your Mac</h2>
     <p>Scribe records meetings only when you press Record, and transcribes them on your Mac with local speech models. Recordings, transcripts, speaker names you assign, and settings are stored in folders on your Mac that you control. We do not receive them. Dictation audio is held in memory and discarded once the text is inserted.</p>
-    <p>The Voice Assistant is optional and off until you turn it on. When you hold its key, Scribe transcribes your spoken instruction on your Mac and sends it, with the text selected in the field you are typing in, text you copied since your previous request, and the text visible in the front app's windows, directly from your Mac to the ChatGPT account or OpenAI API key you chose. It does not pass through the relay and we do not receive it. OpenAI handles it under its own privacy policy and your settings there; requests are sent with storage turned off. Audio, screenshots, other apps and password fields are never sent, and Scribe keeps none of it after the answer is inserted. Sign-in tokens and API keys are kept only in your Mac's Keychain.</p>
+    <p>The Voice Assistant is optional and off until you turn it on. When you hold its key, Scribe transcribes your spoken instruction on your Mac and sends it, with the text selected in the field you are typing in, text you copied since your previous request, and the text visible in the front app's windows, directly from your Mac to the account you chose: your ChatGPT account, or the model provider whose API key you added (such as OpenAI, Anthropic, Google, OpenRouter, Vercel, xAI, Groq, Mistral or DeepSeek), or the OpenAI-compatible server whose address you entered (such as Ollama or LM Studio on your Mac, or a gateway your organization runs). It does not pass through the relay and we do not receive it. That provider handles it under its own privacy policy and your settings there; requests to OpenAI are sent with storage turned off. If you choose Apple's on-device model, the request is processed on your Mac and is not sent anywhere. If you choose Apple Private Cloud Compute, the request is sent from your Mac to Apple's Private Cloud Compute servers, which Apple states process it only to answer and do not retain it or make it accessible to Apple. Audio, screenshots, other apps and password fields are never sent, and Scribe keeps none of it after the answer is inserted. Sign-in tokens and API keys are kept only in your Mac's Keychain.</p>
     <p>The app contacts the internet to download its speech models from Hugging Face when you first set it up; after that it transcribes with the network off. The download button on this site fetches the app from GitHub. Those services see your IP address under their own privacy policies. The app has no analytics or advertising trackers.</p>
 
     <h2>Connecting an assistant through the relay</h2>

@@ -19,13 +19,24 @@
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.2609280557.0</string>
+    <string>0.2609280723.0</string>
     <key>CFBundleVersion</key>
-    <string>0.2609280557.0</string>
+    <string>0.2609280723.0</string>
     <key>LSMinimumSystemVersion</key>
     <string>15.0</string>
     <key>LSUIElement</key>
     <false/>
+    <!--
+        The Voice Assistant's custom endpoint is usually Ollama or LM Studio on
+        this Mac over plain http (localhost, 127.0.0.1, a .local name), which
+        App Transport Security would otherwise refuse. Servers elsewhere still
+        need https; nothing else is exempted.
+    -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsLocalNetworking</key>
+        <true/>
+    </dict>
     <key>NSCalendarsFullAccessUsageDescription</key>
     <string>Scribe reads the meeting on your calendar when a recording starts so the recording and its transcript can be named after it.</string>
     <key>NSAppleEventsUsageDescription</key>

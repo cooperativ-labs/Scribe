@@ -96,16 +96,19 @@ public enum AssistError: Error, Equatable, Sendable, LocalizedError {
     case usageLimitReached(resetsAt: Date?)
     /// The backend refused this account (403: the plan has no Codex, or the route is closed).
     case notAvailableForAccount
-    /// The OpenAI API key is missing or was rejected (401).
-    case invalidAPIKey
+    /// The provider's API key is missing or was rejected (401).
+    case invalidAPIKey(provider: String)
     /// The API key's rate or quota limit (429).
-    case rateLimited(retryAfter: TimeInterval?, message: String?)
+    case rateLimited(provider: String, retryAfter: TimeInterval?, message: String?)
     /// The chosen model is no longer offered to this account.
     case modelUnavailable(String)
     /// The model answered with no text.
     case emptyResponse
+    /// Apple's model (on this Mac or on Private Cloud Compute) is unavailable
+    /// or declined the request; the message is the system's or says what to change.
+    case appleModel(String)
     case network(String)
-    case server(status: Int, message: String?)
+    case server(provider: String, status: Int, message: String?)
 
     public var errorDescription: String? {
         switch self {
@@ -119,23 +122,23 @@ public enum AssistError: Error, Equatable, Sendable, LocalizedError {
             }
         case .notAvailableForAccount:
             "Voice Assistant is not available for this ChatGPT account."
-        case .invalidAPIKey:
-            "OpenAI did not accept the API key."
-        case .rateLimited(_, let message):
-            message ?? "OpenAI’s rate limit was reached. Try again shortly."
+        case .invalidAPIKey(let provider):
+            "\(provider) did not accept the API key."
+        case .rateLimited(let provider, _, let message):
+            message ?? "\(provider)’s rate limit was reached. Try again shortly."
         case .modelUnavailable(let model):
             "\(model) is no longer offered to this account. Choose another model in Settings."
         case .emptyResponse:
             "The model returned no text."
-        case .network(let message):
+        case .network(let message), .appleModel(let message):
             message
-        case .server(let status, let message):
-            message.map { "OpenAI returned an error (\(status)): \($0)" } ?? "OpenAI returned an error (\(status))."
+        case .server(let provider, let status, let message):
+            message.map { "\(provider) returned an error (\(status)): \($0)" } ?? "\(provider) returned an error (\(status))."
         }
     }
 
     /// The time alone when the reset is today, the day and time otherwise.
-    private static func resetStyle(for date: Date) -> Date.FormatStyle {
+    static func resetStyle(for date: Date) -> Date.FormatStyle {
         Calendar.current.isDateInToday(date)
             ? .dateTime.hour().minute()
             : .dateTime.weekday(.abbreviated).hour().minute()

@@ -283,16 +283,11 @@ final class ScribeAppEnvironment: ObservableObject {
     /// What the assistant key does right now, resolved at each press so a
     /// change in Settings applies to the next request.
     private func assistantAvailability() -> AssistantAvailability {
-        guard let assistant = VoiceAssistantAccount.shared.makeAssistant(settings: settings) else {
-            switch settings.assistantAccountType {
-            case .chatGPT: return .needsAccount("Sign in to ChatGPT to use Voice Assistant.")
-            case .apiKey: return .needsAccount("Add an OpenAI API key to use Voice Assistant.")
-            }
+        let account = VoiceAssistantAccount.shared
+        guard let assistant = account.makeAssistant(settings: settings) else {
+            return .needsAccount(account.setupMessage(settings: settings))
         }
-        let modelName: String? = switch settings.assistantAccountType {
-        case .chatGPT: settings.assistantChatGPTModelName ?? settings.assistantChatGPTModel
-        case .apiKey: settings.assistantAPIKeyModel
-        }
+        let modelName = account.modelName(settings: settings)
         return .ready(AssistantConfiguration(
             assistant: assistant,
             modelName: modelName,

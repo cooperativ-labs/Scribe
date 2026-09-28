@@ -111,7 +111,7 @@ final class ResponsesClientTests: XCTestCase {
     func testAPIKey429IsARateLimitWithTheServersMessage() throws {
         let body = try Fixture.text("api-429.json")
         let error = ResponsesError.http(status: 429, headers: ["retry-after": "1"], body: body)
-        guard case .rateLimited(let retryAfter, let message) = OpenAIKeyAssistant.map(error, model: "gpt-5-mini") else {
+        guard case .rateLimited("OpenAI", let retryAfter, let message) = OpenAIKeyAssistant.map(error, model: "gpt-5-mini") else {
             return XCTFail("expected a rate limit")
         }
         XCTAssertEqual(retryAfter, 1)
@@ -122,12 +122,12 @@ final class ResponsesClientTests: XCTestCase {
         XCTAssertEqual(ChatGPTAssistant.map(.http(status: 401, headers: [:], body: ""), model: "m"), .signInRequired)
         XCTAssertEqual(ChatGPTAssistant.map(.http(status: 403, headers: [:], body: #"{"detail":"Forbidden"}"#), model: "m"), .notAvailableForAccount)
         XCTAssertEqual(ChatGPTAssistant.map(.http(status: 400, headers: [:], body: #"{"detail":"Unsupported model"}"#), model: "gpt-5-codex"), .modelUnavailable("gpt-5-codex"))
-        XCTAssertEqual(ChatGPTAssistant.map(.http(status: 400, headers: [:], body: #"{"detail":"Bad input"}"#), model: "m"), .server(status: 400, message: "Bad input"))
+        XCTAssertEqual(ChatGPTAssistant.map(.http(status: 400, headers: [:], body: #"{"detail":"Bad input"}"#), model: "m"), .server(provider: "OpenAI", status: 400, message: "Bad input"))
         XCTAssertEqual(ChatGPTAssistant.map(.transport("offline"), model: "m"), .network("offline"))
     }
 
     func testAPIKeyStatusMapping() {
-        XCTAssertEqual(OpenAIKeyAssistant.map(.http(status: 401, headers: [:], body: ""), model: "m"), .invalidAPIKey)
+        XCTAssertEqual(OpenAIKeyAssistant.map(.http(status: 401, headers: [:], body: ""), model: "m"), .invalidAPIKey(provider: "OpenAI"))
         XCTAssertEqual(
             OpenAIKeyAssistant.map(.http(status: 404, headers: [:], body: #"{"error":{"message":"The model `x` does not exist","code":"model_not_found"}}"#), model: "x"),
             .modelUnavailable("x")

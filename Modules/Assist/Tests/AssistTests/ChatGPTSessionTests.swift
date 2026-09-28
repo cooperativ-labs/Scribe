@@ -186,7 +186,7 @@ final class ChatGPTSessionTests: XCTestCase {
             _ = try await session(store: store, transport: transport).credentials()
             XCTFail("expected an error")
         } catch let error as AssistError {
-            XCTAssertEqual(error, .server(status: 503, message: nil))
+            XCTAssertEqual(error, .server(provider: "OpenAI", status: 503, message: nil))
         }
         XCTAssertNotNil(try store.read(ChatGPTSession.tokensAccount))
     }

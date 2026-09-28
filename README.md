@@ -37,8 +37,14 @@ Hold a second key, say what you want, and Scribe writes the answer where your
 cursor is: a reply to the message in front of you, a shorter version of the
 paragraph you selected, or a rewrite of what you just copied. Turn it on in
 **Settings → Assistants → Voice Assistant**, pick the key (Right Shift by
-default; it is never the same key as dictation), and sign in with your ChatGPT
-account or add an OpenAI API key. Your spoken instruction is transcribed
+default; it is never the same key as dictation), and choose an account: sign in
+with your ChatGPT account; add your own API key for OpenAI, Anthropic, Google
+Gemini, OpenRouter, the Vercel AI Gateway, xAI, Groq, Mistral or DeepSeek;
+point it at a custom OpenAI-compatible endpoint (Ollama or LM Studio on your
+Mac, or a company gateway), with a key only if the server wants one;
+use Apple's on-device model (macOS 26 or later with Apple Intelligence on), in
+which case nothing leaves your Mac; or use Apple's larger server model on
+Private Cloud Compute (macOS 27 or later, in builds Apple has granted access). Your spoken instruction is transcribed
 offline by the dictation model, so the model needs to be installed. Hold the
 key and speak, release it to send, or double-tap it to keep listening. Escape,
 or the indicator's Cancel control, discards the request, including one that is
@@ -53,14 +59,23 @@ password fields and Scribe's own windows are never read. Each of the three text
 sources has its own switch in Settings, and the indicator names the sources it
 is using while you speak. Scribe keeps nothing: the instruction, the source text
 and the answer are held in memory for the request and then dropped, and every
-request is sent with `store: false` so OpenAI's API does not retain it either
-(subscription traffic is subject to OpenAI's own policy).
+OpenAI request is sent with `store: false` so OpenAI's API does not retain it
+either (subscription traffic is subject to OpenAI's own policy). Other
+providers handle requests under their own API data policies.
 
 The ChatGPT account route uses your plan the way the Codex CLI does and counts
 against its Codex limits; it is not an OpenAI-documented integration, and the
-sign-in card says so. The API-key route bills your OpenAI Platform account at
-API rates. Tokens and keys are kept only in your Keychain and are removed when
-you sign out. The answer goes into the focused field through the same
+sign-in card says so. The API-key route bills the provider you chose at its API
+rates; each provider's key is its own Keychain item. The custom endpoint route
+sends Chat Completions requests to the base URL you enter (usually ending in
+`/v1`); a server on your Mac may use plain `http`, one elsewhere must use
+`https`, and the key is optional. The on-device route is
+free but uses a small model with a short context, so long screen text is
+shortened to fit. The Private Cloud Compute route sends the request to Apple's
+Private Cloud Compute servers, which Apple says keep nothing; it needs no key
+and is not billed, but Apple sets a per-person usage limit, and it works only
+in a build signed with Apple's Private Cloud Compute entitlement. Tokens and keys are kept only in your Keychain and are
+removed when you sign out or remove the key. The answer goes into the focused field through the same
 Accessibility-then-paste path as dictation, replacing your selection when there
 was one, or onto the clipboard if you choose **Copy to the clipboard only**.
 

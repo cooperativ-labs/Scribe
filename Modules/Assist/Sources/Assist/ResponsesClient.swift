@@ -29,37 +29,7 @@ public struct ResponsesClient: Sendable {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         request.httpBody = try JSONSerialization.data(withJSONObject: body(model: model, instructions: instructions, input: input))
-
-        let (response, lines): (HTTPURLResponse, AsyncThrowingStream<String, Error>)
-        do {
-            (response, lines) = try await transport.lines(for: request)
-        } catch is CancellationError {
-            throw CancellationError()
-        } catch {
-            throw ResponsesError.transport(error.localizedDescription)
-        }
-        guard response.statusCode == 200 else {
-            var body: [String] = []
-            do {
-                for try await line in lines { body.append(line) }
-            } catch {}
-            throw ResponsesError.http(status: response.statusCode, headers: response.lowercasedHeaders, body: body.joined(separator: "\n"))
-        }
-        var decoder = ResponsesStreamDecoder(requestedModel: model)
-        do {
-            for try await line in lines {
-                try Task.checkCancellation()
-                if let result = try decoder.consume(line) { return result }
-            }
-        } catch let error as ResponsesError {
-            throw error
-        } catch is CancellationError {
-            throw CancellationError()
-        } catch {
-            throw ResponsesError.transport(error.localizedDescription)
-        }
-        try Task.checkCancellation()
-        return try decoder.finish()
+        return try await transport.stream(request, decoder: ResponsesStreamDecoder(requestedModel: model))
     }
 
     func body(model: String, instructions: String, input: String) -> [String: Any] {
@@ -98,6 +68,8 @@ public struct ResponsesResult: Sendable, Equatable {
     }
 }
 
+/// Why a streamed model request failed, for every wire format in this module:
+/// the Responses API, Chat Completions and Anthropic Messages.
 public enum ResponsesError: Error, Equatable, Sendable {
     /// A non-200 status, with the body the server sent.
     case http(status: Int, headers: [String: String], body: String)
@@ -112,12 +84,14 @@ public enum ResponsesError: Error, Equatable, Sendable {
     }
 }
 
-/// The fields of an OpenAI error body that change what the person is told.
+/// The fields of a provider's error body that change what the person is told.
 ///
 /// The ChatGPT backend's usage-limit 429 looks like
 /// `{"error":{"type":"usage_limit_reached","plan_type":"plus","resets_at":…,"resets_in_seconds":…}}`
 /// (codex-rs parses the same fields); the public API's errors are
 /// `{"error":{"message":…,"type":…,"code":…}}`; some backend errors are `{"detail":…}`.
+/// Anthropic sends `{"type":"error","error":{"type":…,"message":…}}`, and Gemini's
+/// OpenAI-compatible endpoint wraps its error object in a one-element array.
 public struct ResponsesErrorBody: Sendable, Equatable {
     public var type: String?
     public var code: String?
@@ -127,8 +101,8 @@ public struct ResponsesErrorBody: Sendable, Equatable {
     public var resetsInSeconds: TimeInterval?
 
     public init?(json: String) {
-        guard let data = json.data(using: .utf8),
-              let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return nil }
+        guard let data = json.data(using: .utf8), let parsed = try? JSONSerialization.jsonObject(with: data),
+              let object = parsed as? [String: Any] ?? (parsed as? [[String: Any]])?.first else { return nil }
         if let error = object["error"] as? [String: Any] {
             type = error["type"] as? String
             code = error["code"] as? String
@@ -160,7 +134,7 @@ public struct ResponsesErrorBody: Sendable, Equatable {
 ///
 /// OpenAI sends one `data:` line per event, so each is handled as it comes;
 /// `event:` lines, comments and blank separators carry nothing needed here.
-struct ResponsesStreamDecoder {
+struct ResponsesStreamDecoder: StreamDecoder {
     let requestedModel: String
     private var text = ""
     private var doneText: String?

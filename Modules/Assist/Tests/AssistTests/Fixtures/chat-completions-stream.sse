@@ -1,0 +1,11 @@
+: OPENROUTER PROCESSING
+
+data: {"id":"gen-1","model":"anthropic/claude-opus-5","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}
+
+data: {"id":"gen-1","model":"anthropic/claude-opus-5","choices":[{"index":0,"delta":{"content":"Thanks, "},"finish_reason":null}]}
+
+data: {"id":"gen-1","model":"anthropic/claude-opus-5","choices":[{"index":0,"delta":{"content":"see you Friday."},"finish_reason":"stop"}]}
+
+data: {"id":"gen-1","model":"anthropic/claude-opus-5","choices":[],"usage":{"prompt_tokens":812,"completion_tokens":9,"total_tokens":821}}
+
+data: [DONE]

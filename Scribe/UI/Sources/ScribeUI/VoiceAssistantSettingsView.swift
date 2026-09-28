@@ -87,9 +87,7 @@ struct VoiceAssistantSettingsView: View {
             PermissionStatusRow(name: "Microphone", allowed: access.microphone == .granted, pane: .microphone, permissions: permissions)
             PermissionStatusRow(name: "Accessibility", allowed: access.accessibility, pane: .accessibility, permissions: permissions)
             if settings.assistantEnabled && !account.isReady(settings: settings) {
-                Text(settings.assistantAccountType == .chatGPT
-                    ? "Sign in to ChatGPT below so Voice Assistant has an account to send to."
-                    : "Add an OpenAI API key below so Voice Assistant has an account to send to.")
+                Text(account.setupMessage(settings: settings))
                     .font(.footnote).foregroundStyle(.orange)
             }
             if settings.assistantEnabled && !access.isReady {
@@ -168,7 +166,11 @@ struct VoiceAssistantSettingsView: View {
         Section {
             Picker("Account", selection: $settings.assistantAccountType) {
                 Text("ChatGPT account").tag(AssistantAccountType.chatGPT)
-                Text("OpenAI API key").tag(AssistantAccountType.apiKey)
+                Text("API key").tag(AssistantAccountType.apiKey)
+                Text("On this Mac").tag(AssistantAccountType.onDevice)
+                if showsPrivateCloud {
+                    Text("Private Cloud").tag(AssistantAccountType.privateCloud)
+                }
             }
             .pickerStyle(.segmented)
             .labelsHidden()
@@ -176,6 +178,8 @@ struct VoiceAssistantSettingsView: View {
             switch settings.assistantAccountType {
             case .chatGPT: chatGPTCard
             case .apiKey: apiKeyRows
+            case .onDevice: onDeviceCard
+            case .privateCloud: privateCloudCard
             }
         } header: {
             Text("Account")
@@ -185,7 +189,11 @@ struct VoiceAssistantSettingsView: View {
                 case .chatGPT:
                     Text("Uses your ChatGPT account the way the Codex CLI does. Usage counts against your ChatGPT plan’s Codex limits. This is not an OpenAI-documented integration.")
                 case .apiKey:
-                    Text("Requests are billed to your OpenAI Platform account at API rates. The key is kept in your Keychain.")
+                    Text(apiKeyFooter)
+                case .onDevice:
+                    Text("Uses Apple’s on-device foundation model. Nothing leaves your Mac and nothing is billed. The model is small and reads only a few thousand words, so long screen text is shortened, and answers are simpler than a cloud model’s.")
+                case .privateCloud:
+                    Text("Uses the larger Apple Intelligence model on Apple’s Private Cloud Compute servers. Your request leaves your Mac for Apple’s servers, which Apple says do not store it or make it accessible to Apple. There is no key or bill, but Apple sets a usage limit. It reads far more text than the on-device model, so long screen text is rarely shortened.")
                 }
             }
             .font(.footnote)
@@ -276,38 +284,101 @@ struct VoiceAssistantSettingsView: View {
         }
     }
 
+    private var provider: AssistProvider { VoiceAssistantAccount.provider(settings: settings) }
+
+    private var providerBinding: Binding<AssistProvider> {
+        Binding(
+            get: { provider },
+            set: { newValue in
+                apiKeyDraft = ""
+                settings.assistantAPIProvider = newValue.rawValue
+            }
+        )
+    }
+
+    private var apiKeyFooter: String {
+        if provider.isCustom {
+            return "Sends requests in OpenAI’s Chat Completions format to the server above: Ollama or LM Studio on this Mac, or a company gateway. A server off this Mac must use https. The key is only needed when the server asks for one, and is kept in your Keychain."
+        }
+        let billing = provider.isGateway
+            ? "Requests are billed to your \(provider.displayName) account, which routes them to the model’s lab."
+            : "Requests are billed to your \(provider.displayName) account at API rates."
+        return "\(billing) Each provider’s key is kept in your Keychain."
+    }
+
+    /// The custom endpoint's URL, nil until it is one requests can go to.
+    private var customEndpointURL: URL? { VoiceAssistantAccount.customEndpointURL(settings: settings) }
+
+    /// The server's host while the URL is usable, for the status lines.
+    private var customEndpointName: String { customEndpointURL?.host() ?? "the endpoint" }
+
+    private var customEndpointBinding: Binding<String> {
+        Binding(
+            get: { settings.assistantCustomEndpointURL },
+            set: { account.setCustomEndpointURL($0, settings: settings) }
+        )
+    }
+
+    private static func providerTitle(_ provider: AssistProvider) -> String {
+        provider.isCustom ? "Custom OpenAI-compatible endpoint" : provider.displayName
+    }
+
     @ViewBuilder
     private var apiKeyRows: some View {
-        if account.hasAPIKey {
-            HStack {
-                Label("API key saved in your Keychain", systemImage: "key.fill")
-                Spacer()
-                Button("Test") { Task { await account.testAPIKey(settings: settings) } }
-                    .disabled(account.apiKeyStatus == .testing)
-                Button("Remove") { account.removeAPIKey() }
-            }
-        } else {
-            HStack {
-                SecureField("OpenAI API key", text: $apiKeyDraft, prompt: Text("sk-…"))
-                    .textContentType(.password)
-                    .onSubmit(saveAPIKey)
-                Button("Save and Test", action: saveAPIKey)
-                    .disabled(apiKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        Picker("Provider", selection: providerBinding) {
+            ForEach(AssistProvider.allCases) { provider in
+                Text(account.hasAPIKey(for: provider) ? "\(Self.providerTitle(provider)) · key saved" : Self.providerTitle(provider))
+                    .tag(provider)
             }
         }
-        switch account.apiKeyStatus {
+        if provider.isCustom {
+            TextField("Base URL", text: customEndpointBinding, prompt: Text(AssistProvider.custom.baseURL.absoluteString))
+                .textContentType(.URL)
+                .autocorrectionDisabled()
+                .onSubmit(saveAPIKey)
+            if !settings.assistantCustomEndpointURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, customEndpointURL == nil {
+                Label("Use HTTPS for remote servers. HTTP is allowed only for localhost or a loopback IP address. The address usually ends in /v1.", systemImage: "exclamationmark.circle")
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+            }
+        }
+        if account.hasAPIKey(for: provider) {
+            HStack {
+                Label("\(provider.displayName) key saved in your Keychain", systemImage: "key.fill")
+                Spacer()
+                Button("Test") { Task { await account.testAPIKey(for: provider, settings: settings) } }
+                    .disabled(account.status(for: provider) == .testing || (provider.isCustom && customEndpointURL == nil))
+                Button("Remove") { account.removeAPIKey(for: provider) }
+            }
+        } else {
+            let draftIsEmpty = apiKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            HStack {
+                SecureField("\(provider.displayName) API key", text: $apiKeyDraft, prompt: Text(provider.keyPlaceholder))
+                    .textContentType(.password)
+                    .onSubmit(saveAPIKey)
+                // With no key to save, a custom endpoint's button only tests the connection.
+                Button(draftIsEmpty && provider.keyIsOptional ? "Test" : "Save and Test", action: saveAPIKey)
+                    .disabled(provider.isCustom ? customEndpointURL == nil || account.status(for: provider) == .testing : draftIsEmpty)
+            }
+            if let keysURL = provider.keysURL {
+                Link("Get a \(provider.displayName) API key", destination: keysURL)
+                    .font(.footnote)
+            }
+        }
+        switch account.status(for: provider) {
         case .untested:
             EmptyView()
         case .testing:
             HStack(spacing: 6) {
                 ProgressView().controlSize(.small)
-                Text("Checking the key with OpenAI…").foregroundStyle(.secondary)
+                Text(provider.isCustom ? "Connecting to \(customEndpointName)…" : "Checking the key with \(provider.displayName)…")
+                    .foregroundStyle(.secondary)
             }
             .font(.footnote)
         case .valid(let count):
-            Label("The key works. \(count) models available.", systemImage: "checkmark.circle.fill")
+            Label(Self.connectedMessage(count: count, provider: provider), systemImage: count == 0 ? "exclamationmark.circle" : "checkmark.circle.fill")
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(count == 0 ? .orange : .secondary)
         case .failed(let message):
             Label(message, systemImage: "exclamationmark.circle")
                 .font(.footnote)
@@ -315,10 +386,90 @@ struct VoiceAssistantSettingsView: View {
         }
     }
 
+    private var onDeviceCard: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: account.onDeviceStatus == .available ? "apple.intelligence" : "exclamationmark.triangle")
+                .font(.title2)
+                .foregroundStyle(account.onDeviceStatus == .available ? Color.accentColor : .orange)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Apple Intelligence").font(.headline)
+                Text(account.onDeviceStatus.message)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+            if account.onDeviceStatus == .appleIntelligenceNotEnabled {
+                Button("Open Settings…") {
+                    if let url = URL(string: "x-apple.systempreferences:com.apple.Siri-Settings.extension") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+            } else if account.onDeviceStatus != .available && account.onDeviceStatus != .unsupportedSystem && account.onDeviceStatus != .deviceNotEligible {
+                Button("Check Again") { account.refreshOnDeviceStatus() }
+            }
+        }
+        .onAppear { account.refreshOnDeviceStatus() }
+    }
+
+    /// Offered from macOS 27, or on an older system while it is still the
+    /// chosen account, so the choice stays visible with its reason.
+    private var showsPrivateCloud: Bool {
+        account.privateCloudStatus != .unsupportedSystem || settings.assistantAccountType == .privateCloud
+    }
+
+    private var privateCloudCard: some View {
+        let status = account.privateCloudStatus
+        return HStack(alignment: .top, spacing: 12) {
+            Image(systemName: status == .available ? "apple.intelligence" : "exclamationmark.triangle")
+                .font(.title2)
+                .foregroundStyle(status == .available ? Color.accentColor : .orange)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Apple Private Cloud Compute").font(.headline)
+                Text(status.message)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if account.privateCloudApproachingLimit {
+                    Text("You are close to your usage limit.")
+                        .font(.footnote)
+                        .foregroundStyle(.orange)
+                }
+            }
+            Spacer()
+            let limited = if case .limitReached = status { true } else { false }
+            if status == .systemNotReady {
+                VStack(alignment: .trailing) {
+                    Button("Open Settings…") {
+                        if let url = URL(string: "x-apple.systempreferences:com.apple.Siri-Settings.extension") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+                    Button("Check Again") { account.refreshPrivateCloudStatus() }
+                }
+            } else if (limited || account.privateCloudApproachingLimit) && account.privateCloudCanIncreaseLimit {
+                Button("Increase Limit…") { PrivateCloudModel.showLimitIncrease() }
+            } else if limited {
+                Button("Check Again") { account.refreshPrivateCloudStatus() }
+            }
+        }
+        .onAppear { account.refreshPrivateCloudStatus() }
+    }
+
+    /// Saves the typed key and tests it; for a custom endpoint with no key
+    /// typed, only tests the connection.
     private func saveAPIKey() {
         let key = apiKeyDraft
+        let provider = provider
         apiKeyDraft = ""
-        Task { await account.saveAPIKey(key, settings: settings) }
+        Task { await account.saveAPIKey(key, for: provider, settings: settings) }
+    }
+
+    /// What a successful test says. A local server with nothing loaded lists
+    /// no models, which is worth saying since the model must then be typed.
+    static func connectedMessage(count: Int, provider: AssistProvider) -> String {
+        guard provider.isCustom else { return "The key works. \(count) models available." }
+        return count == 0
+            ? "Connected, but the server lists no models. Type a model ID below."
+            : "Connected. \(count) models available."
     }
 
     private func copyCode(_ code: String) {
@@ -366,28 +517,49 @@ struct VoiceAssistantSettingsView: View {
                         .font(.footnote).foregroundStyle(.orange)
                 }
             case .apiKey:
-                if account.apiModels.isEmpty {
-                    TextField("Model", text: $settings.assistantAPIKeyModel)
+                let models = account.apiModels[provider] ?? []
+                if models.isEmpty {
+                    TextField("Model", text: apiModelBinding, prompt: Text(provider.defaultModel.isEmpty ? "e.g. llama3.2" : provider.defaultModel))
                 } else {
-                    Picker("Model", selection: $settings.assistantAPIKeyModel) {
-                        if !account.apiModels.contains(where: { $0.slug == settings.assistantAPIKeyModel }) {
-                            Text(settings.assistantAPIKeyModel).tag(settings.assistantAPIKeyModel)
+                    Picker("Model", selection: apiModelBinding) {
+                        if !models.contains(where: { $0.slug == apiModelBinding.wrappedValue }) {
+                            Text(apiModelBinding.wrappedValue).tag(apiModelBinding.wrappedValue)
                         }
-                        ForEach(account.apiModels) { model in
+                        ForEach(models) { model in
                             Text(model.displayName).tag(model.slug)
                         }
                     }
                 }
+            case .onDevice:
+                LabeledContent("Model", value: "Apple on-device model")
+            case .privateCloud:
+                LabeledContent("Model", value: "Apple Private Cloud Compute model")
             }
         } header: {
             Text("Model")
         } footer: {
-            Text(settings.assistantAccountType == .chatGPT
-                ? "The models your ChatGPT plan offers. GPT-6 Luna (light) is chosen when it is available."
-                : "Test the key to list the models it can use.")
+            Text(modelFooter)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    private var modelFooter: String {
+        switch settings.assistantAccountType {
+        case .chatGPT: "The models your ChatGPT plan offers. GPT-6 Luna (light) is chosen when it is available."
+        case .apiKey: provider.isCustom
+            ? "Test the connection to list the models the server has, or type a model ID."
+            : "Test the key to list the models it can use, or type a model ID."
+        case .onDevice: "The model that comes with Apple Intelligence. It updates with macOS."
+        case .privateCloud: "The server model behind Apple Intelligence. Apple updates it on its servers."
+        }
+    }
+
+    private var apiModelBinding: Binding<String> {
+        Binding(
+            get: { VoiceAssistantAccount.apiModel(for: provider, settings: settings) },
+            set: { account.chooseAPIModel($0, for: provider, settings: settings) }
+        )
     }
 
     private var chatGPTModelBinding: Binding<String> {
