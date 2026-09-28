@@ -274,9 +274,10 @@ final class ScribeAppEnvironment: ObservableObject {
 
     func stopToggleDictation() { triggerMonitor.stopToggle() }
 
-    /// The indicator's Cancel: an assistant request in flight, else a toggled session.
+    /// The indicator's ✕: a request past its key (loading the model,
+    /// transcribing, or asking the assistant), else a toggled session.
     func cancelToggleDictation() {
-        if dictationCoordinator?.cancelAssistantRequest() == true { return }
+        if dictationCoordinator?.cancelPendingRequest() == true { return }
         triggerMonitor.cancelToggle()
     }
 

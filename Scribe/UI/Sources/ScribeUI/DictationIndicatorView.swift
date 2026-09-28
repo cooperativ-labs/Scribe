@@ -8,6 +8,9 @@ public struct DictationIndicatorView: View {
     public let state: DictationState
     public let showsToggleControls: Bool
     public let showsTranscribingLabel: Bool
+    /// The session is past its key: loading the model or transcribing can be
+    /// abandoned with ✕. Off for the warm-up at launch, which is not a session.
+    public let showsCancel: Bool
     /// Which mode the session belongs to; the assistant is labelled so the two
     /// gestures never look alike.
     public let intent: DictationIntent
@@ -18,7 +21,8 @@ public struct DictationIndicatorView: View {
     public var openSettings: () -> Void = {}
 
     public init(state: DictationState, livePreview: String? = nil, showsToggleControls: Bool = false,
-                showsTranscribingLabel: Bool = false, intent: DictationIntent = .dictation,
+                showsTranscribingLabel: Bool = false, showsCancel: Bool = false,
+                intent: DictationIntent = .dictation,
                 assistantHint: String? = nil,
                 stop: @escaping () -> Void = {}, cancel: @escaping () -> Void = {},
                 openSettings: @escaping () -> Void = {}) {
@@ -26,6 +30,7 @@ public struct DictationIndicatorView: View {
         self.state = state
         self.showsToggleControls = showsToggleControls
         self.showsTranscribingLabel = showsTranscribingLabel
+        self.showsCancel = showsCancel
         self.intent = intent
         self.assistantHint = assistantHint
         self.stop = stop
@@ -85,6 +90,14 @@ public struct DictationIndicatorView: View {
             }
     }
 
+    private var cancelMark: some View {
+        Image(systemName: "xmark")
+            .foregroundStyle(.secondary)
+            .onTapGesture(perform: cancel)
+            .accessibilityLabel(intent == .assistant ? "Cancel assistant" : "Cancel dictation")
+            .accessibilityAddTraits(.isButton)
+    }
+
     private func link(_ title: String, action: @escaping () -> Void) -> some View {
         Text(title)
             .foregroundStyle(.tint)
@@ -101,6 +114,7 @@ public struct DictationIndicatorView: View {
                 Image(systemName: "hourglass")
                     .symbolEffect(.pulse, options: .repeating)
                 Text("Loading model…")
+                if showsCancel { cancelMark }
             case .listening(let level):
                 Image(systemName: "mic.fill").foregroundStyle(.red)
                     .symbolEffect(.pulse, options: .repeating)
@@ -119,15 +133,15 @@ public struct DictationIndicatorView: View {
                         .foregroundStyle(.tint)
                         .onTapGesture(perform: stop)
                         .accessibilityAddTraits(.isButton)
-                    Image(systemName: "xmark")
-                        .foregroundStyle(.secondary)
-                        .onTapGesture(perform: cancel)
-                        .accessibilityLabel(intent == .assistant ? "Cancel assistant" : "Cancel dictation")
-                        .accessibilityAddTraits(.isButton)
+                    cancelMark
                 }
             case .transcribing:
                 shimmerBar
-                if showsTranscribingLabel { Text("Transcribing…") }
+                // Most transcriptions finish before the label; ✕ arrives with it.
+                if showsTranscribingLabel {
+                    Text("Transcribing…")
+                    if showsCancel { cancelMark }
+                }
             case .thinking(let assistant, let model):
                 Image(systemName: "sparkles")
                     .symbolEffect(.pulse, options: .repeating)
@@ -137,11 +151,7 @@ public struct DictationIndicatorView: View {
                         Text(model).font(.caption2).foregroundStyle(.secondary)
                     }
                 }
-                Image(systemName: "xmark")
-                    .foregroundStyle(.secondary)
-                    .onTapGesture(perform: cancel)
-                    .accessibilityLabel("Cancel request")
-                    .accessibilityAddTraits(.isButton)
+                cancelMark
             case .nothingToWorkWith(let application):
                 Image(systemName: "text.badge.xmark").foregroundStyle(.secondary)
                 Text(application.map { "Nothing to work with in \($0)" } ?? "Nothing to work with")

@@ -278,10 +278,14 @@ that the worker holds about 465 MB of RAM the whole time dictation is on,
 the same amount a batch transcription uses while it runs, and macOS may
 compress or swap it when memory is tight. The settings tab offers **keep
 loaded while dictation is on** (default) or **unload after 10 minutes idle**,
-which trades a few seconds of warm-up on the first dictation after a break
-for a smaller footprint. Warm load happens at launch when dictation is
-enabled, and the indicator shows a "Warming up" state if a trigger arrives
-first. The existing comment in `WorkerStageRunner` that a resident model
+which trades a cold start on the first dictation after a break (30 to 40
+seconds on an M-series Mac: the weights are mapped and the Neural Engine
+programs compiled) for a smaller footprint. Warm load happens at launch when
+dictation is enabled, and the indicator shows "Loading model…" whenever a
+dictation finds the helper cold. A memory-pressure warning releases the
+helper only under "unload after idle"; critical pressure always does, but
+never mid-request: an unload that arrives while a dictation is loading or
+transcribing waits for it, and cancelling a dictation keeps the helper. The existing comment in `WorkerStageRunner` that a resident model
 "would compete with a recording for memory" still holds for batch jobs, so
 the batch worker keeps its per-job lifecycle; only the dictation worker
 stays up.
@@ -388,14 +392,18 @@ the main actor with a 250 ms timeout so a slow app never delays the capsule.
 | State | Look |
 | --- | --- |
 | Listening | Mic glyph plus 5 level bars driven by the RMS meter, subtle pulse |
-| Transcribing | Bars collapse into a shimmer; text "Transcribing…" only if it exceeds 800 ms |
+| Transcribing | Bars collapse into a shimmer; text "Transcribing…" with a ✕ only if it exceeds 800 ms |
 | Inserted | Checkmark for 600 ms, then fade out |
 | Copied | "Copied. Press ⌘V" for 3 s |
-| Warming up | "Loading model…" |
+| Warming up | "Loading model…"; with a ✕ when it is a dictation waiting for a cold helper, without one for the warm-up at launch |
 | Error | One line, with a "Settings" link, 4 s |
 
 While the mic is held open by a double tap, the capsule has a ✕ (Escape does
-the same) and a Stop button. During a hold it has neither. An optional start/stop tick uses `NSSound`
+the same) and a Stop button. During a hold it has neither. Once the key is
+released, any wait the person can see (loading the model, "Transcribing…",
+"Asking…") has a ✕ that abandons the result; the helper stays warm for the
+next dictation. Escape cancels only an assistant request past its key, since
+an ordinary Escape press would otherwise discard dictated words. An optional start/stop tick uses `NSSound`
 system sounds, off by default. The menu bar icon shows a mic state while
 listening, and the status menu gains a "Dictation: On / Off" item and a
 "Dictation Settings…" item.

@@ -28,6 +28,8 @@ public final class DictationIndicatorController {
     private var targetScreen: NSScreen?
     private var showLabel = false
     private var visible = false
+    /// From listening until the session's outcome; the ✕ is offered only here.
+    private var inSession = false
     private var delayTask: Task<Void, Never>?
     private var dismissalTask: Task<Void, Never>?
 
@@ -90,20 +92,26 @@ public final class DictationIndicatorController {
             visible = true
         case .nothingToWorkWith, .signInRequired:
             delayTask?.cancel(); delayTask = nil
+            inSession = false
             if !visible { beginAnchor() }
             visible = true
             scheduleDismissal(for: state)
         case .inserted, .copied, .error:
             delayTask?.cancel(); delayTask = nil
+            inSession = false
             scheduleDismissal(for: state)
         case .idle:
             delayTask?.cancel(); delayTask = nil
             dismissalTask?.cancel(); dismissalTask = nil
+            inSession = false
             visible = false
             panel.orderOut(nil)
             return
         case .warming:
-            break
+            // Within a session this is a cold helper loading the model, shown
+            // at once with ✕; at launch it is the warm-up, without one.
+            delayTask?.cancel(); delayTask = nil
+            if inSession { visible = true }
         }
         render(state)
     }
@@ -111,6 +119,7 @@ public final class DictationIndicatorController {
     private func beginSession() {
         mode = coordinator.triggerMode
         showLabel = false
+        inSession = true
         visible = mode == .doubleTap
         beginAnchor()
         let session = generation
@@ -195,7 +204,7 @@ public final class DictationIndicatorController {
         let intent = coordinator.intent
         host.rootView = DictationIndicatorView(
             state: state, livePreview: livePreview, showsToggleControls: mode == .doubleTap, showsTranscribingLabel: showLabel,
-            intent: intent, assistantHint: coordinator.assistantHint,
+            showsCancel: inSession, intent: intent, assistantHint: coordinator.assistantHint,
             stop: stop, cancel: cancel, openSettings: intent == .assistant ? openAssistantSettings : openSettings
         )
         let fit = host.sizeThatFits(in: NSSize(width: 700, height: 240))

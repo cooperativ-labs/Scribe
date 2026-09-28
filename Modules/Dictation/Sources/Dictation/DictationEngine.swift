@@ -10,6 +10,12 @@ public struct DictationTranscript: Sendable, Equatable {
 
 /// Owns a separate resident helper. A crashed helper is discarded and the next
 /// warm or dictate call launches a new one; batch transcription is untouched.
+///
+/// A cold helper needs tens of seconds before its first request: the ASR
+/// weights are mapped and the Neural Engine programs compiled. So a helper is
+/// never thrown away while a request is using it. An unload that arrives
+/// mid-request is applied once the request has finished, and cancelling a
+/// request abandons its result without ending the helper.
 public actor DictationEngine {
     private let installation: WorkerInstallation
     private let modelsDirectoryProvider: @Sendable () async -> URL
@@ -22,6 +28,7 @@ public actor DictationEngine {
     private var idleMinutes = 10
     private var requestBusy = false
     private var requestWaiters: [CheckedContinuation<Void, Never>] = []
+    /// A request, including the warm it may need first, is using the helper.
     private var inFlight = false
     private var pendingUnload = false
     private var epoch = 0
@@ -45,12 +52,29 @@ public actor DictationEngine {
         scheduleIdleUnload()
         if pressureSource == nil {
             let source = DispatchSource.makeMemoryPressureSource(eventMask: [.warning, .critical], queue: .global())
-            source.setEventHandler { [weak self] in
-                Task { await self?.unload() }
+            source.setEventHandler { [weak self, weak source] in
+                let critical = source?.data.contains(.critical) ?? false
+                Task { await self?.memoryPressureChanged(critical: critical) }
             }
             source.resume()
             pressureSource = source
         }
+    }
+
+    /// Whether a dictate call can be answered without launching or warming a
+    /// helper. The coordinator uses this to say "Loading model…" rather than
+    /// "Transcribing…" for the tens of seconds a cold start takes.
+    public func isReady() async -> Bool {
+        guard warmTask == nil, let worker else { return false }
+        return await worker.isRunning
+    }
+
+    /// A warning releases a helper the person did not ask to keep; only
+    /// critical pressure overrides "keep model loaded". Neither interrupts a
+    /// request in flight, which `unload` lets finish first.
+    func memoryPressureChanged(critical: Bool) async {
+        guard critical || !keepLoaded else { return }
+        await unload()
     }
 
     public func warm() async throws {
@@ -104,9 +128,12 @@ public actor DictationEngine {
             }
             worker = client
             warmTask = nil
-            scheduleIdleUnload()
+            // A standalone warm applies an unload that waited for it; a
+            // request's warm leaves that to `endRequest`.
+            if pendingUnload, !inFlight { await unload() } else { scheduleIdleUnload() }
         } catch {
             if epoch == startedAtEpoch { warmTask = nil }
+            if pendingUnload, !inFlight { await unload() }
             throw error
         }
     }
@@ -124,35 +151,49 @@ public actor DictationEngine {
             else { requestWaiters.removeFirst().resume() }
         }
         try Task.checkCancellation()
-        try await warm()
-        try Task.checkCancellation()
-        guard let worker else { throw WorkerFailure(code: "worker_unavailable", message: "Dictation helper is unavailable.") }
+        inFlight = true
+        do {
+            try await warm()
+            try Task.checkCancellation()
+        } catch {
+            await endRequest()
+            throw error
+        }
+        guard let worker else {
+            await endRequest()
+            throw WorkerFailure(code: "worker_unavailable", message: "Dictation helper is unavailable.")
+        }
         var payload: [String: WorkerJSONValue] = [
             "audioPath": .string(audioURL.path),
             "runDirectory": .string(runDirectoryURL.path),
         ]
         if let language { payload["language"] = .string(language) }
-        inFlight = true
-        do {
-            let response = try await worker.dictationCommand("dictate", payload: payload)
-            inFlight = false
-            if pendingUnload { await unload() }
-            scheduleIdleUnload()
+        // The helper answers this request whether or not the caller still wants
+        // the answer. Cancelling waits for it, a few seconds of inference at
+        // most, rather than ending a helper that took tens of seconds to warm.
+        let command = Task { try await worker.dictationCommand("dictate", payload: payload) }
+        let outcome = await command.result
+        switch outcome {
+        case let .success(response):
+            await endRequest()
+            try Task.checkCancellation()
             return DictationTranscript(
                 text: response["text"]?.stringValue ?? "",
                 hasSpeech: response["status"]?.stringValue != "no_speech"
             )
-        } catch {
-            inFlight = false
+        case let .failure(error):
+            // The channel or the helper failed; the next request launches anew.
+            if self.worker === worker { self.worker = nil }
             await worker.shutdown()
-            self.worker = nil
-            if pendingUnload { await unload() }
+            await endRequest()
             throw error
         }
     }
 
     public func unload() async {
-        if inFlight {
+        // A request or a warm in progress finishes first; the helper is then
+        // released by `endRequest` or `warm`.
+        if inFlight || warmTask != nil {
             pendingUnload = true
             return
         }
@@ -160,15 +201,20 @@ public actor DictationEngine {
         epoch += 1
         idleTask?.cancel()
         idleTask = nil
-        if let warmTask {
-            _ = try? await warmTask.value
-            self.warmTask = nil
-        }
-        if let worker {
-            _ = try? await worker.dictationCommand("unload")
-            await worker.shutdown()
-        }
+        // Detached before any await so a request arriving meanwhile launches its
+        // own helper instead of sharing one that is on its way out.
+        guard let departing = worker else { return }
         worker = nil
+        workerModelsDirectory = nil
+        if await departing.isRunning {
+            _ = try? await departing.dictationCommand("unload")
+        }
+        await departing.shutdown()
+    }
+
+    private func endRequest() async {
+        inFlight = false
+        if pendingUnload { await unload() } else { scheduleIdleUnload() }
     }
 
     private func scheduleIdleUnload() {

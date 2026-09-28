@@ -57,6 +57,8 @@ public final class DictationCoordinator: ObservableObject {
     private let capture = DictationAudioCapture()
     private var levelTimer: Timer?
     private var transcriptionTask: Task<Void, Never>?
+    /// The current session is waiting for a cold helper to load the model.
+    private var warmingForSession = false
     private var active = false
     private var generation = 0
     private var appliedPolicy: (keepLoaded: Bool, idleMinutes: Int)?
@@ -209,6 +211,17 @@ public final class DictationCoordinator: ObservableObject {
                 var runDirectory: URL?
                 defer { if let runDirectory { try? FileManager.default.removeItem(at: runDirectory) } }
                 do {
+                    // A cold helper spends tens of seconds mapping the model and
+                    // compiling for the Neural Engine; call that what it is.
+                    if !(await engine.isReady()) {
+                        guard let self, self.generation == currentGeneration else { return }
+                        self.warmingForSession = true
+                        self.state = .warming
+                        defer { self.warmingForSession = false }
+                        try await engine.warm()
+                        guard self.generation == currentGeneration, !Task.isCancelled else { return }
+                        self.state = .transcribing
+                    }
                     let directory = FileManager.default.temporaryDirectory.appending(path: "ScribeDictation-\(UUID().uuidString)", directoryHint: .isDirectory)
                     runDirectory = directory
                     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -229,7 +242,7 @@ public final class DictationCoordinator: ObservableObject {
                     }
                 } catch {
                     guard let self, self.generation == currentGeneration else { return }
-                    self.state = .error(error.localizedDescription)
+                    self.state = Self.transcriptionState(for: error)
                 }
             }
         case .cancelled(let reason, _):
@@ -243,20 +256,39 @@ public final class DictationCoordinator: ObservableObject {
         }
     }
 
-    /// Escape and the indicator's Cancel while the assistant transcribes or
-    /// waits for the model. Returns false when there was nothing to cancel.
+    /// The indicator's ✕ once the key is released: the model loading for this
+    /// session, the transcription, or the assistant's request. Returns false
+    /// when there was nothing to cancel.
+    @discardableResult
+    public func cancelPendingRequest() -> Bool {
+        switch state {
+        case .transcribing, .thinking: cancel(); return true
+        case .warming where warmingForSession: cancel(); return true
+        default: return false
+        }
+    }
+
+    /// Escape after the assistant key is released. Escape is left alone for
+    /// dictation, where an ordinary press would discard the words just spoken.
     @discardableResult
     public func cancelAssistantRequest() -> Bool {
         guard intent == .assistant else { return false }
-        switch state {
-        case .transcribing, .thinking: cancel(); return true
-        default: return false
+        return cancelPendingRequest()
+    }
+
+    /// The engine only cancels a request it could not keep; the person is
+    /// told to try again rather than shown Swift's CancellationError text.
+    nonisolated static func transcriptionState(for error: any Error) -> DictationState {
+        if error is CancellationError {
+            return .error("Dictation was interrupted before it finished. Try again.")
         }
+        return .error(error.localizedDescription)
     }
 
     public func cancel() {
         stopPreview()
         generation += 1
+        warmingForSession = false
         transcriptionTask?.cancel()
         transcriptionTask = nil
         sourcesTask?.cancel()
