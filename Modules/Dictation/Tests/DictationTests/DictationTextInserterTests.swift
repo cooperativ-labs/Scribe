@@ -42,8 +42,11 @@ private final class FakeAX: FocusedFieldAXClient, @unchecked Sendable {
     var directWorks = false
     var textRole = true
     var electron = false
+    var exposesFocusedElement = true
     var manualAccessibilityRequests = 0
-    func focusedElement(frontmostPID: pid_t) -> AXUIElement? { frontmostPID == targetPID ? element : nil }
+    func focusedElement(frontmostPID: pid_t) -> AXUIElement? {
+        frontmostPID == targetPID && exposesFocusedElement ? element : nil
+    }
     func pid(of element: AXUIElement) -> pid_t? { elementPID }
     func string(_ attribute: String, of element: AXUIElement) -> String? {
         attribute == kAXRoleAttribute as String ? (textRole ? "AXTextArea" : "AXButton") : nil
@@ -72,9 +75,11 @@ private final class FakeAX: FocusedFieldAXClient, @unchecked Sendable {
 @MainActor private final class FakePaste: DictationPasteClient {
     var pasted: String?
     var copied: String?
+    var restoredClipboard: Bool?
     func copyOnly(_ text: String) { copied = text }
     func insertAndReport(_ text: String, restoreClipboard: Bool) async -> PasteInsertionOutcome {
         pasted = text
+        restoredClipboard = restoreClipboard
         return .posted
     }
 }
@@ -145,6 +150,29 @@ final class DictationTextInserterTests: XCTestCase {
         _ = await locator.locate(frontmostPID: ax.targetPID, screenTop: 100, screens: [])
         _ = await locator.locate(frontmostPID: ax.targetPID, screenTop: 100, screens: [])
         XCTAssertEqual(ax.manualAccessibilityRequests, 1)
+    }
+    @MainActor func testInaccessibleComposerUsesUnverifiedPasteAndKeepsTranscript() async {
+        let ax = FakeAX()
+        ax.exposesFocusedElement = false
+        let paste = FakePaste()
+        let inserter = DictationTextInserter(locator: FocusedFieldLocator(client: ax), paste: paste)
+        let outcome = await inserter.insertDictation("hello", frontmostPID: ax.targetPID, screenTop: 100,
+                                                    screens: [], allowsUnverifiedPaste: true,
+                                                    currentPID: { ax.targetPID })
+        XCTAssertEqual(outcome, .unverifiedPaste)
+        XCTAssertEqual(paste.pasted, "hello")
+        XCTAssertEqual(paste.restoredClipboard, false)
+    }
+    @MainActor func testInaccessibleComposerDoesNotPasteAfterAppSwitch() async {
+        let ax = FakeAX()
+        ax.exposesFocusedElement = false
+        let paste = FakePaste()
+        let inserter = DictationTextInserter(locator: FocusedFieldLocator(client: ax), paste: paste)
+        let outcome = await inserter.insertDictation("hello", frontmostPID: ax.targetPID, screenTop: 100,
+                                                    screens: [], allowsUnverifiedPaste: true,
+                                                    currentPID: { 999 })
+        XCTAssertEqual(outcome, .discarded)
+        XCTAssertNil(paste.pasted)
     }
 }
 

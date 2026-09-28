@@ -10,6 +10,9 @@ public enum DictationState: Sendable, Equatable {
     case listening(level: Float)
     case transcribing
     case inserted(String?)
+    /// A paste was posted into an app whose text field is inaccessible to AX.
+    /// The transcript remains on the clipboard because insertion is unverified.
+    case unverifiedPaste
     case copied
     case error(String)
     /// The assistant's request is in flight: the provider ("ChatGPT") and the model.
@@ -396,6 +399,7 @@ public final class DictationCoordinator: ObservableObject {
                 moved = !(await focusLocator.stillFocused(originalField, frontmostPID: currentPID))
             }
             state = .inserted(moved ? currentApp?.localizedName : nil)
+        case .unverifiedPaste: state = .unverifiedPaste
         case .copied: state = .copied
         case .discarded: state = .idle
         }

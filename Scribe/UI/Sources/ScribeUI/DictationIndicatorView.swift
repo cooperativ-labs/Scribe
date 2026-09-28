@@ -163,6 +163,9 @@ public struct DictationIndicatorView: View {
             case .inserted(let application):
                 Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
                 if let application { Text("Inserted in \(application)") }
+            case .unverifiedPaste:
+                Image(systemName: "doc.on.clipboard")
+                Text("Sent to app. If missing, press ⌘V")
             case .copied:
                 Image(systemName: "doc.on.clipboard")
                 Text("Copied. Press ⌘V")

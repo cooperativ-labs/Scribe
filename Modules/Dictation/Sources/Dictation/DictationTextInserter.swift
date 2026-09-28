@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import Foundation
 import Platform
 
@@ -16,6 +17,7 @@ public struct DictationTextOptions: Sendable {
 public enum DictationInsertionOutcome: Sendable, Equatable {
     case accessibility
     case pasted
+    case unverifiedPaste
     case copied
     case discarded
 }
@@ -67,6 +69,9 @@ public final class DictationTextInserter: TextInserting {
         self.paste = paste
         self.options = options
     }
+    private static func allowsUnverifiedPaste(into pid: pid_t) -> Bool {
+        NSRunningApplication(processIdentifier: pid)?.bundleIdentifier == "com.openai.codex"
+    }
     public func insert(_ text: String) {
         Task { _ = await insertDictation(text) }
     }
@@ -74,15 +79,19 @@ public final class DictationTextInserter: TextInserting {
         guard let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier else { return .discarded }
         let screenTop = NSScreen.screens.first?.frame.maxY ?? 0
         let screens = NSScreen.screens.map(\.frame)
-        return await insertDictation(transcript, frontmostPID: pid, screenTop: screenTop, screens: screens) {
+        let allowsUnverifiedPaste = Self.allowsUnverifiedPaste(into: pid)
+        return await insertDictation(transcript, frontmostPID: pid, screenTop: screenTop, screens: screens,
+                                    allowsUnverifiedPaste: allowsUnverifiedPaste) {
             NSWorkspace.shared.frontmostApplication?.processIdentifier
         }
     }
 
     public func insertDictation(_ transcript: String, frontmostPID pid: pid_t,
                                 screenTop: CGFloat, screens: [CGRect],
+                                allowsUnverifiedPaste: Bool = false,
                                 currentPID: () -> pid_t?) async -> DictationInsertionOutcome {
-        await insert(frontmostPID: pid, screenTop: screenTop, screens: screens, currentPID: currentPID) { [options] preceding, fieldIsEmpty in
+        await insert(frontmostPID: pid, screenTop: screenTop, screens: screens,
+                     allowsUnverifiedPaste: allowsUnverifiedPaste, currentPID: currentPID) { [options] preceding, fieldIsEmpty in
             DictationTextShaper.shape(transcript, preceding: preceding, fieldIsEmpty: fieldIsEmpty, options: options)
         }
     }
@@ -96,16 +105,20 @@ public final class DictationTextInserter: TextInserting {
         }
         let screenTop = NSScreen.screens.first?.frame.maxY ?? 0
         let screens = NSScreen.screens.map(\.frame)
-        return await insertGenerated(answer, copyOnly: copyOnly, frontmostPID: pid, screenTop: screenTop, screens: screens) {
+        let allowsUnverifiedPaste = Self.allowsUnverifiedPaste(into: pid)
+        return await insertGenerated(answer, copyOnly: copyOnly, frontmostPID: pid, screenTop: screenTop,
+                                     screens: screens, allowsUnverifiedPaste: allowsUnverifiedPaste) {
             NSWorkspace.shared.frontmostApplication?.processIdentifier
         }
     }
 
     public func insertGenerated(_ answer: String, copyOnly: Bool = false, frontmostPID pid: pid_t,
                                 screenTop: CGFloat, screens: [CGRect],
+                                allowsUnverifiedPaste: Bool = false,
                                 currentPID: () -> pid_t?) async -> DictationInsertionOutcome {
         if copyOnly { return copyGenerated(answer) }
-        let outcome = await insert(frontmostPID: pid, screenTop: screenTop, screens: screens, currentPID: currentPID) { [options] preceding, _ in
+        let outcome = await insert(frontmostPID: pid, screenTop: screenTop, screens: screens,
+                                   allowsUnverifiedPaste: allowsUnverifiedPaste, currentPID: currentPID) { [options] preceding, _ in
             DictationTextShaper.shapeGenerated(answer, preceding: preceding, options: options)
         }
         // An answer the person waited for is never thrown away: when focus
@@ -119,25 +132,41 @@ public final class DictationTextInserter: TextInserting {
         return .copied
     }
 
-    private func insert(frontmostPID pid: pid_t, screenTop: CGFloat, screens: [CGRect], currentPID: () -> pid_t?,
+    private func insert(frontmostPID pid: pid_t, screenTop: CGFloat, screens: [CGRect],
+                        allowsUnverifiedPaste: Bool, currentPID: () -> pid_t?,
                         shape: (_ preceding: String?, _ fieldIsEmpty: Bool?) -> String?) async -> DictationInsertionOutcome {
         let snapshot = await locator.locate(frontmostPID: pid, screenTop: screenTop, screens: screens)
-        guard let snapshot, !snapshot.isSecure else { return .discarded }
-        guard snapshot.isTextRole else {
-            guard let text = shape(nil, nil) else { return .discarded }
-            paste.copyOnly(text)
+        guard snapshot?.isSecure != true else { return .discarded }
+        if let snapshot, snapshot.isTextRole {
+            let preceding = await locator.precedingCharacter(snapshot)
+            guard let text = shape(preceding, snapshot.valueLength == 0) else { return .discarded }
+            if currentPID() == pid, await locator.stillFocused(snapshot, frontmostPID: pid) {
+                if snapshot.selectedTextSettable, await locator.insertDirect(text, into: snapshot) { return .accessibility }
+                if currentPID() == pid, await locator.stillFocused(snapshot, frontmostPID: pid) {
+                    switch await paste.insertAndReport(text, restoreClipboard: options.restoreClipboard) {
+                    case .posted: return .pasted
+                    case .copied, .failed: return .copied
+                    }
+                }
+            }
+        }
+        guard let text = shape(nil, true) else { return .discarded }
+        if allowsUnverifiedPaste, currentPID() == pid, !IsSecureEventInputEnabled() {
+            // This app may provide no AX field at all. Keep the transcript on
+            // the clipboard because a posted Cmd-V cannot be verified here.
+            switch await paste.insertAndReport(text, restoreClipboard: false) {
+            case .posted: return .unverifiedPaste
+            case .copied: return .copied
+            case .failed:
+                paste.copyOnly(text)
+                return .copied
+            }
+        }
+        if let snapshot, !snapshot.isTextRole {
+            guard let copiedText = shape(nil, nil) else { return .discarded }
+            paste.copyOnly(copiedText)
             return .copied
         }
-        let preceding = await locator.precedingCharacter(snapshot)
-        guard let text = shape(preceding, snapshot.valueLength == 0) else { return .discarded }
-        guard currentPID() == pid,
-              await locator.stillFocused(snapshot, frontmostPID: pid) else { return .discarded }
-        if snapshot.selectedTextSettable, await locator.insertDirect(text, into: snapshot) { return .accessibility }
-        guard currentPID() == pid,
-              await locator.stillFocused(snapshot, frontmostPID: pid) else { return .discarded }
-        switch await paste.insertAndReport(text, restoreClipboard: options.restoreClipboard) {
-        case .posted: return .pasted
-        case .copied, .failed: return .copied
-        }
+        return .discarded
     }
 }

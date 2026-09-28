@@ -96,7 +96,7 @@ public final class DictationIndicatorController {
             if !visible { beginAnchor() }
             visible = true
             scheduleDismissal(for: state)
-        case .inserted, .copied, .error:
+        case .inserted, .unverifiedPaste, .copied, .error:
             delayTask?.cancel(); delayTask = nil
             inSession = false
             scheduleDismissal(for: state)
@@ -182,7 +182,7 @@ public final class DictationIndicatorController {
         let duration: Int
         switch state {
         case .inserted: duration = 600
-        case .copied: duration = 3_000
+        case .unverifiedPaste, .copied: duration = 3_000
         case .signInRequired: duration = 6_000
         default: duration = 4_000
         }
