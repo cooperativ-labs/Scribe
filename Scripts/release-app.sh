@@ -91,29 +91,34 @@ xcrun notarytool store-credentials "$NOTARYTOOL_PROFILE" \
 
 distribution_dir="$repo_root/dist"
 # Keep the distribution directory limited to the artifacts from this release.
-# The archive is versioned, so removing only the current path would leave
-# archives and checksums from earlier releases behind.
+# The artifacts are versioned, so removing only the current paths would leave
+# files and checksums from earlier releases behind.
 rm -f -- \
   "$distribution_dir"/Scribe-*-macos.zip \
-  "$distribution_dir"/Scribe-*-macos.zip.sha256
+  "$distribution_dir"/Scribe-*-macos.zip.sha256 \
+  "$distribution_dir"/Scribe-*-macos.dmg \
+  "$distribution_dir"/Scribe-*-macos.dmg.sha256
 archive_path="$distribution_dir/Scribe-$version-macos.zip"
-rm -f -- "$archive_path" "$archive_path.sha256"
-Scripts/package-app.sh --inputs "$inputs_file" --notary-profile "$NOTARYTOOL_PROFILE" --output "$archive_path"
-[[ -f "$archive_path" ]] || die "notarization completed but no release archive was produced"
+dmg_path="$distribution_dir/Scribe-$version-macos.dmg"
+rm -f -- "$archive_path" "$archive_path.sha256" "$dmg_path" "$dmg_path.sha256"
+Scripts/package-app.sh --inputs "$inputs_file" --notary-profile "$NOTARYTOOL_PROFILE" \
+  --output "$archive_path" --dmg-output "$dmg_path"
+[[ -f "$archive_path" && -f "$dmg_path" ]] || die "notarization completed but release artifacts are missing"
 shasum -a 256 "$archive_path" | sed 's|  .*/|  |' > "$archive_path.sha256"
+shasum -a 256 "$dmg_path" | sed 's|  .*/|  |' > "$dmg_path.sha256"
 
 git tag --annotate "$tag" --message "Scribe $version"
 git push origin "HEAD:refs/heads/$branch" "refs/tags/$tag"
 
 if ! command -v gh >/dev/null 2>&1; then
   cat >&2 <<EOF
-Published $tag, but the GitHub CLI is not installed so the notarized archive
-was not uploaded. Install gh, then run:
-  gh release create "$tag" "$archive_path" "$archive_path.sha256" --title "Scribe $tag" --generate-notes
+Published $tag, but the GitHub CLI is not installed so the notarized assets
+were not uploaded. Install gh, then run:
+  gh release create "$tag" "$archive_path" "$archive_path.sha256" "$dmg_path" "$dmg_path.sha256" --title "Scribe $tag" --generate-notes
 EOF
   exit 1
 fi
 
-gh release create "$tag" "$archive_path" "$archive_path.sha256" \
+gh release create "$tag" "$archive_path" "$archive_path.sha256" "$dmg_path" "$dmg_path.sha256" \
   --title "Scribe $tag" --generate-notes
-echo "Published $tag with $archive_path"
+echo "Published $tag with $archive_path and $dmg_path"

@@ -47,9 +47,9 @@ description = "Set the next UTC timestamp-based marketing and build version"
 run = "Scripts/bump-minor-version.sh"
 
 [tasks.package]
-description = "Build, sign, notarize, and archive from reviewed local release inputs"
+description = "Build, sign, and notarize the app, update ZIP, and download DMG"
 run = "Scripts/package-app.sh --inputs Scripts/release-inputs.local.env"
 
 [tasks.release]
-description = "Publish the committed, notarized archive and checksum as a GitHub release"
+description = "Publish the notarized DMG and ZIP with checksums as a GitHub release"
 run = "Scripts/release-app.sh --inputs Scripts/release-inputs.local.env"

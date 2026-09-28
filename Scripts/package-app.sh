@@ -9,11 +9,12 @@ repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 
 usage() {
   cat <<'EOF'
-Usage: Scripts/package-app.sh [--inputs PATH] [--notary-profile NAME] [--output PATH]
+Usage: Scripts/package-app.sh [--inputs PATH] [--notary-profile NAME] [--output PATH] [--dmg-output PATH]
 
 --inputs PATH  Source a local release-input environment file before validation.
 --notary-profile NAME  Override the notarytool keychain profile from inputs.
 --output PATH  Write the notarized Scribe.zip archive to PATH.
+--dmg-output PATH  Write the signed, notarized Scribe.dmg to PATH.
 
 Required environment:
   DEVELOPER_ID_APPLICATION  Developer ID Application signing identity.
@@ -72,6 +73,11 @@ Copy Scripts/release-inputs.example.env to Scripts/release-inputs.local.env and 
       output_archive="$2"
       shift 2
       ;;
+    --dmg-output)
+      (($# >= 2)) || die "--dmg-output requires a path"
+      output_dmg="$2"
+      shift 2
+      ;;
     -h|--help) usage; exit 0 ;;
     *) die "unknown argument: $1" ;;
   esac
@@ -89,7 +95,7 @@ helpers_dir="$app_path/Contents/Library/Helpers"
 frameworks_dir="$app_path/Contents/Frameworks"
 notarytool_profile="${notarytool_profile_override:-${NOTARYTOOL_PROFILE:-}}"
 
-for command in xcodebuild swift codesign xcrun ditto find file grep spctl; do require_command "$command"; done
+for command in xcodebuild swift codesign xcrun ditto diskutil find file grep readlink spctl unzip; do require_command "$command"; done
 for variable in DEVELOPER_ID_APPLICATION DEVELOPER_TEAM_ID SCRIBE_FFMPEG_PATH SCRIBE_FFPROBE_PATH; do require_value "$variable"; done
 [[ -n "$notarytool_profile" ]] || die "NOTARYTOOL_PROFILE is required; see Scripts/release-inputs.example.env"
 for variable in SCRIBE_NOTICE_WEBRTC SCRIBE_NOTICE_FLUIDAUDIO SCRIBE_NOTICE_PARAKEET SCRIBE_NOTICE_DIARIZATION SCRIBE_NOTICE_FFMPEG; do require_value "$variable"; done
@@ -211,8 +217,10 @@ if [[ "${SCRIBE_LIBFLAC_BUNDLED:-0}" == "1" ]]; then
 fi
 
 output_archive="${output_archive:-$distribution_dir/Scribe.zip}"
-mkdir -p "$(dirname "$output_archive")"
-rm -f "$notarization_archive" "$output_archive"
+output_dmg="${output_dmg:-${output_archive%.zip}.dmg}"
+[[ "$output_archive" != "$output_dmg" ]] || die "ZIP and DMG output paths must differ"
+mkdir -p "$(dirname "$output_archive")" "$(dirname "$output_dmg")"
+rm -f "$notarization_archive" "$output_archive" "$output_dmg"
 echo "Creating notarization archive…"
 ditto -c -k --keepParent "$app_path" "$notarization_archive"
 
@@ -224,7 +232,50 @@ spctl --assess --type execute --verbose=4 "$app_path"
 
 # The notarization upload predates stapling. Recreate the distributable archive
 # from the stapled app so offline installation receives the ticket as well.
-ditto -c -k --keepParent "$app_path" "$output_archive"
+# Do not add AppleDouble ._ entries for extended attributes: extractors that
+# leave them as files inside the bundle invalidate its sealed resources.
+ditto -c -k --norsrc --keepParent "$app_path" "$output_archive"
+
+# Verify the artifact as a recipient might extract it, not only the source app.
+scratch_root="${TMPDIR:-/tmp}"
+[[ -d "$scratch_root" ]] || scratch_root=/tmp
+verification_dir="$(mktemp -d "$scratch_root/scribe-release-verify.XXXXXX")"
+mount_point="$verification_dir/mounted"
+mounted=0
+cleanup() {
+  if [[ "$mounted" == 1 ]]; then diskutil eject "$mount_point" >/dev/null || true; fi
+  rm -rf "$verification_dir"
+}
+trap cleanup EXIT
+unzip -q "$output_archive" -d "$verification_dir"
+extracted_app="$verification_dir/Scribe.app"
+[[ -d "$extracted_app" ]] || die "release archive did not contain Scribe.app"
+codesign --verify --deep --strict --verbose=2 "$extracted_app"
+xcrun stapler validate "$extracted_app"
+spctl --assess --type execute --verbose=4 "$extracted_app"
+
+echo "Creating signed distribution disk image…"
+ln -s /Applications "$verification_dir/Applications"
+diskutil image create from --format UDZO --volumeName Scribe "$verification_dir" "$output_dmg"
+codesign --force --sign "$DEVELOPER_ID_APPLICATION" --timestamp "$output_dmg"
+codesign --verify --verbose=2 "$output_dmg"
+
+echo "Submitting disk image to Apple notarization…"
+xcrun notarytool submit "$output_dmg" --keychain-profile "$notarytool_profile" --wait
+xcrun stapler staple "$output_dmg"
+xcrun stapler validate "$output_dmg"
+spctl --assess --type open --context context:primary-signature --verbose=4 "$output_dmg"
+
+# Check the mounted image as well as its signature and ticket.
+diskutil image attach --readOnly --nobrowse --mountPoint "$mount_point" "$output_dmg"
+mounted=1
+[[ "$(readlink "$mount_point/Applications")" == /Applications ]] || die "disk image is missing the Applications link"
+codesign --verify --deep --strict --verbose=2 "$mount_point/Scribe.app"
+xcrun stapler validate "$mount_point/Scribe.app"
+spctl --assess --type execute --verbose=4 "$mount_point/Scribe.app"
+diskutil eject "$mount_point"
+mounted=0
 
 echo "Notarized archive: $output_archive"
+echo "Notarized disk image: $output_dmg"
 echo "Notarized app: $app_path"

@@ -122,6 +122,12 @@ Sandbox, and the hardened runtime. `Scripts/package-app.sh` builds an archive,
 embeds the transcription helper plus FFmpeg/ffprobe and any local runtime
 frameworks, aggregates required third-party notices, signs nested Mach-O code,
 notarizes, staples, checks Gatekeeper, and creates `build/release/distribution/Scribe.zip`.
+It also creates a signed, notarized `Scribe.dmg` containing the app and an
+Applications shortcut. The website offers the DMG for drag-to-Applications
+installation; the ZIP remains the in-app update artifact. The release command
+uploads both files and their SHA-256 checksums to the same GitHub release.
+To install from the website, open the DMG, drag Scribe to Applications, eject
+the disk image, then open Scribe from Applications.
 It accepts only reviewed local paths—there are no dependency or model download
 steps in the release script.
 

@@ -11,6 +11,8 @@ const LATEST = {
   assets: [
     { name: 'Scribe-0.2609270609.0-macos.zip.sha256', state: 'uploaded', size: 98, browser_download_url: 'https://github.com/cooperativ-labs/Scribe/releases/download/v0.2609270609.0/Scribe-0.2609270609.0-macos.zip.sha256' },
     { name: 'Scribe-0.2609270609.0-macos.zip', state: 'uploaded', size: 28748454, browser_download_url: 'https://github.com/cooperativ-labs/Scribe/releases/download/v0.2609270609.0/Scribe-0.2609270609.0-macos.zip' },
+    { name: 'Scribe-0.2609270609.0-macos.dmg.sha256', state: 'uploaded', size: 98, browser_download_url: 'https://github.com/cooperativ-labs/Scribe/releases/download/v0.2609270609.0/Scribe-0.2609270609.0-macos.dmg.sha256' },
+    { name: 'Scribe-0.2609270609.0-macos.dmg', state: 'uploaded', size: 32854855, browser_download_url: 'https://github.com/cooperativ-labs/Scribe/releases/download/v0.2609270609.0/Scribe-0.2609270609.0-macos.dmg' },
   ],
 };
 
@@ -25,17 +27,23 @@ function githubStub(responses) {
   return { fetch, calls };
 }
 
-test('the newest macOS archive is picked out of a release and cached through outages', async () => {
+test('the newest macOS disk image is preferred and cached through outages', async () => {
   assert.equal(releaseFromGitHub({ tag_name: 'v1', assets: [{ name: 'Scribe-1-macos.zip', state: 'open', browser_download_url: 'x' }] }), null, 'an asset still uploading is not offered');
   assert.equal(releaseFromGitHub({ tag_name: 'v1', assets: [{ name: 'notes.txt', browser_download_url: 'x' }] }), null);
+  const zipOnly = releaseFromGitHub({ ...LATEST, assets: LATEST.assets.slice(0, 2) });
+  assert.equal(zipOnly.url, LATEST.assets[1].browser_download_url, 'older ZIP-only releases remain downloadable');
+  assert.equal(zipOnly.format, 'zip');
+  const uploadingDmg = releaseFromGitHub({ ...LATEST, assets: [...LATEST.assets.slice(0, 3), { ...LATEST.assets[3], state: 'open' }] });
+  assert.equal(uploadingDmg.url, LATEST.assets[1].browser_download_url, 'an incomplete DMG does not replace the ZIP');
   let clock = 1_000_000;
   const github = githubStub([{ status: 200, body: LATEST }, { status: 403, body: {} }, new Error('offline'), { status: 200, body: { ...LATEST, tag_name: 'v0.3' } }]);
   const source = new ReleaseSource({ fetch: github.fetch, now: () => clock, ttlMs: 600_000, retryMs: 60_000, token: 'ghp_test' });
   const [first, again] = await Promise.all([source.latest(), source.latest()]);
   assert.equal(first.version, '0.2609270609.0');
-  assert.equal(first.url, LATEST.assets[1].browser_download_url);
-  assert.equal(first.checksumURL, LATEST.assets[0].browser_download_url);
-  assert.equal(first.size, 28748454);
+  assert.equal(first.url, LATEST.assets[3].browser_download_url);
+  assert.equal(first.checksumURL, LATEST.assets[2].browser_download_url);
+  assert.equal(first.format, 'dmg');
+  assert.equal(first.size, 32854855);
   assert.equal(again, first, 'concurrent callers share one request');
   assert.equal(github.calls.length, 1);
   assert.match(github.calls[0].url, /api\.github\.com\/repos\/cooperativ-labs\/Scribe\/releases\/latest$/);
@@ -50,17 +58,20 @@ test('the newest macOS archive is picked out of a release and cached through out
 test('the page renders with and without a known release, escaping what GitHub says', () => {
   const releases = new ReleaseSource({ fetch: async () => { throw new Error('unused'); } });
   const withRelease = renderSite({ release: releaseFromGitHub({ ...LATEST, tag_name: 'v1.0<script>' }), releases });
-  assert.match(withRelease, /Version 1\.0&lt;script&gt;, released 27 September 2026\. 28\.7 MB zip, notarized by Apple\./);
+  assert.match(withRelease, /Version 1\.0&lt;script&gt;, released 27 September 2026\. 32\.9 MB dmg, notarized by Apple\./);
   assert.match(withRelease, /href="\/download"[^>]*>[\s\S]*?Download for macOS/);
+  assert.match(withRelease, /Open the disk image and drag Scribe to Applications\./);
   assert.match(withRelease, /SHA-256/);
   assert.doesNotMatch(withRelease, /<script/);
+  const withZip = renderSite({ release: releaseFromGitHub({ ...LATEST, assets: LATEST.assets.slice(0, 2) }), releases });
+  assert.match(withZip, /Unzip and move Scribe to Applications\./);
   const without = renderSite({ release: null, releases });
   assert.match(without, /The newest notarized build from GitHub\./);
   assert.match(without, /href="https:\/\/github\.com\/cooperativ-labs\/Scribe\/releases"/);
   assert.doesNotMatch(without, /SHA-256/);
 });
 
-test('the relay serves the page at its root and redirects /download to the latest macOS archive', async t => {
+test('the relay serves the page at its root and redirects /download to the latest macOS disk image', async t => {
   const root = await mkdtemp(path.join(tmpdir(), 'scribe-site-'));
   const github = githubStub([{ status: 200, body: LATEST }]);
   const relay = await startRelay(t, root, { site: { fetch: github.fetch } });
@@ -74,7 +85,7 @@ test('the relay serves the page at its root and redirects /download to the lates
   assert.match(html, /Version 0\.2609270609\.0/);
   const download = await fetch(relay.origin + '/download', { redirect: 'manual' });
   assert.equal(download.status, 302);
-  assert.equal(download.headers.get('location'), LATEST.assets[1].browser_download_url);
+  assert.equal(download.headers.get('location'), LATEST.assets[3].browser_download_url);
   const api = await (await fetch(relay.origin + '/api/release')).json();
   assert.equal(api.version, '0.2609270609.0'); assert.equal(api.download, '/download');
   const mark = await fetch(relay.origin + '/site/mark.png');

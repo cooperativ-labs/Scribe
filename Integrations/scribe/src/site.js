@@ -7,8 +7,8 @@
 // right at first paint and the page needs nothing but its own inline styles.
 //
 // `/download` asks GitHub for the latest release and redirects to its macOS
-// archive (`Scribe-<version>-macos.zip`, as Scripts/release-app.sh names it),
-// so shipping a release changes nothing here. The answer is cached for ten
+// disk image (`Scribe-<version>-macos.dmg`). Older ZIP-only releases remain
+// available as a fallback. The answer is cached for ten
 // minutes; if GitHub cannot be reached the last good answer is kept, and with
 // none the button falls back to the releases page.
 
@@ -17,22 +17,26 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const DEFAULT_RELEASE_REPO = 'cooperativ-labs/Scribe';
+const MAC_DISK_IMAGE = /-macos\.dmg$/i;
 const MAC_ARCHIVE = /-macos\.zip$/i;
 const SITE_FILES = new Set(['mark.png', 'logo.png', 'icon.png']);
 
-/// The parts of a GitHub release the page shows, or null without a macOS archive.
+/// The parts of a GitHub release the page shows, or null without a macOS download.
 export function releaseFromGitHub(json) {
   const assets = Array.isArray(json?.assets) ? json.assets : [];
-  const archive = assets.find(asset => MAC_ARCHIVE.test(asset?.name ?? '') && (asset.state ?? 'uploaded') === 'uploaded');
-  if (!archive || typeof json.tag_name !== 'string') return null;
-  const checksum = assets.find(asset => asset?.name === `${archive.name}.sha256`);
+  const uploaded = asset => (asset.state ?? 'uploaded') === 'uploaded';
+  const download = assets.find(asset => MAC_DISK_IMAGE.test(asset?.name ?? '') && uploaded(asset))
+    ?? assets.find(asset => MAC_ARCHIVE.test(asset?.name ?? '') && uploaded(asset));
+  if (!download || typeof json.tag_name !== 'string') return null;
+  const checksum = assets.find(asset => asset?.name === `${download.name}.sha256` && uploaded(asset));
   return {
     tag: json.tag_name,
     version: json.tag_name.replace(/^v/, ''),
     publishedAt: json.published_at ?? null,
-    name: archive.name,
-    size: Number.isFinite(archive.size) ? archive.size : null,
-    url: archive.browser_download_url,
+    name: download.name,
+    format: MAC_DISK_IMAGE.test(download.name) ? 'dmg' : 'zip',
+    size: Number.isFinite(download.size) ? download.size : null,
+    url: download.browser_download_url,
     checksumURL: checksum?.browser_download_url ?? null,
     notesURL: json.html_url ?? null,
   };
@@ -112,7 +116,7 @@ export function renderSite({ release, releases }) {
   const releasesURL = releases?.releasesURL ?? `https://github.com/${DEFAULT_RELEASE_REPO}/releases`;
   const repoURL = releasesURL.replace(/\/releases$/, '');
   const versionLine = release
-    ? `Version ${escape(release.version)}${release.publishedAt && shortDate(release.publishedAt) ? `, released ${escape(shortDate(release.publishedAt))}` : ''}${release.size ? `. ${escape(megabytes(release.size))} zip` : ''}, notarized by Apple.`
+    ? `Version ${escape(release.version)}${release.publishedAt && shortDate(release.publishedAt) ? `, released ${escape(shortDate(release.publishedAt))}` : ''}${release.size ? `. ${escape(megabytes(release.size))} ${release.format}` : ''}, notarized by Apple.`
     : 'The newest notarized build from GitHub.';
   const notesURL = release?.notesURL ?? releasesURL;
   return `<!doctype html>
@@ -345,6 +349,7 @@ footer .made { margin-left: auto; }
           Download for macOS
         </a>
         <p class="version">${versionLine}${release?.checksumURL ? ` <a href="${escape(release.checksumURL)}">SHA-256</a>` : ''}</p>
+        ${release ? `<p class="requires">${release.format === 'dmg' ? 'Open the disk image and drag Scribe to Applications.' : 'Unzip and move Scribe to Applications.'}</p>` : ''}
         <p class="requires">macOS 15 or later on Apple silicon.</p>
       </div>
 
