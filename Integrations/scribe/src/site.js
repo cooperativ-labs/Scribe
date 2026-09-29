@@ -443,12 +443,12 @@ footer .made { margin-left: auto; }
         <span class="new">New</span>
         <h2 id="assist-heading">Say what you want written, and it appears where you type</h2>
         <p>Hold a second key, right Shift unless you pick another, and say something like "reply that Thursday works but pricing waits". Scribe reads what is in front of you, asks the model you chose, and types the answer into the field you are in. Select a paragraph first and say "make this shorter" to rewrite it in place, or copy text from anywhere and say what to do with it.</p>
-        <p>In Settings → Assistants → Voice Assistant, sign in with your ChatGPT account, add an API key for OpenAI, Anthropic, Google Gemini, OpenRouter, Vercel AI Gateway, xAI, Groq, Mistral or DeepSeek, or connect a custom OpenAI-compatible endpoint such as Ollama or LM Studio.</p>
-        <p>You can also choose Apple's on-device model on macOS 26 or later. Apple Private Cloud Compute appears on macOS 27 or later, but needs an Apple-approved build before it can answer. ChatGPT uses your plan's Codex allowance; API providers bill your own account. Your spoken instruction is transcribed on your Mac, and Escape cancels a request at any point.</p>
+        <p>In Settings → Assistants → Voice Assistant, connect your ChatGPT account through the installed Codex CLI, add an API key for OpenAI, Anthropic, Google Gemini, OpenRouter, Vercel AI Gateway, xAI, Groq, Mistral or DeepSeek, or connect a custom OpenAI-compatible endpoint such as Ollama or LM Studio.</p>
+        <p>You can also choose Apple's on-device model on macOS 26 or later. Apple Private Cloud Compute appears on macOS 27 or later, but needs an Apple-approved build before it can answer. ChatGPT uses your plan's Codex allowance, connected Codex tools and enabled local Codex memory; API providers bill your own account. Your spoken instruction is transcribed on your Mac, and Escape cancels a request at any point.</p>
         <dl>
           <dt>Sent</dt><dd>The instruction you spoke, your selection, text you copied since the last request, and the text in the front app's windows. Each source has its own switch.</dd>
-          <dt>Never sent</dt><dd>Audio, screenshots, other apps, and password fields.</dd>
-          <dt>Kept by Scribe</dt><dd>Nothing after the answer is inserted. Requests go directly from your Mac to the provider or endpoint you choose; Apple's on-device model keeps them on your Mac. OpenAI API requests have storage turned off. Other providers apply their own policies.</dd>
+          <dt>Never sent by Scribe</dt><dd>Audio, screenshots and password-field contents. Connected Codex tools may access services you authorized.</dd>
+          <dt>Kept by Scribe</dt><dd>Nothing after the answer is inserted. ChatGPT requests run through Codex App Server in an ephemeral thread; API-key requests go directly to the chosen provider or endpoint. Apple's on-device model keeps requests on your Mac. OpenAI API requests have storage turned off. Codex and other providers apply their own policies.</dd>
         </dl>
       </div>
 

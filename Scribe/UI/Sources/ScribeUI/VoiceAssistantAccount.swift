@@ -6,9 +6,8 @@ import Platform
 /// the model list, the API key for each provider, and Apple's models on this
 /// Mac and on Private Cloud Compute.
 ///
-/// Secrets stay in the Keychain behind `ChatGPTSession` and the API-key stores;
-/// settings cache only the plan, the account label and the chosen model, so
-/// opening Settings never reads a token.
+/// Codex manages its ChatGPT credential and connected tools. API provider keys
+/// remain in Scribe's Keychain. Settings cache only display labels and models.
 @MainActor
 public final class VoiceAssistantAccount: ObservableObject {
     public static let shared = VoiceAssistantAccount()
@@ -16,7 +15,7 @@ public final class VoiceAssistantAccount: ObservableObject {
     public enum SignInState: Equatable {
         case signedOut
         case requestingCode
-        case awaitingCode(DeviceSignIn)
+        case awaitingCode(CodexDeviceCode)
         case signedIn
     }
 
@@ -43,17 +42,18 @@ public final class VoiceAssistantAccount: ObservableObject {
     /// Whether Apple offers a way to raise the Private Cloud Compute quota.
     @Published public private(set) var privateCloudCanIncreaseLimit = false
 
-    let session: ChatGPTSession
+    let codex: CodexAppServer
     private let apiKeyStore: @Sendable (AssistProvider) -> SecretStore
     private var signInTask: Task<Void, Never>?
+    private var signInGeneration = 0
     private var loaded = false
     private var customEndpointRevision = 0
 
     init(
-        session: ChatGPTSession = ChatGPTSession(),
+        codex: CodexAppServer = CodexAppServer(),
         apiKeyStore: @escaping @Sendable (AssistProvider) -> SecretStore = { KeychainStore(service: $0.keychainService) }
     ) {
-        self.session = session
+        self.codex = codex
         self.apiKeyStore = apiKeyStore
     }
 
@@ -65,11 +65,17 @@ public final class VoiceAssistantAccount: ObservableObject {
             providersWithKeys = Set(AssistProvider.allCases.filter {
                 (try? apiKeyStore($0).contains(OpenAIKeyAssistant.keychainAccount)) ?? false
             })
-            if case .signedOut = signIn, await session.isSignedIn() {
-                signIn = .signedIn
-            } else if case .signedOut = signIn {
-                settings.assistantChatGPTPlan = nil
-                settings.assistantChatGPTAccountLabel = nil
+        }
+        if signInTask == nil {
+            do {
+                if let account = try await codex.account() {
+                    setSignedIn(account, settings: settings)
+                } else {
+                    clearSignedIn(settings: settings)
+                }
+            } catch {
+                clearSignedIn(settings: settings)
+                signInError = error.localizedDescription
             }
         }
         onDeviceStatus = OnDeviceModel.status
@@ -91,24 +97,30 @@ public final class VoiceAssistantAccount: ObservableObject {
         privateCloudCanIncreaseLimit = PrivateCloudModel.canIncreaseLimit
     }
 
-    // MARK: ChatGPT sign-in
+    // MARK: Codex-managed ChatGPT sign-in
 
     public func beginSignIn(settings: ScribeSettings) {
         signInTask?.cancel()
+        signInGeneration += 1
+        let generation = signInGeneration
         signInError = nil
         signIn = .requestingCode
-        signInTask = Task {
+        signInTask = Task { [self] in
+            defer { if signInGeneration == generation { signInTask = nil } }
             do {
-                let pending = try await session.beginDeviceSignIn()
-                signIn = .awaitingCode(pending)
-                let account = try await session.completeDeviceSignIn(pending)
-                settings.assistantChatGPTPlan = account.planName
-                settings.assistantChatGPTAccountLabel = account.email ?? account.accountID
-                signIn = .signedIn
+                let signedInAccount = try await codex.signIn { pending in
+                    await MainActor.run {
+                        if self.signInGeneration == generation { self.signIn = .awaitingCode(pending) }
+                    }
+                }
+                guard signInGeneration == generation else { return }
+                setSignedIn(signedInAccount, settings: settings)
                 await refreshModels(settings: settings)
             } catch is CancellationError {
-                signIn = .signedOut
+                if signInGeneration == generation { signIn = .signedOut }
             } catch {
+                guard signInGeneration == generation else { return }
+                guard !Task.isCancelled else { signIn = .signedOut; return }
                 signInError = error.localizedDescription
                 signIn = .signedOut
             }
@@ -117,23 +129,27 @@ public final class VoiceAssistantAccount: ObservableObject {
 
     public func cancelSignIn() {
         signInTask?.cancel()
+        signInGeneration += 1
         signInTask = nil
         signIn = .signedOut
     }
 
     public func signOut(settings: ScribeSettings) {
         signInTask?.cancel()
+        signInGeneration += 1
+        signInTask = nil
+        signIn = .signedOut
         Task {
             do {
-                try await session.signOut()
+                try await codex.signOut()
                 signInError = nil
             } catch {
                 signInError = error.localizedDescription
             }
-            signIn = await session.isSignedIn() ? .signedIn : .signedOut
-            if signIn == .signedOut {
-                settings.assistantChatGPTPlan = nil
-                settings.assistantChatGPTAccountLabel = nil
+            if let account = try? await codex.account() {
+                setSignedIn(account, settings: settings)
+            } else {
+                clearSignedIn(settings: settings)
                 models = []
                 modelsError = nil
             }
@@ -145,20 +161,28 @@ public final class VoiceAssistantAccount: ObservableObject {
         modelsLoading = true
         defer { modelsLoading = false }
         do {
-            models = try await session.models()
+            models = try await codex.models()
             modelsError = nil
             if let choice = Self.modelChoice(current: settings.assistantChatGPTModel, in: models) {
                 settings.assistantChatGPTModel = choice.slug
                 settings.assistantChatGPTModelName = choice.displayName
             }
-        } catch AssistError.signInRequired {
-            signIn = .signedOut
-            settings.assistantChatGPTPlan = nil
-            settings.assistantChatGPTAccountLabel = nil
-            signInError = AssistError.signInRequired.localizedDescription
         } catch {
             modelsError = error.localizedDescription
         }
+    }
+
+    private func setSignedIn(_ account: CodexAccount, settings: ScribeSettings) {
+        settings.assistantChatGPTPlan = account.planName
+        settings.assistantChatGPTAccountLabel = account.email
+        signIn = .signedIn
+        signInError = nil
+    }
+
+    private func clearSignedIn(settings: ScribeSettings) {
+        signIn = .signedOut
+        settings.assistantChatGPTPlan = nil
+        settings.assistantChatGPTAccountLabel = nil
     }
 
     /// The model to select after a list loads: the current one while it is
@@ -307,7 +331,10 @@ public final class VoiceAssistantAccount: ObservableObject {
         switch settings.assistantAccountType {
         case .chatGPT:
             guard signIn == .signedIn, let model = settings.assistantChatGPTModel else { return nil }
-            return ChatGPTAssistant(session: session, model: model, systemPrompt: settings.assistantSystemPrompt)
+            return CodexAppServerAssistant(
+                server: codex, model: model, systemPrompt: settings.assistantSystemPrompt,
+                requestInput: { questions in await CodexToolApprovalPresenter.answer(questions) }
+            )
         case .apiKey:
             guard let assistant = apiAssistant(for: Self.provider(settings: settings), settings: settings), !assistant.model.isEmpty else { return nil }
             return assistant
@@ -345,7 +372,9 @@ public final class VoiceAssistantAccount: ObservableObject {
     public func setupMessage(settings: ScribeSettings) -> String {
         switch settings.assistantAccountType {
         case .chatGPT:
-            return "Sign in to ChatGPT to use Voice Assistant."
+            return codex.executableURL == nil
+                ? "Install the Codex CLI to use connected tools in Voice Assistant."
+                : "Sign in to ChatGPT through Codex to use Voice Assistant."
         case .apiKey:
             let provider = Self.provider(settings: settings)
             guard provider.isCustom else { return "Add your \(provider.displayName) API key to use Voice Assistant." }

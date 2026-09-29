@@ -92,10 +92,10 @@ test('the relay serves the page at its root and redirects /download to the lates
   assert.equal(mark.status, 200); assert.equal(mark.headers.get('content-type'), 'image/png');
   assert.match(html, /src="\/site\/mark\.png"/);
   assert.match(html, /Parakeet TDT 0\.6B v3[\s\S]*pyannote segmentation 3\.0[\s\S]*WeSpeaker/);
-  assert.match(html, /id="assist-heading"[\s\S]*Never sent<\/dt><dd>Audio, screenshots/, 'the Voice Assistant section says what is and is not sent');
+  assert.match(html, /id="assist-heading"[\s\S]*Never sent by Scribe<\/dt><dd>Audio, screenshots/, 'the Voice Assistant section says what is and is not sent');
   assert.match(html, /OpenAI, Anthropic, Google Gemini, OpenRouter, Vercel AI Gateway, xAI, Groq, Mistral or DeepSeek/, 'the page describes the available API providers');
   assert.match(html, /Ollama or LM Studio[\s\S]*on-device model on macOS 26[\s\S]*Private Cloud Compute appears on macOS 27/, 'the page describes custom and Apple routes with availability');
-  assert.match(html, /OpenAI API requests have storage turned off\. Other providers apply their own policies\./, 'the privacy claim is scoped to OpenAI API requests');
+  assert.match(html, /OpenAI API requests have storage turned off\. Codex and other providers apply their own policies\./, 'the privacy claim is scoped to OpenAI API requests');
   assert.doesNotMatch(html, /only thing that ever leaves your Mac/, 'the privacy line allows for Voice Assistant requests');
   const logo = await fetch(relay.origin + '/site/logo.png');
   assert.equal(logo.status, 200); assert.equal(logo.headers.get('content-type'), 'image/png');

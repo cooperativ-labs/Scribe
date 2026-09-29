@@ -38,7 +38,7 @@ cursor is: a reply to the message in front of you, a shorter version of the
 paragraph you selected, or a rewrite of what you just copied. Turn it on in
 **Settings → Assistants → Voice Assistant**, pick the key (Right Shift by
 default; it is never the same key as dictation), and choose an account: sign in
-with your ChatGPT account; add your own API key for OpenAI, Anthropic, Google
+with your ChatGPT account through the installed Codex CLI; add your own API key for OpenAI, Anthropic, Google
 Gemini, OpenRouter, the Vercel AI Gateway, xAI, Groq, Mistral or DeepSeek;
 point it at a custom OpenAI-compatible endpoint (Ollama or LM Studio on your
 Mac, or a company gateway), with a key only if the server wants one;
@@ -50,22 +50,30 @@ key and speak, release it to send, or double-tap it to keep listening. Escape,
 or the indicator's Cancel control, discards the request, including one that is
 already in flight.
 
-Each request sends exactly four things to the account you chose, and nothing
-else: the instruction you spoke; the text selected in the field you are typing
+Each request sends your spoken instruction and whichever text sources you enabled:
+the text selected in the field you are typing
 in; the text you copied, only when it is new since your last request; and the
 text visible in the front app's windows, read through Accessibility. Audio never
-leaves your Mac. No screenshot or pixels are taken. No other app is read, and
-password fields and Scribe's own windows are never read. Each of the three text
+leaves your Mac. Scribe takes no screenshot or pixels and does not read other
+apps itself; connected Codex tools may access the services you authorized.
+Password fields and Scribe's own windows are never gathered as source text.
+Each of the three text
 sources has its own switch in Settings, and the indicator names the sources it
-is using while you speak. Scribe keeps nothing: the instruction, the source text
-and the answer are held in memory for the request and then dropped, and every
-OpenAI request is sent with `store: false` so OpenAI's API does not retain it
-either (subscription traffic is subject to OpenAI's own policy). Other
-providers handle requests under their own API data policies.
+is using while you speak. Scribe drops the instruction, source text and answer
+after insertion. With the ChatGPT account choice, Codex can call tools from
+your installed plugins and use local Codex memories when you have enabled
+them. Tool results can add context to the answer; Scribe asks you in a dialog
+when a tool requires a choice. A request that needs an unsupported approval or
+sign-in step stops with an actionable error. The Codex voice thread is ephemeral,
+so it does not appear in your Codex chat list. API-key requests to OpenAI use
+`store: false`; Codex and other providers handle requests under their own data
+policies.
 
-The ChatGPT account route uses your plan the way the Codex CLI does and counts
-against its Codex limits; it is not an OpenAI-documented integration, and the
-sign-in card says so. The API-key route bills the provider you chose at its API
+The ChatGPT account route uses the documented Codex App Server and counts
+against your plan's Codex limits. Install the Codex CLI and sign in from Scribe
+or another Codex client. The sign-in is shared with Codex on this Mac; signing
+out in Scribe signs out the other local Codex clients too. Local Codex memory is
+separate from ChatGPT saved memory. The API-key route bills the provider you chose at its API
 rates; each provider's key is its own Keychain item. The custom endpoint route
 sends Chat Completions requests to the base URL you enter (usually ending in
 `/v1`); a server on your Mac may use plain `http`, one elsewhere must use
@@ -74,8 +82,9 @@ free but uses a small model with a short context, so long screen text is
 shortened to fit. The Private Cloud Compute route sends the request to Apple's
 Private Cloud Compute servers, which Apple says keep nothing; it needs no key
 and is not billed, but Apple sets a per-person usage limit, and it works only
-in a build signed with Apple's Private Cloud Compute entitlement. Tokens and keys are kept only in your Keychain and are
-removed when you sign out or remove the key. The answer goes into the focused field through the same
+in a build signed with Apple's Private Cloud Compute entitlement. Codex manages
+the ChatGPT sign-in; Scribe keeps API keys in your Keychain and removes them when
+you remove the key. The answer goes into the focused field through the same
 Accessibility-then-paste path as dictation, replacing your selection when there
 was one, or onto the clipboard if you choose **Copy to the clipboard only**.
 

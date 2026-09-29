@@ -8,9 +8,7 @@ import SwiftUI
 ///
 /// It follows the tab's existing pattern, a status row with an icon, a headline
 /// and one sentence, then the single action, and shares the dictation model and
-/// the Microphone and Accessibility gates with the Dictation tab. Account,
-/// Model, Sources, Result and Advanced are laid out but not yet active: the
-/// assistant has no account to send to until sign-in exists.
+/// the Microphone and Accessibility gates with the Dictation tab.
 struct VoiceAssistantSettingsView: View {
     @ObservedObject var settings: ScribeSettings
     @ObservedObject var modelInstaller: TranscriptionModelInstaller
@@ -57,7 +55,7 @@ struct VoiceAssistantSettingsView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(settings.assistantEnabled ? "Hold \(settings.assistantActivationKey.shortName) and speak" : "Voice Assistant is off")
                         .font(.headline)
-                    Text("Sends the instruction you speak, your selection or copied text, and the text visible in the front app’s windows to the account below. Audio never leaves your Mac, and nothing is kept.")
+                    Text("Sends the instruction you speak and your enabled text sources to the account below. Audio stays on your Mac. Codex can use your connected tools when ChatGPT is selected.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -187,7 +185,7 @@ struct VoiceAssistantSettingsView: View {
             Group {
                 switch settings.assistantAccountType {
                 case .chatGPT:
-                    Text("Uses your ChatGPT account the way the Codex CLI does. Usage counts against your ChatGPT plan’s Codex limits. This is not an OpenAI-documented integration.")
+                    Text("Runs through the Codex App Server using your ChatGPT plan and connected Codex tools. It can use local Codex memory when enabled; ChatGPT saved memory is separate. Sign-in and sign-out also affect other Codex clients on this Mac.")
                 case .apiKey:
                     Text(apiKeyFooter)
                 case .onDevice:
@@ -208,7 +206,7 @@ struct VoiceAssistantSettingsView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(account.signIn == .signedIn ? "Signed in to ChatGPT" : "ChatGPT").font(.headline)
+                    Text(account.signIn == .signedIn ? "ChatGPT connected through Codex" : "ChatGPT through Codex").font(.headline)
                     Text(chatGPTSubtitle)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
@@ -219,44 +217,43 @@ struct VoiceAssistantSettingsView: View {
                 case .signedOut:
                     Button("Sign in with ChatGPT…") { account.beginSignIn(settings: settings) }
                         .buttonStyle(.borderedProminent)
+                        .disabled(account.codex.executableURL == nil)
                 case .requestingCode:
                     ProgressView().controlSize(.small)
                     Button("Cancel") { account.cancelSignIn() }
                 case .awaitingCode:
                     Button("Cancel") { account.cancelSignIn() }
                 case .signedIn:
-                    Button("Sign Out") { account.signOut(settings: settings) }
+                    Button("Sign Out of Codex") { account.signOut(settings: settings) }
                 }
             }
             if case .awaitingCode(let pending) = account.signIn {
-                TimelineView(.everyMinute) { _ in
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(alignment: .center) {
-                            Text(pending.userCode)
-                                .font(.system(size: 26, weight: .semibold, design: .monospaced))
-                                .tracking(3)
-                                .textSelection(.enabled)
-                                .accessibilityLabel("Sign-in code \(pending.userCode.map(String.init).joined(separator: " "))")
-                            Spacer()
-                            if codeCopied {
-                                Label("Copied code", systemImage: "doc.on.clipboard")
-                                    .font(.callout)
-                                    .foregroundStyle(.secondary)
-                                    .transition(.opacity)
-                            }
-                            Button("Copy") { copyCode(pending.userCode) }
-                            Button("Open openai.com") { NSWorkspace.shared.open(pending.verificationURL) }
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        HStack(spacing: 6) {
-                            ProgressView().controlSize(.mini)
-                            Text("Enter the code on the OpenAI page and sign in with your ChatGPT account. Scribe is waiting; the code expires at \(pending.expiresAt.formatted(date: .omitted, time: .shortened)).")
-                                .font(.footnote)
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .center) {
+                        Text(pending.userCode)
+                            .font(.system(size: 26, weight: .semibold, design: .monospaced))
+                            .tracking(3)
+                            .textSelection(.enabled)
+                            .accessibilityLabel("Sign-in code \(pending.userCode.map(String.init).joined(separator: " "))")
+                        Spacer()
+                        if codeCopied {
+                            Label("Copied code", systemImage: "doc.on.clipboard")
+                                .font(.callout)
                                 .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
+                                .transition(.opacity)
                         }
+                        Button("Copy") { copyCode(pending.userCode) }
+                        Button("Open openai.com") { NSWorkspace.shared.open(pending.verificationURL) }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    HStack(spacing: 6) {
+                        ProgressView().controlSize(.mini)
+                        Text("Enter the code on the OpenAI page and sign in with your ChatGPT account. Scribe is waiting for Codex to finish sign-in.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }

@@ -44,7 +44,7 @@ final class VoiceAssistantAccountTests: XCTestCase {
         let settings = ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: folder)
         let stores = Dictionary(uniqueKeysWithValues: AssistProvider.allCases.map { ($0, InMemorySecretStore()) })
         let account = VoiceAssistantAccount(
-            session: ChatGPTSession(store: InMemorySecretStore()),
+            codex: CodexAppServer(executableURL: nil),
             apiKeyStore: { stores[$0]! }
         )
 
@@ -83,7 +83,7 @@ final class VoiceAssistantAccountTests: XCTestCase {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(suiteName, isDirectory: true)
         defer { try? FileManager.default.removeItem(at: folder) }
         let settings = ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: folder)
-        let account = VoiceAssistantAccount(session: ChatGPTSession(store: InMemorySecretStore()), apiKeyStore: { _ in InMemorySecretStore() })
+        let account = VoiceAssistantAccount(codex: CodexAppServer(executableURL: nil), apiKeyStore: { _ in InMemorySecretStore() })
         settings.assistantAccountType = .privateCloud
         account.refreshPrivateCloudStatus()
 
@@ -105,7 +105,7 @@ final class VoiceAssistantAccountTests: XCTestCase {
         let settings = ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: folder)
         let stores = Dictionary(uniqueKeysWithValues: AssistProvider.allCases.map { ($0, InMemorySecretStore()) })
         let account = VoiceAssistantAccount(
-            session: ChatGPTSession(store: InMemorySecretStore()),
+            codex: CodexAppServer(executableURL: nil),
             apiKeyStore: { stores[$0]! }
         )
         settings.assistantAccountType = .apiKey
@@ -150,7 +150,7 @@ final class VoiceAssistantAccountTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: folder) }
         let settings = ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: folder)
         let account = VoiceAssistantAccount(
-            session: ChatGPTSession(store: InMemorySecretStore()),
+            codex: CodexAppServer(executableURL: nil),
             apiKeyStore: { _ in InMemorySecretStore() }
         )
         settings.assistantAccountType = .apiKey

@@ -330,15 +330,12 @@ public final class DictationCoordinator: ObservableObject {
     private func runAssistant(instruction: String, configuration: AssistantConfiguration, generation session: Int) async {
         let sources = await sourcesTask?.value ?? GatheredSources()
         guard generation == session, !Task.isCancelled else { return }
-        guard !sources.isEmpty else {
-            state = .nothingToWorkWith(startedApplicationName)
-            return
-        }
         state = .thinking(assistant: configuration.assistant.displayName, model: configuration.modelName)
         let request = sources.request(instruction: instruction, applicationName: startedApplicationName)
+        let assistant = configuration.assistant
+        let timeout: Duration = assistant is CodexAppServerAssistant ? .seconds(180) : assistantTimeout
         do {
-            let assistant = configuration.assistant
-            let response = try await Self.withTimeout(assistantTimeout) { try await assistant.respond(to: request) }
+            let response = try await Self.withTimeout(timeout) { try await assistant.respond(to: request) }
             guard generation == session, !Task.isCancelled else { return }
             let outcome = await insertTrackingClipboard {
                 await self.inserter.insertGenerated(response.text, copyOnly: configuration.copyOnly)
@@ -347,7 +344,7 @@ public final class DictationCoordinator: ObservableObject {
             await report(outcome)
         } catch {
             guard generation == session, !Task.isCancelled, !(error is CancellationError) else { return }
-            state = Self.assistantState(for: error, timeout: assistantTimeout)
+            state = Self.assistantState(for: error, timeout: timeout)
         }
     }
 
