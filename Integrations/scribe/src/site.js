@@ -408,7 +408,7 @@ footer .made { margin-left: auto; }
             <span class="close">✕</span>
           </div>
         </div>
-        <h2>It asks before it records</h2>
+        <h2>Reminds you to record</h2>
         <p>When Zoom, Teams, Meet, Slack, FaceTime or another call app opens the microphone, a small chip appears under the menu bar. Press Record and it becomes that recording's transport. Dismiss it and Scribe stays out of the way until the next call.</p>
         <p>Transcription runs on your Mac with a local speech model, and the finished transcript opens with speakers told apart, timestamps and search.</p>
       </div>
