@@ -1,0 +1,611 @@
+{
+  "objective": "coo:1158.4dev",
+  "date": "2026-10-13",
+  "fixture": "6.527 s synthetic Samantha speech, three-term synthetic vocabulary; networking denied",
+  "diskAvailableBeforeMeasurements": "10 GiB free of 460 GiB",
+  "runs": {
+    "beforeChange": {
+      "worker": "Release worker built from pre-change source (copied before editing)",
+      "warmVocabulary": false,
+      "cycles": 2,
+      "networkDenied": true,
+      "idleSeconds": 180,
+      "rows": [
+        {
+          "label": "warm",
+          "wallSeconds": 45.0868,
+          "status": "ready",
+          "warning": null,
+          "tokens": 0
+        },
+        {
+          "label": "1.1-empty",
+          "wallSeconds": 0.7536,
+          "status": "complete",
+          "warning": null,
+          "tokens": 37,
+          "replacements": 0
+        },
+        {
+          "label": "1.2-vocabulary",
+          "wallSeconds": 89.6928,
+          "status": "complete",
+          "warning": null,
+          "tokens": 37,
+          "replacements": 1
+        },
+        {
+          "label": "1.3-vocabulary",
+          "wallSeconds": 2.3786,
+          "status": "complete",
+          "warning": null,
+          "tokens": 37,
+          "replacements": 1
+        },
+        {
+          "label": "1.4-empty",
+          "wallSeconds": 0.4886,
+          "status": "complete",
+          "warning": null,
+          "tokens": 37,
+          "replacements": 0
+        },
+        {
+          "label": "2.1-empty",
+          "wallSeconds": 0.5116,
+          "status": "complete",
+          "warning": null,
+          "tokens": 37,
+          "replacements": 0
+        },
+        {
+          "label": "2.2-vocabulary",
+          "wallSeconds": 2.0186,
+          "status": "complete",
+          "warning": null,
+          "tokens": 37,
+          "replacements": 1
+        },
+        {
+          "label": "2.3-vocabulary",
+          "wallSeconds": 1.1655,
+          "status": "complete",
+          "warning": null,
+          "tokens": 37,
+          "replacements": 1
+        },
+        {
+          "label": "2.4-empty",
+          "wallSeconds": 0.1931,
+          "status": "complete",
+          "warning": null,
+          "tokens": 37,
+          "replacements": 0
+        },
+        {
+          "label": "after-idle-warm",
+          "wallSeconds": 0.0034,
+          "status": "ready",
+          "warning": null,
+          "tokens": 0
+        },
+        {
+          "label": "after-idle.1-empty",
+          "wallSeconds": 0.2451,
+          "status": "complete",
+          "warning": null,
+          "tokens": 37,
+          "replacements": 0
+        },
+        {
+          "label": "after-idle.2-vocabulary",
+          "wallSeconds": 1.6689,
+          "status": "complete",
+          "warning": null,
+          "tokens": 37,
+          "replacements": 1
+        },
+        {
+          "label": "after-idle.3-vocabulary",
+          "wallSeconds": 1.1265,
+          "status": "complete",
+          "warning": null,
+          "tokens": 37,
+          "replacements": 1
+        },
+        {
+          "label": "after-idle.4-empty",
+          "wallSeconds": 0.2159,
+          "status": "complete",
+          "warning": null,
+          "tokens": 37,
+          "replacements": 0
+        },
+        {
+          "label": "unload",
+          "wallSeconds": 0.0056,
+          "status": "ready",
+          "warning": null,
+          "tokens": 0
+        }
+      ]
+    },
+    "afterChange": {
+      "worker": "Release worker with retained booster",
+      "warmVocabulary": true,
+      "cycles": 2,
+      "networkDenied": true,
+      "idleSeconds": 180,
+      "rows": [
+        {
+          "label": "warm",
+          "wallSeconds": 4.745,
+          "status": "ready",
+          "warning": null,
+          "tokens": 0,
+          "timings": {
+            "totalSeconds": 4.27516875
+          },
+          "booster": {
+            "contextReused": false,
+            "modelLoadSeconds": 0.98633525,
+            "preparationSeconds": 1.2072091249999999,
+            "readiness": "ready",
+            "source": "loaded",
+            "warmInferenceSeconds": 0.211289208
+          }
+        },
+        {
+          "label": "1.1-empty",
+          "wallSeconds": 0.1942,
+          "status": "complete",
+          "warning": null,
+          "tokens": 37,
+          "timings": {
+            "acousticSpottingSeconds": 0,
+            "candidateComparisonSeconds": 0,
+            "speechLoad": "retained",
+            "speechRecognitionSeconds": 0.177073917,
+            "totalSeconds": 0.191910542,
+            "vadSeconds": 0.01007,
+            "vocabularyModelLoadSeconds": 0,
+            "vocabularyPreparationSeconds": 0
+          },
+          "booster": {
+            "contextReused": false,
+            "modelLoadSeconds": 0,
+            "preparationSeconds": 0,
+            "readiness": "not_needed"
+          },
+          "replacements": 0
+        },
+        {
+          "label": "1.2-vocabulary",
+          "wallSeconds": 0.4373,
+          "status": "complete",
+          "warning": null,
+          "tokens": 37,
+          "timings": {
+            "acousticSpottingSeconds": 0.299476625,
+            "candidateComparisonSeconds": 0.010132833,
+            "speechLoad": "retained",
+            "speechRecognitionSeconds": 0.115879667,
+            "totalSeconds": 0.435678958,
+            "vadSeconds": 0.006122917,
+            "vocabularyModelLoadSeconds": 2.4708e-05,
+            "vocabularyPreparationSeconds": 0.001539375
+          },
+          "booster": {
+            "contextReused": true,
+            "modelLoadSeconds": 2.4708e-05,
+            "preparationSeconds": 0.001539375,
+            "readiness": "ready",
+            "source": "retained"
+          },
+          "replacements": 1
+        },
+        {
+          "label": "1.3-vocabulary",
+          "wallSeconds": 0.3173,
+          "status": "complete",
+          "warning": null,
+          "tokens": 37,
+          "timings": {
+            "acousticSpottingSeconds": 0.196867333,
+            "candidateComparisonSeconds": 0.00965875,
+            "speechLoad": "retained",
+            "speechRecognitionSeconds": 0.099929625,
+            "totalSeconds": 0.315787375,
+            "vadSeconds": 0.006181667,
+            "vocabularyModelLoadSeconds": 5.75e-06,
+            "vocabularyPreparationSeconds": 0.001510833
+          },
+          "booster": {
+            "contextReused": true,
+            "modelLoadSeconds": 5.75e-06,
+            "preparationSeconds": 0.001510833,
+            "readiness": "ready",
+            "source": "retained"
+          },
+          "replacements": 1
+        },
+        {
+          "label": "1.4-empty",
+          "wallSeconds": 0.1088,
+          "status": "complete",
+          "warning": null,
+          "tokens": 37,
+          "timings": {
+            "acousticSpottingSeconds": 0,
+            "candidateComparisonSeconds": 0,
+            "speechLoad": "retained",
+            "speechRecognitionSeconds": 0.100883584,
+            "totalSeconds": 0.107175292,
+            "vadSeconds": 0.005932792,
+            "vocabularyModelLoadSeconds": 0,
+            "vocabularyPreparationSeconds": 0
+          },
+          "booster": {
+            "contextReused": false,
+            "modelLoadSeconds": 0,
+            "preparationSeconds": 0,
+            "readiness": "not_needed"
+          },
+          "replacements": 0
+        },
+        {
+          "label": "2.1-empty",
+          "wallSeconds": 0.1061,
+          "status": "complete",
+          "warning": null,
+          "tokens": 37,
+          "timings": {
+            "acousticSpottingSeconds": 0,
+            "candidateComparisonSeconds": 0,
+            "speechLoad": "retained",
+            "speechRecognitionSeconds": 0.09703625,
+            "totalSeconds": 0.104081875,
+            "vadSeconds": 0.006375458,
+            "vocabularyModelLoadSeconds": 0,
+            "vocabularyPreparationSeconds": 0
+          },
+          "booster": {
+            "contextReused": false,
+            "modelLoadSeconds": 0,
+            "preparationSeconds": 0,
+            "readiness": "not_needed"
+          },
+          "replacements": 0
+        },
+        {
+          "label": "2.2-vocabulary",
+          "wallSeconds": 0.3163,
+          "status": "complete",
+          "warning": null,
+          "tokens": 37,
+          "timings": {
+            "acousticSpottingSeconds": 0.195465417,
+            "candidateComparisonSeconds": 0.010114166,
+            "speechLoad": "retained",
+            "speechRecognitionSeconds": 0.09951075,
+            "totalSeconds": 0.314674375,
+            "vadSeconds": 0.006133917,
+            "vocabularyModelLoadSeconds": 5.709e-06,
+            "vocabularyPreparationSeconds": 0.002050708
+          },
+          "booster": {
+            "contextReused": true,
+            "modelLoadSeconds": 5.709e-06,
+            "preparationSeconds": 0.002050708,
+            "readiness": "ready",
+            "source": "retained"
+          },
+          "replacements": 1
+        },
+        {
+          "label": "2.3-vocabulary",
+          "wallSeconds": 0.3579,
+          "status": "complete",
+          "warning": null,
+          "tokens": 37,
+          "timings": {
+            "acousticSpottingSeconds": 0.205715833,
+            "candidateComparisonSeconds": 0.011678,
+            "speechLoad": "retained",
+            "speechRecognitionSeconds": 0.126921875,
+            "totalSeconds": 0.355599333,
+            "vadSeconds": 0.007420042,
+            "vocabularyModelLoadSeconds": 5.708e-06,
+            "vocabularyPreparationSeconds": 0.002186375
+          },
+          "booster": {
+            "contextReused": true,
+            "modelLoadSeconds": 5.708e-06,
+            "preparationSeconds": 0.002186375,
+            "readiness": "ready",
+            "source": "retained"
+          },
+          "replacements": 1
+        },
+        {
+          "label": "2.4-empty",
+          "wallSeconds": 0.116,
+          "status": "complete",
+          "warning": null,
+          "tokens": 37,
+          "timings": {
+            "acousticSpottingSeconds": 0,
+            "candidateComparisonSeconds": 0,
+            "speechLoad": "retained",
+            "speechRecognitionSeconds": 0.105549083,
+            "totalSeconds": 0.113945167,
+            "vadSeconds": 0.007642583,
+            "vocabularyModelLoadSeconds": 0,
+            "vocabularyPreparationSeconds": 0
+          },
+          "booster": {
+            "contextReused": false,
+            "modelLoadSeconds": 0,
+            "preparationSeconds": 0,
+            "readiness": "not_needed"
+          },
+          "replacements": 0
+        },
+        {
+          "label": "after-idle-warm",
+          "wallSeconds": 0.0304,
+          "status": "ready",
+          "warning": null,
+          "tokens": 0,
+          "timings": {
+            "totalSeconds": 0.021274666
+          },
+          "booster": {
+            "contextReused": true,
+            "modelLoadSeconds": 0.000271167,
+            "preparationSeconds": 0.003515584,
+            "readiness": "ready",
+            "source": "retained"
+          }
+        },
+        {
+          "label": "after-idle.1-empty",
+          "wallSeconds": 0.5944,
+          "status": "complete",
+          "warning": null,
+          "tokens": 37,
+          "timings": {
+            "acousticSpottingSeconds": 0,
+            "candidateComparisonSeconds": 0,
+            "speechLoad": "retained",
+            "speechRecognitionSeconds": 0.520118542,
+            "totalSeconds": 0.592115333,
+            "vadSeconds": 0.045244083,
+            "vocabularyModelLoadSeconds": 0,
+            "vocabularyPreparationSeconds": 0
+          },
+          "booster": {
+            "contextReused": false,
+            "modelLoadSeconds": 0,
+            "preparationSeconds": 0,
+            "readiness": "not_needed"
+          },
+          "replacements": 0
+        },
+        {
+          "label": "after-idle.2-vocabulary",
+          "wallSeconds": 0.6375,
+          "status": "complete",
+          "warning": null,
+          "tokens": 37,
+          "timings": {
+            "acousticSpottingSeconds": 0.49728175,
+            "candidateComparisonSeconds": 0.024767542,
+            "speechLoad": "retained",
+            "speechRecognitionSeconds": 0.101402375,
+            "totalSeconds": 0.632913625,
+            "vadSeconds": 0.006306875,
+            "vocabularyModelLoadSeconds": 1.0542e-05,
+            "vocabularyPreparationSeconds": 0.001173958
+          },
+          "booster": {
+            "contextReused": true,
+            "modelLoadSeconds": 1.0542e-05,
+            "preparationSeconds": 0.001173958,
+            "readiness": "ready",
+            "source": "retained"
+          },
+          "replacements": 1
+        },
+        {
+          "label": "after-idle.3-vocabulary",
+          "wallSeconds": 0.3435,
+          "status": "complete",
+          "warning": null,
+          "tokens": 37,
+          "timings": {
+            "acousticSpottingSeconds": 0.218904208,
+            "candidateComparisonSeconds": 0.010373834,
+            "speechLoad": "retained",
+            "speechRecognitionSeconds": 0.10388425,
+            "totalSeconds": 0.341864167,
+            "vadSeconds": 0.005977375,
+            "vocabularyModelLoadSeconds": 8.666e-06,
+            "vocabularyPreparationSeconds": 0.001385209
+          },
+          "booster": {
+            "contextReused": true,
+            "modelLoadSeconds": 8.666e-06,
+            "preparationSeconds": 0.001385209,
+            "readiness": "ready",
+            "source": "retained"
+          },
+          "replacements": 1
+        },
+        {
+          "label": "after-idle.4-empty",
+          "wallSeconds": 0.1264,
+          "status": "complete",
+          "warning": null,
+          "tokens": 37,
+          "timings": {
+            "acousticSpottingSeconds": 0,
+            "candidateComparisonSeconds": 0,
+            "speechLoad": "retained",
+            "speechRecognitionSeconds": 0.11674875,
+            "totalSeconds": 0.124063083,
+            "vadSeconds": 0.0068105,
+            "vocabularyModelLoadSeconds": 0,
+            "vocabularyPreparationSeconds": 0
+          },
+          "booster": {
+            "contextReused": false,
+            "modelLoadSeconds": 0,
+            "preparationSeconds": 0,
+            "readiness": "not_needed"
+          },
+          "replacements": 0
+        },
+        {
+          "label": "unload",
+          "wallSeconds": 0.013,
+          "status": "ready",
+          "warning": null,
+          "tokens": 0
+        }
+      ]
+    },
+    "packagedHelperColdPath": {
+      "worker": "Contents/Library/Helpers/TranscriptionWorker in the locally built Debug Scribe.app (first launch from that path)",
+      "warmVocabulary": true,
+      "cycles": 1,
+      "networkDenied": true,
+      "idleSeconds": 0,
+      "rows": [
+        {
+          "label": "warm",
+          "wallSeconds": 56.9997,
+          "status": "ready",
+          "warning": null,
+          "tokens": 0,
+          "timings": {
+            "totalSeconds": 56.241646416
+          },
+          "booster": {
+            "contextReused": false,
+            "modelLoadSeconds": 25.068108042,
+            "preparationSeconds": 25.258965625,
+            "readiness": "ready",
+            "source": "loaded",
+            "warmInferenceSeconds": 0.18491225
+          }
+        },
+        {
+          "label": "1.1-empty",
+          "wallSeconds": 0.1904,
+          "status": "complete",
+          "warning": null,
+          "tokens": 37,
+          "timings": {
+            "acousticSpottingSeconds": 0,
+            "candidateComparisonSeconds": 0,
+            "speechLoad": "retained",
+            "speechRecognitionSeconds": 0.179682875,
+            "totalSeconds": 0.188901167,
+            "vadSeconds": 0.006738458,
+            "vocabularyModelLoadSeconds": 0,
+            "vocabularyPreparationSeconds": 0
+          },
+          "booster": {
+            "contextReused": false,
+            "modelLoadSeconds": 0,
+            "preparationSeconds": 0,
+            "readiness": "not_needed"
+          },
+          "replacements": 0
+        },
+        {
+          "label": "1.2-vocabulary",
+          "wallSeconds": 0.3389,
+          "status": "complete",
+          "warning": null,
+          "tokens": 37,
+          "timings": {
+            "acousticSpottingSeconds": 0.22471575,
+            "candidateComparisonSeconds": 0.009879958,
+            "speechLoad": "retained",
+            "speechRecognitionSeconds": 0.090930125,
+            "totalSeconds": 0.335383333,
+            "vadSeconds": 0.005694542,
+            "vocabularyModelLoadSeconds": 2.3041e-05,
+            "vocabularyPreparationSeconds": 0.001532167
+          },
+          "booster": {
+            "contextReused": true,
+            "modelLoadSeconds": 2.3041e-05,
+            "preparationSeconds": 0.001532167,
+            "readiness": "ready",
+            "source": "retained"
+          },
+          "replacements": 1
+        },
+        {
+          "label": "1.3-vocabulary",
+          "wallSeconds": 0.3118,
+          "status": "complete",
+          "warning": null,
+          "tokens": 37,
+          "timings": {
+            "acousticSpottingSeconds": 0.187831417,
+            "candidateComparisonSeconds": 0.009576333,
+            "speechLoad": "retained",
+            "speechRecognitionSeconds": 0.104721083,
+            "totalSeconds": 0.310418792,
+            "vadSeconds": 0.005641375,
+            "vocabularyModelLoadSeconds": 7.208e-06,
+            "vocabularyPreparationSeconds": 0.001410333
+          },
+          "booster": {
+            "contextReused": true,
+            "modelLoadSeconds": 7.208e-06,
+            "preparationSeconds": 0.001410333,
+            "readiness": "ready",
+            "source": "retained"
+          },
+          "replacements": 1
+        },
+        {
+          "label": "1.4-empty",
+          "wallSeconds": 0.106,
+          "status": "complete",
+          "warning": null,
+          "tokens": 37,
+          "timings": {
+            "acousticSpottingSeconds": 0,
+            "candidateComparisonSeconds": 0,
+            "speechLoad": "retained",
+            "speechRecognitionSeconds": 0.098159,
+            "totalSeconds": 0.104317292,
+            "vadSeconds": 0.005762917,
+            "vocabularyModelLoadSeconds": 0,
+            "vocabularyPreparationSeconds": 0
+          },
+          "booster": {
+            "contextReused": false,
+            "modelLoadSeconds": 0,
+            "preparationSeconds": 0,
+            "readiness": "not_needed"
+          },
+          "replacements": 0
+        },
+        {
+          "label": "unload",
+          "wallSeconds": 0.0131,
+          "status": "ready",
+          "warning": null,
+          "tokens": 0
+        }
+      ]
+    }
+  }
+}

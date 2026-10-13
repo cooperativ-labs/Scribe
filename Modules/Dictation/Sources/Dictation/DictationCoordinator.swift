@@ -16,12 +16,17 @@ public enum DictationState: Sendable, Equatable {
     case unverifiedPaste
     case copied
     case error(String)
+    /// An observed trigger attempt was blocked; passive transitions stay idle.
+    case secureInputBlocked
+
     /// The assistant's request is in flight: the provider ("ChatGPT") and the model.
     case thinking(assistant: String, model: String?)
     /// No selection, no fresh clipboard and no window text in the named app.
     case nothingToWorkWith(String?)
     /// The ChatGPT sign-in is missing or expired; the indicator offers Sign in.
     case signInRequired(String)
+
+    public static let secureInputMessage = "Secure Keyboard Entry is on. Leave the password field or protected app, then try again."
 }
 
 /// What the assistant needs at key-down, resolved from Settings by the host.
@@ -77,7 +82,8 @@ public final class DictationCoordinator: ObservableObject {
     private let engine: DictationEngine
     private let debugLog: MessageDebugLog
     private let inserter: DictationTextInserter
-    private let capture = DictationAudioCapture()
+    private let capture: any DictationAudioCapturing
+    private var secureInputBlocked = false
     private var levelTimer: Timer?
     private var transcriptionTask: Task<Void, Never>?
     /// The current session is waiting for a cold helper to load the model.
@@ -108,11 +114,17 @@ public final class DictationCoordinator: ObservableObject {
     public var keepModelLoaded = true
     public var idleUnloadMinutes = 10
 
-    public init(engine: DictationEngine, inserter: DictationTextInserter = DictationTextInserter(),
+    public convenience init(engine: DictationEngine, inserter: DictationTextInserter = DictationTextInserter(),
                 debugLog: MessageDebugLog = .shared) {
+        self.init(engine: engine, inserter: inserter, debugLog: debugLog, capture: DictationAudioCapture())
+    }
+
+    init(engine: DictationEngine, inserter: DictationTextInserter = DictationTextInserter(),
+         debugLog: MessageDebugLog = .shared, capture: any DictationAudioCapturing) {
         self.engine = engine
         self.inserter = inserter
         self.debugLog = debugLog
+        self.capture = capture
         capture.onRecoveryFailure = { [weak self] message in
             self?.cancel()
             self?.state = .error(message)
@@ -126,15 +138,31 @@ public final class DictationCoordinator: ObservableObject {
     }
 
     public func setSecureInputBlocked(_ blocked: Bool) {
+        guard blocked != secureInputBlocked else { return }
+        secureInputBlocked = blocked
         debugLog.record("Dictation secure-input block \(blocked ? "applied" : "cleared")", source: "Keyboard", level: .event,
                         context: "\(debugContext); state=\(state.debugStatus.message)")
         if blocked {
-            cancel()
-            intent = .dictation
-            state = .error("Dictation is paused while Secure Keyboard Entry is on")
-        } else if state == .error("Dictation is paused while Secure Keyboard Entry is on") {
+            cancelSessionForSecureInput()
+        } else if state == .secureInputBlocked {
             state = .idle
         }
+    }
+
+    private func cancelSessionForSecureInput() {
+        switch state {
+        case .listening, .transcribing, .thinking: cancel()
+        case .warming where warmingForSession: cancel()
+        default: break
+        }
+    }
+
+    private func showSecureInputNotice(for intent: DictationIntent) {
+        guard state != .secureInputBlocked else { return }
+        cancelSessionForSecureInput()
+        self.intent = intent
+        vocabularyWarning = nil
+        state = .secureInputBlocked
     }
 
     public var textOptions: DictationTextOptions {
@@ -177,6 +205,24 @@ public final class DictationCoordinator: ObservableObject {
     }
 
     public func consume(_ event: DictationTriggerEvent) {
+        // The transition callback already cancels session work. Its router
+        // cancellation must not cancel the notice or create duplicate logs.
+        if case .cancelled(.secureInput, _) = event {
+            cancelSessionForSecureInput()
+            return
+        }
+        if case .secureInputBlocked(let intent) = event {
+            setSecureInputBlocked(true)
+            guard state != .secureInputBlocked else { return }
+            self.intent = intent
+            debugLog.record(event.debugMessage, source: "Dictation trigger", level: .event, context: debugContext)
+            showSecureInputNotice(for: intent)
+            return
+        }
+        if case .listeningStarted(_, let intent) = event, secureInputBlocked {
+            showSecureInputNotice(for: intent)
+            return
+        }
         if case .listeningStarted = event { debugSessionID = UUID() }
         debugLog.record(event.debugMessage, source: "Dictation trigger", level: .event, context: debugContext)
         switch event {
@@ -283,9 +329,7 @@ public final class DictationCoordinator: ObservableObject {
             if reason == .maximumDuration {
                 state = .error("Maximum dictation length reached. Start a new dictation to continue.")
             }
-        case .secureInputBlocked:
-            cancel()
-            state = .error("Dictation is paused while Secure Keyboard Entry is on")
+        case .secureInputBlocked: break // Handled before logging and session setup.
         }
     }
 

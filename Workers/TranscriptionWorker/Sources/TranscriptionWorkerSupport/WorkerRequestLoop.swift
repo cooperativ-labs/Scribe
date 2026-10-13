@@ -17,6 +17,9 @@ public final class WorkerRequestLoop: @unchecked Sendable {
         self.configuration = configuration
         self.mode = mode
         self.dictation = WorkerDictationSession(configuration: configuration)
+        if mode == .dictation {
+            WorkerDictationSession.logger.notice("Dictation helper started, pid \(ProcessInfo.processInfo.processIdentifier, privacy: .public)")
+        }
     }
 
     public func run() {

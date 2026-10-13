@@ -1,5 +1,7 @@
 # Dictation QA (2026-09-25)
 
+For the 2026-10-13 Secure Input fix, current automated results, log interpretation, and remaining physical checks, see [Secure Input handling](dictation-secure-input.md).
+
 ## Build and automated checks
 
 | Check | Result |

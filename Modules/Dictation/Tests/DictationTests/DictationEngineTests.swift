@@ -178,6 +178,62 @@ final class DictationEngineTests: XCTestCase {
         await engine.unload()
     }
 
+    /// Adding the first term to a resident helper must not report it ready
+    /// until the booster is prepared; the same process does that preparation.
+    @MainActor
+    func testBoosterIsPreparedOnWarmBeforeReadiness() async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let store = try VocabularyStore(directoryURL: fixture.root.appendingPathComponent("vocabulary-store"))
+        let engine = fixture.makeEngine(vocabulary: { try store.load().snapshot })
+        try fixture.booster("ready")
+        try await engine.warm()
+        var ready = await engine.isReady()
+        XCTAssertTrue(ready, "An empty vocabulary needs no booster")
+        XCTAssertEqual(try fixture.operations().last?.dropFirst(), ["warm", "no"], "Empty vocabulary is not sent")
+
+        try store.addTerm("Livmarli", aliases: ["Liv Mali"], notes: "private note")
+        ready = await engine.isReady()
+        XCTAssertFalse(ready, "A new term needs the booster before the helper is ready")
+        try await engine.warm()
+        ready = await engine.isReady()
+        XCTAssertTrue(ready)
+        let operations = try fixture.operations()
+        XCTAssertEqual(operations.last?.dropFirst(), ["warm", "yes"])
+        XCTAssertEqual(Set(operations.map(\.first)).count, 1, "The resident helper prepares it; nothing relaunches")
+        XCTAssertFalse(try fixture.requests().contains("private note"), "Warm sends text and aliases, not notes")
+
+        _ = try await engine.dictate(audioURL: fixture.audio, runDirectoryURL: fixture.root)
+        XCTAssertEqual(try fixture.operations().last?.dropFirst(), ["dictate", "no"])
+        XCTAssertEqual(try fixture.operations().filter { $0[1] == "warm" }.count, 2, "A prepared booster is not warmed again")
+
+        // Unloading drops readiness; the next warm prepares a new helper's booster.
+        await engine.unload()
+        ready = await engine.isReady()
+        XCTAssertFalse(ready)
+        try await engine.warm()
+        let relaunched = try fixture.operations()
+        XCTAssertEqual(relaunched.last?.dropFirst(), ["warm", "yes"])
+        XCTAssertEqual(Set(relaunched.map(\.first)).count, 2, "A genuine unload restarts the helper")
+        await engine.unload()
+    }
+
+    /// Unavailable optional assets must not hold dictation in "Loading model…";
+    /// the request goes ahead and reports the structured warning.
+    @MainActor
+    func testUnavailableBoosterDoesNotBlockReadiness() async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let store = try VocabularyStore(directoryURL: fixture.root.appendingPathComponent("vocabulary-store"))
+        try store.addTerm("Livmarli")
+        let engine = fixture.makeEngine(vocabulary: { try store.load().snapshot })
+        try fixture.booster("unavailable")
+        try await engine.warm()
+        let ready = await engine.isReady()
+        XCTAssertTrue(ready)
+        await engine.unload()
+    }
+
     @MainActor
     private struct Fixture {
         let root: URL
@@ -193,12 +249,31 @@ final class DictationEngineTests: XCTestCase {
             try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
         }
 
-        func makeEngine() -> DictationEngine {
+        func makeEngine(
+            vocabulary: @escaping @Sendable () throws -> VocabularySnapshot = { .init(revision: nil, terms: []) }
+        ) -> DictationEngine {
             let directory = ScribeSettings.defaultModelsFolderURL
             return DictationEngine(
                 installation: WorkerInstallation(executableURL: executable, manifestURL: root.appending(path: "model_manifest.json")),
-                modelsDirectoryProvider: { directory }
+                modelsDirectoryProvider: { directory },
+                vocabularySnapshot: vocabulary
             )
+        }
+
+        /// The readiness the fake helper reports when a warm carries vocabulary.
+        func booster(_ readiness: String) throws {
+            try Data(readiness.utf8).write(to: root.appending(path: "booster"))
+        }
+
+        /// One `[pid, operation, carriesVocabulary]` row per request after the handshake.
+        func operations() throws -> [[String]] {
+            try String(contentsOf: root.appending(path: "operations"), encoding: .utf8)
+                .split(separator: "\n").map { $0.split(separator: " ").map(String.init) }
+                .filter { $0[1] != "handshake" }
+        }
+
+        func requests() throws -> String {
+            try String(contentsOf: root.appending(path: "requests"), encoding: .utf8)
         }
 
         func slow(_ operation: String) throws {
@@ -224,8 +299,14 @@ final class DictationEngineTests: XCTestCase {
         # A marker file beside the script makes that operation slow, standing
         # in for a model load or a long inference.
         if [ -f "$(dirname "$0")/slow-$operation" ]; then sleep 1; fi
+        vocabulary=no
+        case "$line" in *'"vocabulary":'*) vocabulary=yes ;; esac
+        printf '%s %s %s\n' "$$" "$operation" "$vocabulary" >> "$(dirname "$0")/operations"
+        printf '%s\n' "$line" >> "$(dirname "$0")/requests"
         if [ "$operation" = handshake ]; then
             printf '{"version":2,"kind":"stage_result","requestID":"%s","payload":{"stage":"handshake","protocolVersion":2,"networking":"disabled","runtimeDownloads":false,"telemetry":false}}\n' "$rid"
+        elif [ "$operation" = warm ] && [ "$vocabulary" = yes ] && [ -f "$(dirname "$0")/booster" ]; then
+            printf '{"version":2,"kind":"stage_result","requestID":"%s","payload":{"stage":"warm","status":"ready","vocabularyBooster":{"readiness":"%s","source":"loaded"}}}\n' "$rid" "$(cat "$(dirname "$0")/booster")"
         else
             printf '{"version":2,"kind":"stage_result","requestID":"%s","payload":{"stage":"%s","status":"complete","text":"%s"}}\n' "$rid" "$operation" "$$"
         fi

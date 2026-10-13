@@ -29,7 +29,7 @@ final class DictationTriggerStateTests: XCTestCase {
             _ = state.handle(key(1, true, code: activationKey.keyCode))
             XCTAssertEqual(state.handle(key(1.1, true, code: 8)), [.cancelled(.chord, .dictation)])
             XCTAssertEqual(state.handle(key(1.5, false, code: activationKey.keyCode)), [])
-            XCTAssertEqual(state.handle(key(2, true, code: activationKey.keyCode), secureInput: true), [.secureInputBlocked])
+            XCTAssertEqual(state.handle(key(2, true, code: activationKey.keyCode), secureInput: true), [.secureInputBlocked(.dictation)])
         }
     }
 
@@ -142,7 +142,7 @@ final class DictationTriggerStateTests: XCTestCase {
 
     func testSecureInputBlocksTrigger() {
         var state = DictationTriggerState()
-        XCTAssertEqual(state.handle(key(1, true), secureInput: true), [.secureInputBlocked])
+        XCTAssertEqual(state.handle(key(1, true), secureInput: true), [.secureInputBlocked(.dictation)])
     }
 
     func testPanelStopFinishesToggleAndNextPressStartsCleanly() {

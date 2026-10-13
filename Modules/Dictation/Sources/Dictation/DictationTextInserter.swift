@@ -61,13 +61,21 @@ public enum DictationTextShaper {
 public final class DictationTextInserter: TextInserting {
     private let locator: FocusedFieldLocator
     private let paste: any DictationPasteClient
+    private let secureInputEnabled: @MainActor () -> Bool
     public var options: DictationTextOptions
-    public init(locator: FocusedFieldLocator = FocusedFieldLocator(),
+    public convenience init(locator: FocusedFieldLocator = FocusedFieldLocator(),
                 paste: any DictationPasteClient = KeystrokeTextInserter(),
                 options: DictationTextOptions = .init()) {
+        self.init(locator: locator, paste: paste, options: options,
+                  secureInputEnabled: { IsSecureEventInputEnabled() })
+    }
+
+    init(locator: FocusedFieldLocator, paste: any DictationPasteClient,
+         options: DictationTextOptions = .init(), secureInputEnabled: @escaping @MainActor () -> Bool) {
         self.locator = locator
         self.paste = paste
         self.options = options
+        self.secureInputEnabled = secureInputEnabled
     }
     private static func allowsUnverifiedPaste(into pid: pid_t) -> Bool {
         NSRunningApplication(processIdentifier: pid)?.bundleIdentifier == "com.openai.codex"
@@ -151,7 +159,7 @@ public final class DictationTextInserter: TextInserting {
             }
         }
         guard let text = shape(nil, true) else { return .discarded }
-        if allowsUnverifiedPaste, currentPID() == pid, !IsSecureEventInputEnabled() {
+        if allowsUnverifiedPaste, currentPID() == pid, !secureInputEnabled() {
             // This app may provide no AX field at all. Keep the transcript on
             // the clipboard because a posted Cmd-V cannot be verified here.
             switch await paste.insertAndReport(text, restoreClipboard: false) {

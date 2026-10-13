@@ -38,30 +38,53 @@ public enum OfflineVocabularyRescorer {
         public let text: String
         public let replacements: [VocabularyReplacement]
         public let warning: String?
+        /// Preparation outcome and timing; `source` says whether CTC was retained or loaded.
+        public var booster = VocabularyBooster.Report(readiness: .notNeeded)
+        public var spottingSeconds: Double = 0
+        public var comparisonSeconds: Double = 0
     }
 
+    /// One-shot rescoring for batch jobs, whose worker lives for a single job.
     public static func rescore(
         fileURL: URL, text: String, tokens: [TokenTiming], snapshot: WorkerVocabularySnapshot,
         manifest: ModelManifest, modelsDirectory: URL
     ) async -> Output {
         guard !snapshot.usableTerms.isEmpty else { return .init(text: text, replacements: [], warning: nil) }
+        let (prepared, report) = await VocabularyBooster().prepare(
+            snapshot: snapshot, manifest: manifest, manifestData: (try? JSONEncoder().encode(manifest)) ?? Data(),
+            modelsDirectory: modelsDirectory, warmInference: false)
+        return await rescore(prepared: prepared, report: report, fileURL: fileURL, text: text, tokens: tokens, snapshot: snapshot)
+    }
+
+    /// Dictation rescoring with the worker's retained booster.
+    public static func rescore(
+        booster: VocabularyBooster, fileURL: URL, text: String, tokens: [TokenTiming],
+        snapshot: WorkerVocabularySnapshot, manifestURL: URL, modelsDirectory: URL
+    ) async -> Output {
+        guard !snapshot.usableTerms.isEmpty else { return .init(text: text, replacements: [], warning: nil) }
+        let (prepared, report) = await booster.prepare(snapshot: snapshot, manifestURL: manifestURL,
+                                                       modelsDirectory: modelsDirectory, warmInference: false)
+        return await rescore(prepared: prepared, report: report, fileURL: fileURL, text: text, tokens: tokens, snapshot: snapshot)
+    }
+
+    static func rescore(
+        prepared: VocabularyBooster.Prepared?, report: VocabularyBooster.Report, fileURL: URL, text: String,
+        tokens: [TokenTiming], snapshot: WorkerVocabularySnapshot
+    ) async -> Output {
+        switch report.readiness {
+        case .notNeeded:
+            return .init(text: text, replacements: [], warning: nil, booster: report)
+        case .unavailable:
+            return .init(text: text, replacements: [], warning: "vocabulary_assets_unavailable", booster: report)
+        case .ready:
+            break
+        }
+        guard let prepared else {
+            return .init(text: text, replacements: [], warning: "vocabulary_assets_unavailable", booster: report)
+        }
+        let context = prepared.context, spotter = prepared.spotter, rescorer = prepared.rescorer
+        var spottingSeconds = 0.0, comparisonSeconds = 0.0
         do {
-            let models = try await OfflineModelLoader.loadCTC(manifest: manifest, modelsDirectory: modelsDirectory)
-            let directory = modelsDirectory.appendingPathComponent("parakeet-ctc-110m-coreml")
-            let tokenizer = try await CtcTokenizer.load(from: directory)
-            let terms = snapshot.usableTerms.compactMap { term -> CustomVocabularyTerm? in
-                let ids = tokenizer.encode(term.text)
-                guard !ids.isEmpty else { return nil }
-                return CustomVocabularyTerm(text: term.text, aliases: term.aliases.filter { $0.count >= 3 }, ctcTokenIds: ids)
-            }
-            guard !terms.isEmpty else { return .init(text: text, replacements: [], warning: nil) }
-            let context = CustomVocabularyContext(terms: terms)
-            let spotter = CtcKeywordSpotter(models: models)
-            let rescorer = try await VocabularyRescorer.create(
-                spotter: spotter, vocabulary: context,
-                config: .init(shortTermCbwTaperPivot: 5, spotterRescueEnabled: false),
-                ctcModelDirectory: directory
-            )
             let file = try AVAudioFile(forReading: fileURL)
             let duration = Double(file.length) / 16_000
             var replacements: [VocabularyReplacement] = []
@@ -84,7 +107,11 @@ public enum OfflineVocabularyRescorer {
                     try file.read(into: buffer, frameCount: count)
                     guard let channel = buffer.floatChannelData?[0] else { throw CocoaError(.fileReadUnknown) }
                     let samples = Array(UnsafeBufferPointer(start: channel, count: Int(buffer.frameLength)))
+                    let spotStarted = ContinuousClock.now
                     let spotted = try await spotter.spotKeywordsWithLogProbs(audioSamples: samples, customVocabulary: context)
+                    let compareStarted = ContinuousClock.now
+                    spottingSeconds += (compareStarted - spotStarted).seconds
+                    defer { comparisonSeconds += (ContinuousClock.now - compareStarted).seconds }
                     let evidence = rescorer.ctcTokenEvaluateCandidates(
                         transcript: localTokens.map(\.token).joined().replacingOccurrences(of: "▁", with: " ").trimmingCharacters(in: .whitespaces),
                         tokenTimings: localTokens, logProbs: spotted.logProbs,
@@ -123,9 +150,11 @@ public enum OfflineVocabularyRescorer {
             // Dictation uses text; batch applies these same spans to canonical words.
             // Only replace a uniquely aligned phrase in the raw text, in token order.
             let corrected = correctedText(text, tokens: tokens, replacements: replacements)
-            return .init(text: corrected, replacements: replacements, warning: nil)
+            return .init(text: corrected, replacements: replacements, warning: nil, booster: report,
+                         spottingSeconds: spottingSeconds, comparisonSeconds: comparisonSeconds)
         } catch {
-            return .init(text: text, replacements: [], warning: "vocabulary_assets_unavailable")
+            return .init(text: text, replacements: [], warning: "vocabulary_assets_unavailable", booster: report,
+                         spottingSeconds: spottingSeconds, comparisonSeconds: comparisonSeconds)
         }
     }
 

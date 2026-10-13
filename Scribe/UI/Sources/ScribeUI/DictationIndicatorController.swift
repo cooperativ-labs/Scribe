@@ -90,6 +90,12 @@ public final class DictationIndicatorController {
             delayTask?.cancel(); delayTask = nil
             dismissalTask?.cancel(); dismissalTask = nil
             visible = true
+        case .secureInputBlocked:
+            delayTask?.cancel(); delayTask = nil
+            dismissalTask?.cancel(); dismissalTask = nil
+            inSession = false
+            if !visible { beginAnchor() }
+            visible = true
         case .nothingToWorkWith, .signInRequired:
             delayTask?.cancel(); delayTask = nil
             inSession = false
@@ -200,7 +206,9 @@ public final class DictationIndicatorController {
         let livePreview: String?
         if case .listening = state { livePreview = preview ?? coordinator.livePreview }
         else { livePreview = nil }
-        guard position() != "off" || livePreview != nil else { panel.orderOut(nil); return }
+        // A blocked attempt needs an explanation even when listening visuals
+        // are off. Passive Secure Input transitions never enter this state.
+        guard position() != "off" || livePreview != nil || state == .secureInputBlocked else { panel.orderOut(nil); return }
         let intent = coordinator.intent
         host.rootView = DictationIndicatorView(
             state: state,

@@ -22,8 +22,13 @@ public final class DictationTriggerMonitor {
     private var localMonitor: Any?
     private var timer: Timer?
     private var secureInputBlocked = false
+    private let secureInputEnabled: @MainActor () -> Bool
 
-    public init() {}
+    public convenience init() { self.init(secureInputEnabled: { IsSecureEventInputEnabled() }) }
+
+    init(secureInputEnabled: @escaping @MainActor () -> Bool) {
+        self.secureInputEnabled = secureInputEnabled
+    }
 
     public var isRunning: Bool { flagsMonitor != nil }
 
@@ -83,8 +88,12 @@ public final class DictationTriggerMonitor {
     }
 
     private func handleFlags(_ event: NSEvent) {
+        handleFlags(keyCode: event.keyCode, flags: event.modifierFlags, time: event.timestamp)
+    }
+
+    func handleFlags(keyCode: UInt16, flags: NSEvent.ModifierFlags, time: TimeInterval) {
         let secure = currentSecureInput()
-        let result = router.flagsChanged(keyCode: event.keyCode, flags: event.modifierFlags, time: event.timestamp, secureInput: secure)
+        let result = router.flagsChanged(keyCode: keyCode, flags: flags, time: time, secureInput: secure)
         for intent in result.observed { onActivationKeyObserved?(intent) }
         emit(result.events)
     }
@@ -104,13 +113,12 @@ public final class DictationTriggerMonitor {
     }
 
     private func currentSecureInput() -> Bool {
-        let secure = IsSecureEventInputEnabled()
-        if secure != secureInputBlocked { refreshSecureInput() }
-        return secure
+        refreshSecureInput()
+        return secureInputBlocked
     }
 
-    private func refreshSecureInput() {
-        let blocked = IsSecureEventInputEnabled()
+    func refreshSecureInput() {
+        let blocked = secureInputEnabled()
         guard blocked != secureInputBlocked else { return }
         secureInputBlocked = blocked
         MessageDebugLog.shared.record("Secure Keyboard Entry observed \(blocked ? "on" : "off")", source: "Keyboard", level: .event,
@@ -118,7 +126,8 @@ public final class DictationTriggerMonitor {
         onSecureInputChange?(blocked)
         if blocked {
             emit(router.cancelAll(.secureInput))
-            emit([.secureInputBlocked])
+            // A transition is availability, not evidence of a trigger attempt.
+            // macOS may still deliver modifier edges; only those can report one.
         }
     }
 

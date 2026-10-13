@@ -41,6 +41,8 @@ private final class FakeAX: FocusedFieldAXClient, @unchecked Sendable {
     var preceding: String? = " "
     var directWorks = false
     var textRole = true
+    var secureRole = false
+    var secureSubrole = false
     var electron = false
     var exposesFocusedElement = true
     var manualAccessibilityRequests = 0
@@ -49,7 +51,9 @@ private final class FakeAX: FocusedFieldAXClient, @unchecked Sendable {
     }
     func pid(of element: AXUIElement) -> pid_t? { elementPID }
     func string(_ attribute: String, of element: AXUIElement) -> String? {
-        attribute == kAXRoleAttribute as String ? (textRole ? "AXTextArea" : "AXButton") : nil
+        if secureRole, attribute == kAXRoleAttribute as String { return "AXSecureTextField" }
+        if secureSubrole, attribute == kAXSubroleAttribute as String { return "AXSecureTextField" }
+        return attribute == kAXRoleAttribute as String ? (textRole ? "AXTextArea" : "AXButton") : nil
     }
     func valueLength(of element: AXUIElement) -> Int? { value.utf16.count }
     func selectedRange(of element: AXUIElement) -> CFRange? { range }
@@ -85,6 +89,48 @@ private final class FakeAX: FocusedFieldAXClient, @unchecked Sendable {
 }
 
 final class DictationTextInserterTests: XCTestCase {
+    @MainActor func testSecureRoleAndSubroleRejectDirectWriteAndUnverifiedPaste() async {
+        for role in [true, false] {
+            let ax = FakeAX()
+            ax.secureRole = role
+            ax.secureSubrole = !role
+            ax.directWorks = true
+            let paste = FakePaste()
+            let inserter = DictationTextInserter(locator: FocusedFieldLocator(client: ax), paste: paste)
+            let outcome = await inserter.insertDictation("hello", frontmostPID: ax.targetPID, screenTop: 100,
+                                                        screens: [], allowsUnverifiedPaste: true,
+                                                        currentPID: { ax.targetPID })
+            XCTAssertEqual(outcome, .discarded)
+            XCTAssertEqual(ax.value, "before")
+            XCTAssertNil(paste.pasted)
+            XCTAssertNil(paste.copied)
+            let generated = await inserter.insertGenerated("Reply", frontmostPID: ax.targetPID, screenTop: 100,
+                                                           screens: [], allowsUnverifiedPaste: true,
+                                                           currentPID: { ax.targetPID })
+            XCTAssertEqual(generated, .copied)
+            XCTAssertEqual(ax.value, "before")
+            XCTAssertNil(paste.pasted)
+        }
+    }
+
+    @MainActor func testSecureInputRejectsUnverifiedPasteIntoInaccessibleComposer() async {
+        let ax = FakeAX()
+        ax.exposesFocusedElement = false
+        let paste = FakePaste()
+        let inserter = DictationTextInserter(locator: FocusedFieldLocator(client: ax), paste: paste,
+                                            secureInputEnabled: { true })
+        let outcome = await inserter.insertDictation("hello", frontmostPID: ax.targetPID, screenTop: 100,
+                                                    screens: [], allowsUnverifiedPaste: true,
+                                                    currentPID: { ax.targetPID })
+        XCTAssertEqual(outcome, .discarded)
+        XCTAssertNil(paste.pasted)
+        let generated = await inserter.insertGenerated("Reply", frontmostPID: ax.targetPID, screenTop: 100,
+                                                       screens: [], allowsUnverifiedPaste: true,
+                                                       currentPID: { ax.targetPID })
+        XCTAssertEqual(generated, .copied)
+        XCTAssertNil(paste.pasted)
+    }
+
     @MainActor func testDirectWriteAndNoOpPasteFallback() async {
         let ax = FakeAX()
         let paste = FakePaste()

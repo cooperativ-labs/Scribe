@@ -22,13 +22,13 @@ public enum DictationTriggerEvent: Sendable, Equatable {
     case listeningStarted(DictationTriggerMode, DictationIntent)
     case listeningEnded(DictationIntent)
     case cancelled(DictationCancellation, DictationIntent)
-    case secureInputBlocked
+    case secureInputBlocked(DictationIntent)
 
-    /// The mode the event belongs to; nil for the monitor-wide secure-input notice.
+    /// The mode the event belongs to, including an observed blocked attempt.
     public var intent: DictationIntent? {
         switch self {
         case .listeningStarted(_, let intent), .listeningEnded(let intent), .cancelled(_, let intent): intent
-        case .secureInputBlocked: nil
+        case .secureInputBlocked(let intent): intent
         }
     }
 }
@@ -75,7 +75,7 @@ public struct DictationTriggerState: Sendable {
     public mutating func handle(_ input: DictationKeyEvent, secureInput: Bool = false) -> [DictationTriggerEvent] {
         if secureInput {
             let events = cancel(.secureInput)
-            return events + (input.keyCode == activationKey.keyCode && input.isDown ? [.secureInputBlocked] : [])
+            return events + (input.keyCode == activationKey.keyCode && input.isDown ? [.secureInputBlocked(intent)] : [])
         }
         guard input.keyCode == activationKey.keyCode else {
             if input.isDown, downAt != nil {

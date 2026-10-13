@@ -1,0 +1,232 @@
+{
+  "objective": "coo:1158.k526",
+  "date": "2026-10-13",
+  "platform": "macOS 27.0.1 arm64",
+  "build": "Release",
+  "fluidAudio": "0.17.4",
+  "networkDenied": true,
+  "sourceDurationSeconds": 6.5271875,
+  "fixture": "Local Samantha speech; Livmarli, Cooperativ, Neah synthetic vocabulary",
+  "workerSHA256": "7d716ca55e9abe639c1ad2fa696922aa4042a9da5d511f801f562e2ba5a96bf5",
+  "installedWorkerSHA256": "a1f6af1261cdef2a2bb7fcd0e1446bbfb2384dd5915f08e60134dcc69418fb9d",
+  "fixtureAudioSHA256": "5ed41141302f0cb51a62a76b046fdbdceb0d7c62d3c90e5c65d6e201661491d2",
+  "dictation": {
+    "cycles": 3,
+    "networkDenied": true,
+    "rows": [
+      {
+        "label": "warm",
+        "wallSeconds": 4.0676,
+        "status": "ready",
+        "warning": null,
+        "tokens": 0
+      },
+      {
+        "label": "1.1-empty",
+        "wallSeconds": 1.2057,
+        "status": "complete",
+        "warning": null,
+        "tokens": 37,
+        "replacements": 0
+      },
+      {
+        "label": "1.2-vocabulary",
+        "wallSeconds": 41.2251,
+        "status": "complete",
+        "warning": null,
+        "tokens": 37,
+        "replacements": 1
+      },
+      {
+        "label": "1.3-vocabulary",
+        "wallSeconds": 1.6749,
+        "status": "complete",
+        "warning": null,
+        "tokens": 37,
+        "replacements": 1
+      },
+      {
+        "label": "1.4-empty",
+        "wallSeconds": 0.2632,
+        "status": "complete",
+        "warning": null,
+        "tokens": 37,
+        "replacements": 0
+      },
+      {
+        "label": "2.1-empty",
+        "wallSeconds": 0.2092,
+        "status": "complete",
+        "warning": null,
+        "tokens": 37,
+        "replacements": 0
+      },
+      {
+        "label": "2.2-vocabulary",
+        "wallSeconds": 1.7178,
+        "status": "complete",
+        "warning": null,
+        "tokens": 37,
+        "replacements": 1
+      },
+      {
+        "label": "2.3-vocabulary",
+        "wallSeconds": 2.1856,
+        "status": "complete",
+        "warning": null,
+        "tokens": 37,
+        "replacements": 1
+      },
+      {
+        "label": "2.4-empty",
+        "wallSeconds": 0.2952,
+        "status": "complete",
+        "warning": null,
+        "tokens": 37,
+        "replacements": 0
+      },
+      {
+        "label": "3.1-empty",
+        "wallSeconds": 0.2145,
+        "status": "complete",
+        "warning": null,
+        "tokens": 37,
+        "replacements": 0
+      },
+      {
+        "label": "3.2-vocabulary",
+        "wallSeconds": 1.9668,
+        "status": "complete",
+        "warning": null,
+        "tokens": 37,
+        "replacements": 1
+      },
+      {
+        "label": "3.3-vocabulary",
+        "wallSeconds": 2.5979,
+        "status": "complete",
+        "warning": null,
+        "tokens": 37,
+        "replacements": 1
+      },
+      {
+        "label": "3.4-empty",
+        "wallSeconds": 0.345,
+        "status": "complete",
+        "warning": null,
+        "tokens": 37,
+        "replacements": 0
+      },
+      {
+        "label": "unload",
+        "wallSeconds": 0.0135,
+        "status": "ready",
+        "warning": null,
+        "tokens": 0
+      }
+    ]
+  },
+  "setupProbe": [
+    {
+      "label": "1-validate",
+      "wallSeconds": 0.622671667
+    },
+    {
+      "label": "1-loadModels",
+      "wallSeconds": 45.796796542
+    },
+    {
+      "label": "1-tokenizersAndContext",
+      "wallSeconds": 0.008488041
+    },
+    {
+      "label": "1-spotKeywords-1",
+      "wallSeconds": 0.212834416
+    },
+    {
+      "label": "1-spotKeywords-2",
+      "wallSeconds": 0.195822334
+    },
+    {
+      "label": "2-validate",
+      "wallSeconds": 0.062841083
+    },
+    {
+      "label": "2-loadModels",
+      "wallSeconds": 0.835857584
+    },
+    {
+      "label": "2-tokenizersAndContext",
+      "wallSeconds": 0.007584708
+    },
+    {
+      "label": "2-spotKeywords-1",
+      "wallSeconds": 0.206264834
+    },
+    {
+      "label": "2-spotKeywords-2",
+      "wallSeconds": 0.203825666
+    },
+    {
+      "label": "3-validate",
+      "wallSeconds": 0.054000875
+    },
+    {
+      "label": "3-loadModels",
+      "wallSeconds": 0.506964292
+    },
+    {
+      "label": "3-tokenizersAndContext",
+      "wallSeconds": 0.007699708
+    },
+    {
+      "label": "3-spotKeywords-1",
+      "wallSeconds": 0.211970917
+    },
+    {
+      "label": "3-spotKeywords-2",
+      "wallSeconds": 0.216683708
+    }
+  ],
+  "preliminaryInvalidFixtureWarmSeconds": 42.9726,
+  "idlePolicy": {
+    "savedKeepLoaded": "unset",
+    "effectiveKeepLoaded": true,
+    "savedIdleMinutes": "unset",
+    "effectiveIdleMinutes": 10,
+    "normalIdleTimerActive": false
+  },
+  "auxiliaryChecks": [
+    {
+      "check": "60-second batch empty-vocabulary baseline",
+      "outcome": "timeout",
+      "timeoutSeconds": 180
+    },
+    {
+      "check": "same-process 180-second idle comparison",
+      "outcome": "initial TDT warm timed out before idle phase",
+      "timeoutSeconds": 180
+    },
+    {
+      "check": "two-second sample of stalled synthetic worker",
+      "outcome": "No space left on device"
+    },
+    {
+      "check": "startup data disk",
+      "capacityPercent": 100,
+      "availableMiBBeforeCleanup": 136,
+      "availableMiBAfterOwnCacheCleanup": 206
+    },
+    {
+      "check": "one-time memory-pressure query",
+      "systemMemoryFreePercent": 35
+    }
+  ],
+  "limitations": [
+    "System load and Core ML caches were not reset or controlled.",
+    "Setup-only probe excludes candidate comparison and final text replacement.",
+    "Idle recurrence not reproduced in a valid controlled run.",
+    "Disk exhaustion may affect later model preparation; causal contribution to original symptom unproven.",
+    "Local build measured; installed signed helper has a different hash."
+  ]
+}

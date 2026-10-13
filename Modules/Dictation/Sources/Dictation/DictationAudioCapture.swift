@@ -56,7 +56,18 @@ final class AudioRing: @unchecked Sendable {
 }
 
 @MainActor
-public final class DictationAudioCapture {
+protocol DictationAudioCapturing: AnyObject {
+    var isRecording: Bool { get }
+    var level: Float { get }
+    var onRecoveryFailure: (@MainActor (String) -> Void)? { get set }
+    func start(microphoneID: String?) throws
+    func stop()
+    func finish() throws -> [Float]
+    func previewSamples() -> [Float]
+}
+
+@MainActor
+public final class DictationAudioCapture: DictationAudioCapturing {
     private var engine: AVAudioEngine?
     private var configurationObserver: NSObjectProtocol?
     private var sleepObserver: NSObjectProtocol?

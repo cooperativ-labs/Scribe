@@ -148,7 +148,7 @@ final class DictationTriggerRouterTests: XCTestCase {
     func testSecureInputBlocksBothKeys() {
         var router = router()
         let result = router.flagsChanged(keyCode: 60, flags: rightShift, time: 1, secureInput: true)
-        XCTAssertEqual(result.events, [.secureInputBlocked])
+        XCTAssertEqual(result.events, [.secureInputBlocked(.assistant)])
     }
 
     func testRemovingOrMovingAModeCancelsOnlyThatMode() {

@@ -178,6 +178,11 @@ public struct DictationIndicatorView: View {
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
                 Text(message).lineLimit(1).frame(maxWidth: 280)
                 link("Settings", action: openSettings)
+            case .secureInputBlocked:
+                Image(systemName: "lock.fill").foregroundStyle(.orange)
+                Text(DictationState.secureInputMessage)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(width: 280, alignment: .leading)
             }
         }
     }
