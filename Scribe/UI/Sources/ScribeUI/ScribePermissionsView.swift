@@ -145,6 +145,7 @@ public struct ScribePermissionsView: View {
             }
             if let error = settings.modelsFolderError {
                 Text(error).font(.footnote).foregroundStyle(.red)
+                    .captureDebugMessage(error, source: "Models folder")
             }
         }
     }
@@ -163,6 +164,7 @@ public struct ScribePermissionsView: View {
             .toggleStyle(.switch)
             if let error = settings.launchAtLoginError {
                 Text(error).font(.footnote).foregroundStyle(.red)
+                    .captureDebugMessage(error, source: "Launch at login")
                 if settings.launchAtLoginStatusMessage == error {
                     Button("Open Login Items Settings") { SMAppService.openSystemSettingsLoginItems() }
                 }

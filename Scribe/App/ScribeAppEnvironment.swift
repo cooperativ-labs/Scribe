@@ -50,7 +50,14 @@ final class ScribeAppEnvironment: ObservableObject {
     var openSettingsWindow: (() -> Void)?
     /// Mirrors the transcription service's status into the menu.
     @Published private(set) var transcriptionStatus = TranscriptionHostService.Status()
-    @Published private(set) var updateState: UpdateMenuState = .idle
+    @Published private(set) var updateState: UpdateMenuState = .idle {
+        didSet {
+            guard oldValue != updateState else { return }
+            if case .failed(let message) = updateState {
+                MessageDebugLog.shared.record(message, source: "Updates", level: .error)
+            }
+        }
+    }
     private var transcriptWindow: NSWindow?
     private var speakersWindow: NSWindow?
 
@@ -75,6 +82,8 @@ final class ScribeAppEnvironment: ObservableObject {
     private var repairedSessionIDs: Set<UUID> = []
 
     init() {
+        // Load the opt-in flag before any startup messages can be emitted.
+        _ = MessageDebugLog.shared
         let settings = ScribeSettings()
         let permissions = PermissionService()
         self.settings = settings

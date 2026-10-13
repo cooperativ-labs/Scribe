@@ -79,6 +79,10 @@ public struct ScribeSettingsView: View {
         .onAppear { sources.refreshSources() }
         .onAppear { settings.refreshLaunchAtLoginStatus() }
         .onChange(of: selectedTab) { shortcutCapture.stop() }
+        .captureDebugMessage(folderSelectionError, source: "Recording folder")
+        .captureDebugMessage(settings.launchAtLoginError, source: "Launch at login")
+        .captureDebugMessage(settings.modelsFolderError, source: "Models folder")
+        .captureDebugMessage(settings.recordingsFolderError?.localizedDescription, source: "Recording folder")
         .onDisappear { shortcutCapture.stop() }
         .fileImporter(
             isPresented: $isChoosingRecordingsFolder,
@@ -175,6 +179,7 @@ public struct ScribeSettingsView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
+            MessageDebuggingSection()
         }
         .formStyle(.grouped)
     }

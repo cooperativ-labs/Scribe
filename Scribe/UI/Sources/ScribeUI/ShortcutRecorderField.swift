@@ -54,6 +54,7 @@ struct ShortcutRecorderField: View {
                 }
                 if isRecording, let message = capture.message {
                     Text(message)
+                        .captureDebugMessage(message, source: "Shortcut setup", level: .warning)
                         .font(.footnote)
                         .foregroundStyle(.red)
                 }

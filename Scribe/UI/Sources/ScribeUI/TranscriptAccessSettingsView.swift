@@ -108,6 +108,7 @@ public struct TranscriptAccessSettingsView: View {
             }
             if let message = state.message {
                 Text(message)
+                    .captureDebugMessage(message, source: "Assistant plugin", level: state.failed ? .error : .warning)
                     .font(.footnote)
                     .foregroundStyle(state.failed ? .red : .orange)
                     .fixedSize(horizontal: false, vertical: true)
@@ -426,6 +427,7 @@ public struct TranscriptAccessSettingsView: View {
     private func failure(in source: CopySource) -> some View {
         if let copyFailure, copyFailure.source == source {
             Text(copyFailure.message)
+                .captureDebugMessage(copyFailure.message, source: "Assistant setup")
                 .font(.footnote)
                 .foregroundStyle(.red)
         }

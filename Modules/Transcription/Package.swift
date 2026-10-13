@@ -6,6 +6,7 @@ let package = Package(
     platforms: [.macOS(.v15)],
     products: [.library(name: "Transcription", targets: ["Transcription"])],
     dependencies: [
+        .package(path: "../../Scribe/Platform"),
         .package(path: "../ScribeDesign"),
         // The speaker library is an independent service contract; review shares its
         // person IDs rather than defining a second identity type.
@@ -20,6 +21,7 @@ let package = Package(
         .target(
             name: "Transcription",
             dependencies: [
+                .product(name: "Platform", package: "Platform"),
                 .product(name: "ScribeDesign", package: "ScribeDesign"),
                 .product(name: "Speakers", package: "Speakers"),
                 .product(name: "Vocabulary", package: "Vocabulary"),
@@ -30,6 +32,7 @@ let package = Package(
         .testTarget(
             name: "TranscriptionTests",
             dependencies: [
+                .product(name: "Platform", package: "Platform"),
                 "Transcription",
                 .product(name: "Speakers", package: "Speakers"),
                 .product(name: "Vocabulary", package: "Vocabulary"),

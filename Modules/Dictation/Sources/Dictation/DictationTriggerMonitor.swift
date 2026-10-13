@@ -29,6 +29,7 @@ public final class DictationTriggerMonitor {
 
     public func start() {
         guard flagsMonitor == nil else { return }
+        MessageDebugLog.shared.record("Keyboard monitors started", source: "Keyboard", level: .event)
         flagsMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
             MainActor.assumeIsolated { self?.handleFlags(event) }
         }
@@ -53,6 +54,7 @@ public final class DictationTriggerMonitor {
     }
 
     public func stop() {
+        if isRunning { MessageDebugLog.shared.record("Keyboard monitors stopped", source: "Keyboard", level: .event) }
         if let flagsMonitor { NSEvent.removeMonitor(flagsMonitor) }
         if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
         if let localMonitor { NSEvent.removeMonitor(localMonitor) }
@@ -63,6 +65,7 @@ public final class DictationTriggerMonitor {
         timer = nil
         if secureInputBlocked {
             secureInputBlocked = false
+            MessageDebugLog.shared.record("Secure-input tracking reset because monitors stopped", source: "Keyboard", level: .event)
             onSecureInputChange?(false)
         }
         emit(router.cancelAll(.stopped))
@@ -110,6 +113,8 @@ public final class DictationTriggerMonitor {
         let blocked = IsSecureEventInputEnabled()
         guard blocked != secureInputBlocked else { return }
         secureInputBlocked = blocked
+        MessageDebugLog.shared.record("Secure Keyboard Entry observed \(blocked ? "on" : "off")", source: "Keyboard", level: .event,
+                                      context: "frontmost=\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "unknown")")
         onSecureInputChange?(blocked)
         if blocked {
             emit(router.cancelAll(.secureInput))

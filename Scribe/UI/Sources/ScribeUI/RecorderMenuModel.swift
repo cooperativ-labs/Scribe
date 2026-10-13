@@ -33,8 +33,10 @@ public final class RecorderMenuModel: ObservableObject {
             at: now(),
             pasteTimestampShortcut: pasteTimestampShortcut()
         )
+        recordMessages(in: snapshot, previous: nil)
         observation = coordinator.observeSnapshot { [weak self] snapshot in
             guard let self else { return }
+            self.recordMessages(in: snapshot, previous: self.snapshot)
             self.snapshot = snapshot
             refreshPresentation()
         }
@@ -48,6 +50,22 @@ public final class RecorderMenuModel: ObservableObject {
             at: now(),
             pasteTimestampShortcut: pasteTimestampShortcut()
         )
+    }
+
+    private func recordMessages(in snapshot: RecorderSnapshot, previous: RecorderSnapshot?) {
+        if snapshot.permissions != previous?.permissions,
+           let prompt = PermissionPrompt(requirements: snapshot.permissions.blockingRequirements(for: snapshot.recordingMode)) {
+            MessageDebugLog.shared.record(prompt.title, source: "Recorder permissions", level: .warning)
+        }
+        if let notice = snapshot.recoveryNotice, notice != previous?.recoveryNotice {
+            MessageDebugLog.shared.record(notice, source: "Recorder", level: .warning)
+        }
+        for issue in snapshot.shortcutIssues where previous?.shortcutIssues.contains(issue) != true {
+            MessageDebugLog.shared.record(issue, source: "Shortcuts", level: .warning)
+        }
+        if case .failed(let failure) = snapshot.state, snapshot.state != previous?.state {
+            MessageDebugLog.shared.record(failure.message, source: "Recorder", level: .error, context: failure.recoveryHint)
+        }
     }
 
     // MARK: Menu lifecycle

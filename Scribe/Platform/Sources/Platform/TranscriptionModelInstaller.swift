@@ -164,7 +164,13 @@ public final class TranscriptionModelInstaller: ObservableObject {
     public enum State: Equatable {
         case checking, notInstalled, installing, installed, failed(String)
     }
-    @Published public private(set) var state: State = .checking
+    @Published public private(set) var state: State = .checking {
+        didSet {
+            if case .failed(let message) = state, state != oldValue {
+                MessageDebugLog.shared.record(message, source: "Model installation", level: .error)
+            }
+        }
+    }
     @Published public private(set) var completedBytes: Int64 = 0
     @Published public private(set) var totalBytes: Int64 = 0
     @Published public private(set) var currentFile = ""

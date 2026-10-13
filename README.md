@@ -31,6 +31,24 @@ temporary WAV given to the local worker is removed after transcription.
 Text goes directly into the focused field when possible, with a paste fallback
 for apps that do not support Accessibility insertion.
 
+To diagnose a warning that disappears too quickly, enable **Settings → General
+→ Debugging → Capture messages for debugging**, then reproduce it. **View
+Captured Messages…** shows timestamped messages and dictation events, with
+search, **Copy All**, **Export…**, and **Clear History…**. Secure Keyboard Entry
+on/off observations, trigger cancellation reasons, session states, and the
+frontmost app's identifier help explain interrupted dictation. Capturing does
+not change Secure Keyboard Entry protections or prevent session cancellation.
+
+Capture is off by default. When enabled, Scribe keeps the latest 1,000 messages
+locally in `~/Library/Application Support/Scribe/Debugging/messages.json`, across
+restarts. This includes dictation/assistant status and errors, transcript
+notifications, recorder recovery and shortcut warnings, model-installation
+errors, update errors, and settings feedback. It excludes audio, dictated text,
+live previews, assistant source text and answers. Messages can contain app
+names, filenames, paths or provider error details; inspect the export before
+sharing it. Turning capture off keeps existing history; **Clear History…**
+removes the saved entries.
+
 ## Voice Assistant
 
 Hold a second key, say what you want, and Scribe writes the answer where your

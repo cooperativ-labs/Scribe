@@ -27,13 +27,33 @@ public final class VoiceAssistantAccount: ObservableObject {
     }
 
     @Published public private(set) var signIn: SignInState = .signedOut
-    @Published public private(set) var signInError: String?
+    @Published public private(set) var signInError: String? {
+        didSet {
+            if let signInError, signInError != oldValue {
+                MessageDebugLog.shared.record(signInError, source: "Assistant sign-in", level: .error)
+            }
+        }
+    }
     @Published public private(set) var models: [AssistModel] = []
     @Published public private(set) var modelsLoading = false
-    @Published public private(set) var modelsError: String?
+    @Published public private(set) var modelsError: String? {
+        didSet {
+            if let modelsError, modelsError != oldValue {
+                MessageDebugLog.shared.record(modelsError, source: "Assistant models", level: .error)
+            }
+        }
+    }
     /// The providers with a key saved in the Keychain.
     @Published public private(set) var providersWithKeys: Set<AssistProvider> = []
-    @Published public private(set) var apiKeyStatus: [AssistProvider: APIKeyStatus] = [:]
+    @Published public private(set) var apiKeyStatus: [AssistProvider: APIKeyStatus] = [:] {
+        didSet {
+            for (provider, status) in apiKeyStatus where status != oldValue[provider] {
+                if case .failed(let message) = status {
+                    MessageDebugLog.shared.record(message, source: "Assistant connection", level: .error)
+                }
+            }
+        }
+    }
     @Published public private(set) var apiModels: [AssistProvider: [AssistModel]] = [:]
     @Published public private(set) var onDeviceStatus: OnDeviceModel.Status = .unsupportedSystem
     @Published public private(set) var privateCloudStatus: PrivateCloudModel.Status = .unsupportedSystem

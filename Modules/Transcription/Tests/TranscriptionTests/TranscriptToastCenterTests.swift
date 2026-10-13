@@ -1,8 +1,35 @@
 import XCTest
+import Platform
 @testable import Transcription
 
 @MainActor
 final class TranscriptToastCenterTests: XCTestCase {
+    func testHistoryKeepsEvictedDismissedAndFinishedMessages() async throws {
+        let name = "ToastDebugLogTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+        let folder = FileManager.default.temporaryDirectory.appending(path: name)
+        defer {
+            defaults.removePersistentDomain(forName: name)
+            try? FileManager.default.removeItem(at: folder)
+        }
+        let log = MessageDebugLog(defaults: defaults, fileURL: folder.appending(path: "messages.json"))
+        log.isEnabled = true
+        let center = TranscriptToastCenter(schedulesExpiry: false, debugLog: log)
+        let progress = center.post("Queuing", kind: .progress)
+        for index in 0..<4 { center.post("Result \(index)", kind: .result) }
+        // Completion of an evicted progress toast must still be captured once.
+        center.finish(progress, text: "Import failed", failure: true)
+        let second = center.post("Exporting", kind: .progress)
+        center.finish(second, text: "Exported", failure: false)
+        center.dismiss(second)
+        XCTAssertFalse(center.visible.contains { $0.text == "Queuing" || $0.text == "Exported" })
+        XCTAssertEqual(log.entries.filter { $0.message == "Import failed" }.count, 1)
+        XCTAssertTrue(log.entries.contains { $0.message == "Import failed" && $0.level == .error })
+        XCTAssertTrue(log.exportText().contains("Queuing"))
+        XCTAssertTrue(log.exportText().contains("Exported"))
+        await log.flush()
+    }
+
     func testNewestThreeRemainInOrder() {
         let center = TranscriptToastCenter(schedulesExpiry: false)
         for label in ["one", "two", "three", "four"] {

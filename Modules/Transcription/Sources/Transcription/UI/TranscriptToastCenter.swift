@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import Platform
 
 public struct TranscriptToast: Identifiable, Equatable {
     public enum Kind: Equatable { case result, failure, progress }
@@ -29,14 +30,18 @@ public final class TranscriptToastCenter {
     public private(set) var visible: [TranscriptToast] = []
     @ObservationIgnored private let now: () -> Date
     @ObservationIgnored private let schedulesExpiry: Bool
+    @ObservationIgnored private let debugLog: MessageDebugLog
 
-    public init(now: @escaping () -> Date = Date.init, schedulesExpiry: Bool = true) {
+    public init(now: @escaping () -> Date = Date.init, schedulesExpiry: Bool = true,
+                debugLog: MessageDebugLog = .shared) {
         self.now = now
         self.schedulesExpiry = schedulesExpiry
+        self.debugLog = debugLog
     }
 
     @discardableResult
     public func post(_ text: String, kind: TranscriptToast.Kind, action: TranscriptToast.Action? = nil) -> UUID {
+        debugLog.record(text, source: "Transcripts", level: kind == .failure ? .error : .status)
         if action == .undo || action == .redo { clearReversibleActions() }
         var toast = TranscriptToast(text: text, kind: kind, action: action)
         if kind == .result { toast.deadline = now().addingTimeInterval(4) }
@@ -51,6 +56,7 @@ public final class TranscriptToastCenter {
             post(text, kind: failure ? .failure : .result, action: action)
             return
         }
+        debugLog.record(text, source: "Transcripts", level: failure ? .error : .status)
         visible[index].text = text
         visible[index].kind = failure ? .failure : .result
         visible[index].action = action

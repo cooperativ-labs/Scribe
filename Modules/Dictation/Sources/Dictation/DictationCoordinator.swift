@@ -3,6 +3,7 @@ import AppKit
 import Assist
 import Combine
 import Foundation
+import Platform
 
 public enum DictationState: Sendable, Equatable {
     case idle
@@ -50,13 +51,31 @@ public enum AssistantAvailability: Sendable {
 /// outbox, background scheduler, or meeting recording capture pipeline.
 @MainActor
 public final class DictationCoordinator: ObservableObject {
-    @Published public private(set) var vocabularyWarning: String?
-    @Published public private(set) var state: DictationState = .idle
+    @Published public private(set) var vocabularyWarning: String? {
+        didSet {
+            if debugLog.isEnabled, let vocabularyWarning, vocabularyWarning != oldValue {
+                debugLog.record(vocabularyWarning, source: "Dictation", level: .warning, context: debugContext)
+            }
+        }
+    }
+    @Published public private(set) var state: DictationState = .idle {
+        didSet {
+            guard debugLog.isEnabled else { return }
+            // Audio levels change twenty times a second; keep semantic state
+            // changes, never those samples or the live transcript.
+            if case .listening = oldValue, case .listening = state { return }
+            guard oldValue != state else { return }
+            let status = state.debugStatus
+            debugLog.record(status.message, source: "Dictation", level: status.level,
+                            context: "\(debugContext); previous=\(oldValue.debugStatus.message)")
+        }
+    }
     @Published public private(set) var triggerMode: DictationTriggerMode = .hold
     @Published public private(set) var livePreview: String?
     public var livePreviewEnabled = false
     private var previewTask: Task<Void, Never>?
     private let engine: DictationEngine
+    private let debugLog: MessageDebugLog
     private let inserter: DictationTextInserter
     private let capture = DictationAudioCapture()
     private var levelTimer: Timer?
@@ -65,6 +84,7 @@ public final class DictationCoordinator: ObservableObject {
     private var warmingForSession = false
     private var active = false
     private var generation = 0
+    private var debugSessionID: UUID?
     private var appliedPolicy: (keepLoaded: Bool, idleMinutes: Int)?
     private var startedInApplication: pid_t?
     private let focusLocator = FocusedFieldLocator()
@@ -88,9 +108,11 @@ public final class DictationCoordinator: ObservableObject {
     public var keepModelLoaded = true
     public var idleUnloadMinutes = 10
 
-    public init(engine: DictationEngine, inserter: DictationTextInserter = DictationTextInserter()) {
+    public init(engine: DictationEngine, inserter: DictationTextInserter = DictationTextInserter(),
+                debugLog: MessageDebugLog = .shared) {
         self.engine = engine
         self.inserter = inserter
+        self.debugLog = debugLog
         capture.onRecoveryFailure = { [weak self] message in
             self?.cancel()
             self?.state = .error(message)
@@ -104,6 +126,8 @@ public final class DictationCoordinator: ObservableObject {
     }
 
     public func setSecureInputBlocked(_ blocked: Bool) {
+        debugLog.record("Dictation secure-input block \(blocked ? "applied" : "cleared")", source: "Keyboard", level: .event,
+                        context: "\(debugContext); state=\(state.debugStatus.message)")
         if blocked {
             cancel()
             intent = .dictation
@@ -129,6 +153,7 @@ public final class DictationCoordinator: ObservableObject {
             }
             return
         }
+        debugLog.record("Dictation \(enabled ? "enabled" : "disabled")", source: "Dictation", level: .event, context: debugContext)
         active = enabled
         if enabled {
             appliedPolicy = (keepModelLoaded, idleUnloadMinutes)
@@ -152,6 +177,8 @@ public final class DictationCoordinator: ObservableObject {
     }
 
     public func consume(_ event: DictationTriggerEvent) {
+        if case .listeningStarted = event { debugSessionID = UUID() }
+        debugLog.record(event.debugMessage, source: "Dictation trigger", level: .event, context: debugContext)
         switch event {
         case .listeningStarted(let mode, let intent):
             vocabularyWarning = nil
@@ -292,6 +319,10 @@ public final class DictationCoordinator: ObservableObject {
     }
 
     public func cancel() {
+        if state != .idle {
+            debugLog.record("Session cancelled", source: "Dictation", level: .event,
+                            context: "\(debugContext); state=\(state.debugStatus.message)")
+        }
         stopPreview()
         generation += 1
         warmingForSession = false
@@ -306,6 +337,11 @@ public final class DictationCoordinator: ObservableObject {
         startingFocus?.cancel()
         startingFocus = nil
         state = .idle
+    }
+
+    private var debugContext: String {
+        let application = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "unknown"
+        return "session=\(debugSessionID?.uuidString ?? "none"); generation=\(generation); intent=\(intent); trigger=\(triggerMode); frontmost=\(application)"
     }
 
     // MARK: Assistant

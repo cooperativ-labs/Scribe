@@ -1,4 +1,5 @@
 import Foundation
+import Platform
 import Observation
 
 /// One profile as the Speakers view presents it.
@@ -51,7 +52,13 @@ public final class SpeakerLibraryViewModel {
     public private(set) var ownerProfileID: UUID?
     public private(set) var rows: [SpeakerLibraryRow] = []
     public private(set) var revision: SpeakerLibraryRevision?
-    public private(set) var errorMessage: String?
+    public private(set) var errorMessage: String? {
+        didSet {
+            if let errorMessage, errorMessage != oldValue {
+                MessageDebugLog.shared.record(errorMessage, source: "Speaker library", level: .error)
+            }
+        }
+    }
     public var selectedProfileID: UUID?
 
     @ObservationIgnored private let store: SpeakerProfileStore
