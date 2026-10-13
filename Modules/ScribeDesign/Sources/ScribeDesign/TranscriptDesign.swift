@@ -98,19 +98,10 @@ public enum TranscriptDesign {
         public static let turnLineSpacing: CGFloat = (turnLineHeightMultiple - 1.2) * turnFontSize
 
         /// The speaker's name at the head of a turn or on a chip.
-        #if os(iOS)
-        public static let speakerName = Font.subheadline.weight(.semibold)
-        #else
         public static let speakerName = Font.system(size: 13, weight: .semibold)
-        #endif
         /// Start times and the transport readout; digits line up column to column.
-        #if os(iOS)
-        public static let timecode = Font.caption.monospacedDigit()
-        public static let chip = Font.caption.weight(.medium)
-        #else
         public static let timecode = Font.system(size: 12).monospacedDigit()
         public static let chip = Font.system(size: 12, weight: .medium)
-        #endif
         /// The turn count on a speaker chip or the count badge on the filter menu.
         public static let badge = Font.system(size: 11, weight: .semibold).monospacedDigit()
     }
@@ -233,7 +224,7 @@ public struct TranscriptGlassSurface: ViewModifier {
     }
 
     public func body(content: Content) -> some View {
-        if #available(iOS 26, macOS 26, *) {
+        if #available(macOS 26, *) {
             content.glassEffect(interactive ? .regular.interactive() : .regular, in: shape.anyShape)
         } else {
             content
@@ -265,7 +256,7 @@ public struct TranscriptGlassEffectContainer<Content: View>: View {
     }
 
     public var body: some View {
-        if #available(iOS 26, macOS 26, *) {
+        if #available(macOS 26, *) {
             GlassEffectContainer(spacing: spacing, content: content)
         } else {
             content()

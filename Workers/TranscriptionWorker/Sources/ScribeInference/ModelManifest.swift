@@ -3,6 +3,7 @@ import Foundation
 
 public struct ModelManifest: Codable, Sendable {
     public struct Asset: Codable, Sendable {
+        public let optional: Bool?
         public let id: String
         public let relativePath: String
         public let upstream: Upstream
@@ -60,9 +61,9 @@ public struct ModelManifest: Codable, Sendable {
     /// Validates exactly the staged files. It never asks FluidAudio, Core ML, or
     /// a model host to fill a gap; callers get one structured setup error with
     /// all missing or mismatched paths.
-    public func validate(modelsDirectory: URL) -> AssetValidationReport {
+    public func validate(modelsDirectory: URL, assetID: String? = nil) -> AssetValidationReport {
         var failures: [AssetValidationFailure] = []
-        for asset in assets {
+        for asset in assets where assetID.map({ asset.id == $0 }) ?? (asset.optional != true) {
             let assetURL = modelsDirectory.appending(path: asset.relativePath, directoryHint: .isDirectory)
             for file in asset.requiredFiles {
                 let fileURL = assetURL.appending(path: file.relativePath, directoryHint: .notDirectory)

@@ -15,11 +15,16 @@ public struct TranscriptionModelManifest: Decodable, Sendable {
             public let bytes: Int
             public let sha256: String?
         }
+        public let optional: Bool?
         public let relativePath: String
         public let upstream: Upstream
         public let requiredFiles: [File]
     }
+    public enum Group: Sendable { case transcription, vocabulary }
     public let assets: [Asset]
+    public func selecting(_ group: Group) -> Self {
+        Self(assets: assets.filter { group == .vocabulary ? $0.optional == true : $0.optional != true })
+    }
     public var totalBytes: Int64 { assets.reduce(0) { $0 + $1.requiredFiles.reduce(0) { $0 + Int64($1.bytes) } } }
 
     public static func load(from url: URL?) throws -> Self {
@@ -75,6 +80,7 @@ public actor TranscriptionModelDownloader {
     }
 
     public func isInstalled(manifest: TranscriptionModelManifest, directory: URL) throws -> Bool {
+        guard !manifest.assets.isEmpty else { return false }
         for asset in manifest.assets {
             for file in asset.requiredFiles {
                 try Task.checkCancellation()
@@ -163,13 +169,16 @@ public final class TranscriptionModelInstaller: ObservableObject {
     @Published public private(set) var totalBytes: Int64 = 0
     @Published public private(set) var currentFile = ""
     public var isBusy: Bool { state == .checking || state == .installing }
+    private let group: TranscriptionModelManifest.Group
     private let manifestURL: URL?
     private let downloader: TranscriptionModelDownloader
     private var task: Task<Void, Never>?
     private var generation = UUID()
 
     public init(manifestURL: URL? = Bundle.main.url(forResource: "model_manifest", withExtension: "json"),
-                downloader: TranscriptionModelDownloader = .init()) {
+                downloader: TranscriptionModelDownloader = .init(),
+                group: TranscriptionModelManifest.Group = .transcription) {
+        self.group = group
         self.manifestURL = manifestURL
         self.downloader = downloader
     }
@@ -189,11 +198,11 @@ public final class TranscriptionModelInstaller: ObservableObject {
         self.generation = generation
         state = install ? .installing : .checking
         completedBytes = 0
-        task = Task { [weak self, downloader, manifestURL] in
+        task = Task { [weak self, downloader, manifestURL, group] in
             let accessing = directory.startAccessingSecurityScopedResource()
             defer { if accessing { directory.stopAccessingSecurityScopedResource() } }
             do {
-                let manifest = try TranscriptionModelManifest.load(from: manifestURL)
+                let manifest = try TranscriptionModelManifest.load(from: manifestURL).selecting(group)
                 self?.totalBytes = manifest.totalBytes
                 if install {
                     try await downloader.install(manifest: manifest, directory: directory) { [weak self] completed, total, file in

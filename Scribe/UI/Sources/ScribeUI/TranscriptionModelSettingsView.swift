@@ -4,6 +4,14 @@ import SwiftUI
 struct TranscriptionModelSettingsView: View {
     @ObservedObject var settings: ScribeSettings
     @ObservedObject var installer: TranscriptionModelInstaller
+    @ObservedObject private var vocabularyInstaller: TranscriptionModelInstaller
+
+    init(settings: ScribeSettings, installer: TranscriptionModelInstaller) {
+        self.settings = settings
+        self.installer = installer
+        self.vocabularyInstaller = settings.vocabularyInstaller
+    }
+
     @State private var choosingFolder = false
     @State private var folderError: String?
 
@@ -27,7 +35,7 @@ struct TranscriptionModelSettingsView: View {
                 }
                 .disabled(settings.modelsFolderURL == ScribeSettings.defaultModelsFolderURL)
             }
-            .disabled(installer.isBusy)
+            .disabled(installer.isBusy || vocabularyInstaller.isBusy)
             Text("Changing folders leaves existing downloads in their original location.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -58,6 +66,21 @@ struct TranscriptionModelSettingsView: View {
                 Text(message).font(.footnote).foregroundStyle(.red)
                 installButton("Retry Installation")
             }
+            LabeledContent("Vocabulary boosting") {
+                Text(vocabularyInstaller.state == .installed ? "Installed · Ready" : "Unavailable")
+            }
+            Text("Optional 103 MB download. Applies your personal vocabulary and enabled packs to future batch and dictation requests. Without it, transcription continues with a vocabulary-unavailable warning.")
+                .font(.footnote).foregroundStyle(.secondary)
+            if vocabularyInstaller.state == .installing || vocabularyInstaller.state == .checking {
+                ProgressView(value: Double(vocabularyInstaller.completedBytes), total: Double(max(1, vocabularyInstaller.totalBytes)))
+                    .accessibilityLabel("Vocabulary model installation")
+                Button("Cancel Vocabulary Setup") { vocabularyInstaller.cancel() }
+            } else if vocabularyInstaller.state != .installed {
+                Button("Install Vocabulary Boosting") { vocabularyInstaller.install(directory: settings.modelsFolderURL) }
+                if case let .failed(message) = vocabularyInstaller.state { Text(message).foregroundStyle(.red) }
+            }
+            Link("Parakeet CTC 110M · License notices", destination: URL(string: "https://huggingface.co/FluidInference/parakeet-ctc-110m-coreml#license")!)
+                .font(.footnote)
             if let error = folderError ?? settings.modelsFolderError {
                 Text(error).font(.footnote).foregroundStyle(.red)
             }

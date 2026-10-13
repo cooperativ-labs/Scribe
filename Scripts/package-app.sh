@@ -172,6 +172,7 @@ fi
 
 copy_notice 'WebRTC.txt' "$SCRIBE_NOTICE_WEBRTC"
 copy_notice 'FluidAudio.txt' "$SCRIBE_NOTICE_FLUIDAUDIO"
+copy_notice 'Parakeet-CTC-110M.txt' "$repo_root/Workers/TranscriptionWorker/Licenses/Parakeet-CTC-110M.txt"
 copy_notice 'Silero-VAD.txt' "$repo_root/Workers/TranscriptionWorker/Licenses/Silero-VAD.txt"
 copy_notice 'Parakeet-CC-BY-4.0.txt' "$SCRIBE_NOTICE_PARAKEET"
 copy_notice 'Diarization-Models.txt' "$SCRIBE_NOTICE_DIARIZATION"

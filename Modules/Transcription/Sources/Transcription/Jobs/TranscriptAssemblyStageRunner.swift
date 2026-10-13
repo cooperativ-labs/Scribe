@@ -211,16 +211,18 @@ public struct TranscriptAssemblyStageRunner: TranscriptionStageRunning {
             sourceDurationMs: milliseconds(prepared.sourceDurationSeconds)
         ))
 
-        let record = ReconciledWordsRecord(
-            words: result.words.map {
+        let rawWords = result.words.map {
                 ReconciledWordsRecord.Word(
                     id: $0.id, text: $0.text, startMs: $0.startMs, endMs: $0.endMs,
                     enclosingStartMs: $0.enclosingStartMs, enclosingEndMs: $0.enclosingEndMs
                 )
-            },
-            droppedDuplicateTokenCount: result.droppedDuplicateTokenCount,
-            warnings: result.warnings
-        )
+            }
+        let words = VocabularyWordReplacer.apply(workerTranscript.vocabularyReplacements ?? [], to: rawWords)
+        var warnings = result.warnings
+        if workerTranscript.vocabularyWarning != nil {
+            warnings.append(TranscriptWarning(code: "vocabulary_assets_unavailable", message: "Vocabulary unavailable: install or repair Vocabulary boosting in Settings. This run used normal transcription."))
+        }
+        let record = ReconciledWordsRecord(words: words, droppedDuplicateTokenCount: result.droppedDuplicateTokenCount, warnings: warnings)
         return TranscriptionStageOutput(artifactURL: try write(record, named: TranscriptRunArtifact.words, in: job))
     }
 
@@ -345,6 +347,11 @@ public struct TranscriptAssemblyStageRunner: TranscriptionStageRunning {
                 ]
             }()),
         ]
+        if let vocabulary = job.vocabularySnapshot {
+            processingOptions["vocabulary_revision"] = vocabulary.revision.map(TranscriptJSONValue.string) ?? .null
+            processingOptions["vocabulary_snapshot"] = .string("vocabulary.json")
+            processingOptions["vocabulary_raw_asr"] = .string("transcript.json")
+        }
         processingOptions["microphone_speaker_prior_enabled"] = .boolean(job.request.microphoneSpeakerPrior == true)
         processingOptions["source_energy_prior_status"] = .string(job.request.microphoneSpeakerPrior != true ? "disabled"
             : energy == nil ? "unavailable" : sourcePrior == nil ? "no_confident_cluster" : "selected")

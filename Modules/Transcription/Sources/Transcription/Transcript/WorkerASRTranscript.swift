@@ -5,6 +5,10 @@ import Foundation
 /// Keys match `ParakeetAdapter.Transcript` so recorded worker-output JSON can be
 /// decoded without taking a FluidAudio dependency in this module.
 public struct WorkerASRTranscript: Codable, Sendable, Equatable {
+    public var rawText: String?
+    public var vocabularyRevision: String?
+    public var vocabularyReplacements: [WorkerVocabularyReplacement]?
+    public var vocabularyWarning: String?
     public let text: String
     public let tokens: [WorkerTimedToken]
     /// Unmerged per-chunk token streams. Absent on the current worker, which
@@ -88,5 +92,22 @@ public enum WorkerASRTranscriptCodec {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         return try encoder.encode(transcript)
+    }
+}
+
+/// Audio-backed source-relative span emitted by FluidAudio candidate evaluation.
+public struct WorkerVocabularyReplacement: Codable, Sendable, Equatable {
+    public let original: String
+    public let replacement: String
+    public let startSeconds: Double
+    public let endSeconds: Double
+    public let originalScore: Float
+    public let replacementScore: Float
+
+    public init(original: String, replacement: String, startSeconds: Double, endSeconds: Double,
+                originalScore: Float = 0, replacementScore: Float = 0) {
+        self.original = original; self.replacement = replacement
+        self.startSeconds = startSeconds; self.endSeconds = endSeconds
+        self.originalScore = originalScore; self.replacementScore = replacementScore
     }
 }

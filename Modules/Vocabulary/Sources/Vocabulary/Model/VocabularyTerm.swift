@@ -45,7 +45,7 @@ public struct VocabularyTerm: Equatable, Hashable, Identifiable, Sendable {
     public var key: String { VocabularyText.matchKey(text) }
 
     /// Whether this term is long enough for the recognizer to act on it.
-    public var isBoostable: Bool { text.count >= Self.minimumLength }
+    public var isBoostable: Bool { text.count >= Self.minimumLength && text.contains { $0.isLetter || $0.isNumber } }
 
     /// Advisories the editor and the command line both show. They never block a
     /// save: a person adding "AI" should be told it will not be boosted, not
@@ -93,7 +93,7 @@ public enum VocabularyAdvisory: Equatable, Hashable, Sendable {
     public var message: String {
         switch self {
         case .tooShort:
-            "Shorter than \(VocabularyTerm.minimumLength) characters — kept in the list, but not applied to transcription."
+            "Needs at least \(VocabularyTerm.minimumLength) characters and a letter or number — kept in the list, but not applied to transcription."
         case .commonWord:
             "This is a common English word. Boosting it is likely to rewrite ordinary speech."
         case .aliasTooShort(let alias):

@@ -1,2 +1,2 @@
-// Preserve the desktop worker API while mobile links only the inference library.
+// Preserve the desktop worker API while clients can link the inference library directly.
 @_exported import ScribeInference

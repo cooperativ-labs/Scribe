@@ -4,6 +4,7 @@ import SwiftUI
 /// A small, non-activating readout for the field that had focus at dictation start.
 public struct DictationIndicatorView: View {
     @State private var shimmer = false
+    public let vocabularyWarning: String?
     public let livePreview: String?
     public let state: DictationState
     public let showsToggleControls: Bool
@@ -20,12 +21,13 @@ public struct DictationIndicatorView: View {
     public var cancel: () -> Void = {}
     public var openSettings: () -> Void = {}
 
-    public init(state: DictationState, livePreview: String? = nil, showsToggleControls: Bool = false,
+    public init(state: DictationState, vocabularyWarning: String? = nil, livePreview: String? = nil, showsToggleControls: Bool = false,
                 showsTranscribingLabel: Bool = false, showsCancel: Bool = false,
                 intent: DictationIntent = .dictation,
                 assistantHint: String? = nil,
                 stop: @escaping () -> Void = {}, cancel: @escaping () -> Void = {},
                 openSettings: @escaping () -> Void = {}) {
+        self.vocabularyWarning = vocabularyWarning
         self.livePreview = livePreview
         self.state = state
         self.showsToggleControls = showsToggleControls
@@ -46,6 +48,9 @@ public struct DictationIndicatorView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             status
+            if let vocabularyWarning {
+                Text(vocabularyWarning).font(.caption).foregroundStyle(.orange).frame(maxWidth: 300, alignment: .leading)
+            }
             if isAssistantListening, let assistantHint {
                 Text(assistantHint)
                     .font(.caption)

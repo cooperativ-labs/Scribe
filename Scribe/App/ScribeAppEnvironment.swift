@@ -124,7 +124,8 @@ final class ScribeAppEnvironment: ObservableObject {
         if let installation = try? WorkerLocator.locate() {
             dictationCoordinator = DictationCoordinator(engine: DictationEngine(
                 installation: installation,
-                modelsDirectoryProvider: { @MainActor [settings] in settings.modelsFolderURL }
+                modelsDirectoryProvider: { @MainActor [settings] in settings.modelsFolderURL },
+                vocabularySnapshot: { try VocabularyStore.openApplicationSupportLibrary().load().snapshot }
             ))
         }
         vocabulary = VocabularyViewModel.applicationSupportModel()

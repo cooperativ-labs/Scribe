@@ -50,6 +50,7 @@ public enum AssistantAvailability: Sendable {
 /// outbox, background scheduler, or meeting recording capture pipeline.
 @MainActor
 public final class DictationCoordinator: ObservableObject {
+    @Published public private(set) var vocabularyWarning: String?
     @Published public private(set) var state: DictationState = .idle
     @Published public private(set) var triggerMode: DictationTriggerMode = .hold
     @Published public private(set) var livePreview: String?
@@ -153,6 +154,7 @@ public final class DictationCoordinator: ObservableObject {
     public func consume(_ event: DictationTriggerEvent) {
         switch event {
         case .listeningStarted(let mode, let intent):
+            vocabularyWarning = nil
             stopPreview()
             transcriptionTask?.cancel()
             sourcesTask?.cancel()
@@ -232,6 +234,7 @@ public final class DictationCoordinator: ObservableObject {
                     try Self.writeWAV(samples, to: audioURL)
                     let result = try await engine.dictate(audioURL: audioURL, runDirectoryURL: directory, language: language)
                     guard let self, self.generation == currentGeneration, !Task.isCancelled else { return }
+                    self.vocabularyWarning = result.vocabularyWarning == nil ? nil : "Vocabulary unavailable. Install Vocabulary boosting in Settings."
                     if result.hasSpeech, !result.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         if let assistant {
                             await self.runAssistant(instruction: result.text, configuration: assistant, generation: currentGeneration)

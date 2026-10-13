@@ -108,7 +108,7 @@ public struct WorkerJobRunner: Sendable {
         } else {
             // The adapter's manager and Core ML models are scoped to this call.
             // Returning only its value releases the ASR model set before VBx loads.
-            result = try await ParakeetAdapter(manifest: manifest, modelsDirectory: configuration.modelsDirectory).transcribe(fileURL: URL(fileURLWithPath: prepared.preparedAudioPath))
+            result = try await ParakeetAdapter(manifest: manifest, modelsDirectory: configuration.modelsDirectory).transcribe(fileURL: URL(fileURLWithPath: prepared.preparedAudioPath), vocabulary: try WorkerVocabularySnapshot.load(in: job.runDirectory, path: job.vocabularyPath))
         }
         let resultURL = job.runDirectory.appending(path: "transcript.json")
         try commit(result, to: resultURL)
@@ -228,6 +228,7 @@ public struct WorkerJobRunner: Sendable {
 }
 
 private struct Job {
+    let vocabularyPath: String?
     let sourceURL: URL
     let runDirectory: URL
     let knownSpeakerCount: Int?
@@ -240,6 +241,7 @@ private struct Job {
         guard let sourcePath = payload["sourcePath"]?.stringValue else { throw WorkerJobRunner.Error.missingValue("sourcePath") }
         guard let runPath = payload["runDirectory"]?.stringValue else { throw WorkerJobRunner.Error.missingValue("runDirectory") }
         guard sourcePath.hasPrefix("/"), runPath.hasPrefix("/") else { throw WorkerJobRunner.Error.invalidPath("sourcePath and runDirectory must be absolute local paths.") }
+        vocabularyPath = payload["vocabularyPath"]?.stringValue
         sourceURL = URL(fileURLWithPath: sourcePath)
         runDirectory = URL(fileURLWithPath: runPath, isDirectory: true)
         guard FileManager.default.fileExists(atPath: sourceURL.path) else { throw WorkerJobRunner.Error.invalidPath("Input audio does not exist at \(sourceURL.path).") }

@@ -87,11 +87,30 @@ struct TranscriptionModelInstallerTests {
         let settings = ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: fixture.root, modelManifestURL: fixture.manifestURL)
         #expect(settings.modelsFolderURL.path.hasSuffix("Library/Application Support/Scribe/Models"))
         settings.modelInstaller.cancel()
+        settings.vocabularyInstaller.cancel()
         try settings.setModelsFolder(fixture.destination)
         let relaunched = ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: fixture.root, modelManifestURL: fixture.manifestURL)
         #expect(relaunched.modelsFolderURL == fixture.destination.standardizedFileURL)
         relaunched.modelInstaller.cancel()
+        relaunched.vocabularyInstaller.cancel()
         settings.modelInstaller.cancel()
+        settings.vocabularyInstaller.cancel()
+    }
+
+    @Test func optionalVocabularyGroupDoesNotGateTranscriptionReadiness() async throws {
+        let repo = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let manifest = try TranscriptionModelManifest.load(from: repo.appendingPathComponent("Workers/TranscriptionWorker/model_manifest.json"))
+        let base = manifest.selecting(.transcription)
+        let vocabulary = manifest.selecting(.vocabulary)
+        #expect(base.assets.allSatisfy { $0.optional != true })
+        #expect(vocabulary.assets.count == 1)
+        #expect(vocabulary.assets.first?.relativePath == "parakeet-ctc-110m-coreml")
+        #expect(vocabulary.totalBytes > 100_000_000)
+        #expect(base.totalBytes + vocabulary.totalBytes == manifest.totalBytes)
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        #expect(try await !TranscriptionModelDownloader().isInstalled(manifest: vocabulary, directory: fixture.root))
     }
 
     /// Opt in to downloading the shipping model set; regular tests stay offline.

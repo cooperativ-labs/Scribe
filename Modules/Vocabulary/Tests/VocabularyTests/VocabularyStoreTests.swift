@@ -171,7 +171,7 @@ struct VocabularyRevisionTests {
         #expect(VocabularyLibrary().revision == nil)
     }
 
-    @Test("The revision follows content, not spelling case or term order")
+    @Test("The revision follows output spelling and aliases, independent of term order")
     func revisionIsCanonical() {
         var first = VocabularyLibrary()
         _ = first.update { $0.upsert(VocabularyTerm(text: "NVIDIA", aliases: ["N Vidia"])) }
@@ -181,7 +181,11 @@ struct VocabularyRevisionTests {
         _ = second.update { $0.upsert(VocabularyTerm(text: "macOS")) }
         _ = second.update { $0.upsert(VocabularyTerm(text: "nvidia", aliases: ["n vidia"])) }
 
-        #expect(first.revision == second.revision)
+        #expect(first.revision != second.revision)
+        var reordered = VocabularyLibrary()
+        _ = reordered.update { $0.upsert(VocabularyTerm(text: "macOS")) }
+        _ = reordered.update { $0.upsert(VocabularyTerm(text: "NVIDIA", aliases: ["N Vidia"])) }
+        #expect(first.revision == reordered.revision)
     }
 
     @Test("Adding a mishearing changes the revision")
@@ -197,7 +201,8 @@ struct VocabularyRevisionTests {
     func shortTermsAreInactive() {
         var library = VocabularyLibrary()
         _ = library.update { $0.upsert(VocabularyTerm(text: "AI")) }
-        #expect(library.personal.terms.count == 1)
+        _ = library.update { $0.upsert(VocabularyTerm(text: "...")) }
+        #expect(library.personal.terms.count == 2)
         #expect(library.activeTerms.isEmpty)
         #expect(library.revision == nil)
     }

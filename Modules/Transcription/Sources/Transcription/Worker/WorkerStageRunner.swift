@@ -156,7 +156,7 @@ public actor WorkerStageRunner: TranscriptionStageRunning {
                 runDirectoryURL: job.runDirectoryURL,
                 knownSpeakerCount: job.request.speakerCount.knownCount,
                 maximumSpeakerCount: job.request.speakerCount.maximumCount,
-                additionalOptions: additionalRunOptions
+                additionalOptions: additionalRunOptions.merging(job.vocabularySnapshot == nil ? [:] : ["vocabularyPath": .string("vocabulary.json")]) { _, new in new }
             ))
         } catch {
             await client.shutdown()

@@ -1,0 +1,43 @@
+{
+  "date": "2026-10-13",
+  "platform": {
+    "os": "macOS 27.0.1 (26A434)",
+    "architecture": "arm64",
+    "configuration": "Debug, cpuAndNeuralEngine"
+  },
+  "fluidAudio": "0.17.4",
+  "networkPolicy": "sandbox-exec: deny network*",
+  "measurements": [
+    {
+      "name": "long-baseline",
+      "durationSeconds": 7200,
+      "usedChunkedProcessing": true,
+      "ASRProcessingSeconds": 40.95035803318024,
+      "tokens": 41118,
+      "replacementCount": 0,
+      "vocabularyRevision": null,
+      "warning": null,
+      "maximumRSSBytes": 627785728,
+      "wallSeconds": 74.88,
+      "peakMemoryFootprintBytes": 144442688
+    },
+    {
+      "name": "long-final",
+      "durationSeconds": 7200,
+      "usedChunkedProcessing": true,
+      "ASRProcessingSeconds": 44.49408292770386,
+      "tokens": 41118,
+      "replacementCount": 1103,
+      "vocabularyRevision": "terms-v1",
+      "warning": null,
+      "maximumRSSBytes": 594231296,
+      "wallSeconds": 610.76,
+      "peakMemoryFootprintBytes": 121308120
+    }
+  ],
+  "limitations": [
+    "Synthetic speech and a three-term glossary; not a real-world accuracy evaluation.",
+    "Single Debug runs; Core ML caches, mapped-file RSS and concurrent test work affect measurements.",
+    "Long measurement checks the bounded-window acoustic/alias path; exact-spelling formatting is separately unit tested."
+  ]
+}

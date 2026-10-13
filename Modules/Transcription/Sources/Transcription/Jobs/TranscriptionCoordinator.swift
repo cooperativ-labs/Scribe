@@ -1,4 +1,5 @@
 import Foundation
+import Vocabulary
 import ScribeAppCore
 
 /// Owns the persistent, capture-aware transcription queue.
@@ -39,12 +40,10 @@ public actor TranscriptionCoordinator {
     private let snapshotService: SourceSnapshotService
     private let writer: AtomicReplaceFileWriter
     private let now: @Sendable () -> Date
-    /// The custom vocabulary in force when a job is queued, as a content hash.
-    ///
-    /// Read here rather than carried on every `TranscriptionRequest` so the
-    /// three ways a job arrives — the recorder handoff, a folder import, and a
-    /// dropped file — cannot disagree about which glossary a run was made with.
-    /// A request that names its own revision keeps it.
+    /// Read once at enqueue, including enabled packs and aliases. Actual
+    /// snapshot content is authoritative; derived runs may preserve an older one.
+    private let vocabularySnapshot: @Sendable () throws -> VocabularySnapshot
+    /// Compatibility with revision-only producers predating saved snapshots.
     private let vocabularyRevision: @Sendable () -> String?
     nonisolated(unsafe) private let fileManager: FileManager
 
@@ -63,7 +62,8 @@ public actor TranscriptionCoordinator {
         fileManager: FileManager = .default,
         now: @escaping @Sendable () -> Date = Date.init,
         canStartJob: @escaping @Sendable () async -> Bool = { true },
-        vocabularyRevision: @escaping @Sendable () -> String? = { nil }
+        vocabularyRevision: @escaping @Sendable () -> String? = { nil },
+        vocabularySnapshot: @escaping @Sendable () throws -> VocabularySnapshot = { .init(revision: nil, terms: []) }
     ) throws {
         self.configuration = configuration
         self.canStartJob = canStartJob
@@ -74,6 +74,7 @@ public actor TranscriptionCoordinator {
         self.fileManager = fileManager
         self.now = now
         self.vocabularyRevision = vocabularyRevision
+        self.vocabularySnapshot = vocabularySnapshot
         try fileManager.createDirectory(at: configuration.transcriptStoreURL, withIntermediateDirectories: true)
         let indexed = try Self.readQueueIndex(at: configuration.queueFileURL, fileManager: fileManager)
         let discovered = Self.discoverRecoverableJobs(in: configuration.transcriptStoreURL, fileManager: fileManager)
@@ -113,6 +114,11 @@ public actor TranscriptionCoordinator {
     /// Snapshots a request source and creates an independent run directory.
     @discardableResult
     public func enqueue(_ request: TranscriptionRequest) throws -> TranscriptionJob {
+        try enqueue(request, snapshot: nil)
+    }
+
+    private func enqueue(_ request: TranscriptionRequest, snapshot preserved: VocabularySnapshot?) throws -> TranscriptionJob {
+        let vocabulary = try preserved ?? vocabularySnapshot()
         let importConfiguration = ImportConfiguration(
             modelProfileID: request.modelProfileID,
             languageMode: request.languageMode,
@@ -121,7 +127,7 @@ public actor TranscriptionCoordinator {
             speakerMatching: request.speakerMatching,
             microphoneSpeakerPrior: request.microphoneSpeakerPrior == true,
             speakerLibraryRevision: request.speakerLibraryRevision,
-            vocabularyRevision: request.vocabularyRevision ?? vocabularyRevision()
+            vocabularyRevision: vocabulary.revision ?? request.vocabularyRevision ?? vocabularyRevision()
         )
         let fingerprint: ImportFingerprint
         let snapshot: SourceSnapshot
@@ -142,7 +148,8 @@ public actor TranscriptionCoordinator {
             modelFingerprint: modelFingerprint,
             configurationFingerprint: fingerprint.configurationHash,
             createdAt: now(),
-            updatedAt: now()
+            updatedAt: now(),
+            vocabularySnapshot: vocabulary
         )
         try write(job)
         jobs[job.id] = job
@@ -222,7 +229,8 @@ public actor TranscriptionCoordinator {
             checkpoints: compatible,
             createdAt: now(),
             updatedAt: now(),
-            retryOfRunID: previous.runID
+            retryOfRunID: previous.runID,
+            vocabularySnapshot: previous.vocabularySnapshot
         )
         try write(job)
         try copySourceEnergy(from: previous, to: job)
@@ -248,7 +256,7 @@ public actor TranscriptionCoordinator {
             modelProfileID: previous.request.modelProfileID,
             microphoneSpeakerPrior: microphoneSpeakerPrior
         )
-        return try enqueueDerivedRun(from: previous, request: request)
+        return try enqueueDerivedRun(from: previous, request: request, snapshot: previous.vocabularySnapshot ?? .init(revision: previous.request.vocabularyRevision, terms: []))
     }
 
     /// Queues a fresh run over a retained source with the host's current model
@@ -302,9 +310,10 @@ public actor TranscriptionCoordinator {
 
     private func enqueueDerivedRun(
         from previous: TranscriptionJob,
-        request: TranscriptionRequest
+        request: TranscriptionRequest,
+        snapshot: VocabularySnapshot? = nil
     ) throws -> TranscriptionJob {
-        var job = try enqueue(request)
+        var job = try enqueue(request, snapshot: snapshot)
         job.retryOfRunID = previous.runID
         try copySourceEnergy(from: previous, to: job)
         try write(job)
@@ -470,6 +479,9 @@ public actor TranscriptionCoordinator {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        if let snapshot = job.vocabularySnapshot {
+            try writer.write(encoder.encode(snapshot), to: job.runDirectoryURL.appendingPathComponent("vocabulary.json"))
+        }
         try writer.write(encoder.encode(job), to: job.jobFileURL)
     }
 

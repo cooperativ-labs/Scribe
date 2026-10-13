@@ -1,8 +1,11 @@
 import Dispatch
 import Foundation
+import Vocabulary
 import Transcription
 
 public struct DictationTranscript: Sendable, Equatable {
+    public var rawText: String?
+    public var vocabularyWarning: String?
     public let text: String
     public let hasSpeech: Bool
     public init(text: String, hasSpeech: Bool) { self.text = text; self.hasSpeech = hasSpeech }
@@ -17,6 +20,7 @@ public struct DictationTranscript: Sendable, Equatable {
 /// mid-request is applied once the request has finished, and cancelling a
 /// request abandons its result without ending the helper.
 public actor DictationEngine {
+    private let vocabularySnapshot: @Sendable () throws -> VocabularySnapshot
     private let installation: WorkerInstallation
     private let modelsDirectoryProvider: @Sendable () async -> URL
     private var worker: WorkerClient?
@@ -35,7 +39,8 @@ public actor DictationEngine {
 
     public init(
         installation: WorkerInstallation,
-        modelsDirectoryProvider: @escaping @Sendable () async -> URL
+        modelsDirectoryProvider: @escaping @Sendable () async -> URL,
+        vocabularySnapshot: @escaping @Sendable () throws -> VocabularySnapshot = { .init(revision: nil, terms: []) }
     ) {
         self.installation = WorkerInstallation(
             executableURL: installation.executableURL,
@@ -44,6 +49,7 @@ public actor DictationEngine {
             mode: "dictation"
         )
         self.modelsDirectoryProvider = modelsDirectoryProvider
+        self.vocabularySnapshot = vocabularySnapshot
     }
 
     public func configure(keepLoaded: Bool, idleMinutes: Int) {
@@ -139,6 +145,7 @@ public actor DictationEngine {
     }
 
     public func dictate(audioURL: URL, runDirectoryURL: URL, language: String? = nil) async throws -> DictationTranscript {
+        let snapshot = try vocabularySnapshot()
         // Actors are reentrant across worker awaits. Serialize preview and final
         // requests, including a new session started before the old one drains.
         if requestBusy {
@@ -151,6 +158,9 @@ public actor DictationEngine {
             else { requestWaiters.removeFirst().resume() }
         }
         try Task.checkCancellation()
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        try encoder.encode(snapshot).write(to: runDirectoryURL.appendingPathComponent("vocabulary.json"), options: .atomic)
         inFlight = true
         do {
             try await warm()
@@ -164,6 +174,7 @@ public actor DictationEngine {
             throw WorkerFailure(code: "worker_unavailable", message: "Dictation helper is unavailable.")
         }
         var payload: [String: WorkerJSONValue] = [
+            "vocabularyPath": .string("vocabulary.json"),
             "audioPath": .string(audioURL.path),
             "runDirectory": .string(runDirectoryURL.path),
         ]
@@ -177,10 +188,13 @@ public actor DictationEngine {
         case let .success(response):
             await endRequest()
             try Task.checkCancellation()
-            return DictationTranscript(
+            var transcript = DictationTranscript(
                 text: response["text"]?.stringValue ?? "",
                 hasSpeech: response["status"]?.stringValue != "no_speech"
             )
+            transcript.rawText = response["rawText"]?.stringValue
+            transcript.vocabularyWarning = response["vocabularyWarning"]?.stringValue
+            return transcript
         case let .failure(error):
             // The channel or the helper failed; the next request launches anew.
             if self.worker === worker { self.worker = nil }

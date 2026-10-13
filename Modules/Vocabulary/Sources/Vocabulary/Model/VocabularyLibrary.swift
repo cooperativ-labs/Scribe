@@ -52,10 +52,10 @@ public struct VocabularyLibrary: Codable, Equatable, Sendable {
         let terms = activeTerms
         guard !terms.isEmpty else { return nil }
         let body = terms
-            .map { "\($0.key)\t\($0.aliases.map(VocabularyText.matchKey).sorted().joined(separator: "\u{1F}"))" }
+            .map { "\($0.text)\t\($0.aliases.sorted().joined(separator: "\u{1F}"))" }
             .sorted()
             .joined(separator: "\n")
-        let digest = SHA256.hash(data: Data("scribe.vocabulary.v1\n\(body)".utf8))
+        let digest = SHA256.hash(data: Data("scribe.vocabulary.v2\n\(body)".utf8))
         return digest.map { String(format: "%02x", $0) }.joined()
     }
 

@@ -2,9 +2,29 @@ import Foundation
 import Platform
 import Transcription
 import XCTest
+import Vocabulary
 @testable import Dictation
 
 final class DictationEngineTests: XCTestCase {
+    @MainActor
+    func testEveryDictationRequestCapturesTermsAliasesAndRevision() async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let store = try VocabularyStore(directoryURL: fixture.root.appendingPathComponent("vocabulary-store"))
+        try store.addTerm("Livmarli", aliases: ["Liv Mali"])
+        let engine = DictationEngine(installation: WorkerInstallation(executableURL: fixture.root.appendingPathComponent("worker"), manifestURL: fixture.root.appendingPathComponent("manifest.json")),
+            modelsDirectoryProvider: { fixture.root }, vocabularySnapshot: { try store.load().snapshot })
+        _ = try await engine.dictate(audioURL: fixture.audio, runDirectoryURL: fixture.root)
+        let first = try JSONDecoder().decode(VocabularySnapshot.self, from: Data(contentsOf: fixture.root.appendingPathComponent("vocabulary.json")))
+        XCTAssertEqual(first, try store.load().snapshot)
+        XCTAssertEqual(first.terms.first?.aliases, ["Liv Mali"])
+        try store.addTerm("NVIDIA")
+        _ = try await engine.dictate(audioURL: fixture.audio, runDirectoryURL: fixture.root)
+        let second = try JSONDecoder().decode(VocabularySnapshot.self, from: Data(contentsOf: fixture.root.appendingPathComponent("vocabulary.json")))
+        XCTAssertNotEqual(first.revision, second.revision)
+        await engine.unload()
+    }
+
     @MainActor
     func testWorkerUsesSettingsFolderAndReloadsWhenItChanges() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)

@@ -1,6 +1,7 @@
 import Foundation
 import ScribeAppCore
 import XCTest
+import Vocabulary
 @testable import Transcription
 
 /// Drives the real `TranscriptionWorker` binary over its real protocol.
@@ -125,6 +126,87 @@ final class WorkerIntegrationTests: XCTestCase {
 
     private var workerEnvironment: [String: String] {
         ProcessInfo.processInfo.environment.merging(["SCRIBE_TRANSCRIPTION_WORKER_TEST_MODE": "1"]) { _, new in new }
+    }
+
+    func testRealOfflineVocabularyBatchAndShortDictation() async throws {
+        guard let audioPath = ProcessInfo.processInfo.environment["SCRIBE_VOCABULARY_TEST_AUDIO"],
+              let dictationPath = ProcessInfo.processInfo.environment["SCRIBE_VOCABULARY_TEST_DICTATION"],
+              let vocabularyPath = ProcessInfo.processInfo.environment["SCRIBE_VOCABULARY_TEST_SNAPSHOT"] else {
+            throw XCTSkip("Set SCRIBE_VOCABULARY_TEST_AUDIO, SCRIBE_VOCABULARY_TEST_DICTATION and SCRIBE_VOCABULARY_TEST_SNAPSHOT for real offline vocabulary integration.")
+        }
+        let snapshot = try JSONDecoder().decode(VocabularySnapshot.self, from: Data(contentsOf: URL(fileURLWithPath: vocabularyPath)))
+        let runner = WorkerStageRunner(configuration: .init(installation: try installation(), responseTimeout: .seconds(180)), hostStageRunner: TranscriptAssemblyStageRunner())
+        let storeURL = root.appendingPathComponent("offline-vocabulary-store")
+        let coordinator = try TranscriptionCoordinator(configuration: .init(transcriptStoreURL: storeURL), stageRunner: runner, vocabularySnapshot: { snapshot })
+        let queued = try await coordinator.enqueue(.init(sourceURL: URL(fileURLWithPath: audioPath), modelProfileID: "parakeet-v3"))
+        await coordinator.runPending()
+        let job = await coordinator.job(id: queued.id)
+        XCTAssertEqual(job?.state, .complete, "\(String(describing: job?.failure))")
+        let run = try XCTUnwrap(TranscriptStore(storeDirectoryURL: storeURL).latestRunPerSource().first)
+        let transcript = try XCTUnwrap(run.transcript)
+        XCTAssertTrue(transcript.segments.map(\.text).joined(separator: " ").contains("Livmarli"))
+        let raw = try WorkerASRTranscriptCodec.decode(Data(contentsOf: run.job.runDirectoryURL.appendingPathComponent("transcript.json")))
+        XCTAssertTrue(raw.rawText?.contains("live marly") == true)
+        XCTAssertTrue(raw.vocabularyReplacements?.contains { $0.replacement == "Livmarli" } == true)
+        XCTAssertNil(raw.vocabularyWarning)
+
+        let directory = root.appendingPathComponent("short-dictation")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let audio = directory.appendingPathComponent("audio.wav")
+        try FileManager.default.copyItem(at: URL(fileURLWithPath: dictationPath), to: audio)
+        try Data(contentsOf: URL(fileURLWithPath: vocabularyPath)).write(to: directory.appendingPathComponent("vocabulary.json"))
+        let batch = try installation()
+        let client = WorkerClient(configuration: .init(installation: WorkerInstallation(executableURL: batch.executableURL, manifestURL: batch.manifestURL, modelsDirectoryURL: batch.modelsDirectoryURL, mode: "dictation"), responseTimeout: .seconds(180)))
+        try await client.handshake()
+        let response = try await client.dictationCommand("dictate", payload: ["audioPath": .string(audio.path), "runDirectory": .string(directory.path), "vocabularyPath": .string("vocabulary.json")])
+        XCTAssertEqual(response["status"]?.stringValue, "complete")
+        XCTAssertTrue(response["text"]?.stringValue?.contains("Livmarli") == true, "\(response)")
+        XCTAssertNil(response["vocabularyWarning"])
+        XCTAssertEqual(response["vocabularyRevision"]?.stringValue, snapshot.revision)
+        let empty = VocabularySnapshot(revision: nil, terms: [])
+        try JSONEncoder().encode(empty).write(to: directory.appendingPathComponent("vocabulary.json"), options: .atomic)
+        let emptyResponse = try await client.dictationCommand("dictate", payload: ["audioPath": .string(audio.path), "runDirectory": .string(directory.path), "vocabularyPath": .string("vocabulary.json")])
+        XCTAssertEqual(emptyResponse["text"]?.stringValue, emptyResponse["rawText"]?.stringValue)
+        XCTAssertNil(emptyResponse["vocabularyWarning"])
+        let unrelated = VocabularySnapshot(revision: "nonhit-v1", terms: [VocabularyTerm(text: "Broomhilda")])
+        try JSONEncoder().encode(unrelated).write(to: directory.appendingPathComponent("vocabulary.json"), options: .atomic)
+        let nonhit = try await client.dictationCommand("dictate", payload: ["audioPath": .string(audio.path), "runDirectory": .string(directory.path), "vocabularyPath": .string("vocabulary.json")])
+        XCTAssertEqual(nonhit["text"]?.stringValue, nonhit["rawText"]?.stringValue)
+        XCTAssertNil(nonhit["vocabularyWarning"])
+        await client.shutdown()
+
+        let baseOnly = root.appendingPathComponent("base-models-only")
+        try FileManager.default.createDirectory(at: baseOnly, withIntermediateDirectories: true)
+        for name in ["parakeet-tdt-0.6b-v3-coreml", "speaker-diarization-coreml"] {
+            try FileManager.default.createSymbolicLink(at: baseOnly.appendingPathComponent(name), withDestinationURL: try XCTUnwrap(batch.modelsDirectoryURL).appendingPathComponent(name))
+        }
+        try JSONEncoder().encode(snapshot).write(to: directory.appendingPathComponent("vocabulary.json"), options: .atomic)
+        let missingClient = WorkerClient(configuration: .init(installation: WorkerInstallation(executableURL: batch.executableURL, manifestURL: batch.manifestURL, modelsDirectoryURL: baseOnly, mode: "dictation"), responseTimeout: .seconds(180)))
+        try await missingClient.handshake()
+        let missing = try await missingClient.dictationCommand("dictate", payload: ["audioPath": .string(audio.path), "runDirectory": .string(directory.path), "vocabularyPath": .string("vocabulary.json")])
+        XCTAssertEqual(missing["status"]?.stringValue, "complete")
+        XCTAssertEqual(missing["text"]?.stringValue, missing["rawText"]?.stringValue)
+        XCTAssertEqual(missing["vocabularyWarning"]?.stringValue, "vocabulary_assets_unavailable")
+        await missingClient.shutdown()
+    }
+
+    func testLongVocabularyEvidenceUsesSourceRelativeCanonicalWords() throws {
+        guard let path = ProcessInfo.processInfo.environment["SCRIBE_VOCABULARY_TEST_LONG_TRANSCRIPT"] else {
+            throw XCTSkip("Set SCRIBE_VOCABULARY_TEST_LONG_TRANSCRIPT to a real long-recording worker artifact.")
+        }
+        let transcript = try WorkerASRTranscriptCodec.decode(Data(contentsOf: URL(fileURLWithPath: path)))
+        XCTAssertTrue(transcript.usedChunkedProcessing)
+        XCTAssertGreaterThanOrEqual(transcript.sourceDurationSeconds, 3600)
+        let result = try TokenTimingReconciler().reconcile(.init(workerTranscript: transcript, timeMapping: .init(sourceSampleRate: 16_000), sourceDurationMs: Int(transcript.sourceDurationSeconds * 1_000)))
+        let words = result.words.map { ReconciledWordsRecord.Word(id: $0.id, text: $0.text, startMs: $0.startMs, endMs: $0.endMs, enclosingStartMs: $0.enclosingStartMs, enclosingEndMs: $0.enclosingEndMs) }
+        let replacements = try XCTUnwrap(transcript.vocabularyReplacements)
+        XCTAssertGreaterThan(replacements.count, 100)
+        XCTAssertTrue(replacements.contains { $0.startSeconds > 3600 })
+        let corrected = VocabularyWordReplacer.apply(replacements, to: words)
+        XCTAssertEqual(corrected.filter { $0.text.contains("Livmarli") }.count, replacements.filter { $0.replacement == "Livmarli" }.count)
+        XCTAssertTrue(corrected.contains { $0.text.contains("Livmarli") && ($0.startMs ?? 0) > 3_600_000 })
+        XCTAssertTrue(corrected.allSatisfy { ($0.endMs ?? 0) <= 7_200_000 })
+        XCTAssertNil(transcript.vocabularyWarning)
     }
 
     private func installation() throws -> WorkerInstallation {

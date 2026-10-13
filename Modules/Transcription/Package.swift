@@ -10,6 +10,7 @@ let package = Package(
         // The speaker library is an independent service contract; review shares its
         // person IDs rather than defining a second identity type.
         .package(path: "../Speakers"),
+        .package(path: "../Vocabulary"),
         // The recorder-session manifest and producer handoff types are host
         // integration-layer contracts (plan section 12); the importer consumes
         // them rather than keeping a second copy that can drift.
@@ -21,6 +22,7 @@ let package = Package(
             dependencies: [
                 .product(name: "ScribeDesign", package: "ScribeDesign"),
                 .product(name: "Speakers", package: "Speakers"),
+                .product(name: "Vocabulary", package: "Vocabulary"),
                 .product(name: "ScribeAppCore", package: "app"),
             ],
             resources: [.process("Transcript/CanonicalTranscript.schema.json")]
@@ -30,6 +32,7 @@ let package = Package(
             dependencies: [
                 "Transcription",
                 .product(name: "Speakers", package: "Speakers"),
+                .product(name: "Vocabulary", package: "Vocabulary"),
                 .product(name: "ScribeAppCore", package: "app"),
             ],
             path: "Tests",

@@ -36,6 +36,7 @@ done
 require() { command -v "$1" >/dev/null || { echo "error: missing required command: $1" >&2; exit 69; }; }
 require git
 require shasum
+require python3
 git lfs version >/dev/null || { echo "error: Git LFS is required to fetch and verify model weights" >&2; exit 69; }
 
 fetch_snapshot() {
@@ -94,6 +95,12 @@ fetch_snapshot \
   "1ed7a662fdc7109e36d822db793ee6eebdaf8594" \
   "Segmentation.mlmodelc" "Embedding.mlmodelc" "FBank.mlmodelc" "PldaRho.mlmodelc" "plda-parameters.json" "xvector-transform.json"
 
+# Vocabulary boosting is optional at runtime, but this development installer
+# stages the exact optional group too. Every bundle file is pinned, not only weights.
+vocabulary_options=()
+if ((verify_only)); then vocabulary_options+=(--verify-only); fi
+python3 "$repo_root/Scripts/install-vocabulary-models.py" --models-dir "$models_dir" "${vocabulary_options[@]}"
+
 # Recheck the release lock after Git LFS validates its local object store. The
 # worker independently applies the same checks before loading any model.
 verify_sha256 "$models_dir/parakeet-tdt-0.6b-v3-coreml/Preprocessor.mlmodelc/weights/weight.bin" "129b76e3aeafa8afa3ea76d995b964b145fe83700d579f6ff42c4c38fa0968ea"
@@ -111,4 +118,7 @@ verify_sha256 "$models_dir/speaker-diarization-coreml/xvector-transform.json" "f
 actual_bytes="$(find "$models_dir" -type f ! -path '*/.git/*' -print0 | xargs -0 stat -f '%z' | awk '{ total += $1 } END { print total + 0 }')"
 echo "Verified offline transcription models at: $models_dir"
 echo "Staged model bytes: $actual_bytes"
-echo "Manifest declared bytes (without Git metadata): 505044116"
+python3 - "$repo_root/Workers/TranscriptionWorker/model_manifest.json" <<'PY'
+import json, sys
+print("Manifest declared bytes (without Git metadata):", json.load(open(sys.argv[1]))["totalDeclaredOnDiskBytes"])
+PY

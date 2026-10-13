@@ -30,3 +30,10 @@ attribution.
 - Licence: CC-BY-4.0 for the converted Core ML assets; see the notice for
   upstream pyannote (MIT) and WeSpeaker terms
 - File: `Diarization-Models.txt`
+
+## Parakeet CTC 110M (optional vocabulary boosting)
+
+- Upstream: <https://huggingface.co/FluidInference/parakeet-ctc-110m-coreml>
+- Revision: `accdafd8cf8a2ff1cabe3c11e54416b405d409aa`
+- Model card: Apache-2.0; repository metadata also labels CC-BY-4.0.
+- Files: `Parakeet-CTC-110M.txt`, `Parakeet-CC-BY-4.0.txt`

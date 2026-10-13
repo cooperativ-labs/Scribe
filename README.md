@@ -200,15 +200,21 @@ Both surfaces open
 `~/Library/Application Support/Scribe/Vocabulary/library.json` under a lock and
 write it atomically, so an edit made in one shows up in the other. Adding a term
 that is already present merges its mishearings rather than duplicating the row,
-which makes `add` safe to repeat. Terms shorter than three characters are kept
+which makes `add` safe to repeat. Terms shorter than three characters, or containing only punctuation, are kept
 and marked but not applied.
 
-Each run records the vocabulary it was queued with, as
-`ImportConfiguration.vocabularyRevision`, so editing the list makes a rerun a
-genuinely new run. The recognizer-side work that makes the list change what
-Parakeet actually produces — the CTC model pin, worker boosting, and applying
-replacements to the word stream — is steps 2 to 4 in
-`docs/decisions/custom-transcription-vocabulary.md` and is **not built yet**.
+Install the optional **Vocabulary Boosting** group in **Settings → Transcription
+model** (about 103 MB) to enable audio-backed corrections for batch and dictation.
+Missing or unusable vocabulary assets leave normal transcription available and
+show a clear warning. Empty vocabulary does not load the booster.
+
+Each batch run saves its terms, aliases and revision in `job.json` and
+`vocabulary.json`. Retry and speaker reprocessing preserve that snapshot;
+**Transcribe again** captures the current library. Corrections update canonical
+timed words before review and TXT/SRT/JSON export, while raw ASR tokens remain
+available in the run. See
+[the vocabulary decision](docs/decisions/custom-transcription-vocabulary.md)
+for offline assets, conservative matching and validation.
 
 ### Meeting detection
 
@@ -351,7 +357,3 @@ on macOS, including an active recording, a cancelled/failed download, and an
 unwritable installation. Automated tests cover archive selection/extraction,
 bundle identity/version rejection, replacement, and rollback; they substitute
 code-signing assessment and Launch Services in the transaction fixtures.
-
-## iPad and iPhone foundation
-
-The native mobile app is in `ScribeMobile.xcodeproj`. See [the mobile guide](docs/mobile/README.md) for microphone recording, local imports, verified offline model setup, shared design/inference architecture, and device tests.

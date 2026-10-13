@@ -15,7 +15,7 @@ struct ASRBenchmark {
                 configuration: .init(computeUnits: options.computeUnits)
             )
             let startedAt = ContinuousClock.now
-            let transcript = try await adapter.transcribe(fileURL: options.audioURL)
+            let transcript = try await adapter.transcribe(fileURL: options.audioURL, vocabulary: try options.vocabularyURL.map { try JSONDecoder().decode(WorkerVocabularySnapshot.self, from: Data(contentsOf: $0)) } ?? .init())
             if let tokensURL = options.tokensURL {
                 // The full worker transcript, in the same shape the host reads
                 // from a run's `transcript.json`, so a benchmark run can be fed
@@ -111,6 +111,7 @@ private struct Options {
     let modelsURL: URL
     let computeUnits: ASRComputeUnits
     /// Optional worker-transcript sidecar for offline timing comparisons.
+    let vocabularyURL: URL?
     let tokensURL: URL?
 
     init(arguments: [String]) throws {
@@ -132,6 +133,7 @@ private struct Options {
         manifestURL = URL(fileURLWithPath: manifest)
         modelsURL = URL(fileURLWithPath: models, isDirectory: true)
         self.computeUnits = computeUnits
+        vocabularyURL = values["--vocabulary-json"].map { URL(fileURLWithPath: $0) }
         tokensURL = values["--tokens-json"].map { URL(fileURLWithPath: $0) }
     }
 }

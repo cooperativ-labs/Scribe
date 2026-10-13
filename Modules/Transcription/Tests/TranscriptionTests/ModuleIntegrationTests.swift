@@ -296,6 +296,44 @@ final class ModuleIntegrationTests: XCTestCase {
         XCTAssertNotNil(TranscriptReviewFile(run).processingError)
     }
 
+    func testVocabularySpansReachCanonicalReviewAndEveryExport() async throws {
+        let source = try writeAudio(named: "vocabulary.wav", in: root, seconds: 6)
+        let replacement = WorkerVocabularyReplacement(original: "Hello there.", replacement: "Clear Comply", startSeconds: 0.1, endSeconds: 1.2)
+        let runner = ScriptedWorkerStageRunner(hostStageRunner: TranscriptAssemblyStageRunner(), vocabularyReplacements: [replacement])
+        let coordinator = try TranscriptionCoordinator(configuration: .init(transcriptStoreURL: storeURL), stageRunner: runner)
+        _ = try await coordinator.enqueue(.init(sourceURL: source, modelProfileID: "parakeet-v3"))
+        await coordinator.runPending()
+        let store = TranscriptStore(storeDirectoryURL: storeURL)
+        let run = try XCTUnwrap(store.latestRunPerSource().first)
+        let transcript = try XCTUnwrap(run.transcript)
+        XCTAssertEqual(transcript.segments.first?.text, "Clear Comply.")
+        XCTAssertNoThrow(try CanonicalTranscriptValidator.validate(transcript))
+        let words = try JSONDecoder().decode(ReconciledWordsRecord.self, from: Data(contentsOf: run.job.runDirectoryURL.appendingPathComponent("words.json")))
+        XCTAssertEqual(words.words.first?.text, "Clear Comply.")
+        XCTAssertEqual(words.words.first?.startMs, 100)
+        XCTAssertEqual(words.words.first?.endMs, 1200)
+        let raw = try WorkerASRTranscriptCodec.decode(Data(contentsOf: run.job.runDirectoryURL.appendingPathComponent("transcript.json")))
+        XCTAssertTrue(raw.tokens.first?.text.contains("Hello") == true)
+        let model = await TranscriptViewModel(files: store.latestRunPerSource().map(TranscriptReviewFile.init), playback: RecordingPlayback())
+        let exports = root.appendingPathComponent("vocabulary-exports")
+        try FileManager.default.createDirectory(at: exports, withIntermediateDirectories: true)
+        await MainActor.run { model.export(Set(TranscriptExportFormat.allCases), to: exports) }
+        for suffix in ["txt", "srt", "json", "kb.json"] {
+            let text = try String(contentsOf: exports.appendingPathComponent("vocabulary.\(suffix)"), encoding: .utf8)
+            XCTAssertTrue(text.contains("Clear Comply"), "\(suffix) omitted canonical correction")
+        }
+    }
+
+    func testMissingVocabularyAssetsRemainReviewableWithWarning() async throws {
+        let source = try writeAudio(named: "missing-vocabulary.wav", in: root, seconds: 6)
+        let coordinator = try TranscriptionCoordinator(configuration: .init(transcriptStoreURL: storeURL), stageRunner: ScriptedWorkerStageRunner(hostStageRunner: TranscriptAssemblyStageRunner(), vocabularyWarning: "vocabulary_assets_unavailable"))
+        _ = try await coordinator.enqueue(.init(sourceURL: source, modelProfileID: "parakeet-v3"))
+        await coordinator.runPending()
+        let transcript = try XCTUnwrap(TranscriptStore(storeDirectoryURL: storeURL).latestRunPerSource().first?.transcript)
+        XCTAssertEqual(transcript.segments.first?.text, "Hello there.")
+        XCTAssertTrue(transcript.warnings.contains { $0.code == "vocabulary_assets_unavailable" })
+    }
+
     // MARK: - Helpers
 
     @discardableResult
@@ -334,6 +372,8 @@ struct ScriptedWorkerStageRunner: TranscriptionStageRunning {
     var writesDiarization = true
     var embeddings: [WorkerSpeakerEmbeddingRecord] = []
     var collapsedDiagnostics = false
+    var vocabularyReplacements: [WorkerVocabularyReplacement] = []
+    var vocabularyWarning: String?
 
     func run(stage: TranscriptionJobState, job: TranscriptionJob) async throws -> TranscriptionStageOutput {
         switch stage {
@@ -345,11 +385,13 @@ struct ScriptedWorkerStageRunner: TranscriptionStageRunning {
                 "channels": .number(1),
             ], named: TranscriptRunArtifact.prepare, in: job))
         case .transcribing:
-            let transcript = WorkerASRTranscript(
+            var transcript = WorkerASRTranscript(
                 text: "Hello there. Good to see you. Shall we start?",
                 tokens: Self.tokens,
                 sourceDurationSeconds: 6
             )
+            transcript.vocabularyReplacements = vocabularyReplacements
+            transcript.vocabularyWarning = vocabularyWarning
             let url = job.runDirectoryURL.appending(path: TranscriptRunArtifact.workerTranscript)
             try AtomicReplaceFileWriter().write(try WorkerASRTranscriptCodec.encode(transcript), to: url)
             return TranscriptionStageOutput(artifactURL: url)

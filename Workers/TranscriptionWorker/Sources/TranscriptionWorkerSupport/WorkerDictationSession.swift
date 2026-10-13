@@ -64,6 +64,7 @@ public actor WorkerDictationSession {
               FileManager.default.fileExists(atPath: audioURL.path) else {
             throw DictationError.invalidRequest("audioPath must be an existing file directly in runDirectory.")
         }
+        let snapshot = try WorkerVocabularySnapshot.load(in: runURL, path: payload["vocabularyPath"]?.stringValue)
         _ = try await warm()
         guard let manager, let models, let vad else { throw DictationError.invalidRequest("ASR is unavailable.") }
         let file = try AVAudioFile(forReading: audioURL)
@@ -112,7 +113,24 @@ public actor WorkerDictationSession {
                 "confidence": .number(Double(token.confidence)),
             ])
         }
-        return ["stage": .string("dictate"), "status": .string("complete"), "text": .string(result.text), "tokens": .array(tokens)]
+        let manifest = try ModelManifest.load(from: configuration.manifestURL)
+        let corrected = await OfflineVocabularyRescorer.rescore(fileURL: audioURL, text: result.text,
+            tokens: (result.tokenTimings ?? []).filter { $0.startTime < duration }.map {
+                TokenTiming(token: $0.token, tokenId: $0.tokenId, startTime: $0.startTime, endTime: min(duration, $0.endTime), confidence: $0.confidence)
+            }, snapshot: snapshot, manifest: manifest, modelsDirectory: configuration.modelsDirectory)
+        var response: [String: JSONValue] = ["stage": .string("dictate"), "status": .string("complete"),
+            "text": .string(corrected.text), "rawText": .string(result.text), "tokens": .array(tokens)]
+        if let warning = corrected.warning { response["vocabularyWarning"] = .string(warning) }
+        if let revision = snapshot.revision { response["vocabularyRevision"] = .string(revision) }
+        // Retain raw/corrected text, snapshot revision and replacement spans together.
+        struct Record: Encodable {
+            let rawText: String; let text: String; let vocabularyRevision: String?
+            let vocabularyReplacements: [VocabularyReplacement]; let vocabularyWarning: String?
+        }
+        try JSONEncoder().encode(Record(rawText: result.text, text: corrected.text, vocabularyRevision: snapshot.revision,
+            vocabularyReplacements: corrected.replacements, vocabularyWarning: corrected.warning))
+            .write(to: runURL.appendingPathComponent("dictation-transcript.json"), options: .atomic)
+        return response
     }
 
     public enum DictationError: LocalizedError {

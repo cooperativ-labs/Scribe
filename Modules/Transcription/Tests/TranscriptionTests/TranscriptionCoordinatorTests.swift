@@ -1,6 +1,7 @@
 import Foundation
 import ScribeAppCore
 import XCTest
+import Vocabulary
 @testable import Transcription
 
 final class TranscriptionCoordinatorTests: XCTestCase {
@@ -206,6 +207,36 @@ final class TranscriptionCoordinatorTests: XCTestCase {
         XCTAssertEqual(saved.state, .cancelled)
         XCTAssertEqual(Set(saved.checkpoints.keys), Set([.preparing, .transcribing]))
         XCTAssertNil(saved.failure)
+    }
+
+    func testVocabularySnapshotSurvivesEditsRetryRecoveryAndReprocessing() async throws {
+        let source = root.appendingPathComponent("snapshot.flac")
+        try Data("snapshot audio".utf8).write(to: source)
+        let vocabStore = try VocabularyStore(directoryURL: root.appendingPathComponent("Vocabulary"))
+        try vocabStore.addTerm("Livmarli", aliases: ["Liv Mali"])
+        let pack = try vocabStore.addPack(named: "Client")
+        try vocabStore.addTerm("Clear Comply", aliases: ["clearcomply"], listID: pack.id)
+        let originalSnapshot = try vocabStore.load().snapshot
+        let coordinator = try TranscriptionCoordinator(
+            configuration: .init(transcriptStoreURL: root.appendingPathComponent("transcripts")),
+            stageRunner: RecordingRunner(), vocabularySnapshot: { try vocabStore.load().snapshot }
+        )
+        let queued = try await coordinator.enqueue(.init(sourceURL: source, modelProfileID: "parakeet-v3"))
+        XCTAssertEqual(queued.vocabularySnapshot, originalSnapshot)
+        let disk = try JSONDecoder().decode(VocabularySnapshot.self, from: Data(contentsOf: queued.runDirectoryURL.appendingPathComponent("vocabulary.json")))
+        XCTAssertEqual(disk, originalSnapshot)
+        try vocabStore.addTerm("NVIDIA")
+        let retry = try await coordinator.retry(jobID: queued.id)
+        XCTAssertEqual(retry.vocabularySnapshot, originalSnapshot)
+        XCTAssertEqual(retry.configurationFingerprint, queued.configurationFingerprint)
+        let reprocessed = try await coordinator.reprocess(queued, speakerCount: .known(2))
+        XCTAssertEqual(reprocessed.vocabularySnapshot, originalSnapshot)
+        let fresh = try await coordinator.retranscribe(queued, modelProfileID: "parakeet-v3", speakerCount: .automatic)
+        XCTAssertEqual(fresh.vocabularySnapshot, try vocabStore.load().snapshot)
+        XCTAssertNotEqual(fresh.configurationFingerprint, queued.configurationFingerprint)
+        let restored = try TranscriptionCoordinator(configuration: .init(transcriptStoreURL: root.appendingPathComponent("transcripts")), stageRunner: RecordingRunner())
+        let recovered = await restored.job(id: queued.id)
+        XCTAssertEqual(recovered?.vocabularySnapshot, originalSnapshot)
     }
 
     private func write(_ job: TranscriptionJob) throws {

@@ -131,9 +131,9 @@ final class TranscriptionHostService {
             // Read at enqueue time, not held: the list a job runs with is the
             // one in force when it was queued, including edits an agent made
             // through `scribe-vocab` a moment earlier.
-            vocabularyRevision: { [vocabularyStore] in
-                guard let vocabularyStore else { return nil }
-                return (try? vocabularyStore.load())?.revision
+            vocabularySnapshot: { [vocabularyStore] in
+                guard let vocabularyStore else { return .init(revision: nil, terms: []) }
+                return try vocabularyStore.load().snapshot
             }
         )
         prober = (try? MediaToolLocator.ffprobe()).map { MediaProber(ffprobeURL: $0) }

@@ -2,7 +2,7 @@
 import FluidAudio
 import Foundation
 
-/// Shared model-loading entry point for desktop workers and the mobile app. It constructs FluidAudio
+/// Shared model-loading entry point for desktop workers. It constructs FluidAudio
 /// model values from files the host explicitly staged; it intentionally never
 /// calls `AsrModels.download`, `downloadAndLoad`, `DownloadUtils`, or a cache
 /// convenience API that may attempt recovery by downloading.
@@ -99,6 +99,14 @@ public enum OfflineModelLoader {
             pldaPsi: try loadPLDAPsi(from: directory.appending(path: "plda-parameters.json")),
             compilationDuration: 0
         )
+    }
+
+    public static func loadCTC(manifest: ModelManifest, modelsDirectory: URL) async throws -> CtcModels {
+        guard !manifest.telemetry.enabled, !manifest.telemetry.runtimeDownloadsAllowed else { throw ModelSetupError.unsafeManifest }
+        guard manifest.assets.contains(where: { $0.id == "parakeet-ctc-110m" }) else { throw ModelSetupError.unsafeManifest }
+        let report = manifest.validate(modelsDirectory: modelsDirectory, assetID: "parakeet-ctc-110m")
+        guard report.isValid else { throw ModelSetupError.report(report) }
+        return try await CtcModels.loadDirect(from: modelsDirectory.appendingPathComponent("parakeet-ctc-110m-coreml"), variant: .ctc110m)
     }
 
     private static func loadModel(_ url: URL, configuration: MLModelConfiguration) throws -> MLModel {

@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "TranscriptionWorker",
-    platforms: [.macOS(.v15), .iOS("26.0")],
+    platforms: [.macOS(.v15)],
     products: [
         .library(name: "ScribeInference", targets: ["ScribeInference"]),
         .library(name: "TranscriptionWorkerSupport", targets: ["TranscriptionWorkerSupport"]),

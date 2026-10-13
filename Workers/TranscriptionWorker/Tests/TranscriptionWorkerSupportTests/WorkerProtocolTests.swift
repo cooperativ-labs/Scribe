@@ -30,7 +30,7 @@ func manifestIsOfflineOnlyAndReportsMissingAssets() throws {
     let manifest = try ModelManifest.load(from: packageRoot.appending(path: "model_manifest.json"))
     #expect(manifest.telemetry.enabled == false)
     #expect(manifest.telemetry.runtimeDownloadsAllowed == false)
-    #expect(manifest.totalDeclaredOnDiskBytes == 505044116)
+    #expect(manifest.totalDeclaredOnDiskBytes == manifest.assets.flatMap(\.requiredFiles).compactMap(\.bytes).reduce(0, +))
     #expect(manifest.assets.count >= 10)
     let report = manifest.validate(modelsDirectory: packageRoot.appending(path: "models-not-installed"))
     #expect(report.isValid == false)
@@ -179,7 +179,7 @@ func workerBinarySequentialIntegration() throws {
     defer { try? FileManager.default.removeItem(at: runDirectory) }
 
     let process = Process()
-    process.executableURL = packageRoot.appending(path: ".build/debug/TranscriptionWorker")
+    process.executableURL = ProcessInfo.processInfo.environment["SCRIBE_TRANSCRIPTION_WORKER_PATH"].map { URL(fileURLWithPath: $0) } ?? packageRoot.appending(path: ".build/debug/TranscriptionWorker")
     process.currentDirectoryURL = packageRoot
     process.environment = ProcessInfo.processInfo.environment.merging(["SCRIBE_TRANSCRIPTION_WORKER_TEST_MODE": "1"]) { _, new in new }
     let input = Pipe(), output = Pipe()
@@ -211,7 +211,7 @@ func workerBinaryCancellationIntegration() throws {
     defer { try? FileManager.default.removeItem(at: runDirectory) }
 
     let process = Process()
-    process.executableURL = packageRoot.appending(path: ".build/debug/TranscriptionWorker")
+    process.executableURL = ProcessInfo.processInfo.environment["SCRIBE_TRANSCRIPTION_WORKER_PATH"].map { URL(fileURLWithPath: $0) } ?? packageRoot.appending(path: ".build/debug/TranscriptionWorker")
     process.currentDirectoryURL = packageRoot
     process.environment = ProcessInfo.processInfo.environment.merging(["SCRIBE_TRANSCRIPTION_WORKER_TEST_MODE": "1"]) { _, new in new }
     let input = Pipe(), output = Pipe()
@@ -259,7 +259,7 @@ func workerBinaryCrashRecoveryIntegration() throws {
     defer { try? FileManager.default.removeItem(at: runDirectory) }
 
     let process = Process()
-    process.executableURL = packageRoot.appending(path: ".build/debug/TranscriptionWorker")
+    process.executableURL = ProcessInfo.processInfo.environment["SCRIBE_TRANSCRIPTION_WORKER_PATH"].map { URL(fileURLWithPath: $0) } ?? packageRoot.appending(path: ".build/debug/TranscriptionWorker")
     process.currentDirectoryURL = packageRoot
     process.environment = ProcessInfo.processInfo.environment.merging(["SCRIBE_TRANSCRIPTION_WORKER_TEST_MODE": "1"]) { _, new in new }
     let input = Pipe()

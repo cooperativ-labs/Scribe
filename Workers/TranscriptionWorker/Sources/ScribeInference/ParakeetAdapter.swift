@@ -61,7 +61,11 @@ public struct ParakeetAdapter: Sendable {
     }
 
     public struct Transcript: Codable, Sendable, Equatable {
-        public let text: String
+        public var rawText: String?
+        public var vocabularyRevision: String?
+        public var vocabularyReplacements: [VocabularyReplacement]?
+        public var vocabularyWarning: String?
+        public var text: String
         public let tokens: [TimedToken]
         public let sourceDurationSeconds: TimeInterval
         public let processingTimeSeconds: TimeInterval
@@ -116,7 +120,7 @@ public struct ParakeetAdapter: Sendable {
 
     /// Transcribes a local 16 kHz mono file.  Long files use the pinned
     /// FluidAudio disk-backed chunker and produce source-relative timings.
-    public func transcribe(fileURL: URL) async throws -> Transcript {
+    public func transcribe(fileURL: URL, vocabulary: WorkerVocabularySnapshot = .init()) async throws -> Transcript {
         let sourceDuration = try validatePreparedAudio(fileURL)
         let models = try await OfflineModelLoader.loadASR(
             manifest: manifest,
@@ -132,7 +136,14 @@ public struct ParakeetAdapter: Sendable {
         try await manager.loadModels(models)
         var decoderState = TdtDecoderState.make(decoderLayers: models.version.decoderLayers)
         let result = try await manager.transcribe(fileURL, decoderState: &decoderState)
-        return try makeTranscript(result, sourceDuration: sourceDuration)
+        var transcript = try makeTranscript(result, sourceDuration: sourceDuration)
+        let corrected = await OfflineVocabularyRescorer.rescore(fileURL: fileURL, text: result.text, tokens: result.tokenTimings ?? [], snapshot: vocabulary, manifest: manifest, modelsDirectory: modelsDirectory)
+        transcript.rawText = result.text
+        transcript.text = corrected.text
+        transcript.vocabularyRevision = vocabulary.revision
+        transcript.vocabularyReplacements = corrected.replacements
+        transcript.vocabularyWarning = corrected.warning
+        return transcript
     }
 
     /// Kept internal so unit tests can verify the host-facing timing contract

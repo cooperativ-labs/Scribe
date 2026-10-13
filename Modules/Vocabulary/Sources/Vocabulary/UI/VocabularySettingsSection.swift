@@ -44,7 +44,7 @@ public struct VocabularySettingsSection: View {
                 message(error, systemImage: "exclamationmark.triangle.fill", tint: .red)
             }
 
-            Text("Applied to transcriptions that start from now on. Transcripts you already have keep their wording until you transcribe them again.")
+            Text("Applied to future batch and dictation requests when Vocabulary boosting is installed in Transcription model settings. Existing transcripts keep their wording until you transcribe them again.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 

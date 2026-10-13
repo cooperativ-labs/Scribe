@@ -3,7 +3,7 @@
   "profileID": "parakeet-v3-offline-diarization-v1",
   "fluidAudio": {
     "repository": "https://github.com/FluidInference/FluidAudio.git",
-    "revision": "v0.15.7 (41540ea237350afe5117a082b5c28eda642d0612)"
+    "revision": "v0.17.4 (21493f8dac5a97e65742e6ff26f42f164c2fda0f)"
   },
   "telemetry": {
     "enabled": false,
@@ -16,7 +16,7 @@
     "chosenComputeUnits": "cpuAndNeuralEngine",
     "allowLowPrecisionAccumulationOnGPU": true,
     "longFileProcessing": {
-      "implementation": "FluidAudio v0.15.7 disk-backed ChunkProcessor",
+      "implementation": "FluidAudio v0.17.4 disk-backed ChunkProcessor",
       "modelWindowSeconds": 14.88,
       "overlapSeconds": 2.0,
       "leftContextSeconds": 0.08,
@@ -46,7 +46,7 @@
   },
   "diarizationRuntime": {
     "adapter": "OfflineDiarizationAdapter",
-    "pipeline": "FluidAudio v0.15.7 OfflineDiarizerManager with pyannote segmentation, WeSpeaker embeddings, and global VBx clustering",
+    "pipeline": "FluidAudio v0.17.4 OfflineDiarizerManager with pyannote segmentation, WeSpeaker embeddings, and global VBx clustering",
     "input": "any locally readable audio; streaming conversion to 16 kHz mono Float32 disk-backed PCM",
     "knownSpeakerCount": "OfflineDiarizerConfig.withSpeakers(exactly:) when supplied; clustering.maxSpeakers for an up-to ceiling; otherwise automatic global clustering",
     "postProcessing": {
@@ -89,11 +89,20 @@
       }
     }
   },
-  "totalDeclaredOnDiskBytes": 505044116,
-  "totalDeclaredOnDiskSize": "505.0 MB (481.6 MiB; exact staged file bytes, before filesystem allocation)",
+  "totalDeclaredOnDiskBytes": 607681148,
+  "totalDeclaredOnDiskSize": "607.7 MB (579.5 MiB; includes optional vocabulary group, exact staged file bytes)",
   "vad": {
     "separateModelRequired": false,
     "reason": "The pinned pyannote segmentation bundle supplies speech activity and overlap decisions for the offline VBx pipeline."
+  },
+  "vocabularyRuntime": {
+    "optionalAssetID": "parakeet-ctc-110m",
+    "api": "CtcModels.loadDirect + VocabularyRescorer.ctcTokenEvaluateCandidates",
+    "windowSeconds": 30,
+    "contextSeconds": 3,
+    "spotterRescueEnabled": false,
+    "shortTermCbwTaperPivot": 5,
+    "runtimeDownloadsAllowed": false
   },
   "assets": [
     {
@@ -225,6 +234,88 @@
       "checksum": { "algorithm": "SHA-256", "value": "f7cd5cc16e63e2d89db052a23018ecfc47a311998ed1e9e39838fbac65048688", "scope": "xvector-transform.json" },
       "license": "CC-BY-4.0",
       "requiredFiles": [ { "relativePath": "xvector-transform.json", "sha256": "f7cd5cc16e63e2d89db052a23018ecfc47a311998ed1e9e39838fbac65048688", "bytes": 177499 } ]
+    },
+    {
+      "id": "parakeet-ctc-110m",
+      "optional": true,
+      "relativePath": "parakeet-ctc-110m-coreml",
+      "upstream": {
+        "repository": "https://huggingface.co/FluidInference/parakeet-ctc-110m-coreml",
+        "revision": "accdafd8cf8a2ff1cabe3c11e54416b405d409aa"
+      },
+      "checksum": {
+        "algorithm": "sha256",
+        "value": "16bbfbb9974ca4334ad4d10c1a7709af86115e8d386503dbde77e8d847fb22e4",
+        "scope": "required-files"
+      },
+      "license": "Apache-2.0 (model card); repository metadata also labels CC-BY-4.0; both notices included",
+      "requiredFiles": [
+        {
+          "relativePath": "AudioEncoder.mlmodelc/analytics/coremldata.bin",
+          "bytes": 243,
+          "sha256": "8906c823e9bb3bf6b16d9f0308f98cd70573526333ad85dd767dc3f9ae6b25fa"
+        },
+        {
+          "relativePath": "AudioEncoder.mlmodelc/coremldata.bin",
+          "bytes": 505,
+          "sha256": "a88b002b58193b4c31211754cdfdf220a85f9651dc61caf336ab84400cbc191a"
+        },
+        {
+          "relativePath": "AudioEncoder.mlmodelc/metadata.json",
+          "bytes": 3456,
+          "sha256": "4f288bfe5cbe867ef1e592cdae33578b2fe59ada69182fc12209879558f985c2"
+        },
+        {
+          "relativePath": "AudioEncoder.mlmodelc/model.mil",
+          "bytes": 1060924,
+          "sha256": "2f84ef93a69115e55f3b5d8ce695b3c937de1833d4d229620634fae967cd587e"
+        },
+        {
+          "relativePath": "AudioEncoder.mlmodelc/weights/weight.bin",
+          "bytes": 100778304,
+          "sha256": "af0734b4a5d7465ad9e8bb170f0c53c5e6b91ebb75a9bdf88d3f59ae4ad6aebd"
+        },
+        {
+          "relativePath": "MelSpectrogram.mlmodelc/analytics/coremldata.bin",
+          "bytes": 243,
+          "sha256": "22f2a8cba1de25c984050566b534a1d8caf22a82f9fe6c1c6f3149a0dd7e8ae3"
+        },
+        {
+          "relativePath": "MelSpectrogram.mlmodelc/coremldata.bin",
+          "bytes": 330,
+          "sha256": "3a32ec67c76aa0aa2faef518413c311493e89aeb7fa11289fa4b8653ab8a160c"
+        },
+        {
+          "relativePath": "MelSpectrogram.mlmodelc/metadata.json",
+          "bytes": 1962,
+          "sha256": "5e11d21a65c02bcfc37db43e941978e5d60d59e0efeadfda08e41f33b4f835d3"
+        },
+        {
+          "relativePath": "MelSpectrogram.mlmodelc/model.mil",
+          "bytes": 12584,
+          "sha256": "0a7cb5693b39667295218bac5c7c09053f6bcd4b32699a83d06ac35d14ac6b79"
+        },
+        {
+          "relativePath": "MelSpectrogram.mlmodelc/weights/weight.bin",
+          "bytes": 567712,
+          "sha256": "0a89c055bfde9022029d3cc59a23e949385e063974460d8eaec3a7614c3eaaa8"
+        },
+        {
+          "relativePath": "tokenizer.json",
+          "bytes": 360106,
+          "sha256": "9f7c517c0bf644b1b690ab037bab4d4c53aecd38e047e7154d011013ab9160db"
+        },
+        {
+          "relativePath": "tokenizer_config.json",
+          "bytes": 632,
+          "sha256": "7a29ed0fec88768d8666d65be8dc00ae41a60c4b7758c4df99a912108e62a23a"
+        },
+        {
+          "relativePath": "vocab.json",
+          "bytes": 16086,
+          "sha256": "319d386eead79aadc80df9c3ecc8340d1a727efb7c02a8847eb940380dd61e1f"
+        }
+      ]
     }
   ]
 }

@@ -16,6 +16,7 @@ public final class ScribeSettings: ObservableObject {
 
     @Published public private(set) var modelsFolderURL: URL
     @Published public private(set) var modelsFolderError: String?
+    public let vocabularyInstaller: TranscriptionModelInstaller
     public let modelInstaller: TranscriptionModelInstaller
 
     @Published public private(set) var recordingsFolderURL: URL
@@ -305,6 +306,7 @@ public final class ScribeSettings: ObservableObject {
         self.fileManager = fileManager
         self.loginItemManager = loginItemManager
         modelInstaller = TranscriptionModelInstaller(manifestURL: modelManifestURL)
+        vocabularyInstaller = TranscriptionModelInstaller(manifestURL: modelManifestURL, group: .vocabulary)
         do {
             modelsFolderURL = try Self.resolveBookmark(from: defaults, fileManager: fileManager, key: Key.modelsFolderBookmark)
                 ?? Self.defaultModelsFolderURL
@@ -394,6 +396,7 @@ public final class ScribeSettings: ObservableObject {
 
         recordingsFolderURL = defaultRecordingsFolderURL
         modelInstaller.refresh(directory: modelsFolderURL)
+        vocabularyInstaller.refresh(directory: modelsFolderURL)
 
         do {
             recordingsFolderURL = try Self.resolveBookmark(from: defaults, fileManager: fileManager)
@@ -484,7 +487,7 @@ public final class ScribeSettings: ObservableObject {
     /// Selecting a new root leaves existing models in place. The installer
     /// recognizes a complete installation there or offers to download it.
     public func setModelsFolder(_ url: URL) throws {
-        guard !modelInstaller.isBusy else { throw ModelInstallationError("Wait for model setup to finish or cancel the download first.") }
+        guard !modelInstaller.isBusy, !vocabularyInstaller.isBusy else { throw ModelInstallationError("Wait for model setup to finish or cancel the download first.") }
         let url = url.standardizedFileURL
         let accessing = url.startAccessingSecurityScopedResource()
         defer { if accessing { url.stopAccessingSecurityScopedResource() } }
@@ -494,6 +497,7 @@ public final class ScribeSettings: ObservableObject {
         modelsFolderURL = url
         modelsFolderError = nil
         modelInstaller.refresh(directory: url)
+        vocabularyInstaller.refresh(directory: url)
     }
 
     // MARK: Meeting detection

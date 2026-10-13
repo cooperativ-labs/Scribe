@@ -1,4 +1,5 @@
 import Foundation
+import Vocabulary
 import ScribeAppCore
 
 /// The durable state of a transcription run. Non-terminal cases are safe
@@ -101,6 +102,7 @@ public struct TranscriptionJob: Codable, Sendable, Equatable, Identifiable {
     public let schemaVersion: Int
     public let id: UUID
     public let runID: UUID
+    public let vocabularySnapshot: VocabularySnapshot?
     public let request: TranscriptionRequest
     public let sourceSnapshotURL: URL
     public let runDirectoryURL: URL
@@ -128,11 +130,13 @@ public struct TranscriptionJob: Codable, Sendable, Equatable, Identifiable {
         failure: TranscriptionDiagnostic? = nil,
         createdAt: Date = Date(),
         updatedAt: Date = Date(),
-        retryOfRunID: UUID? = nil
+        retryOfRunID: UUID? = nil,
+        vocabularySnapshot: VocabularySnapshot? = nil
     ) {
         self.schemaVersion = Self.schemaVersion
         self.id = id
         self.runID = runID
+        self.vocabularySnapshot = vocabularySnapshot
         self.request = request
         self.sourceSnapshotURL = sourceSnapshotURL
         self.runDirectoryURL = runDirectoryURL

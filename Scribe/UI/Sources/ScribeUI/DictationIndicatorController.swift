@@ -203,7 +203,8 @@ public final class DictationIndicatorController {
         guard position() != "off" || livePreview != nil else { panel.orderOut(nil); return }
         let intent = coordinator.intent
         host.rootView = DictationIndicatorView(
-            state: state, livePreview: livePreview, showsToggleControls: mode == .doubleTap, showsTranscribingLabel: showLabel,
+            state: state,
+            vocabularyWarning: coordinator.vocabularyWarning, livePreview: livePreview, showsToggleControls: mode == .doubleTap, showsTranscribingLabel: showLabel,
             showsCancel: inSession, intent: intent, assistantHint: coordinator.assistantHint,
             stop: stop, cancel: cancel, openSettings: intent == .assistant ? openAssistantSettings : openSettings
         )
