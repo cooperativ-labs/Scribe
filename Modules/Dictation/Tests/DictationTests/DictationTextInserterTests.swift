@@ -7,10 +7,35 @@ import XCTest
 final class DictationTextShaperTests: XCTestCase {
     func testSpacingAndCapitalization() {
         let options = DictationTextOptions(leadingSpace: true, trailingSpace: true)
-        XCTAssertEqual(DictationTextShaper.shape("  hello world  ", preceding: "Hi.", fieldIsEmpty: false, options: options), " Hello world ")
-        XCTAssertEqual(DictationTextShaper.shape("hello world", preceding: "\n", fieldIsEmpty: false, options: options), "hello world ")
-        XCTAssertEqual(DictationTextShaper.shape("hello world", preceding: nil, fieldIsEmpty: true, options: options), "hello world ")
-        XCTAssertEqual(DictationTextShaper.shape("hello world", preceding: nil, fieldIsEmpty: false, options: options), " hello world ")
+        XCTAssertEqual(DictationTextShaper.shape("  hello world  ", preceding: "Hi.", atFieldStart: false, options: options), " Hello world ")
+        XCTAssertEqual(DictationTextShaper.shape("hello world", preceding: "\n", atFieldStart: false, options: options), "Hello world ")
+        XCTAssertEqual(DictationTextShaper.shape("hello world", preceding: nil, atFieldStart: true, options: options), "Hello world ")
+        XCTAssertEqual(DictationTextShaper.shape("hello world", preceding: nil, atFieldStart: false, options: options), " hello world ")
+    }
+    func testSentenceStartCapitalisationFollowsTheTextBeforeTheCaret() {
+        let options = DictationTextOptions(leadingSpace: false)
+        func shape(_ transcript: String, after preceding: String?) -> String? {
+            DictationTextShaper.shape(transcript, preceding: preceding, atFieldStart: false, options: options)
+        }
+        // After a sentence end, spaces and closing quotes included: capitalise.
+        XCTAssertEqual(shape("then we left", after: "It rained. "), "Then we left")
+        XCTAssertEqual(shape("then we left", after: "Really?\u{201D}  "), "Then we left")
+        XCTAssertEqual(shape("then we left", after: "Done!\n\n"), "Then we left")
+        XCTAssertEqual(shape("then we left", after: "Notes\n"), "Then we left")
+        // Mid-sentence: the transcriber's sentence capital is lowered.
+        XCTAssertEqual(shape("The meeting ran long", after: "I think that "), "the meeting ran long")
+        XCTAssertEqual(shape("Then we left", after: "lunch,"), "then we left")
+        XCTAssertEqual(shape("After 5 we left", after: "at 4 \u{2014} "), "after 5 we left")
+        // "I", its contractions and acronyms keep their case.
+        XCTAssertEqual(shape("I think so", after: "and "), "I think so")
+        XCTAssertEqual(shape("I'm not sure", after: "and "), "I'm not sure")
+        XCTAssertEqual(shape("NASA called", after: "and "), "NASA called")
+        // Ambiguous or unknown context leaves the transcript alone.
+        XCTAssertEqual(shape("The list", after: "Note: "), "The list")
+        XCTAssertEqual(shape("Buy milk", after: "- "), "Buy milk")
+        XCTAssertEqual(shape("And then", after: "well... "), "And then")
+        XCTAssertEqual(shape("The list", after: nil), "The list")
+        XCTAssertEqual(shape("The list", after: "   "), "The list")
     }
     func testGeneratedTextKeepsParagraphsAndCapitalisation() {
         let options = DictationTextOptions(leadingSpace: true, trailingSpace: true)
@@ -26,8 +51,8 @@ final class DictationTextShaperTests: XCTestCase {
         XCTAssertNil(DictationTextShaper.shapeGenerated(" \n ", preceding: nil, options: options))
     }
     func testDropsNoise() {
-        XCTAssertNil(DictationTextShaper.shape(" .!? ", preceding: nil, fieldIsEmpty: true, options: .init()))
-        XCTAssertNil(DictationTextShaper.shape("a", preceding: nil, fieldIsEmpty: true, options: .init()))
+        XCTAssertNil(DictationTextShaper.shape(" .!? ", preceding: nil, atFieldStart: true, options: .init()))
+        XCTAssertNil(DictationTextShaper.shape("a", preceding: nil, atFieldStart: true, options: .init()))
     }
 }
 
@@ -65,7 +90,7 @@ private final class FakeAX: FocusedFieldAXClient, @unchecked Sendable {
         }
         return true
     }
-    func precedingCharacter(of element: AXUIElement, range: CFRange) -> String? { preceding }
+    func precedingText(of element: AXUIElement, range: CFRange, maxLength: Int) -> String? { preceding }
     func frame(of element: AXUIElement) -> CGRect? { nil }
     func caretFrame(of element: AXUIElement, range: CFRange) -> CGRect? { caret }
     func window(of element: AXUIElement) -> AXUIElement? { nil }
@@ -206,8 +231,34 @@ final class DictationTextInserterTests: XCTestCase {
                                                     screens: [], allowsUnverifiedPaste: true,
                                                     currentPID: { ax.targetPID })
         XCTAssertEqual(outcome, .unverifiedPaste)
-        XCTAssertEqual(paste.pasted, "hello")
+        XCTAssertEqual(paste.pasted, "Hello")
         XCTAssertEqual(paste.restoredClipboard, false)
+    }
+    @MainActor func testLeadingSpaceOnlyWhenTextPrecedesTheCaret() async {
+        let ax = FakeAX()
+        let paste = FakePaste()
+        let inserter = DictationTextInserter(locator: FocusedFieldLocator(client: ax), paste: paste)
+        func dictate() async -> String? {
+            _ = await inserter.insertDictation("hello", frontmostPID: ax.targetPID, screenTop: 100,
+                                               screens: [], currentPID: { ax.targetPID })
+            return paste.pasted
+        }
+        ax.preceding = "e"
+        let afterText = await dictate()
+        XCTAssertEqual(afterText, " hello")
+        ax.value = ""
+        ax.range = CFRange(location: 0, length: 0)
+        ax.preceding = nil
+        let emptyField = await dictate()
+        XCTAssertEqual(emptyField, "Hello")
+        // An empty composer that still reports a value, or a caret placed
+        // before existing text: nothing precedes the caret either way.
+        ax.value = "\n"
+        let emptyComposer = await dictate()
+        XCTAssertEqual(emptyComposer, "Hello")
+        ax.value = "world"
+        let beforeText = await dictate()
+        XCTAssertEqual(beforeText, "Hello")
     }
     @MainActor func testInaccessibleComposerDoesNotPasteAfterAppSwitch() async {
         let ax = FakeAX()

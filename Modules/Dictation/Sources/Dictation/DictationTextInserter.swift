@@ -31,17 +31,59 @@ public protocol DictationPasteClient: AnyObject {
 extension KeystrokeTextInserter: DictationPasteClient {}
 
 public enum DictationTextShaper {
-    public static func shape(_ transcript: String, preceding: String?, fieldIsEmpty: Bool?, options: DictationTextOptions) -> String? {
+    public static func shape(_ transcript: String, preceding: String?, atFieldStart: Bool?, options: DictationTextOptions) -> String? {
         var text = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         guard text.count >= 2, text.unicodeScalars.contains(where: { CharacterSet.letters.union(.decimalDigits).contains($0) }) else { return nil }
-        if let preceding, let last = preceding.last, ".!?".contains(last),
-           let firstLetter = text.firstIndex(where: { $0.isLetter }) {
-            text.replaceSubrange(firstLetter...firstLetter, with: String(text[firstLetter]).uppercased())
+        switch sentencePosition(preceding: preceding, atFieldStart: atFieldStart) {
+        case .start:
+            if let firstLetter = text.firstIndex(where: { $0.isLetter }) {
+                text.replaceSubrange(firstLetter...firstLetter, with: String(text[firstLetter]).uppercased())
+            }
+        case .middle:
+            text = lowercasingSentenceCapital(text)
+        case .unknown:
+            break
         }
-        if options.leadingSpace, fieldIsEmpty != true,
+        if options.leadingSpace, atFieldStart != true,
            preceding?.last.map({ !$0.isWhitespace && !$0.isNewline }) ?? true { text = " " + text }
         if options.trailingSpace { text += " " }
         return text
+    }
+
+    private enum SentencePosition { case start, middle, unknown }
+
+    /// Reads the text before the caret, skipping spaces, to decide whether the
+    /// dictation opens a sentence. Anything ambiguous (a colon, an opening
+    /// quote, an ellipsis, a list hyphen, no context at all) leaves the transcript's own case.
+    private static func sentencePosition(preceding: String?, atFieldStart: Bool?) -> SentencePosition {
+        if atFieldStart == true { return .start }
+        guard let preceding else { return .unknown }
+        // A line break after the last word opens a new line, as does a window
+        // of nothing but whitespace that contains one.
+        let lastIndex = preceding.lastIndex(where: { !$0.isWhitespace })
+        let gap = lastIndex.map { preceding[preceding.index(after: $0)...] } ?? preceding[...]
+        if gap.contains(where: \.isNewline) { return .start }
+        guard let lastIndex else { return .unknown }
+        var body = preceding[...lastIndex]
+        while let last = body.last, "\"'”’)]»".contains(last) { body = body.dropLast() }
+        guard let last = body.last else { return .unknown }
+        if last == "…" || body.hasSuffix("..") { return .unknown }
+        if ".!?".contains(last) { return .start }
+        if last.isLetter || last.isNumber || ",;–—".contains(last) { return .middle }
+        return .unknown
+    }
+
+    /// Mid-sentence, the transcriber's sentence capital goes. Only a plain
+    /// capitalised word is lowered: "I", its contractions and all-caps words
+    /// such as acronyms keep their case.
+    private static func lowercasingSentenceCapital(_ text: String) -> String {
+        let word = text.prefix(while: { $0.isLetter || $0 == "'" || $0 == "’" })
+        let letters = word.filter(\.isLetter)
+        guard let first = letters.first, first.isUppercase,
+              letters.dropFirst().allSatisfy({ !$0.isUppercase }),
+              !(first == "I" && (word.count == 1 || "'’".contains(word[word.index(after: word.startIndex)])))
+        else { return text }
+        return first.lowercased() + text.dropFirst()
     }
 
     /// A model's answer keeps its own paragraphs and capitalisation. Only the
@@ -99,8 +141,8 @@ public final class DictationTextInserter: TextInserting {
                                 allowsUnverifiedPaste: Bool = false,
                                 currentPID: () -> pid_t?) async -> DictationInsertionOutcome {
         await insert(frontmostPID: pid, screenTop: screenTop, screens: screens,
-                     allowsUnverifiedPaste: allowsUnverifiedPaste, currentPID: currentPID) { [options] preceding, fieldIsEmpty in
-            DictationTextShaper.shape(transcript, preceding: preceding, fieldIsEmpty: fieldIsEmpty, options: options)
+                     allowsUnverifiedPaste: allowsUnverifiedPaste, currentPID: currentPID) { [options] preceding, atFieldStart in
+            DictationTextShaper.shape(transcript, preceding: preceding, atFieldStart: atFieldStart, options: options)
         }
     }
 
@@ -142,12 +184,15 @@ public final class DictationTextInserter: TextInserting {
 
     private func insert(frontmostPID pid: pid_t, screenTop: CGFloat, screens: [CGRect],
                         allowsUnverifiedPaste: Bool, currentPID: () -> pid_t?,
-                        shape: (_ preceding: String?, _ fieldIsEmpty: Bool?) -> String?) async -> DictationInsertionOutcome {
+                        shape: (_ preceding: String?, _ atFieldStart: Bool?) -> String?) async -> DictationInsertionOutcome {
         let snapshot = await locator.locate(frontmostPID: pid, screenTop: screenTop, screens: screens)
         guard snapshot?.isSecure != true else { return .discarded }
         if let snapshot, snapshot.isTextRole {
-            let preceding = await locator.precedingCharacter(snapshot)
-            guard let text = shape(preceding, snapshot.valueLength == 0) else { return .discarded }
+            let preceding = await locator.precedingText(snapshot)
+            // A caret at location 0 has nothing before it, even when the field
+            // reports a value (text after the caret, or a composer's "\n").
+            let atFieldStart = snapshot.valueLength == 0 || snapshot.selectedRange?.location == 0
+            guard let text = shape(preceding, atFieldStart) else { return .discarded }
             if currentPID() == pid, await locator.stillFocused(snapshot, frontmostPID: pid) {
                 if snapshot.selectedTextSettable, await locator.insertDirect(text, into: snapshot) { return .accessibility }
                 if currentPID() == pid, await locator.stillFocused(snapshot, frontmostPID: pid) {

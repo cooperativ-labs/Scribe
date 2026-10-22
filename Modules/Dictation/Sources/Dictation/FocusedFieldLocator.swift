@@ -29,7 +29,8 @@ public protocol FocusedFieldAXClient: Sendable {
     func selectedText(of element: AXUIElement) -> String?
     func isSettable(_ attribute: String, on element: AXUIElement) -> Bool
     func setSelectedText(_ text: String, on element: AXUIElement) -> Bool
-    func precedingCharacter(of element: AXUIElement, range: CFRange) -> String?
+    /// Up to `maxLength` UTF-16 units of text immediately before `range`.
+    func precedingText(of element: AXUIElement, range: CFRange, maxLength: Int) -> String?
     func frame(of element: AXUIElement) -> CGRect?
     func caretFrame(of element: AXUIElement, range: CFRange) -> CGRect?
     func window(of element: AXUIElement) -> AXUIElement?
@@ -170,9 +171,10 @@ public struct SystemFocusedFieldAXClient: FocusedFieldAXClient {
             AXUIElementSetAttributeValue(timed(element), kAXSelectedTextAttribute as CFString, text as CFString) == .success
         }
     }
-    public func precedingCharacter(of element: AXUIElement, range: CFRange) -> String? {
+    public func precedingText(of element: AXUIElement, range: CFRange, maxLength: Int) -> String? {
         guard range.location > 0 else { return nil }
-        var precedingRange = CFRange(location: range.location - 1, length: 1)
+        let length = min(range.location, maxLength)
+        var precedingRange = CFRange(location: range.location - length, length: length)
         guard let parameter = AXValueCreate(.cfRange, &precedingRange),
               AXUIElementSetMessagingTimeout(element, 0.25) == .success else { return nil }
         return onOwner(of: element) {
@@ -323,9 +325,11 @@ public actor FocusedFieldLocator {
         return CFEqual(current, snapshot.element)
     }
 
-    public func precedingCharacter(_ snapshot: FocusedFieldSnapshot) -> String? {
+    /// A short window before the caret: enough to see the punctuation behind
+    /// trailing spaces, in the same single AX read as one character.
+    public func precedingText(_ snapshot: FocusedFieldSnapshot) -> String? {
         guard let range = snapshot.selectedRange else { return nil }
-        return client.precedingCharacter(of: snapshot.element, range: range)
+        return client.precedingText(of: snapshot.element, range: range, maxLength: 16)
     }
 
     public func insertDirect(_ text: String, into snapshot: FocusedFieldSnapshot) async -> Bool {

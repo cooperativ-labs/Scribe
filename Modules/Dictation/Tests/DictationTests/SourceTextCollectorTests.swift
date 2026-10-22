@@ -52,7 +52,7 @@ private final class TreeAX: FocusedFieldAXClient, @unchecked Sendable {
     func selectedRange(of element: AXUIElement) -> CFRange? { nil }
     func isSettable(_ attribute: String, on element: AXUIElement) -> Bool { false }
     func setSelectedText(_ text: String, on element: AXUIElement) -> Bool { false }
-    func precedingCharacter(of element: AXUIElement, range: CFRange) -> String? { nil }
+    func precedingText(of element: AXUIElement, range: CFRange, maxLength: Int) -> String? { nil }
     func frame(of element: AXUIElement) -> CGRect? { nil }
     func caretFrame(of element: AXUIElement, range: CFRange) -> CGRect? { nil }
     func window(of element: AXUIElement) -> AXUIElement? { windowOfFocused }
