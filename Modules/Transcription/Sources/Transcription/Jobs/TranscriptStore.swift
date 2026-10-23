@@ -109,6 +109,28 @@ public struct TranscriptStore: Sendable {
         try fileManager.removeItem(at: meeting)
     }
 
+    /// Removes the recording behind this run and keeps everything else: the
+    /// source snapshot and the prepared audio each run decoded from it. The
+    /// transcripts, their revisions, and the speaker records stay, so review
+    /// still opens the meeting; it just has nothing left to play.
+    ///
+    /// Every run of the meeting shares the one snapshot, so a run still in
+    /// flight would lose its input mid-stage; that is refused rather than raced.
+    public func deleteAudio(containingRunID runID: UUID) throws {
+        guard let run = run(withRunID: runID) else {
+            throw TranscriptAssemblyError.missingArtifact("the run directory for \(runID.uuidString)")
+        }
+        let meeting = run.runDirectoryURL.deletingLastPathComponent().deletingLastPathComponent()
+        guard meeting.lastPathComponent.hasPrefix(SourceSnapshotService.meetingDirectoryPrefix) else {
+            throw TranscriptAssemblyError.missingArtifact("the meeting directory for \(runID.uuidString)")
+        }
+        let meetingRuns = runs(inMeetingAt: meeting)
+        guard meetingRuns.allSatisfy(\.job.state.isTerminal) else { throw TranscriptStoreError.meetingInUse }
+        for url in audioFiles(inMeetingAt: meeting, runs: meetingRuns) {
+            try fileManager.removeItem(at: url)
+        }
+    }
+
     /// The `TranscriptionResult` a completed run reports back to its caller.
     public func result(for run: StoredTranscriptRun) -> TranscriptionResult? {
         guard let transcript = run.transcript else { return nil }
@@ -150,10 +172,43 @@ public struct TranscriptStore: Sendable {
         }
     }
 
+    /// `source` or `source.<ext>` beside the import sidecar, and each run's
+    /// `prepared.wav`. Only Scribe's own names are matched, so nothing a person
+    /// put in the meeting folder is touched.
+    private func audioFiles(inMeetingAt meeting: URL, runs: [StoredTranscriptRun]) -> [URL] {
+        let contents = (try? fileManager.contentsOfDirectory(
+            at: meeting,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        )) ?? []
+        let sources = contents.filter {
+            let name = $0.lastPathComponent
+            return (name == "source" || name.hasPrefix("source.")) && !$0.hasDirectoryPath
+        }
+        let prepared = runs
+            .map { $0.runDirectoryURL.appending(path: Self.preparedAudioFileName) }
+            .filter { fileManager.fileExists(atPath: $0.path) }
+        return sources + prepared
+    }
+
+    /// The worker's decoded copy of the source, written into each run directory.
+    static let preparedAudioFileName = "prepared.wav"
+
     private static func decodeJob(_ data: Data) throws -> TranscriptionJob {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return try decoder.decode(TranscriptionJob.self, from: data)
+    }
+}
+
+public enum TranscriptStoreError: LocalizedError, Equatable, Sendable {
+    /// Another run of the same meeting is still queued or running.
+    case meetingInUse
+
+    public var errorDescription: String? {
+        switch self {
+        case .meetingInUse: "A transcription of this recording is still running. Try again once it finishes."
+        }
     }
 }
 
@@ -263,6 +318,7 @@ public extension TranscriptReviewFile {
             transcript: UnknownFragmentReconciler.applied(to: run.transcript, in: run.runDirectoryURL),
             jobState: TranscriptJobState(run.job.state, transcript: run.transcript),
             processingError: run.job.failure?.message,
+            hasAudio: FileManager.default.fileExists(atPath: run.job.sourceSnapshotURL.path),
             suggestions: suggestions
         )
     }
@@ -310,7 +366,8 @@ public struct TranscriptStoreRevisionWriter: TranscriptRevisionStoring {
     }
 }
 
-/// Deletes a reviewed file by removing the meeting its run belongs to.
+/// Deletes a reviewed file by removing the meeting its run belongs to, or
+/// only the meeting's recording.
 public struct TranscriptStoreFileDeleter: TranscriptFileDeleting {
     private let store: TranscriptStore
 
@@ -323,5 +380,12 @@ public struct TranscriptStoreFileDeleter: TranscriptFileDeleting {
             throw TranscriptAssemblyError.missingArtifact("the run directory for \(fileID)")
         }
         try store.deleteMeeting(containingRunID: runID)
+    }
+
+    public func deleteAudio(fileID: TranscriptReviewFile.ID) throws {
+        guard let runID = UUID(uuidString: fileID) else {
+            throw TranscriptAssemblyError.missingArtifact("the run directory for \(fileID)")
+        }
+        try store.deleteAudio(containingRunID: runID)
     }
 }

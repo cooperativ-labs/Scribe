@@ -407,6 +407,7 @@ public final class TranscriptViewModel {
     /// Starts playing from this turn and keeps going through the turns that
     /// follow until the transcript ends or the person stops it.
     public func play(segment: TranscriptSegment) {
+        guard canPlayAudio else { return }
         selectedSegmentID = segment.id
         playingSegmentID = segment.id
         playheadMilliseconds = segment.startMs
@@ -418,6 +419,7 @@ public final class TranscriptViewModel {
     /// The bar's one button: pause while playing, resume while paused, and
     /// otherwise start from the selected turn or the top of the transcript.
     public func togglePlayback() {
+        guard canPlayAudio else { return }
         if isPlaying {
             playback.pause()
             isPlaying = false
@@ -593,6 +595,37 @@ public final class TranscriptViewModel {
         }
     }
 
+    /// Whether the sidebar offers to delete only the recording. Same rule as
+    /// deleting the file, and there must still be a recording to delete.
+    public func canDeleteAudio(_ file: TranscriptReviewFile) -> Bool {
+        file.hasAudio && canDelete(file)
+    }
+
+    /// Removes the recording and keeps the transcript in the list. Playback
+    /// stops first when this is the file on screen, so the player lets go of
+    /// the source before it disappears.
+    public func deleteAudio(fileID: TranscriptReviewFile.ID) {
+        guard let index = files.firstIndex(where: { $0.id == fileID }), canDeleteAudio(files[index]) else { return }
+        let file = files[index]
+        if selectedFileID == fileID {
+            stopPlayback()
+            cancelRememberingVoice()
+        }
+        do {
+            try fileDeleter?.deleteAudio(fileID: fileID)
+        } catch {
+            speakerActionMessage = TranscriptSpeakerActionMessage(
+                text: "Could not delete the audio for \(file.filename): \(Self.describe(error))",
+                isFailure: true
+            )
+            return
+        }
+        files[index] = file.removingAudio()
+    }
+
+    /// Whether the selected file still has a recording to play.
+    public var canPlayAudio: Bool { selectedFile?.hasAudio ?? false }
+
     // MARK: - Importing
 
     /// Whether the sidebar accepts dropped files at all. Without a host
@@ -601,9 +634,10 @@ public final class TranscriptViewModel {
     public var canImportFiles: Bool { fileImporter != nil }
 
     /// Whether the toolbar offers speaker-count reprocess. An in-flight job or
-    /// an open reprocess sheet blocks another queue until that one settles.
+    /// an open reprocess sheet blocks another queue until that one settles,
+    /// and a file whose recording was deleted has no audio to diarize.
     public var canReprocess: Bool {
-        guard reprocessor != nil, let file = selectedFile, reprocessSession == nil else { return false }
+        guard reprocessor != nil, let file = selectedFile, file.hasAudio, reprocessSession == nil else { return false }
         switch file.jobState {
         case .ready, .queued, .processing: return false
         case .complete, .completeWithWarnings, .noSpeech, .failed: return true
@@ -613,8 +647,9 @@ public final class TranscriptViewModel {
     /// Whether the sidebar offers to retranscribe this file. A job still in
     /// flight is left alone: queuing another full run of the same source while
     /// its first pass is writing checkpoints is more confusing than useful.
+    /// Without its recording there is nothing to run again.
     public func canRetranscribe(_ file: TranscriptReviewFile) -> Bool {
-        guard retranscriber != nil else { return false }
+        guard retranscriber != nil, file.hasAudio else { return false }
         switch file.jobState {
         case .ready, .queued, .processing: return false
         case .complete, .completeWithWarnings, .noSpeech, .failed: return true
@@ -1181,7 +1216,7 @@ public final class TranscriptViewModel {
 
     /// Collects the excerpts a user can confirm for enrollment of one cluster.
     public func beginRememberingVoice(speakerID: String) {
-        guard let transcript = selectedTranscript else { return }
+        guard canPlayAudio, let transcript = selectedTranscript else { return }
         enrollmentSpeakerID = speakerID
         enrollmentCandidates = TranscriptEnrollmentCandidates.candidates(forSpeakerID: speakerID, in: transcript)
     }

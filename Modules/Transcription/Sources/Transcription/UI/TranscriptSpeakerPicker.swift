@@ -294,6 +294,7 @@ struct TranscriptSpeakerChips: View {
         }
         Divider()
         Button("Remember Voice…") { viewModel.beginRememberingVoice(speakerID: row.speakerID) }
+            .disabled(!viewModel.canPlayAudio)
     }
 
     private func suggestionBadge(_ suggestion: TranscriptSpeakerSuggestion, row: TranscriptSpeakerRow) -> some View {

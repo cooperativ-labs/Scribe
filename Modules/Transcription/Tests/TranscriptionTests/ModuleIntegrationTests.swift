@@ -275,6 +275,34 @@ final class ModuleIntegrationTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: source.path), "the original the user chose is untouched")
     }
 
+    /// Deleting only the audio removes the snapshot and the prepared audio,
+    /// keeps every transcript artifact, and the run still lists without audio.
+    func testDeletingAudioKeepsTheTranscriptInTheStore() async throws {
+        let source = try writeAudio(named: "call.wav", in: root, seconds: 4)
+        let coordinator = try TranscriptionCoordinator(
+            configuration: .init(transcriptStoreURL: storeURL),
+            stageRunner: ScriptedWorkerStageRunner(hostStageRunner: TranscriptAssemblyStageRunner())
+        )
+        _ = try await coordinator.enqueue(TranscriptionRequest(sourceURL: source, modelProfileID: "parakeet-v3"))
+        await coordinator.runPending()
+
+        let store = TranscriptStore(storeDirectoryURL: storeURL)
+        let run = try XCTUnwrap(store.latestRunPerSource().first)
+        let prepared = run.runDirectoryURL.appending(path: "prepared.wav")
+        try Data("RIFF".utf8).write(to: prepared)
+        XCTAssertTrue(TranscriptReviewFile(run).hasAudio)
+
+        try TranscriptStoreFileDeleter(store: store).deleteAudio(fileID: run.job.runID.uuidString)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: run.job.sourceSnapshotURL.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: prepared.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: run.canonicalTranscriptURL.path))
+        let reloaded = try XCTUnwrap(store.latestRunPerSource().first)
+        XCTAssertEqual(reloaded.transcript, run.transcript)
+        XCTAssertFalse(TranscriptReviewFile(reloaded).hasAudio)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: source.path), "the original the user chose is untouched")
+    }
+
     /// A run that fails mid-pipeline keeps its earlier checkpoints and is
     /// presented as failed rather than as an empty transcript.
     func testAFailedAssemblyIsReportedWithoutInventingATranscript() async throws {

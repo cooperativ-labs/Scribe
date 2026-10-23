@@ -7,6 +7,7 @@ import UniformTypeIdentifiers
 public struct TranscriptWindow: View {
     @Bindable private var viewModel: TranscriptViewModel
     @State private var fileAwaitingDeletion: TranscriptReviewFile?
+    @State private var fileAwaitingAudioDeletion: TranscriptReviewFile?
     @State private var fileAwaitingRetranscription: TranscriptReviewFile?
     @State private var fileFilter = ""
 
@@ -175,7 +176,9 @@ public struct TranscriptWindow: View {
                     Divider()
                     Button("Rename…") { beginRenaming(file) }
                         .disabled(file.transcript == nil)
-                    Button("Delete…", role: .destructive) { fileAwaitingDeletion = file }
+                    Button("Delete Audio…", role: .destructive) { fileAwaitingAudioDeletion = file }
+                        .disabled(!viewModel.canDeleteAudio(file))
+                    Button("Delete Transcript and Audio…", role: .destructive) { fileAwaitingDeletion = file }
                         .disabled(!viewModel.canDelete(file))
                 }
             }
@@ -205,6 +208,20 @@ public struct TranscriptWindow: View {
             Button("Cancel", role: .cancel) {}
         } message: { _ in
             Text("The transcript and the copy of the recording kept beside it are removed. Exported files are left alone.")
+        }
+        .confirmationDialog(
+            "Delete the audio for \u{201C}\(fileAwaitingAudioDeletion?.displayName ?? "")\u{201D}?",
+            isPresented: Binding(
+                get: { fileAwaitingAudioDeletion != nil },
+                set: { if !$0 { fileAwaitingAudioDeletion = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: fileAwaitingAudioDeletion
+        ) { file in
+            Button("Delete Audio", role: .destructive) { viewModel.deleteAudio(fileID: file.id) }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("The transcript and its edits are kept. Scribe's copy of the recording is removed, so it can no longer be played, retranscribed, or used to remember a voice. The original file you imported is left alone.")
         }
         .confirmationDialog(
             "Retranscribe \u{201C}\(fileAwaitingRetranscription?.displayName ?? "")\u{201D}?",
@@ -391,6 +408,7 @@ public struct TranscriptWindow: View {
         }
         .contextMenu {
             Button("Play from Here", systemImage: "play.fill") { viewModel.play(paragraph: paragraph) }
+                .disabled(!viewModel.canPlayAudio)
             if let primary {
                 Menu("Speaker") {
                     TranscriptSpeakerMenuItems(viewModel: viewModel, scope: .turn(segmentID: primary.id)) {
@@ -429,6 +447,7 @@ public struct TranscriptWindow: View {
         }
         .contextMenu {
             Button("Play from Here", systemImage: "play.fill") { viewModel.play(segment: segment) }
+                .disabled(!viewModel.canPlayAudio)
             Menu("Speaker") {
                 TranscriptSpeakerMenuItems(viewModel: viewModel, scope: .turn(segmentID: segment.id)) {
                     newPersonScope = .turn(segmentID: segment.id)
@@ -817,11 +836,14 @@ private struct TranscriptFileRow: View {
                         .tint(.accentColor)
                         .accessibilityLabel("Transcription progress")
                 } else {
-                    Text(file.jobState.isFailure ? file.jobState.displayName : file.sidebarDetail())
-                        .font(.caption)
-                        .monospacedDigit()
-                        .foregroundStyle(file.jobState.isFailure ? .red : .secondary)
-                        .lineLimit(1)
+                    HStack(spacing: 4) {
+                        Text(file.jobState.isFailure ? file.jobState.displayName : file.sidebarDetail())
+                            .monospacedDigit()
+                            .foregroundStyle(file.jobState.isFailure ? .red : .secondary)
+                        audioStatus
+                    }
+                    .font(.caption)
+                    .lineLimit(1)
                 }
             }
             Spacer(minLength: 0)
@@ -832,12 +854,22 @@ private struct TranscriptFileRow: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.borderless)
-                .help("Delete this transcript")
+                .help("Delete this transcript and its audio")
                 .accessibilityLabel("Delete \(file.displayName)")
             }
         }
         .contentShape(Rectangle())
         .onHover { isHovering = $0 }
+    }
+
+    /// Present or deleted, so a person can tell which recordings still take
+    /// space and which transcripts can no longer be played.
+    private var audioStatus: some View {
+        Image(systemName: file.hasAudio ? "waveform" : "waveform.slash")
+            .imageScale(.small)
+            .foregroundStyle(.tertiary)
+            .help(file.hasAudio ? "Audio available" : "Audio deleted; the transcript is kept")
+            .accessibilityLabel(file.hasAudio ? "Audio available" : "Audio deleted")
     }
 }
 
@@ -979,11 +1011,17 @@ private struct TranscriptTransportBar: View {
                 .accessibilityLabel(viewModel.isPlaying ? "Pause" : "Play")
                 transportButton("goforward.5", help: "Forward 5 seconds (⌥→)") { viewModel.skip(byMilliseconds: 5_000) }
             }
+            .disabled(!viewModel.canPlayAudio)
 
             VStack(spacing: 3) {
                 speakerTimeline
                 HStack {
-                    if viewModel.isPlaying, let status {
+                    if !viewModel.canPlayAudio {
+                        Label("Audio deleted", systemImage: "waveform.slash")
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    } else if viewModel.isPlaying, let status {
                         Text(status.speakerLabel)
                             .font(.caption2.weight(.medium))
                             .foregroundStyle(.secondary)
@@ -1011,6 +1049,7 @@ private struct TranscriptTransportBar: View {
             .menuStyle(.borderlessButton)
             .fixedSize()
             .help("Playback speed")
+            .disabled(!viewModel.canPlayAudio)
 
             Toggle(isOn: $viewModel.followsPlayback) {
                 Image(systemName: "text.line.first.and.arrowtriangle.forward")

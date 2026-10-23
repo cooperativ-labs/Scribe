@@ -382,6 +382,57 @@ final class TranscriptViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.speakerActionMessage?.text.hasPrefix("Could not delete") == true)
     }
 
+    func testDeletingAudioKeepsTheTranscriptAndDisablesWhatNeedsTheRecording() throws {
+        let playback = PlaybackSpy()
+        let deleter = DeleterSpy()
+        let one = TranscriptReviewFile(sourceSnapshotURL: URL(fileURLWithPath: "/tmp/one.flac"), transcript: try fixture(named: "one-speaker"), jobState: .complete)
+        let viewModel = TranscriptViewModel(
+            files: [one],
+            playback: playback,
+            fileDeleter: deleter,
+            reprocessor: ReprocessorSpy(),
+            retranscriber: RetranscriberSpy()
+        )
+        XCTAssertTrue(viewModel.canDeleteAudio(one))
+        XCTAssertTrue(viewModel.canRetranscribe(one))
+        XCTAssertTrue(viewModel.canReprocess)
+
+        viewModel.play(segment: try XCTUnwrap(viewModel.chronologicalSegments.first))
+        viewModel.deleteAudio(fileID: one.id)
+
+        XCTAssertEqual(deleter.deletedAudio, [one.id])
+        XCTAssertEqual(deleter.deleted, [], "the transcript is not deleted")
+        let kept = try XCTUnwrap(viewModel.files.first)
+        XCTAssertEqual(kept.id, one.id)
+        XCTAssertFalse(kept.hasAudio)
+        XCTAssertEqual(kept.transcript, one.transcript)
+        XCTAssertEqual(viewModel.selectedFileID, one.id, "the selection stays on the transcript")
+        XCTAssertNil(viewModel.playbackStatus, "playback stops before the recording goes")
+        XCTAssertFalse(viewModel.canPlayAudio)
+        XCTAssertFalse(viewModel.canDeleteAudio(kept))
+        XCTAssertTrue(viewModel.canDelete(kept), "the transcript itself can still be deleted")
+        XCTAssertFalse(viewModel.canRetranscribe(kept))
+        XCTAssertFalse(viewModel.canReprocess)
+
+        let transportBefore = playback.transport
+        viewModel.togglePlayback()
+        viewModel.play(segment: try XCTUnwrap(viewModel.chronologicalSegments.first))
+        XCTAssertEqual(playback.transport, transportBefore, "nothing plays without a recording")
+    }
+
+    func testAFailedAudioDeletionKeepsTheAudioAndReportsWhy() throws {
+        let deleter = DeleterSpy()
+        deleter.error = CocoaError(.fileWriteNoPermission)
+        let one = TranscriptReviewFile(sourceSnapshotURL: URL(fileURLWithPath: "/tmp/one.flac"), transcript: try fixture(named: "one-speaker"), jobState: .complete)
+        let viewModel = TranscriptViewModel(files: [one], playback: PlaybackSpy(), fileDeleter: deleter)
+
+        viewModel.deleteAudio(fileID: one.id)
+
+        XCTAssertEqual(viewModel.files.first?.hasAudio, true)
+        XCTAssertEqual(viewModel.speakerActionMessage?.isFailure, true)
+        XCTAssertTrue(viewModel.speakerActionMessage?.text.hasPrefix("Could not delete the audio") == true)
+    }
+
     func testReprocessConfirmationSheetShowsProgressAndCompletion() async throws {
         let transcript = try fixture(named: "two-speakers")
         let file = TranscriptReviewFile(
@@ -747,6 +798,13 @@ private final class DeleterSpy: TranscriptFileDeleting, @unchecked Sendable {
     func delete(fileID: TranscriptReviewFile.ID) throws {
         if let error { throw error }
         deleted.append(fileID)
+    }
+
+    private(set) var deletedAudio: [TranscriptReviewFile.ID] = []
+
+    func deleteAudio(fileID: TranscriptReviewFile.ID) throws {
+        if let error { throw error }
+        deletedAudio.append(fileID)
     }
 }
 

@@ -46,6 +46,9 @@ public struct TranscriptReviewFile: Identifiable, Equatable, Sendable {
     public let transcript: CanonicalTranscript?
     public let jobState: TranscriptJobState
     public let processingError: String?
+    /// False once the recording has been deleted to save space. The transcript
+    /// stays readable; playback and anything that re-reads the audio do not.
+    public let hasAudio: Bool
     /// Matches that scored too low to name automatically and await confirmation.
     public var suggestions: [TranscriptSpeakerSuggestion]
 
@@ -55,6 +58,7 @@ public struct TranscriptReviewFile: Identifiable, Equatable, Sendable {
         transcript: CanonicalTranscript?,
         jobState: TranscriptJobState,
         processingError: String? = nil,
+        hasAudio: Bool = true,
         suggestions: [TranscriptSpeakerSuggestion] = []
     ) {
         self.id = id ?? transcript?.transcriptID ?? sourceSnapshotURL.absoluteString
@@ -62,6 +66,7 @@ public struct TranscriptReviewFile: Identifiable, Equatable, Sendable {
         self.transcript = transcript
         self.jobState = jobState
         self.processingError = processingError
+        self.hasAudio = hasAudio
         self.suggestions = suggestions
     }
 
@@ -122,6 +127,20 @@ public struct TranscriptReviewFile: Identifiable, Equatable, Sendable {
             transcript: transcript,
             jobState: jobState,
             processingError: processingError,
+            hasAudio: hasAudio,
+            suggestions: suggestions
+        )
+    }
+
+    /// The same file after its recording has been deleted.
+    public func removingAudio() -> TranscriptReviewFile {
+        TranscriptReviewFile(
+            id: id,
+            sourceSnapshotURL: sourceSnapshotURL,
+            transcript: transcript,
+            jobState: jobState,
+            processingError: processingError,
+            hasAudio: false,
             suggestions: suggestions
         )
     }
@@ -373,6 +392,8 @@ public protocol TranscriptRevisionStoring: Sendable {
 /// no deleter attached simply removes the row from the list.
 public protocol TranscriptFileDeleting: Sendable {
     func delete(fileID: TranscriptReviewFile.ID) throws
+    /// Removes only the recording, keeping the transcript and its revisions.
+    func deleteAudio(fileID: TranscriptReviewFile.ID) throws
 }
 
 /// The result of handing dropped files to the host for transcription.
