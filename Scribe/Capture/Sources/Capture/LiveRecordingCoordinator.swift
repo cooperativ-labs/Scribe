@@ -39,6 +39,8 @@ public final class LiveRecordingCoordinator: RecordingCoordinating {
     /// is not composed into the build.
     private let recordingTitleProvider: (any RecordingTitleProviding)?
     private let textInserter: any TextInserting
+    /// Seconds Paste Timestamp subtracts from the elapsed clock.
+    private let timestampOffset: @MainActor () -> TimeInterval
     private var eventTask: Task<Void, Never>?
     private var interruptionObservers: [NSObjectProtocol] = []
     private let permissionMonitor: PermissionService?
@@ -54,6 +56,7 @@ public final class LiveRecordingCoordinator: RecordingCoordinating {
         captureActivityHandler: CaptureActivityHandler? = nil,
         recordingTitleProvider: (any RecordingTitleProviding)? = nil,
         textInserter: any TextInserting = KeystrokeTextInserter(),
+        timestampOffset: @escaping @MainActor () -> TimeInterval = { 0 },
         appBuild: String = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "development",
         macOSVersion: String = ProcessInfo.processInfo.operatingSystemVersionString
     ) {
@@ -65,6 +68,7 @@ public final class LiveRecordingCoordinator: RecordingCoordinating {
         self.captureActivityHandler = captureActivityHandler
         self.recordingTitleProvider = recordingTitleProvider
         self.textInserter = textInserter
+        self.timestampOffset = timestampOffset
         permissionMonitor = permissions as? PermissionService
         let initialConfiguration = Self.configuration(from: snapshot, appBuild: appBuild, macOSVersion: macOSVersion)
         let engine = RecordingCoordinator(
@@ -275,7 +279,7 @@ public final class LiveRecordingCoordinator: RecordingCoordinating {
     }
 
     private func pasteTimestamp() {
-        guard let text = RecordingTimestamp.pastableText(state: snapshot.state, at: Date()) else { return }
+        guard let text = RecordingTimestamp.pastableText(state: snapshot.state, at: Date(), offset: timestampOffset()) else { return }
         textInserter.insert(text)
     }
 

@@ -44,34 +44,34 @@ public struct SpeakerLibraryTranscriptDirectory: TranscriptSpeakerDirectory {
     }
 }
 
-/// A match the matcher scored highly but not confidently enough to name.
-///
-/// The transcript keeps its generic label while a suggestion is pending; only
-/// confirmation writes a person into the speaker table.
+/// Similarity evidence for a recognized speaker, persisted alongside the run.
 public struct TranscriptSpeakerSuggestion: Identifiable, Codable, Equatable, Sendable {
     public let speakerID: String
     public let person: SpeakerPersonRef
     public let score: Float
     public let matcherVersion: String
+    /// Nil for older records whose suggestions were not applied.
+    public let appliedAutomatically: Bool?
 
     public var id: String { speakerID }
 
-    public init(speakerID: String, person: SpeakerPersonRef, score: Float, matcherVersion: String) {
+    public init(speakerID: String, person: SpeakerPersonRef, score: Float, matcherVersion: String, appliedAutomatically: Bool? = nil) {
         self.speakerID = speakerID
         self.person = person
         self.score = score
         self.matcherVersion = matcherVersion
+        self.appliedAutomatically = appliedAutomatically
     }
 
-    /// Lifts a matcher result into review state; nil unless it is a suggestion
-    /// awaiting confirmation.
+    /// Lifts a recognized matcher result into review state.
     public init?(_ assignment: Speakers.SpeakerIdentityAssignment) {
-        guard assignment.outcome == .suggested, let person = assignment.person else { return nil }
+        guard assignment.outcome != .unmatched, let person = assignment.person else { return nil }
         self.init(
             speakerID: assignment.recordingSpeakerID,
             person: person,
             score: assignment.evidence.candidates.first?.score ?? 0,
-            matcherVersion: assignment.evidence.matcherVersion
+            matcherVersion: assignment.evidence.matcherVersion,
+            appliedAutomatically: true
         )
     }
 
@@ -85,8 +85,8 @@ public struct TranscriptSpeakerSuggestion: Identifiable, Codable, Equatable, Sen
         "\(Int((min(max(score, 0), 1) * 100).rounded()))%"
     }
 
-    /// The badge on the speaker's chip: "Dana Whitfield? 82%".
+    /// Compact similarity indicator; the name is already on the chip.
     public var chipBadgeTitle: String {
-        "\(person.displayName)? \(percentDescription)"
+        "Auto · \(percentDescription)"
     }
 }

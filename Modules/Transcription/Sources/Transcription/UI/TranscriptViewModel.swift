@@ -43,6 +43,8 @@ public final class TranscriptViewModel {
     public private(set) var enrollmentCandidates: [TranscriptEnrollmentCandidate] = []
     public private(set) var enrollmentSpeakerID: String?
     public private(set) var isEnrolling = false
+    public private(set) var previewingCandidateID: String?
+    @ObservationIgnored private var previewEndMilliseconds: Int?
 
     /// The turn playback is on, or nil when stopped. Set only through the
     /// transport actions so the bar, the rows, and the player never disagree.
@@ -408,6 +410,8 @@ public final class TranscriptViewModel {
     /// follow until the transcript ends or the person stops it.
     public func play(segment: TranscriptSegment) {
         guard canPlayAudio else { return }
+        previewingCandidateID = nil
+        previewEndMilliseconds = nil
         selectedSegmentID = segment.id
         playingSegmentID = segment.id
         playheadMilliseconds = segment.startMs
@@ -442,6 +446,8 @@ public final class TranscriptViewModel {
         playback.pause()
         isPlaying = false
         playingSegmentID = nil
+        previewingCandidateID = nil
+        previewEndMilliseconds = nil
     }
 
     /// Moves the play head to a time in the source, whether or not it is playing.
@@ -545,6 +551,10 @@ public final class TranscriptViewModel {
         case .ended:
             stopPlayback()
         case .timeChanged(let milliseconds):
+            if let previewEndMilliseconds, milliseconds >= previewEndMilliseconds {
+                stopPlayback()
+                return
+            }
             let segments = chronologicalSegments
             guard let last = segments.last else { return }
             if milliseconds >= last.endMs {
@@ -1119,7 +1129,10 @@ public final class TranscriptViewModel {
                 assignment: speaker.identityAssignment,
                 profileID: speaker.profileID,
                 segmentCount: counts[speaker.id] ?? 0,
-                suggestion: file.suggestions.first { $0.speakerID == speaker.id }
+                suggestion: file.suggestions.first {
+                    $0.speakerID == speaker.id && ((speaker.identityAssignment == .unmatched && $0.appliedAutomatically != true) ||
+                        (speaker.identityAssignment == .automatic && $0.person.profileID.uuidString == speaker.profileID))
+                }
             )
         }
     }
@@ -1144,10 +1157,18 @@ public final class TranscriptViewModel {
     /// This only rewrites labels, so it produces a new transcript revision that
     /// exports immediately without rerunning recognition.
     public func assign(_ person: SpeakerPersonRef?, scope: TranscriptSpeakerScope) {
+        let legacySuggestionID: String? = {
+            guard case let .cluster(speakerID) = scope,
+                  selectedTranscript?.speakers.first(where: { $0.id == speakerID })?.identityAssignment == .unmatched else { return nil }
+            return speakerID
+        }()
         applyRevision(scope: scope) { transcript in
             try TranscriptSpeakerLabelEditor.assigning(person: person, scope: scope, in: transcript)
         } success: {
             person.map { "Labelled as \($0.displayName)." } ?? "Cleared the saved name for this speaker."
+        }
+        if speakerActionMessage?.isFailure == false, let legacySuggestionID {
+            removeSuggestion(forSpeakerID: legacySuggestionID)
         }
     }
 
@@ -1222,6 +1243,7 @@ public final class TranscriptViewModel {
     }
 
     public func cancelRememberingVoice() {
+        if previewingCandidateID != nil { stopPlayback() }
         enrollmentSpeakerID = nil
         enrollmentCandidates = []
     }
@@ -1232,9 +1254,17 @@ public final class TranscriptViewModel {
         enrollmentCandidates[index].isConfirmed = confirmed
     }
 
-    /// Seeks the retained snapshot so the user can hear an excerpt before confirming it.
+    /// Plays only the chosen excerpt from the retained snapshot.
     public func preview(_ candidate: TranscriptEnrollmentCandidate) {
-        playback.seek(toMilliseconds: candidate.startMs)
+        if previewingCandidateID == candidate.segmentID {
+            stopPlayback()
+            return
+        }
+        guard let segment = chronologicalSegments.first(where: { $0.id == candidate.segmentID }) else { return }
+        play(segment: segment)
+        guard isPlaying else { return }
+        previewingCandidateID = candidate.segmentID
+        previewEndMilliseconds = candidate.endMs
     }
 
     public var confirmedEnrollmentDuration: TimeInterval {

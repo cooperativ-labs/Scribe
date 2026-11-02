@@ -14,7 +14,10 @@ public struct TranscriptSpeakerRow: Identifiable, Equatable, Sendable {
 
     public var statusDescription: String {
         if let suggestion {
-            return "Suggested: \(suggestion.person.displayName) (\(suggestion.scoreDescription)) — confirm to apply"
+            if assignment == .unmatched {
+                return "Suggested: \(suggestion.person.displayName) (\(suggestion.scoreDescription)) — confirm to apply"
+            }
+            return "Automatically matched (\(suggestion.scoreDescription))"
         }
         return switch assignment {
         case .manual: "Assigned by you"

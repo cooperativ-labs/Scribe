@@ -175,9 +175,8 @@ struct TranscriptNewPersonPopover: View {
 /// of chips: palette dot, name, and turn count.
 ///
 /// Clicking a chip filters the list to that speaker; pressing and holding or
-/// right-clicking opens naming, merging, and Remember Voice. A pending match
-/// rides on its chip with a one-tap confirm, and "Not now" lives in the chip's
-/// menu. The row wraps to at most three lines and then scrolls horizontally, so
+/// right-clicking opens naming, merging, and Remember Voice. Automatic matches
+/// show their similarity on the chip. The row wraps to at most three lines and then scrolls horizontally, so
 /// many speakers cannot squeeze the transcript out of the window.
 struct TranscriptSpeakerChips: View {
     @Bindable var viewModel: TranscriptViewModel
@@ -282,7 +281,8 @@ struct TranscriptSpeakerChips: View {
 
     @ViewBuilder
     private func menuItems(for row: TranscriptSpeakerRow) -> some View {
-        if let suggestion = row.suggestion {
+        // Older runs can contain an unapplied suggestion. Keep it actionable.
+        if row.assignment == .unmatched, let suggestion = row.suggestion {
             Section("Suggested: \(suggestion.person.displayName) (\(suggestion.percentDescription))") {
                 Button("Confirm \(suggestion.person.displayName)") { viewModel.confirm(suggestion) }
                 Button("Not Now") { viewModel.dismiss(suggestion) }
@@ -297,13 +297,16 @@ struct TranscriptSpeakerChips: View {
             .disabled(!viewModel.canPlayAudio)
     }
 
+    @ViewBuilder
     private func suggestionBadge(_ suggestion: TranscriptSpeakerSuggestion, row: TranscriptSpeakerRow) -> some View {
-        Button {
-            viewModel.confirm(suggestion)
-        } label: {
+        if row.assignment == .unmatched {
+            Button("\(suggestion.person.displayName)? \(suggestion.percentDescription)") { viewModel.confirm(suggestion) }
+                .buttonStyle(.plain)
+                .font(TranscriptDesign.TypeRole.badge)
+                .help("Confirm this suggestion from an earlier run, or choose another speaker from the menu.")
+        } else {
             HStack(spacing: 4) {
                 Text(suggestion.chipBadgeTitle)
-                Image(systemName: "checkmark.circle.fill")
             }
             .font(TranscriptDesign.TypeRole.badge)
             .lineLimit(1)
@@ -311,12 +314,10 @@ struct TranscriptSpeakerChips: View {
             .padding(.horizontal, 7)
             .padding(.vertical, 2)
             .background(TranscriptDesign.reviewUncertain.opacity(TranscriptDesign.Tint.chipFill), in: Capsule())
-            .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
         .fixedSize()
-        .help("Confirm \(suggestion.person.displayName) for \(row.label). \(suggestion.scoreDescription.capitalizedFirst); a similarity score is not proof of identity. \"Not Now\" is in the chip's menu.")
-        .accessibilityLabel("Confirm \(suggestion.person.displayName) for \(row.label), \(suggestion.percentDescription) similar")
+        .help("Automatically matched to \(row.label). \(suggestion.scoreDescription.capitalizedFirst); similarity is not a probability of identity. Use the speaker menu to change the assignment.")
+        .accessibilityLabel("Automatically matched, \(suggestion.percentDescription) similarity")
+        }
     }
 
     private func chipHelp(for row: TranscriptSpeakerRow, isSelected: Bool) -> String {
@@ -428,7 +429,10 @@ struct TranscriptEnrollmentSheet: View {
                             }
                         }
                         .disabled(!candidate.isEligible)
-                        Button("Play", systemImage: "play.circle") { viewModel.preview(candidate) }
+                        Button(
+                            viewModel.previewingCandidateID == candidate.segmentID ? "Stop" : "Play",
+                            systemImage: viewModel.previewingCandidateID == candidate.segmentID ? "stop.circle" : "play.circle"
+                        ) { viewModel.preview(candidate) }
                             .labelStyle(.iconOnly)
                             .buttonStyle(.borderless)
                     }

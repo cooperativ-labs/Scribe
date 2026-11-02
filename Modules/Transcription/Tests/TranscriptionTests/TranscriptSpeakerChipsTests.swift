@@ -10,7 +10,7 @@ final class TranscriptSpeakerChipsTests: XCTestCase {
         let suggestion = TranscriptSpeakerSuggestion(speakerID: "speaker_3", person: dana, score: 0.824, matcherVersion: "test")
 
         XCTAssertEqual(suggestion.percentDescription, "82%")
-        XCTAssertEqual(suggestion.chipBadgeTitle, "Dana Whitfield? 82%")
+        XCTAssertEqual(suggestion.chipBadgeTitle, "Auto · 82%")
         XCTAssertEqual(suggestion.scoreDescription, "similarity 0.82", "the hover text keeps the raw similarity")
     }
 

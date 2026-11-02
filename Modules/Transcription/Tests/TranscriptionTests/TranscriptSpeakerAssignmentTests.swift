@@ -119,7 +119,7 @@ final class TranscriptSpeakerAssignmentTests: XCTestCase {
         XCTAssertEqual(viewModel.selectedTranscript?.speakers.first { $0.id == "speaker_2" }?.labelSnapshot, "Speaker 2")
     }
 
-    func testOnlySuggestedMatcherOutcomesBecomeReviewSuggestions() {
+    func testRecognizedMatcherOutcomesRetainEvidence() {
         let evidence = SpeakerIdentityScoreEvidence(
             candidates: [SpeakerIdentityCandidateScore(profile: sarah, score: 0.72, supportingExcerptCount: 1)],
             cleanExcerptCount: 2,
@@ -147,7 +147,23 @@ final class TranscriptSpeakerAssignmentTests: XCTestCase {
 
         XCTAssertEqual(TranscriptSpeakerSuggestion(suggested)?.person, sarah)
         XCTAssertEqual(TranscriptSpeakerSuggestion(suggested)?.score, 0.72)
+        let matched = Speakers.SpeakerIdentityAssignment(recordingSpeakerID: "speaker_2", outcome: .matched, assignmentMethod: .automatic, person: sarah, evidence: evidence)
+        XCTAssertEqual(TranscriptSpeakerSuggestion(matched)?.person, sarah)
         XCTAssertNil(TranscriptSpeakerSuggestion(unmatched))
+    }
+
+    func testManualReassignmentHidesAutomaticMatchEvidence() throws {
+        let suggestion = TranscriptSpeakerSuggestion(speakerID: "speaker_2", person: sarah, score: 0.74, matcherVersion: "test", appliedAutomatically: true)
+        let automatic = try TranscriptSpeakerLabelEditor.assigning(person: sarah, scope: .cluster(speakerID: "speaker_2"), assignment: .automatic, in: fixture(named: "two-speakers"))
+        let viewModel = try makeViewModel(transcript: automatic, suggestions: [suggestion])
+        XCTAssertEqual(viewModel.speakerRows.first { $0.speakerID == "speaker_2" }?.suggestion, suggestion)
+        viewModel.assign(alex, scope: .cluster(speakerID: "speaker_2"))
+        let row = try XCTUnwrap(viewModel.speakerRows.first { $0.speakerID == "speaker_2" })
+        XCTAssertEqual(row.label, "Alex")
+        XCTAssertEqual(row.assignment, .manual)
+        XCTAssertNil(row.suggestion)
+        viewModel.assign(nil, scope: .cluster(speakerID: "speaker_2"))
+        XCTAssertNil(viewModel.speakerRows.first { $0.speakerID == "speaker_2" }?.suggestion)
     }
 
     // MARK: - Label refresh
@@ -228,6 +244,32 @@ final class TranscriptSpeakerAssignmentTests: XCTestCase {
         )
     }
 
+    func testEnrollmentPreviewPlaysAndStopsAtExcerptEndOrDismissal() throws {
+        let playback = PlaybackStub()
+        let viewModel = try makeViewModel(transcript: fixture(named: "dense-overlap"), playback: playback)
+        viewModel.beginRememberingVoice(speakerID: "speaker_1")
+        let candidate = try XCTUnwrap(viewModel.enrollmentCandidates.first)
+
+        viewModel.preview(candidate)
+        XCTAssertEqual(playback.seeks.last, candidate.startMs)
+        XCTAssertEqual(playback.playCount, 1)
+        XCTAssertEqual(viewModel.previewingCandidateID, candidate.segmentID)
+        playback.emit(.timeChanged(milliseconds: candidate.endMs - 1))
+        XCTAssertTrue(viewModel.isPlaying)
+        playback.emit(.timeChanged(milliseconds: candidate.endMs))
+        XCTAssertFalse(viewModel.isPlaying)
+        XCTAssertNil(viewModel.previewingCandidateID)
+        XCTAssertEqual(playback.pauseCount, 1)
+
+        viewModel.preview(candidate)
+        viewModel.preview(candidate)
+        XCTAssertEqual(playback.pauseCount, 2)
+        viewModel.preview(candidate)
+        viewModel.cancelRememberingVoice()
+        XCTAssertEqual(playback.pauseCount, 3)
+        XCTAssertFalse(viewModel.isPlaying)
+    }
+
     func testRememberingAVoiceEnrollsOnlyConfirmedCleanExcerpts() async throws {
         let directory = DirectorySpy()
         let transcript = try fixture(named: "dense-overlap")
@@ -295,7 +337,8 @@ final class TranscriptSpeakerAssignmentTests: XCTestCase {
         transcript: CanonicalTranscript,
         suggestions: [TranscriptSpeakerSuggestion] = [],
         directory: (any TranscriptSpeakerDirectory)? = nil,
-        exportWriter: any TranscriptExportWriting = FileTranscriptExportWriter()
+        exportWriter: any TranscriptExportWriting = FileTranscriptExportWriter(),
+        playback: PlaybackStub = PlaybackStub()
     ) throws -> TranscriptViewModel {
         TranscriptViewModel(
             files: [
@@ -306,7 +349,7 @@ final class TranscriptSpeakerAssignmentTests: XCTestCase {
                     suggestions: suggestions
                 )
             ],
-            playback: PlaybackStub(),
+            playback: playback,
             exportWriter: exportWriter,
             directory: directory
         )
@@ -320,8 +363,16 @@ final class TranscriptSpeakerAssignmentTests: XCTestCase {
 
 @MainActor
 private final class PlaybackStub: TranscriptPlaybackSeeking {
+    private(set) var seeks: [Int] = []
+    private(set) var playCount = 0
+    private(set) var pauseCount = 0
+    private var observer: (@MainActor (TranscriptPlaybackEvent) -> Void)?
     func load(sourceSnapshotURL _: URL) {}
-    func seek(toMilliseconds _: Int) {}
+    func seek(toMilliseconds milliseconds: Int) { seeks.append(milliseconds) }
+    func play() { playCount += 1 }
+    func pause() { pauseCount += 1 }
+    func setPlaybackObserver(_ observer: (@MainActor (TranscriptPlaybackEvent) -> Void)?) { self.observer = observer }
+    func emit(_ event: TranscriptPlaybackEvent) { observer?(event) }
 }
 
 private final class DirectorySpy: TranscriptSpeakerDirectory, @unchecked Sendable {

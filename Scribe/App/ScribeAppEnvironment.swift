@@ -113,7 +113,8 @@ final class ScribeAppEnvironment: ObservableObject {
             captureActivityHandler: { [processingQueue] active in
                 await processingQueue?.setCaptureActive(active)
             },
-            recordingTitleProvider: calendar
+            recordingTitleProvider: calendar,
+            timestampOffset: { TimeInterval(settings.pasteTimestampOffsetSeconds) }
         )
         self.coordinator = coordinator
         menuModel = RecorderMenuModel(

@@ -464,7 +464,7 @@ public struct TranscriptAssemblyStageRunner: TranscriptionStageRunning {
             )
         }
         let automatic: [String: SpeakerPersonRef] = Dictionary(uniqueKeysWithValues: assignments.compactMap { assignment -> (String, SpeakerPersonRef)? in
-            guard assignment.outcome == .matched, let person = assignment.person else { return nil }
+            guard assignment.outcome != .unmatched, let person = assignment.person else { return nil }
             return (assignment.recordingSpeakerID, person)
         })
         let suggestions = assignments.compactMap(TranscriptSpeakerSuggestion.init)

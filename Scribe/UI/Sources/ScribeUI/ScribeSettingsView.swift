@@ -175,7 +175,13 @@ public struct ScribeSettingsView: View {
                     default: .defaultPasteTimestamp,
                     action: .pasteTimestamp
                 )
-                Text("Click a shortcut, then press the keys you want; Escape cancels. Include ⌘, ⌃, or ⌥ (function keys work alone). Paste timestamp copies text such as “at 01:23” and pastes it at the cursor in your active app. Pasting needs Accessibility access; until that is granted, the text is still on the clipboard. If another app already owns a shortcut, Scribe will show the conflict and keep its menu commands available.")
+                Stepper(
+                    "Timestamp offset: \(settings.pasteTimestampOffsetSeconds) s earlier",
+                    value: $settings.pasteTimestampOffsetSeconds,
+                    in: 0...300,
+                    step: 5
+                )
+                Text("Click a shortcut, then press the keys you want; Escape cancels. Include ⌘, ⌃, or ⌥ (function keys work alone). Paste timestamp copies text such as “at 01:23” and pastes it at the cursor in your active app. The time is backed up by the offset because you usually paste after the moment you mean. Pasting needs Accessibility access; until that is granted, the text is still on the clipboard. If another app already owns a shortcut, Scribe will show the conflict and keep its menu commands available.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

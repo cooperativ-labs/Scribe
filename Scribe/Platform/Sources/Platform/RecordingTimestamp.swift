@@ -15,9 +15,11 @@ public enum RecordingTimestamp {
 
     /// Adds `at ` to the elapsed clock for notes. `nil` when nothing is being
     /// recorded, so Paste Timestamp is a no-op. Starting pastes `at 00:00`.
-    public static func pastableText(state: RecorderState, at date: Date) -> String? {
+    /// `offset` seconds are subtracted (floored at zero) because notes are
+    /// usually taken just after the moment they refer to.
+    public static func pastableText(state: RecorderState, at date: Date, offset: TimeInterval = 0) -> String? {
         if let activity = state.activity {
-            return "at \(elapsedText(activity.elapsed(at: date)))"
+            return "at \(elapsedText(max(0, activity.elapsed(at: date) - offset)))"
         }
         if case .starting = state {
             return "at \(elapsedText(0))"

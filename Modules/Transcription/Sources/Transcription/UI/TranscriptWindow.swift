@@ -867,7 +867,8 @@ private struct TranscriptFileRow: View {
     private var audioStatus: some View {
         Image(systemName: file.hasAudio ? "waveform" : "waveform.slash")
             .imageScale(.small)
-            .foregroundStyle(.tertiary)
+            .fontWeight(file.hasAudio ? .semibold : .regular)
+            .foregroundStyle(file.hasAudio ? AnyShapeStyle(Color.blue) : AnyShapeStyle(.tertiary))
             .help(file.hasAudio ? "Audio available" : "Audio deleted; the transcript is kept")
             .accessibilityLabel(file.hasAudio ? "Audio available" : "Audio deleted")
     }

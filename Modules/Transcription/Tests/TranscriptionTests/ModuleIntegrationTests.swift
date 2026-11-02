@@ -188,7 +188,7 @@ final class ModuleIntegrationTests: XCTestCase {
         let format = SpeakerPinnedEmbeddingFormat.self
         let embeddings = [
             WorkerSpeakerEmbeddingRecord(
-                speakerID: "speaker_1", vector: [1, 0],
+                speakerID: "speaker_1", vector: [0.75, 0.6614378],
                 modelID: format.modelID, modelRevision: format.modelRevision,
                 preprocessingVersion: format.preprocessingVersion,
                 normalizationVersion: format.normalizationVersion
@@ -216,7 +216,13 @@ final class ModuleIntegrationTests: XCTestCase {
         XCTAssertEqual(transcript.speakers[0].profileID, profile.profileID.uuidString)
         XCTAssertEqual(transcript.segments.first?.speakerLabel, "Alice")
         XCTAssertEqual(transcript.speakers[1].identityAssignment, .unmatched)
-        XCTAssertEqual(TranscriptReviewFile(run).suggestions, [])
+        let evidence = try XCTUnwrap(TranscriptReviewFile(run).suggestions.first)
+        XCTAssertEqual(evidence.person.profileID, profile.profileID)
+        XCTAssertEqual(evidence.score, 0.75, accuracy: 0.001)
+        let model = await TranscriptViewModel(files: [TranscriptReviewFile(run)], playback: RecordingPlayback())
+        let rows = await model.speakerRows
+        let row = try XCTUnwrap(rows.first { $0.speakerID == "speaker_1" })
+        XCTAssertEqual(row.suggestion?.percentDescription, "75%")
     }
 
     /// Selecting a segment seeks the retained snapshot, which is what makes a

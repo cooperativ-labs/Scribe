@@ -25,4 +25,18 @@ final class RecordingTimestampTests: XCTestCase {
         XCTAssertNil(RecordingTimestamp.pastableText(state: .idle, at: start))
         XCTAssertNil(RecordingTimestamp.pastableText(state: .stopping, at: start))
     }
+
+    func testPastableTextSubtractsOffsetAndFloorsAtZero() {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let activity = RecordingActivity(sessionID: UUID(), startedAt: start)
+
+        XCTAssertEqual(
+            RecordingTimestamp.pastableText(state: .recording(activity), at: start.addingTimeInterval(83), offset: 30),
+            "at 00:53"
+        )
+        XCTAssertEqual(
+            RecordingTimestamp.pastableText(state: .recording(activity), at: start.addingTimeInterval(10), offset: 30),
+            "at 00:00"
+        )
+    }
 }

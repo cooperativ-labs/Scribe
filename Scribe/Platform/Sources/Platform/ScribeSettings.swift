@@ -39,6 +39,11 @@ public final class ScribeSettings: ObservableObject {
     @Published public var pasteTimestampShortcut: GlobalShortcut {
         didSet { storeShortcut(pasteTimestampShortcut, forKey: Key.pasteTimestampShortcut) }
     }
+    /// Seconds Paste Timestamp backs up from the elapsed clock, since a note is
+    /// usually pasted just after the moment it describes.
+    @Published public var pasteTimestampOffsetSeconds: Int {
+        didSet { defaults.set(pasteTimestampOffsetSeconds, forKey: Key.pasteTimestampOffsetSeconds) }
+    }
     @Published public var transcribeWhenFinalRecordingIsReady: Bool {
         didSet { defaults.set(transcribeWhenFinalRecordingIsReady, forKey: Key.transcribeWhenFinalRecordingIsReady) }
     }
@@ -321,6 +326,7 @@ public final class ScribeSettings: ObservableObject {
         startShortcut = Self.loadShortcut(from: defaults, key: Key.startShortcut) ?? .defaultStart
         stopShortcut = Self.loadShortcut(from: defaults, key: Key.stopShortcut) ?? .defaultStop
         pasteTimestampShortcut = Self.loadShortcut(from: defaults, key: Key.pasteTimestampShortcut) ?? .defaultPasteTimestamp
+        pasteTimestampOffsetSeconds = min(max(defaults.object(forKey: Key.pasteTimestampOffsetSeconds) as? Int ?? 30, 0), 300)
         transcribeWhenFinalRecordingIsReady = defaults.object(forKey: Key.transcribeWhenFinalRecordingIsReady) as? Bool ?? false
         keepRecordingFilesForDebugging = defaults.object(forKey: Key.keepRecordingFilesForDebugging) as? Bool ?? false
         microphoneSpeakerPrior = defaults.bool(forKey: "scribe.settings.microphoneSpeakerPrior")
@@ -595,6 +601,7 @@ public final class ScribeSettings: ObservableObject {
         static let startShortcut = "scribe.settings.startShortcut"
         static let stopShortcut = "scribe.settings.stopShortcut"
         static let pasteTimestampShortcut = "scribe.settings.copyTimestampShortcut"
+        static let pasteTimestampOffsetSeconds = "scribe.settings.pasteTimestampOffsetSeconds"
         static let transcribeWhenFinalRecordingIsReady = "scribe.settings.transcribeWhenFinalRecordingIsReady"
         static let keepRecordingFilesForDebugging = "scribe.settings.keepRecordingFilesForDebugging"
         static let transcriptionSpeakerCount = "scribe.settings.transcriptionSpeakerCount"

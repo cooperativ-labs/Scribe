@@ -49,7 +49,7 @@ public struct TranscriptReviewFile: Identifiable, Equatable, Sendable {
     /// False once the recording has been deleted to save space. The transcript
     /// stays readable; playback and anything that re-reads the audio do not.
     public let hasAudio: Bool
-    /// Matches that scored too low to name automatically and await confirmation.
+    /// Similarity evidence recorded by speaker recognition.
     public var suggestions: [TranscriptSpeakerSuggestion]
 
     public init(
