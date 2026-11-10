@@ -580,15 +580,17 @@ public struct TranscriptWindow: View {
                 }
                 Divider()
                 Menu("Up to") {
-                    ForEach(1...8, id: \.self) { count in
+                    ForEach(1...12, id: \.self) { count in
                         Button("Up to \(count) speaker\(count == 1 ? "" : "s")") {
                             viewModel.presentReprocessConfirmation(speakerCount: .upTo(count))
                         }
                     }
                 }
-                ForEach(1...8, id: \.self) { count in
-                    Button("Exactly \(count) speaker\(count == 1 ? "" : "s")") {
-                        viewModel.presentReprocessConfirmation(speakerCount: .known(count))
+                Menu("Exactly") {
+                    ForEach(1...12, id: \.self) { count in
+                        Button("Exactly \(count) speaker\(count == 1 ? "" : "s")") {
+                            viewModel.presentReprocessConfirmation(speakerCount: .known(count))
+                        }
                     }
                 }
                 Divider()
