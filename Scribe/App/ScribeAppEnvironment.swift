@@ -333,8 +333,9 @@ final class ScribeAppEnvironment: ObservableObject {
     }
 
     /// Looks only at GitHub's published latest release. A failed check leaves
-    /// recording and every local feature usable, and a successful check never
-    /// downloads anything until the person explicitly chooses to do so.
+    /// recording and every local feature usable. A newer release is downloaded
+    /// and verified automatically; installing it still requires an explicit
+    /// restart.
     func checkForUpdates() {
         guard updateState != .downloading, updateState != .installing, preparedUpdate == nil else { return }
         updateTask?.cancel()
@@ -349,6 +350,7 @@ final class ScribeAppEnvironment: ObservableObject {
                 if ScribeReleaseVersion.isNewer(release.version, than: currentVersion) {
                     self?.availableRelease = release
                     self?.updateState = .updateAvailable(version: release.version)
+                    self?.downloadAvailableUpdate()
                 } else {
                     self?.updateState = .upToDate
                 }

@@ -356,8 +356,9 @@ the app.
 ### In-app updates
 
 Scribe checks the latest published GitHub release at launch and from **Check for
-Updates…**. Choose **Download Update…** to download and verify the release, then
-**Restart and Install** to replace the application in place and reopen it.
+Updates…**. When it finds a newer release, it automatically downloads and
+verifies it. Choose **Restart and Install** when you are ready to replace the
+application in place and reopen it.
 Active recordings finish saving before installation; background processing
 resumes after relaunch. Quitting normally discards an update that is ready to
 install.

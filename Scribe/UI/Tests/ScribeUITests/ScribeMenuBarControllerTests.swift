@@ -4,73 +4,63 @@ import PlatformTestSupport
 import XCTest
 @testable import ScribeUI
 
-/// Builds the real menu and inspects what it produced.
+/// Builds what the status item's panel lists and inspects it.
 ///
-/// The two facts this has to hold to are the ones that were wrong before: the
-/// transport controls are the first thing in the menu, and the source lists are
-/// submenus that fill themselves in rather than being rebuilt underneath an open
-/// one.
+/// The panel is a window rather than an `NSMenu` so it can appear over another
+/// app's full-screen Space; these tests hold the content to what the menu used
+/// to say, without putting a window on screen.
 @MainActor
 final class ScribeMenuBarControllerTests: XCTestCase {
-    func testTheTransportRowIsTheFirstThingInTheMenu() {
+    func testTheTransportIsNotRepeatedAsTextCommands() {
         let controller = makeController(MockRecordingCoordinator(snapshot: readySnapshot()))
 
-        controller.menuNeedsUpdate(controller.menu)
+        let titles = controller.makeContent().titles
 
-        XCTAssertTrue(controller.menu.items.first?.view is RecordingTransportView)
-        // The old text commands are gone: the row above replaced them, and two
-        // ways to start a recording in one menu is one too many.
-        XCTAssertFalse(controller.menu.items.contains { $0.title == "Start Recording" })
-        XCTAssertFalse(controller.menu.items.contains { $0.title == "Stop Recording" })
+        // The transport row replaced these; two ways to start a recording in
+        // one panel is one too many.
+        XCTAssertFalse(titles.contains("Start Recording"))
+        XCTAssertFalse(titles.contains("Stop Recording"))
+        XCTAssertEqual(controller.state.presentation.transport, .idle)
     }
 
-    func testTheStatusRowFollowsTheRecorderWithoutRebuildingTheMenu() async {
+    func testTheStatusRowAppearsOnceRecordingAndFollowsTheClock() async {
         let start = Date(timeIntervalSince1970: 1_000)
         let coordinator = MockRecordingCoordinator(snapshot: readySnapshot(), now: { start })
         var now = start
         let model = RecorderMenuModel(coordinator: coordinator, now: { now })
         let controller = makeController(coordinator, model: model)
-        controller.menuNeedsUpdate(controller.menu)
-        let built = controller.menu.items
 
-        XCTAssertTrue(built[1].isHidden)
+        // The Record button already says the recorder is ready.
+        XCTAssertFalse(controller.makeContent().titles.contains("Idle"))
 
         coordinator.submit(.start)
         await coordinator.waitUntilIdle()
         now = start.addingTimeInterval(83)
         model.refreshPresentation()
 
-        XCTAssertFalse(controller.menu.items[1].isHidden)
-
-        // The elapsed time is edited into the row that is already there. Adding
-        // or removing an item here is what closed an open submenu.
-        XCTAssertEqual(controller.menu.items.map(\.title), built.map(\.title).enumerated().map { index, title in
-            index == 1 ? "Recording — 01:23" : title
-        })
+        XCTAssertTrue(controller.makeContent().titles.contains("Recording — 01:23"))
+        XCTAssertEqual(model.presentation.transport, .running)
     }
 
-    func testTheApplicationSubmenuFillsItselfInWhenItIsAboutToOpen() async {
+    func testTheApplicationListFillsInOnceSourcesAreEnumerated() async throws {
         let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
         coordinator.scriptedApplications = [
             CaptureApplicationOption(bundleIdentifier: "us.zoom.xos", name: "Zoom"),
             CaptureApplicationOption(bundleIdentifier: "com.microsoft.teams2", name: "Microsoft Teams"),
         ]
-        let controller = makeController(coordinator)
-        controller.menuNeedsUpdate(controller.menu)
+        let model = RecorderMenuModel(coordinator: coordinator)
+        let controller = makeController(coordinator, model: model)
 
-        // The menu opens before source enumeration has answered, which is why
-        // the submenu is not populated with it.
-        let applicationItem = controller.menu.items.first { $0.title == "Application" }
-        XCTAssertTrue(applicationItem?.submenu === controller.applicationMenu)
-        controller.menuWillOpen(controller.menu)
+        // Opening asks for the sources; the answer arrives afterwards.
+        model.menuDidAppear()
         await coordinator.waitUntilIdle()
+        model.menuDidDisappear()
 
-        controller.menuNeedsUpdate(controller.applicationMenu)
-
-        XCTAssertEqual(controller.applicationMenu.items.map(\.title), ["Choose…", "Zoom", "Microsoft Teams"])
+        let applications = try XCTUnwrap(controller.makeContent().choices(titled: "Application"))
+        XCTAssertEqual(applications.options.map(\.title), ["Choose…", "Zoom", "Microsoft Teams"])
     }
 
-    func testTheChosenSourceIsTheCheckedRow() async {
+    func testTheChosenSourceIsTheSelectedOption() async throws {
         let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
         coordinator.scriptedMicrophones = [
             CaptureMicrophoneOption(uniqueID: "mic-1", name: "Built-in Microphone"),
@@ -81,54 +71,64 @@ final class ScribeMenuBarControllerTests: XCTestCase {
         coordinator.submit(.selectMicrophone("mic-2"))
         await coordinator.waitUntilIdle()
 
-        controller.menuNeedsUpdate(controller.microphoneMenu)
-
-        let checked = controller.microphoneMenu.items.filter { $0.state == .on }.map(\.title)
-        XCTAssertEqual(checked, ["Podcast Microphone"])
+        let microphones = try XCTUnwrap(controller.makeContent().choices(titled: "Microphone"))
+        XCTAssertEqual(microphones.options.filter(\.isSelected).map(\.title), ["Podcast Microphone"])
+        XCTAssertEqual(microphones.summary, "Podcast Microphone")
     }
 
-    func testRecordingModePickerMakesMicrophoneOnlyDiscoverable() {
+    func testChoosingAnOptionSubmitsTheSelection() async throws {
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
+        let controller = makeController(coordinator)
+
+        let modes = try XCTUnwrap(controller.makeContent().choices(titled: "Recording Mode"))
+        try XCTUnwrap(modes.options.first { $0.title == "Microphone Only" }).select()
+        await coordinator.waitUntilIdle()
+
+        XCTAssertEqual(
+            controller.makeContent().choices(titled: "Recording Mode")?.options.filter(\.isSelected).map(\.title),
+            ["Microphone Only"]
+        )
+    }
+
+    func testRecordingModePickerMakesMicrophoneOnlyDiscoverable() throws {
         var snapshot = readySnapshot()
         snapshot.recordingMode = .microphoneOnly
         let controller = makeController(MockRecordingCoordinator(snapshot: snapshot))
 
-        controller.menuNeedsUpdate(controller.menu)
-        controller.menuNeedsUpdate(controller.recordingModeMenu)
+        let content = controller.makeContent()
 
-        XCTAssertTrue(controller.menu.items.contains { $0.title == "Microphone-only recording — no application needed" })
-        XCTAssertEqual(controller.recordingModeMenu.items.filter { $0.state == .on }.map(\.title), ["Microphone Only"])
+        XCTAssertTrue(content.titles.contains("Microphone-only recording — no application needed"))
+        XCTAssertNil(content.choices(titled: "Application"))
+        let modes = try XCTUnwrap(content.choices(titled: "Recording Mode"))
+        XCTAssertEqual(modes.options.filter(\.isSelected).map(\.title), ["Microphone Only"])
     }
 
-    func testARememberedMicrophoneThatIsGoneKeepsItsOwnCheckedRow() async {
+    func testARememberedMicrophoneThatIsGoneKeepsItsOwnSelectedOption() async throws {
         let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
         coordinator.submit(.selectMicrophone("USB-Podmic-01"))
         await coordinator.waitUntilIdle()
         let controller = makeController(coordinator)
 
-        controller.menuNeedsUpdate(controller.microphoneMenu)
+        let microphones = try XCTUnwrap(controller.makeContent().choices(titled: "Microphone"))
 
         // Capture binds the chosen device and never substitutes another, so the
-        // menu must not show the default as chosen instead.
-        XCTAssertEqual(controller.microphoneMenu.items.map(\.title), ["System Default", "USB-Podmic-01 (not connected)"])
-        XCTAssertEqual(controller.microphoneMenu.items.filter { $0.state == .on }.map(\.title), ["USB-Podmic-01 (not connected)"])
+        // panel must not show the default as chosen instead.
+        XCTAssertEqual(microphones.options.map(\.title), ["System Default", "USB-Podmic-01 (not connected)"])
+        XCTAssertEqual(microphones.options.filter(\.isSelected).map(\.title), ["USB-Podmic-01 (not connected)"])
     }
 
     func testPasteTimestampShowsItsShortcutAndIsEnabledWhileRecording() async throws {
         let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
         let controller = makeController(coordinator)
-        controller.menuNeedsUpdate(controller.menu)
 
-        let idle = try XCTUnwrap(controller.menu.items.first { $0.title == "Paste Timestamp" })
+        let idle = try XCTUnwrap(controller.makeContent().command(titled: "Paste Timestamp"))
         XCTAssertFalse(idle.isEnabled)
-        XCTAssertEqual(idle.keyEquivalent, "t")
-        XCTAssertTrue(idle.keyEquivalentModifierMask.contains(.command))
-        XCTAssertTrue(idle.keyEquivalentModifierMask.contains(.shift))
+        XCTAssertEqual(idle.shortcut, GlobalShortcut.defaultPasteTimestamp.displayName)
 
         coordinator.submit(.start)
         await coordinator.waitUntilIdle()
-        controller.menuNeedsUpdate(controller.menu)
 
-        let recording = try XCTUnwrap(controller.menu.items.first { $0.title == "Paste Timestamp" })
+        let recording = try XCTUnwrap(controller.makeContent().command(titled: "Paste Timestamp"))
         XCTAssertTrue(recording.isEnabled)
     }
 
@@ -181,28 +181,43 @@ final class ScribeMenuBarControllerTests: XCTestCase {
             )
         )
 
-        controller.menuNeedsUpdate(controller.menu)
+        let content = controller.makeContent()
 
-        let titles = controller.menu.items.map(\.title)
+        let titles = content.titles
         let transcriptionsIndex = try XCTUnwrap(titles.firstIndex(of: "Open Transcriptions Folder"))
         let recordingsIndex = try XCTUnwrap(titles.firstIndex(of: "Open Recordings Folder"))
         XCTAssertEqual(transcriptionsIndex + 1, recordingsIndex)
 
-        let item = try XCTUnwrap(controller.menu.items.first { $0.title == "Open Transcriptions Folder" })
-        XCTAssertTrue(NSApp.sendAction(try XCTUnwrap(item.action), to: item.target, from: item))
+        try XCTUnwrap(content.command(titled: "Open Transcriptions Folder")).perform()
         XCTAssertTrue(openedTranscriptions)
     }
 
     func testOpenTranscriptionsFolderIsAbsentWithoutTranscription() {
         let controller = makeController(MockRecordingCoordinator(snapshot: readySnapshot()))
 
-        controller.menuNeedsUpdate(controller.menu)
+        let titles = controller.makeContent().titles
 
-        XCTAssertFalse(controller.menu.items.contains { $0.title == "Open Transcriptions Folder" })
-        XCTAssertTrue(controller.menu.items.contains { $0.title == "Open Recordings Folder" })
+        XCTAssertFalse(titles.contains("Open Transcriptions Folder"))
+        XCTAssertTrue(titles.contains("Open Recordings Folder"))
     }
 
-    func testRecordingFailuresOmitDiagnosticTextFromTheMenu() {
+    func testDictationRowsReflectTheSetting() throws {
+        var enabled = true
+        let controller = makeController(MockRecordingCoordinator(snapshot: readySnapshot()))
+        controller.dictationEnabled = { enabled }
+        controller.toggleDictation = { enabled.toggle() }
+        controller.dictationSecureInputBlocked = { true }
+
+        let on = try XCTUnwrap(controller.makeContent().command(titled: "Dictation: On"))
+        XCTAssertEqual(on.isOn, true)
+        XCTAssertTrue(controller.makeContent().titles.contains("Dictation is paused while Secure Keyboard Entry is on"))
+
+        on.perform()
+
+        XCTAssertEqual(controller.makeContent().command(titled: "Dictation: Off")?.isOn, false)
+    }
+
+    func testRecordingFailuresOmitDiagnosticText() {
         let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
         coordinator.simulateFailure(
             RecorderFailure(
@@ -213,14 +228,14 @@ final class ScribeMenuBarControllerTests: XCTestCase {
         )
         let controller = makeController(coordinator)
 
-        controller.menuNeedsUpdate(controller.menu)
+        let titles = controller.makeContent().titles
 
-        XCTAssertTrue(controller.menu.items.contains { $0.title == "Recording failed" })
-        XCTAssertFalse(controller.menu.items.contains { $0.title.contains("stopped sharing") })
-        XCTAssertFalse(controller.menu.items.contains { $0.title.contains("Try again") })
+        XCTAssertTrue(titles.contains("Recording failed"))
+        XCTAssertFalse(titles.contains { $0.contains("stopped sharing") })
+        XCTAssertFalse(titles.contains { $0.contains("Try again") })
     }
 
-    func testTranscriptionFailuresAreNotListedInTheMenu() {
+    func testTranscriptionFailuresAreNotListed() {
         let controller = makeController(
             MockRecordingCoordinator(snapshot: readySnapshot()),
             transcription: TranscriptionMenuCommands(
@@ -231,10 +246,10 @@ final class ScribeMenuBarControllerTests: XCTestCase {
             )
         )
 
-        controller.menuNeedsUpdate(controller.menu)
+        let titles = controller.makeContent().titles
 
-        XCTAssertFalse(controller.menu.items.contains { $0.title.contains("model missing") })
-        XCTAssertTrue(controller.menu.items.contains { $0.title == "Transcripts…" })
+        XCTAssertFalse(titles.contains { $0.contains("model missing") })
+        XCTAssertTrue(titles.contains("Transcripts…"))
     }
 
     func testUpdateFailuresShowAShortStatusInsteadOfTheDiagnostic() {
@@ -248,23 +263,23 @@ final class ScribeMenuBarControllerTests: XCTestCase {
             )
         )
 
-        controller.menuNeedsUpdate(controller.menu)
+        let titles = controller.makeContent().titles
 
-        XCTAssertTrue(controller.menu.items.contains { $0.title == "Update failed" })
-        XCTAssertFalse(controller.menu.items.contains { $0.title.contains("signature mismatch") })
+        XCTAssertTrue(titles.contains("Update failed"))
+        XCTAssertFalse(titles.contains { $0.contains("signature mismatch") })
     }
 
-    func testStatusCopyWrapsInsideAMaximumWidth() {
-        var snapshot = readySnapshot()
-        snapshot.recoveryNotice = String(repeating: "Recovered a long recording name from an interrupted session. ", count: 4)
-        let controller = makeController(MockRecordingCoordinator(snapshot: snapshot))
+    func testThePanelCanJoinFullScreenSpaces() {
+        let controller = makeController(MockRecordingCoordinator(snapshot: readySnapshot()))
+        let panel = StatusMenuPanel()
 
-        controller.menuNeedsUpdate(controller.menu)
-
-        let notice = controller.menu.items.first { $0.title == snapshot.recoveryNotice }
-        XCTAssertNotNil(notice?.view)
-        XCTAssertLessThanOrEqual(notice?.view?.frame.width ?? .greatestFiniteMagnitude, 260)
-        XCTAssertGreaterThan(notice?.view?.frame.height ?? 0, 20)
+        // The reason the status item opens a panel at all: an `NSMenu` from a
+        // Dock app is not shown over another app's full-screen Space.
+        XCTAssertTrue(panel.collectionBehavior.contains(.fullScreenAuxiliary))
+        XCTAssertTrue(panel.collectionBehavior.contains(.canJoinAllSpaces))
+        XCTAssertTrue(panel.styleMask.contains(.nonactivatingPanel))
+        XCTAssertTrue(panel.canBecomeKey)
+        XCTAssertFalse(controller.isPanelShown)
     }
 
     // MARK: Helpers

@@ -1,27 +1,23 @@
 import AppKit
 import Combine
 import Platform
+import SwiftUI
 
-/// Owns the status item and its menu.
+/// Owns the status item and the panel it opens.
 ///
-/// The menu is AppKit rather than SwiftUI for two reasons that are really one.
-/// A `MenuBarExtra` rebuilds its whole `NSMenu` whenever the state behind it
-/// changes, and this menu's state changes every second while a recording runs,
-/// which closed the Application and Microphone submenus a moment after they
-/// opened. And no SwiftUI menu can lay two buttons out side by side, which the
-/// transport row needs.
-///
-/// So the split here is deliberate: structure is built once per opening, in
-/// `menuNeedsUpdate`, and everything that changes while the menu is on screen —
-/// the elapsed time, the transport row — is applied by editing the existing
-/// items in place. Nothing is added or removed under an open menu, so a submenu
-/// stays open exactly as long as the pointer is on it.
+/// The panel is a window, not an `NSMenu`. Scribe is a regular app with a Dock
+/// icon, and macOS does not show a regular app's status-item menu over another
+/// app's full-screen Space — the click registers and nothing appears. A
+/// non-activating panel that joins every Space, full-screen ones included, is
+/// the supported way for such an app to put content under its status item
+/// (SwiftUI's `MenuBarExtra` with the `.window` style is the same thing). It
+/// also lays the transport buttons out side by side, and updates in place
+/// while open, which the menu could only do by editing items under the pointer.
 @MainActor
-public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
+public final class ScribeMenuBarController: NSObject {
     private let model: RecorderMenuModel
-    /// Read at every opening rather than captured: both sections are values the
-    /// host recomputes, and a menu built from a stale copy would show a finished
-    /// download as still running.
+    /// Read at every opening and on every recorder change while open, rather
+    /// than captured: both sections are values the host recomputes.
     private let transcription: () -> TranscriptionMenuCommands?
     private let updates: () -> UpdateMenuCommands?
     private let openSettings: () -> Void
@@ -38,17 +34,16 @@ public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
     }
 
     private let statusItem: NSStatusItem
-    /// Internal, not private, so the menu a build produces can be inspected
-    /// without a running status bar.
-    let menu = NSMenu()
-    private let transportView = RecordingTransportView()
-    private let transportRow = NSMenuItem()
-    private let statusItemRow = NSMenuItem()
-    private let pasteTimestampRow = NSMenuItem()
-    let applicationMenu = NSMenu()
-    let microphoneMenu = NSMenu()
-    let recordingModeMenu = NSMenu()
+    private let panel: StatusMenuPanel
+    /// Internal so tests can read what the panel lists without a status bar.
+    let state: StatusMenuState
     private var presentationObservation: AnyCancellable?
+    private var dismissalMonitors: [Any] = []
+    private var spaceObservation: NSObjectProtocol?
+    /// When the panel last closed because it lost key status. A click on the
+    /// status item takes key from the panel before the item's action runs, so
+    /// without this the click that should close the panel would reopen it.
+    private var lastResignedKey: Date?
     /// A live session, from the recorder.
     private var isCapturing = false
 
@@ -93,6 +88,11 @@ public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
         self.accessibilityLabel = accessibilityLabel
         self.normalImage = image
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        panel = StatusMenuPanel()
+        state = StatusMenuState(
+            presentation: model.presentation,
+            content: StatusMenuContent(sections: [])
+        )
         super.init()
 
         // The catalog renders the logo as a template image, so the menu bar
@@ -103,22 +103,31 @@ public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
         // has variable length and grows by the few points it takes.
         statusItem.button?.imagePosition = .imageLeading
         statusItem.button?.setAccessibilityLabel(accessibilityLabel)
+        statusItem.button?.target = self
+        statusItem.button?.action = #selector(statusItemClicked)
+        // On press, as a menu opens, rather than on release.
+        statusItem.button?.sendAction(on: [.leftMouseDown, .rightMouseDown])
 
-        for submenu in [menu, applicationMenu, microphoneMenu, recordingModeMenu] {
-            // Rows are enabled from the presentation, not inferred from whether
-            // something can respond to their action.
-            submenu.autoenablesItems = false
-            submenu.delegate = self
+        let transport = StatusMenuTransport(
+            start: { [weak self] in self?.model.startRecording() },
+            pause: { [weak self] in self?.model.pauseRecording() },
+            resume: { [weak self] in self?.model.resumeRecording() },
+            stop: { [weak self] in self?.model.stopRecording() }
+        )
+        let host = NSHostingController(rootView: StatusMenuPanelContent(
+            menu: StatusMenuView(state: state, transport: transport) { [weak self] action in
+                self?.perform(action)
+            }
+        ))
+        // The panel resizes itself to the content, and `StatusMenuPanel`
+        // keeps its top edge pinned under the status item as it does.
+        host.sizingOptions = [.preferredContentSize]
+        panel.contentViewController = host
+        panel.onResignKey = { [weak self] in
+            self?.lastResignedKey = Date()
+            self?.closePanel()
         }
-        statusItem.menu = menu
-
-        transportView.startAction = { [weak self] in self?.perform { $0.startRecording() } }
-        transportView.pauseAction = { [weak self] in self?.perform { $0.pauseRecording() } }
-        transportView.resumeAction = { [weak self] in self?.perform { $0.resumeRecording() } }
-        transportView.stopAction = { [weak self] in self?.perform { $0.stopRecording() } }
-
-        pasteTimestampRow.target = self
-        pasteTimestampRow.action = #selector(pasteTimestamp)
+        panel.onCancel = { [weak self] in self?.closePanel() }
 
         presentationObservation = model.$presentation.sink { [weak self] presentation in
             self?.applyLiveState(presentation)
@@ -133,47 +142,117 @@ public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
         return window.convertToScreen(button.convert(button.bounds, to: nil))
     }
 
-    // MARK: NSMenuDelegate
+    /// True while the panel is on screen.
+    var isPanelShown: Bool { panel.isVisible }
 
-    public func menuNeedsUpdate(_ menu: NSMenu) {
-        switch menu {
-        case self.menu: rebuildRootMenu()
-        case applicationMenu: rebuildApplicationMenu()
-        case microphoneMenu: rebuildMicrophoneMenu()
-        case recordingModeMenu: rebuildRecordingModeMenu()
-        default: break
+    // MARK: Opening and closing
+
+    @objc private func statusItemClicked() {
+        if panel.isVisible {
+            closePanel()
+        } else if let lastResignedKey, Date().timeIntervalSince(lastResignedKey) < 0.3 {
+            // This click is what just closed the panel; it is not a request to
+            // open it again.
+            self.lastResignedKey = nil
+        } else {
+            showPanel()
         }
     }
 
-    /// Sources are re-enumerated at every opening so an application launched
-    /// after Scribe still appears. The answer arrives after the menu is already
-    /// on screen, which is why the two source submenus fill themselves in from
-    /// their own `menuNeedsUpdate` instead of being built here.
-    public func menuWillOpen(_ menu: NSMenu) {
-        guard menu === self.menu else { return }
+    /// Opens the panel under the status item. Internal so tests can open it.
+    func showPanel() {
+        // Sources are re-enumerated at every opening, so an application
+        // launched after Scribe still appears; the answer arrives a moment
+        // later and the lists update in place.
         model.menuDidAppear()
+        refreshContent(model.presentation)
+        statusItem.button?.highlight(true)
+        panel.anchor = statusItemAnchor
+        // Key without activating Scribe: the app in front, full-screen or not,
+        // stays in front, and the Space does not change.
+        panel.orderFrontRegardless()
+        panel.makeKey()
+        installDismissalMonitors()
     }
 
-    public func menuDidClose(_ menu: NSMenu) {
-        guard menu === self.menu else { return }
+    func closePanel() {
+        guard panel.isVisible else { return }
+        removeDismissalMonitors()
+        panel.orderOut(nil)
+        statusItem.button?.highlight(false)
         model.menuDidDisappear()
+    }
+
+    /// A menu closes on any click outside it, on Escape, and when the Space
+    /// changes; the panel does the same.
+    private func installDismissalMonitors() {
+        removeDismissalMonitors()
+        if let monitor = NSEvent.addGlobalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown],
+            handler: { [weak self] _ in
+                MainActor.assumeIsolated { self?.closePanel() }
+            }
+        ) {
+            dismissalMonitors.append(monitor)
+        }
+        spaceObservation = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.activeSpaceDidChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.closePanel() }
+        }
+    }
+
+    private func removeDismissalMonitors() {
+        for monitor in dismissalMonitors { NSEvent.removeMonitor(monitor) }
+        dismissalMonitors = []
+        if let spaceObservation { NSWorkspace.shared.notificationCenter.removeObserver(spaceObservation) }
+        spaceObservation = nil
+    }
+
+    /// A command closes the panel before it runs, as a menu item closes its
+    /// menu, so a window it opens is not covered by the panel.
+    private func perform(_ action: () -> Void) {
+        closePanel()
+        action()
     }
 
     // MARK: Live state
 
-    /// The only updates allowed while the menu is open: no item is added or
-    /// removed, so an open submenu is never torn out from under the pointer.
     private func applyLiveState(_ presentation: MenuPresentation) {
-        transportView.apply(presentation)
-        statusItemRow.title = presentation.statusTitle
-        statusItemRow.image = NSImage(systemSymbolName: presentation.statusSymbol, accessibilityDescription: nil)
-        // The Record button already communicates the ready state, so do not
-        // spend a menu row repeating "Idle". Keep the item in the menu and
-        // toggle visibility so active-state updates never rebuild an open menu.
-        statusItemRow.isHidden = presentation.statusTitle == "Idle"
-        applyPasteTimestampItem(pasteTimestampRow, presentation: presentation)
         isCapturing = presentation.isCapturing
         applyRecordingIndicator()
+        // Nothing to draw while closed; the content is rebuilt when it opens.
+        guard panel.isVisible else { return }
+        refreshContent(presentation)
+    }
+
+    private func refreshContent(_ presentation: MenuPresentation) {
+        state.presentation = presentation
+        state.content = makeContent(presentation)
+    }
+
+    /// What the panel lists for this presentation. Internal for tests.
+    func makeContent(_ presentation: MenuPresentation? = nil) -> StatusMenuContent {
+        let dictation: DictationMenuInputs? = if let dictationEnabled, let toggleDictation {
+            DictationMenuInputs(
+                isEnabled: dictationEnabled(),
+                isSecureInputBlocked: dictationSecureInputBlocked?() == true,
+                toggle: toggleDictation,
+                openSettings: openDictationSettings
+            )
+        } else {
+            nil
+        }
+        return StatusMenuContent(
+            presentation: presentation ?? model.presentation,
+            model: model,
+            dictation: dictation,
+            transcription: transcription(),
+            updates: updates(),
+            openSettings: openSettings
+        )
     }
 
     /// True while the status item is wearing the red dot.
@@ -191,334 +270,111 @@ public final class ScribeMenuBarController: NSObject, NSMenuDelegate {
         button.setAccessibilityLabel(isDictationListening ? "\(accessibilityLabel) — dictation listening" :
             (shows ? "\(accessibilityLabel) — recording" : accessibilityLabel))
     }
+}
 
-    private func perform(_ action: (RecorderMenuModel) -> Void) {
-        action(model)
-        // A transport button is a command like any menu item, so it dismisses
-        // the menu; the status item's own icon reports what happened next.
-        menu.cancelTracking()
-    }
+/// The panel's backdrop: the material and shape of a menu.
+private struct StatusMenuPanelContent: View {
+    let menu: StatusMenuView
 
-    // MARK: Menu construction
-
-    private func rebuildRootMenu() {
-        let presentation = model.presentation
-        menu.removeAllItems()
-
-        transportRow.view = transportView
-        menu.addItem(transportRow)
-        transportView.apply(presentation)
-
-        statusItemRow.isEnabled = false
-        applyLiveState(presentation)
-        menu.addItem(statusItemRow)
-        if let detail = presentation.statusDetail {
-            menu.addItem(.disabled(detail))
-        }
-
-        applyPasteTimestampItem(pasteTimestampRow, presentation: presentation)
-        menu.addItem(pasteTimestampRow)
-
-        if let prompt = presentation.permissionPrompt {
-            menu.addItem(.separator())
-            menu.addItem(.disabled(prompt.title))
-            if prompt.canRequestInApp {
-                menu.addItem(ActionMenuItem(title: "Request Access…") { [model] in model.requestPermissions() })
-            }
-            for pane in prompt.settingsRoutes {
-                menu.addItem(ActionMenuItem(title: "Open \(pane.displayName) Settings…") { [model] in
-                    model.openSystemSettings(pane)
-                })
-            }
-        }
-
-        if presentation.recoveryNotice != nil || !presentation.processingLines.isEmpty {
-            menu.addItem(.separator())
-        }
-        // Launch recovery, reported before background work: it explains why
-        // there is processing to do that this session did not start.
-        if let notice = presentation.recoveryNotice {
-            menu.addItem(.disabled(notice))
-        }
-        // Background work is listed separately from capture: the recorder above
-        // may already be idle and ready for the next meeting.
-        for line in presentation.processingLines {
-            menu.addItem(.disabled(line))
-        }
-
-        menu.addItem(.separator())
-        menu.addItem(submenuItem(title: "Recording Mode", submenu: recordingModeMenu))
-        if presentation.recordingMode == .systemAudioAndMicrophone {
-            menu.addItem(submenuItem(title: "Application", submenu: applicationMenu))
-        } else {
-            menu.addItem(.disabled("Microphone-only recording — no application needed"))
-        }
-        menu.addItem(submenuItem(title: "Microphone", submenu: microphoneMenu))
-        if let dictationEnabled, let toggleDictation {
-            menu.addItem(.separator())
-            if dictationEnabled(), dictationSecureInputBlocked?() == true {
-                menu.addItem(.disabled("Dictation is paused while Secure Keyboard Entry is on"))
-            }
-            let item = ActionMenuItem(title: dictationEnabled() ? "Dictation: On" : "Dictation: Off", handler: toggleDictation)
-            item.state = dictationEnabled() ? .on : .off
-            menu.addItem(item)
-            if let openDictationSettings {
-                menu.addItem(ActionMenuItem(title: "Dictation Settings…", handler: openDictationSettings))
-            }
-        }
-
-        // Shortcut registration can fail without disabling anything here.
-        if !presentation.shortcutIssues.isEmpty {
-            menu.addItem(.separator())
-            for issue in presentation.shortcutIssues {
-                menu.addItem(.disabled(issue))
-            }
-        }
-
-        if let transcription = transcription() {
-            menu.addItem(.separator())
-            // Transcription is reported separately from capture and from audio
-            // cleanup: all three run independently and a person needs to see
-            // which one is busy.
-            for line in transcription.statusLines {
-                menu.addItem(.disabled(line))
-            }
-            menu.addItem(ActionMenuItem(title: "Transcripts…", handler: transcription.openTranscripts))
-            menu.addItem(ActionMenuItem(title: "Transcribe Folder…", handler: transcription.transcribeFolder))
-            if let openSpeakers = transcription.openSpeakers {
-                menu.addItem(ActionMenuItem(title: "Speakers…", handler: openSpeakers))
-            }
-        }
-
-        menu.addItem(.separator())
-        if let openTranscriptionsFolder = transcription()?.openTranscriptionsFolder {
-            menu.addItem(ActionMenuItem(title: "Open Transcriptions Folder", handler: openTranscriptionsFolder))
-        }
-        menu.addItem(ActionMenuItem(title: "Open Recordings Folder") { [model] in model.openRecordingsFolder() })
-        menu.addItem(ActionMenuItem(title: "Settings…", handler: openSettings))
-
-        if let updates = updates() {
-            menu.addItem(.separator())
-            addUpdateItems(updates)
-        }
-
-        menu.addItem(.separator())
-        menu.addItem(ActionMenuItem(title: "Quit Scribe") { [model] in model.quit() })
-    }
-
-    private func addUpdateItems(_ updates: UpdateMenuCommands) {
-        let check = ActionMenuItem(title: "Check for Updates…", handler: updates.checkForUpdates)
-        switch updates.state {
-        case .idle:
-            menu.addItem(check)
-        case .checking:
-            menu.addItem(.disabled("Checking for updates…"))
-            check.isEnabled = false
-            menu.addItem(check)
-        case .upToDate:
-            menu.addItem(.disabled("Scribe is up to date"))
-            menu.addItem(check)
-        case .updateAvailable(let version):
-            menu.addItem(.disabled("Scribe \(version) is available"))
-            menu.addItem(ActionMenuItem(title: "Download Update…", handler: updates.downloadUpdate))
-            menu.addItem(check)
-        case .downloading:
-            menu.addItem(.disabled("Downloading and verifying update…"))
-        case .readyToInstall(let version):
-            menu.addItem(.disabled("Scribe \(version) is ready to install"))
-            menu.addItem(ActionMenuItem(title: "Restart and Install", handler: updates.installUpdate))
-        case .installing:
-            menu.addItem(.disabled("Restarting to install update…"))
-        case .failed:
-            // No diagnostic text here: the Check item is the recovery path.
-            menu.addItem(.disabled("Update failed"))
-            menu.addItem(check)
-        }
-    }
-
-    @objc private func pasteTimestamp() {
-        model.pasteTimestamp()
-    }
-
-    private func applyPasteTimestampItem(_ item: NSMenuItem, presentation: MenuPresentation) {
-        item.title = "Paste Timestamp"
-        item.isEnabled = presentation.isPasteTimestampEnabled
-        let shortcut = presentation.pasteTimestampShortcut
-        item.keyEquivalent = shortcut.keyEquivalentCharacter
-        item.keyEquivalentModifierMask = shortcut.menuModifierMask
-    }
-
-    private func submenuItem(title: String, submenu: NSMenu) -> NSMenuItem {
-        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
-        item.submenu = submenu
-        return item
-    }
-
-    private func rebuildApplicationMenu() {
-        let presentation = model.presentation
-        applicationMenu.removeAllItems()
-        applicationMenu.addItem(selection(
-            title: "Choose…",
-            isSelected: presentation.selectedApplicationID == nil
-        ) { [model] in model.selectApplication(nil) })
-        // A remembered application that is not running right now keeps its own
-        // row rather than silently clearing the choice, since a meeting
-        // application is usually launched after Scribe.
-        if let unavailable = presentation.unavailableSelectedApplication {
-            applicationMenu.addItem(selection(
-                title: InstalledApplicationName.unavailableLabel(for: unavailable),
-                isSelected: true
-            ) { [model] in model.selectApplication(unavailable.id) })
-        }
-        for application in presentation.applications {
-            applicationMenu.addItem(selection(
-                title: application.name,
-                isSelected: application.id == presentation.selectedApplicationID
-            ) { [model] in model.selectApplication(application.id) })
-        }
-    }
-
-    private func rebuildMicrophoneMenu() {
-        let presentation = model.presentation
-        microphoneMenu.removeAllItems()
-        microphoneMenu.addItem(selection(
-            title: presentation.systemDefaultMicrophoneLabel,
-            isSelected: presentation.selectedMicrophoneID == nil
-        ) { [model] in model.selectMicrophone(nil) })
-        // Shown rather than substituted: capture binds the chosen device and
-        // never falls back to another one, so the list must not pretend a
-        // different device is chosen.
-        if let unavailable = presentation.unavailableSelectedMicrophone {
-            microphoneMenu.addItem(selection(title: unavailable.label, isSelected: true) { [model] in
-                model.selectMicrophone(unavailable.id)
-            })
-        }
-        for microphone in presentation.microphones {
-            microphoneMenu.addItem(selection(
-                title: microphone.name,
-                isSelected: microphone.id == presentation.selectedMicrophoneID
-            ) { [model] in model.selectMicrophone(microphone.id) })
-        }
-    }
-
-    private func rebuildRecordingModeMenu() {
-        let selected = model.presentation.recordingMode
-        recordingModeMenu.removeAllItems()
-        recordingModeMenu.addItem(selection(
-            title: RecordingMode.systemAudioAndMicrophone.menuTitle,
-            isSelected: selected == .systemAudioAndMicrophone
-        ) { [weak self] in
-            self?.perform { $0.selectRecordingMode(.systemAudioAndMicrophone) }
-        })
-        recordingModeMenu.addItem(selection(
-            title: RecordingMode.microphoneOnly.menuTitle,
-            isSelected: selected == .microphoneOnly
-        ) { [weak self] in
-            self?.perform { $0.selectRecordingMode(.microphoneOnly) }
-        })
-    }
-
-    private func selection(title: String, isSelected: Bool, handler: @escaping () -> Void) -> NSMenuItem {
-        let item = ActionMenuItem(title: title, handler: handler)
-        item.state = isSelected ? .on : .off
-        return item
+    var body: some View {
+        menu
+            .background(MenuMaterial())
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5)
+            )
     }
 }
 
-/// A menu item that carries its own action, so the whole menu can be described
-/// where it is built instead of being spread across selectors and tags.
-private final class ActionMenuItem: NSMenuItem {
-    private let handler: () -> Void
-
-    init(title: String, handler: @escaping () -> Void) {
-        self.handler = handler
-        super.init(title: title, action: #selector(fire), keyEquivalent: "")
-        target = self
+private struct MenuMaterial: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .menu
+        view.blendingMode = .behindWindow
+        view.state = .active
+        return view
     }
 
-    @available(*, unavailable)
-    required init(coder: NSCoder) { fatalError("init(coder:) is not used") }
-
-    @objc private func fire() { handler() }
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }
 
-private extension NSMenuItem {
-    /// A row that states a fact. Menus have no other way to show one. Long copy
-    /// wraps inside a fixed maximum width so a meeting title or recovery notice
-    /// cannot stretch the whole menu.
-    @MainActor
-    static func disabled(_ title: String) -> NSMenuItem {
-        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
-        item.isEnabled = false
-        item.view = MenuWrappingLabelView(text: title)
-        return item
-    }
-}
-
-/// A disabled menu row whose text wraps at a fixed maximum width.
+/// The window the status item opens.
 ///
-/// Plain `NSMenuItem` titles never wrap: they grow the menu sideways instead.
-/// Status copy — meeting titles, recovery notices, processing lines — can be
-/// long enough to push every other row out of reach, so those rows use this
-/// view rather than a title string.
+/// Non-activating, so opening it never brings Scribe forward or leaves a
+/// full-screen Space; able to become key anyway, so its controls take clicks
+/// and Escape; and joining every Space as an auxiliary of full-screen ones,
+/// which is the whole reason it is a panel rather than a menu.
 @MainActor
-private final class MenuWrappingLabelView: NSView {
-    /// Cap the menu's content column. Matches the transport row's starting
-    /// width so status text and the buttons share one visual column.
-    static let maximumWidth: CGFloat = 260
-    private static let horizontalInset: CGFloat = 14
-    private static let verticalInset: CGFloat = 4
-
-    private let label = NSTextField(wrappingLabelWithString: "")
-
-    init(text: String) {
-        super.init(frame: .zero)
-
-        label.stringValue = text
-        label.font = .menuFont(ofSize: 0)
-        label.textColor = .secondaryLabelColor
-        label.backgroundColor = .clear
-        label.isBezeled = false
-        label.isEditable = false
-        label.isSelectable = false
-        label.drawsBackground = false
-        label.lineBreakMode = .byWordWrapping
-        label.maximumNumberOfLines = 0
-        label.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        label.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(label)
-
-        let contentWidth = Self.maximumWidth - (Self.horizontalInset * 2)
-        label.preferredMaxLayoutWidth = contentWidth
-        let fitting = label.sizeThatFits(NSSize(width: contentWidth, height: .greatestFiniteMagnitude))
-        // Fixed width: these rows set the menu's content column rather than
-        // growing sideways with the string.
-        frame = NSRect(
-            x: 0,
-            y: 0,
-            width: Self.maximumWidth,
-            height: ceil(fitting.height) + (Self.verticalInset * 2)
-        )
-
-        NSLayoutConstraint.activate([
-            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Self.horizontalInset),
-            label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Self.horizontalInset),
-            label.topAnchor.constraint(equalTo: topAnchor, constant: Self.verticalInset),
-            label.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -Self.verticalInset),
-        ])
+final class StatusMenuPanel: NSPanel {
+    var onResignKey: () -> Void = {}
+    var onCancel: () -> Void = {}
+    /// The status item's frame on screen. The panel hangs from its bottom edge
+    /// and keeps hanging from it as its content grows or shrinks.
+    var anchor: NSRect? {
+        didSet { reposition() }
     }
 
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
-}
+    /// Clear of the menu bar by the gap macOS leaves under a status menu.
+    private static let gap: CGFloat = 4
+    private static let screenMargin: CGFloat = 6
 
-private extension GlobalShortcut {
-    var menuModifierMask: NSEvent.ModifierFlags {
-        var mask: NSEvent.ModifierFlags = []
-        if usesControl { mask.insert(.control) }
-        if usesOption { mask.insert(.option) }
-        if usesShift { mask.insert(.shift) }
-        if usesCommand { mask.insert(.command) }
-        return mask
+    init() {
+        super.init(
+            contentRect: NSRect(x: 0, y: 0, width: StatusMenuView.width, height: 200),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: true
+        )
+        isFloatingPanel = true
+        level = .popUpMenu
+        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient, .ignoresCycle]
+        backgroundColor = .clear
+        isOpaque = false
+        hasShadow = true
+        hidesOnDeactivate = false
+        isReleasedWhenClosed = false
+        animationBehavior = .utilityWindow
+        setAccessibilityLabel("Scribe")
+    }
+
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
+
+    override func resignKey() {
+        super.resignKey()
+        if isVisible { onResignKey() }
+    }
+
+    override func cancelOperation(_ sender: Any?) {
+        onCancel()
+    }
+
+    override func setContentSize(_ size: NSSize) {
+        super.setContentSize(size)
+        reposition()
+    }
+
+    override func setFrame(_ frameRect: NSRect, display flag: Bool) {
+        super.setFrame(frameRect, display: flag)
+        // Growing from the bottom-left origin would push the top of the panel
+        // up over the menu bar; put it back under the status item.
+        if anchor != nil, frame.origin != anchoredOrigin(for: frame.size) { reposition() }
+    }
+
+    private func reposition() {
+        let origin = anchoredOrigin(for: frame.size)
+        if frame.origin != origin { super.setFrameOrigin(origin) }
+    }
+
+    private func anchoredOrigin(for size: NSSize) -> NSPoint {
+        guard let anchor else { return frame.origin }
+        let screen = NSScreen.screens.first { $0.frame.intersects(anchor) } ?? NSScreen.main
+        var origin = NSPoint(x: anchor.minX, y: anchor.minY - Self.gap - size.height)
+        if let visible = screen?.visibleFrame {
+            origin.x = min(max(origin.x, visible.minX + Self.screenMargin), visible.maxX - size.width - Self.screenMargin)
+            origin.y = max(origin.y, visible.minY + Self.screenMargin)
+        }
+        return origin
     }
 }
