@@ -290,14 +290,8 @@ extension StatusMenuContent {
             return [.note("Checking for updates…"), .command(disabled)]
         case .upToDate:
             return [.note("Scribe is up to date"), .command(check)]
-        case .updateAvailable(let version):
-            return [
-                .note("Scribe \(version) is available"),
-                .command(StatusMenuCommand(title: "Download Update…", perform: updates.downloadUpdate)),
-                .command(check),
-            ]
-        case .downloading:
-            return [.note("Downloading and verifying update…")]
+        case .downloading(let version):
+            return [.note("Downloading Scribe \(version)…")]
         case .readyToInstall(let version):
             return [
                 .note("Scribe \(version) is ready to install"),

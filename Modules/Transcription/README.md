@@ -3,6 +3,23 @@
 Transcript import, canonical transcript model, export, and the review UI
 (`Sources/Transcription/UI`).
 
+## Paste a transcript
+
+In the Transcripts window, choose **+ → Paste Transcript…**, enter a title,
+select **Fireflies** in the import format menu, and paste turns such as
+`Mary Laut (01:35): Waiting.`. Timestamps may use `MM:SS` or `HH:MM:SS`;
+wrapped text stays with its speaker. Invalid or decreasing timestamps are
+reported before anything is saved.
+
+Import adds a completed transcript to the durable library and selects it.
+It supports the usual editing, TXT, Scribe JSON, Knowledgebase JSON, SRT, and
+**Send to Agent** actions. Speaker labels come from the pasted headers; Scribe
+does not infer identities from the spoken text. No audio or word timings are
+imported. Turn end times use the next turn start (at least one millisecond),
+and the last turn is assigned one second. The transcript retains a warning
+that end times and duration are estimated. The original paste is kept beside
+the saved run as `imported-fireflies.txt`.
+
 ## Transcripts window design system
 
 `UI/TranscriptDesign.swift` holds the tokens, type roles, review and speaker

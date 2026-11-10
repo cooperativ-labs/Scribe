@@ -403,6 +403,7 @@ final class TranscriptionHostService {
             fileDeleter: TranscriptStoreFileDeleter(store: store),
             recordingCombiner: TranscriptStoreRecordingCombiner(store: store),
             fileImporter: DroppedFileImporter(host: self),
+            pastedTranscriptImporter: StoredPastedTranscriptImporter(store: store),
             reprocessor: TranscriptReprocessor(host: self),
             retranscriber: TranscriptRetranscriber(host: self),
             agentDispatcher: agentDispatcher,

@@ -78,6 +78,7 @@ public final class TranscriptViewModel {
     @ObservationIgnored private let fileDeleter: (any TranscriptFileDeleting)?
     @ObservationIgnored private let recordingCombiner: (any TranscriptRecordingCombining)?
     @ObservationIgnored private let fileImporter: (any TranscriptFileImporting)?
+    @ObservationIgnored private let pastedTranscriptImporter: (any PastedTranscriptImporting)?
     @ObservationIgnored private let reprocessor: (any TranscriptReprocessing)?
     @ObservationIgnored private let retranscriber: (any TranscriptRetranscribing)?
     /// Hands a finished transcript to a coding agent. Absent in a build with no
@@ -132,6 +133,7 @@ public final class TranscriptViewModel {
         fileDeleter: (any TranscriptFileDeleting)? = nil,
         recordingCombiner: (any TranscriptRecordingCombining)? = nil,
         fileImporter: (any TranscriptFileImporting)? = nil,
+        pastedTranscriptImporter: (any PastedTranscriptImporting)? = nil,
         reprocessor: (any TranscriptReprocessing)? = nil,
         retranscriber: (any TranscriptRetranscribing)? = nil,
         agentDispatcher: (any TranscriptAgentDispatching)? = nil,
@@ -148,6 +150,7 @@ public final class TranscriptViewModel {
         self.fileDeleter = fileDeleter
         self.recordingCombiner = recordingCombiner
         self.fileImporter = fileImporter
+        self.pastedTranscriptImporter = pastedTranscriptImporter
         self.reprocessor = reprocessor
         self.retranscriber = retranscriber
         self.agentDispatcher = agentDispatcher
@@ -160,6 +163,19 @@ public final class TranscriptViewModel {
 
     /// Whether the review window can send someone to the vocabulary editor.
     public var canOpenVocabularySettings: Bool { openVocabularySettings != nil }
+
+    public var canImportPastedTranscript: Bool { pastedTranscriptImporter != nil }
+
+    /// Commits to disk before changing selection; a failed import leaves the list intact.
+    public func importPastedTranscript(_ text: String, format: TranscriptImportFormat, title: String) throws {
+        guard let pastedTranscriptImporter else {
+            throw PastedTranscriptImportError(message: "Transcript import is unavailable.")
+        }
+        let file = try pastedTranscriptImporter.importTranscript(text, format: format, title: title)
+        files.insert(file, at: 0)
+        selectedFileID = file.id
+        toastCenter.post("Transcript imported.", kind: .result)
+    }
 
     /// Sends the person to Settings, at the vocabulary. Editing the list here
     /// would be the wrong place: the list is not a property of this transcript,

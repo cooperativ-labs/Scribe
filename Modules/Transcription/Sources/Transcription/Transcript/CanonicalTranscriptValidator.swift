@@ -60,7 +60,7 @@ public enum CanonicalTranscriptValidator {
         return lhs.id <= rhs.id
     }
 
-    public enum Error: Swift.Error, Equatable, Sendable {
+    public enum Error: Swift.Error, Equatable, Sendable, LocalizedError {
         case unsupportedSchemaVersion(Int)
         case emptyTranscriptID
         case invalidRevision(Int)
@@ -75,5 +75,26 @@ public enum CanonicalTranscriptValidator {
         case invalidWordBounds(segmentID: String)
         case unknownCueParent(cueID: String, parentSegmentID: String)
         case invalidCueBounds(cueID: String)
+
+        public var errorDescription: String? {
+            switch self {
+            case .unsupportedSchemaVersion(let version): "Unsupported transcript schema version \(version)."
+            case .emptyTranscriptID: "The transcript has no ID."
+            case .invalidRevision(let revision): "Invalid transcript revision \(revision)."
+            case .invalidSourceDuration(let duration): "Invalid recording duration \(duration) ms."
+            case .unsupportedTimestampBasis: "The transcript uses an unsupported timestamp basis."
+            case .invalidSpeakerTable: "The transcript has duplicate or empty speaker IDs or labels."
+            case .duplicateOrEmptySegmentID(let id): "The transcript has a duplicate or empty segment ID: \(id)."
+            case .emptySegmentText(let id): "Transcript segment \(id) has no text."
+            case .invalidSegmentBounds(let id, let start, let end, let duration):
+                "Transcript segment \(id) has invalid times (\(start)–\(end) ms; recording duration \(duration) ms)."
+            case .unknownSpeakerReference(let segment, let speaker):
+                "Transcript segment \(segment) refers to missing speaker \(speaker)."
+            case .unsortedSegments(let previous, let next): "Transcript segments \(previous) and \(next) are out of order."
+            case .invalidWordBounds(let id): "Transcript segment \(id) contains invalid word text or timing."
+            case .unknownCueParent(let cue, let parent): "Subtitle cue \(cue) refers to missing segment \(parent)."
+            case .invalidCueBounds(let id): "Subtitle cue \(id) has invalid timing."
+            }
+        }
     }
 }

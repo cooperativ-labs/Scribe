@@ -71,7 +71,6 @@ final class ScribeAppEnvironment: ObservableObject {
     private var selectionObservation: RecorderObservationToken?
     private var queueEventTask: Task<Void, Never>?
     private var updateTask: Task<Void, Never>?
-    private var availableRelease: GitHubRelease?
     private let updater = ApplicationUpdater()
     private var preparedUpdate: ApplicationUpdater.PreparedUpdate?
     /// Sessions this launch adopted rather than started, so the recovery notice
@@ -327,7 +326,6 @@ final class ScribeAppEnvironment: ObservableObject {
         UpdateMenuCommands(
             state: updateState,
             checkForUpdates: { [weak self] in self?.checkForUpdates() },
-            downloadUpdate: { [weak self] in self?.downloadAvailableUpdate() },
             installUpdate: { [weak self] in self?.installPreparedUpdate() }
         )
     }
@@ -337,10 +335,9 @@ final class ScribeAppEnvironment: ObservableObject {
     /// and verified automatically; installing it still requires an explicit
     /// restart.
     func checkForUpdates() {
-        guard updateState != .downloading, updateState != .installing, preparedUpdate == nil else { return }
+        guard !isDownloadingOrInstalling, preparedUpdate == nil else { return }
         updateTask?.cancel()
         updateState = .checking
-        availableRelease = nil
         let currentVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
 
         updateTask = Task { [weak self] in
@@ -348,9 +345,7 @@ final class ScribeAppEnvironment: ObservableObject {
                 let release = try await GitHubReleaseClient.fetchLatestRelease()
                 guard !Task.isCancelled else { return }
                 if ScribeReleaseVersion.isNewer(release.version, than: currentVersion) {
-                    self?.availableRelease = release
-                    self?.updateState = .updateAvailable(version: release.version)
-                    self?.downloadAvailableUpdate()
+                    self?.download(release)
                 } else {
                     self?.updateState = .upToDate
                 }
@@ -370,10 +365,18 @@ final class ScribeAppEnvironment: ObservableObject {
         }
     }
 
-    private func downloadAvailableUpdate() {
-        guard let release = availableRelease, updateState != .downloading,
-              updateState != .installing, preparedUpdate == nil else { return }
-        updateState = .downloading
+    private var isDownloadingOrInstalling: Bool {
+        switch updateState {
+        case .downloading, .installing: true
+        default: false
+        }
+    }
+
+    /// Starts as soon as a check finds a newer release; there is no manual
+    /// download step.
+    private func download(_ release: GitHubRelease) {
+        guard !isDownloadingOrInstalling, preparedUpdate == nil else { return }
+        updateState = .downloading(version: release.version)
         let application = Bundle.main.bundleURL
         updateTask = Task { [weak self, updater] in
             do {

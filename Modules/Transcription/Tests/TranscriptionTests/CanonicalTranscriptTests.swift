@@ -3,6 +3,101 @@ import XCTest
 @testable import Transcription
 
 final class CanonicalTranscriptTests: XCTestCase {
+    func testSpeakerMergeIncludesInferredTurnsAndEveryExportRemainsValid() throws {
+        let original = inferredTranscript()
+        let merged = try TranscriptSpeakerLabelEditor.merging(speakerID: "speaker_2", into: "speaker_1", in: original)
+        XCTAssertEqual(merged.speakers.map(\.id), ["speaker_1"])
+        XCTAssertEqual(merged.segments.first?.speakerID, "speaker_1")
+        XCTAssertEqual(merged.segments.first?.attributionSource, .manual)
+        XCTAssertNil(merged.segments.first?.speakerInference)
+        XCTAssertEqual(merged.segments.map(\.text), original.segments.map(\.text))
+        XCTAssertEqual(merged.segments.map(\.words), original.segments.map(\.words))
+        XCTAssertEqual(merged.segments.map(\.startMs), original.segments.map(\.startMs))
+        XCTAssertEqual(merged.segments.map(\.endMs), original.segments.map(\.endMs))
+        XCTAssertNoThrow(try CanonicalTranscriptValidator.validate(merged))
+        for format in TranscriptExportFormat.allCases {
+            XCTAssertFalse(try TranscriptExporter.export(merged, as: format).isEmpty)
+        }
+    }
+
+    func testLoadingAnOldMergeRestoresOnlyMissingInferredSpeakerMetadata() throws {
+        let original = inferredTranscript()
+        let broken = original.nextRevision(speakers: [original.speakers[0]])
+        XCTAssertThrowsError(try TranscriptExporter.knowledgebaseJSON(broken))
+        let recovered = try CanonicalTranscriptCodec.decode(CanonicalTranscriptCodec.encode(broken))
+        XCTAssertEqual(recovered.speakers, original.speakers)
+        XCTAssertEqual(recovered.segments, broken.segments)
+        XCTAssertEqual(recovered.revision, broken.revision)
+        XCTAssertEqual(recovered.source, broken.source)
+        XCTAssertEqual(try CanonicalTranscriptCodec.decode(CanonicalTranscriptCodec.encode(recovered)), recovered)
+        for format in TranscriptExportFormat.allCases {
+            XCTAssertFalse(try TranscriptExporter.export(recovered, as: format).isEmpty)
+        }
+    }
+
+    func testMergingSpeakersAfterCombiningRecordingsKeepsExportsValid() throws {
+        let original = inferredTranscript()
+        let combined = TranscriptRecordingCombiner.combine(
+            first: original, second: original, offsetMs: 1_000,
+            source: TranscriptSource(filename: "combined.wav", durationMs: 2_000, checksum: "combined")
+        )
+        let secondSpeaker = try XCTUnwrap(combined.speakerIDMap["speaker_2"])
+        let merged = try TranscriptSpeakerLabelEditor.merging(
+            speakerID: secondSpeaker, into: "speaker_1", in: combined.transcript
+        )
+        XCTAssertNil(merged.speakers.first { $0.id == secondSpeaker })
+        XCTAssertEqual(merged.segments.last?.speakerID, "speaker_1")
+        XCTAssertEqual(merged.segments.last?.startMs, 1_000)
+        XCTAssertNoThrow(try CanonicalTranscriptValidator.validate(merged))
+        for format in TranscriptExportFormat.allCases {
+            XCTAssertFalse(try TranscriptExporter.export(merged, as: format).isEmpty)
+        }
+    }
+
+    func testMissingSpeakerErrorExplainsTheReference() {
+        let error = CanonicalTranscriptValidator.Error.unknownSpeakerReference(segmentID: "turn", speakerID: "missing")
+        XCTAssertEqual(error.localizedDescription, "Transcript segment turn refers to missing speaker missing.")
+    }
+
+    /// Opt-in verification of saved recordings, without writing to their store.
+    func testSavedTranscriptExportsWhenStoreIsProvided() throws {
+        guard let path = ProcessInfo.processInfo.environment["SCRIBE_TEST_TRANSCRIPT_STORE"] else {
+            throw XCTSkip("Set SCRIBE_TEST_TRANSCRIPT_STORE to check saved recordings.")
+        }
+        let files = try XCTUnwrap(FileManager.default.enumerator(
+            at: URL(fileURLWithPath: path), includingPropertiesForKeys: nil
+        ))
+        var count = 0
+        for case let url as URL in files where url.lastPathComponent == "canonical-transcript.json" {
+            let transcript = try CanonicalTranscriptCodec.decode(Data(contentsOf: url))
+            for format in TranscriptExportFormat.allCases {
+                XCTAssertFalse(try TranscriptExporter.export(transcript, as: format).isEmpty)
+            }
+            count += 1
+        }
+        XCTAssertGreaterThan(count, 0)
+        print("Verified all export formats for \(count) saved transcripts without modifying their files.")
+    }
+
+    private func inferredTranscript() -> CanonicalTranscript {
+        transcript(
+            source: TranscriptSource(filename: "test.wav", durationMs: 1_000, checksum: "test"),
+            speakers: [
+                TranscriptSpeaker(id: "speaker_1", identityAssignment: .unmatched, labelSnapshot: "Speaker 1"),
+                TranscriptSpeaker(id: "speaker_2", identityAssignment: .unmatched, labelSnapshot: "Speaker 2"),
+            ],
+            segments: [TranscriptSegment(
+                id: "inferred", speakerID: nil, speakerLabel: "Unknown speaker",
+                startMs: 0, endMs: 100, text: "Hello", overlap: false, timingQuality: .asrWord,
+                words: [TimedWord(text: "Hello", startMs: 0, endMs: 100)],
+                speakerInference: TranscriptSpeakerInference(
+                    speakerID: "speaker_2", speakerLabel: "Speaker 2",
+                    evidence: .nearestInterval(distanceMs: 15), provenance: "speaker-turn-attribution-v3"
+                )
+            )]
+        )
+    }
+
     private let fixtureNames = [
         "one-speaker", "two-speakers", "four-speakers", "overlap", "unknown-speaker",
         "no-speech", "long-turns", "unicode", "past-one-hour", "past-twenty-four-hours",

@@ -127,7 +127,7 @@ public enum TranscriptSpeakerLabelEditor {
             throw TranscriptSpeakerLabelError.unknownSpeaker(targetSpeakerID)
         }
         let segments = transcript.segments.map { segment in
-            segment.speakerID == speakerID ? segment.withSpeaker(id: target.id, label: target.labelSnapshot) : segment
+            segment.effectiveSpeakerID == speakerID ? segment.withSpeaker(id: target.id, label: target.labelSnapshot) : segment
         }
         let speakers = transcript.speakers.filter { $0.id != speakerID }
         return transcript.nextRevision(speakers: speakers, segments: segments)

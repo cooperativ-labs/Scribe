@@ -421,7 +421,43 @@ public enum CanonicalTranscriptCodec {
 
     public static func decode(_ data: Data) throws -> CanonicalTranscript {
         let decoder = JSONDecoder()
-        return try decoder.decode(CanonicalTranscript.self, from: data)
+        let transcript = try decoder.decode(CanonicalTranscript.self, from: data)
+        // Older speaker merges removed rows still used by inferred turns. The
+        // merge target was not recorded, so preserve the original inference
+        // rather than guessing which person those turns should belong to.
+        var speakers = transcript.speakers
+        var knownIDs = Set(speakers.map(\.id))
+        for segment in transcript.segments {
+            guard let inference = segment.speakerInference,
+                  !inference.speakerID.isEmpty,
+                  !inference.speakerLabel.isEmpty,
+                  knownIDs.insert(inference.speakerID).inserted else { continue }
+            speakers.append(TranscriptSpeaker(
+                id: inference.speakerID,
+                identityAssignment: .unmatched,
+                labelSnapshot: inference.speakerLabel
+            ))
+        }
+        guard speakers != transcript.speakers else { return transcript }
+        return CanonicalTranscript(
+            schemaVersion: transcript.schemaVersion,
+            transcriptID: transcript.transcriptID,
+            revision: transcript.revision,
+            title: transcript.title,
+            status: transcript.status,
+            createdAt: transcript.createdAt,
+            source: transcript.source,
+            language: transcript.language,
+            languageSource: transcript.languageSource,
+            timestampUnit: transcript.timestampUnit,
+            timestampOrigin: transcript.timestampOrigin,
+            speakers: speakers,
+            segments: transcript.segments,
+            subtitleCueMappings: transcript.subtitleCueMappings,
+            processingOptions: transcript.processingOptions,
+            engineRevisions: transcript.engineRevisions,
+            warnings: transcript.warnings
+        )
     }
 }
 

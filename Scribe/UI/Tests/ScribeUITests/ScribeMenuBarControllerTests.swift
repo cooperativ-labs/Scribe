@@ -258,7 +258,6 @@ final class ScribeMenuBarControllerTests: XCTestCase {
             updates: UpdateMenuCommands(
                 state: .failed(message: "The download could not be verified: signature mismatch on Scribe.zip"),
                 checkForUpdates: {},
-                downloadUpdate: {},
                 installUpdate: {}
             )
         )
@@ -267,6 +266,23 @@ final class ScribeMenuBarControllerTests: XCTestCase {
 
         XCTAssertTrue(titles.contains("Update failed"))
         XCTAssertFalse(titles.contains { $0.contains("signature mismatch") })
+    }
+
+    func testAFoundUpdateIsShownDownloadingWithNoManualDownloadCommand() {
+        let controller = makeController(
+            MockRecordingCoordinator(snapshot: readySnapshot()),
+            updates: UpdateMenuCommands(
+                state: .downloading(version: "1.2.3"),
+                checkForUpdates: {},
+                installUpdate: {}
+            )
+        )
+
+        let titles = controller.makeContent().titles
+
+        XCTAssertTrue(titles.contains("Downloading Scribe 1.2.3…"))
+        XCTAssertFalse(titles.contains { $0.localizedCaseInsensitiveContains("Download Update") })
+        XCTAssertFalse(titles.contains("Check for Updates…"))
     }
 
     func testThePanelCanJoinFullScreenSpaces() {

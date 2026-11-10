@@ -21,6 +21,7 @@ public struct TranscriptWindow: View {
     @State private var isShowingShortcuts = false
     @State private var isShowingAgentSheet = false
     @State private var isDropTargeted = false
+    @State private var isShowingImportSheet = false
     @FocusState private var isSearchFocused: Bool
     @FocusState private var isTitleFocused: Bool
 
@@ -64,6 +65,9 @@ public struct TranscriptWindow: View {
         // A floor only: the window, not the transcript's length, decides the size.
         .frame(minWidth: 820, minHeight: 600)
         .task { await viewModel.loadPeople() }
+        .sheet(isPresented: $isShowingImportSheet) {
+            TranscriptImportSheet(viewModel: viewModel)
+        }
         .onChange(of: viewModel.selectedFileID) {
             isRenaming = false
             editingSegmentID = nil
@@ -190,11 +194,15 @@ public struct TranscriptWindow: View {
         .navigationTitle("Transcripts")
         .toolbar {
             ToolbarItem(placement: .navigation) {
-                Button(action: chooseFilesToImport) {
-                    Label("Add Recordings", systemImage: "plus")
+                Menu {
+                    Button("Paste Transcript…") { isShowingImportSheet = true }
+                        .disabled(!viewModel.canImportPastedTranscript)
+                    Button("Add Recordings…", action: chooseFilesToImport)
+                        .disabled(!viewModel.canImportFiles)
+                } label: {
+                    Label("Add Transcript or Recordings", systemImage: "plus")
                 }
-                .disabled(!viewModel.canImportFiles)
-                .help("Choose audio or video files to transcribe. You can also drop them on this list.")
+                .help("Paste a transcript or add recordings to transcribe.")
             }
         }
         .frame(minWidth: 230)
@@ -877,8 +885,8 @@ private struct TranscriptFileRow: View {
             .imageScale(.small)
             .fontWeight(file.hasAudio ? .semibold : .regular)
             .foregroundStyle(file.hasAudio ? AnyShapeStyle(Color.blue) : AnyShapeStyle(.tertiary))
-            .help(file.hasAudio ? "Audio available" : "Audio deleted; the transcript is kept")
-            .accessibilityLabel(file.hasAudio ? "Audio available" : "Audio deleted")
+            .help(file.hasAudio ? "Audio available" : "No audio available; the transcript is kept")
+            .accessibilityLabel(file.hasAudio ? "Audio available" : "No audio available")
     }
 }
 
@@ -1026,7 +1034,7 @@ private struct TranscriptTransportBar: View {
                 speakerTimeline
                 HStack {
                     if !viewModel.canPlayAudio {
-                        Label("Audio deleted", systemImage: "waveform.slash")
+                        Label("No audio available", systemImage: "waveform.slash")
                             .font(.caption2.weight(.medium))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
