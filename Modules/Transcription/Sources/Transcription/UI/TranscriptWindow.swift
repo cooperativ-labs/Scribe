@@ -9,6 +9,7 @@ public struct TranscriptWindow: View {
     @State private var fileAwaitingDeletion: TranscriptReviewFile?
     @State private var fileAwaitingAudioDeletion: TranscriptReviewFile?
     @State private var fileAwaitingRetranscription: TranscriptReviewFile?
+    @State private var fileAwaitingCombination: TranscriptReviewFile?
     @State private var fileFilter = ""
 
     @State private var isRenaming = false
@@ -176,6 +177,8 @@ public struct TranscriptWindow: View {
                     Divider()
                     Button("Rename…") { beginRenaming(file) }
                         .disabled(file.transcript == nil)
+                    Button("Combine With Another Recording…") { fileAwaitingCombination = file }
+                        .disabled(viewModel.isCombining || viewModel.combineCandidates(for: file).isEmpty)
                     Button("Delete Audio…", role: .destructive) { fileAwaitingAudioDeletion = file }
                         .disabled(!viewModel.canDeleteAudio(file))
                     Button("Delete Transcript and Audio…", role: .destructive) { fileAwaitingDeletion = file }
@@ -195,6 +198,9 @@ public struct TranscriptWindow: View {
             }
         }
         .frame(minWidth: 230)
+        .sheet(item: $fileAwaitingCombination) { file in
+            TranscriptCombineSheet(viewModel: viewModel, file: file)
+        }
         .confirmationDialog(
             "Delete \u{201C}\(fileAwaitingDeletion?.displayName ?? "")\u{201D}?",
             isPresented: Binding(

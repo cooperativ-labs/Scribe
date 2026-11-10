@@ -1,7 +1,8 @@
 import Foundation
 
 /// What the send sheet remembers between sendings: the agent last used, the
-/// models typed for each agent, each agent's effort, and the MCP URL.
+/// models typed for each agent, each agent's effort, the MCP URL, and the
+/// instructions sent into each folder.
 ///
 /// Model names are free text because every agent names its models differently
 /// and new ones appear faster than Scribe ships. The history is what makes free
@@ -9,6 +10,7 @@ import Foundation
 /// the most recent one is where the field starts.
 public struct TranscriptAgentPreferences: @unchecked Sendable {
     public static let modelHistoryLimit = 10
+    public static let instructionHistoryLimit = 10
 
     private let defaults: UserDefaults
 
@@ -59,11 +61,36 @@ public struct TranscriptAgentPreferences: @unchecked Sendable {
         }
     }
 
+    /// The instructions sent into this folder, most recent first, without
+    /// repeats. A nil folder is its own project: sendings with no folder share
+    /// one history rather than borrowing another folder's.
+    public func instructionHistory(forFolder folderID: TranscriptAgentFolder.ID?) -> [String] {
+        defaults.stringArray(forKey: Self.instructionHistoryKey(folderID)) ?? []
+    }
+
+    /// Puts an instruction at the top of its folder's history. Sending the same
+    /// words again moves them up rather than listing them twice.
+    public func recordInstruction(_ instruction: String, folderID: TranscriptAgentFolder.ID?) {
+        let instruction = instruction.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !instruction.isEmpty else { return }
+        var history = instructionHistory(forFolder: folderID).filter { $0 != instruction }
+        history.insert(instruction, at: 0)
+        defaults.set(Array(history.prefix(Self.instructionHistoryLimit)), forKey: Self.instructionHistoryKey(folderID))
+    }
+
+    private static func instructionHistoryKey(_ folderID: TranscriptAgentFolder.ID?) -> String {
+        Key.instructionHistory + (folderID ?? Key.noFolder)
+    }
+
     private enum Key {
         static let lastAgent = "scribe.agentHandoff.lastAgent"
         static let mcpURL = "scribe.agentHandoff.mcpURL"
         static let modelHistory = "scribe.agentHandoff.modelHistory."
         static let lastModel = "scribe.agentHandoff.lastModel."
         static let effort = "scribe.agentHandoff.effort."
+        static let instructionHistory = "scribe.agentHandoff.instructionHistory."
+        /// Folder IDs are standardized paths, so they always start with a
+        /// slash; this cannot collide with one.
+        static let noFolder = "none"
     }
 }

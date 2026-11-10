@@ -76,6 +76,7 @@ public final class TranscriptViewModel {
     @ObservationIgnored private let directory: (any TranscriptSpeakerDirectory)?
     @ObservationIgnored private let revisionStore: (any TranscriptRevisionStoring)?
     @ObservationIgnored private let fileDeleter: (any TranscriptFileDeleting)?
+    @ObservationIgnored private let recordingCombiner: (any TranscriptRecordingCombining)?
     @ObservationIgnored private let fileImporter: (any TranscriptFileImporting)?
     @ObservationIgnored private let reprocessor: (any TranscriptReprocessing)?
     @ObservationIgnored private let retranscriber: (any TranscriptRetranscribing)?
@@ -129,6 +130,7 @@ public final class TranscriptViewModel {
         directory: (any TranscriptSpeakerDirectory)? = nil,
         revisionStore: (any TranscriptRevisionStoring)? = nil,
         fileDeleter: (any TranscriptFileDeleting)? = nil,
+        recordingCombiner: (any TranscriptRecordingCombining)? = nil,
         fileImporter: (any TranscriptFileImporting)? = nil,
         reprocessor: (any TranscriptReprocessing)? = nil,
         retranscriber: (any TranscriptRetranscribing)? = nil,
@@ -144,6 +146,7 @@ public final class TranscriptViewModel {
         self.directory = directory
         self.revisionStore = revisionStore
         self.fileDeleter = fileDeleter
+        self.recordingCombiner = recordingCombiner
         self.fileImporter = fileImporter
         self.reprocessor = reprocessor
         self.retranscriber = retranscriber
@@ -633,6 +636,66 @@ public final class TranscriptViewModel {
         files[index] = file.removingAudio()
     }
 
+    // MARK: - Combining
+
+    /// True while two recordings are being joined.
+    public private(set) var isCombining = false
+
+    /// Whether this file can take part in combining: a finished transcript,
+    /// its recording still here, and nothing of it still running.
+    public func canCombine(_ file: TranscriptReviewFile) -> Bool {
+        guard recordingCombiner != nil, file.transcript != nil, file.hasAudio else { return false }
+        return canDelete(file)
+    }
+
+    /// The files `file` could be combined with, nearest in time first, since
+    /// the two halves of a cut-off call were made minutes apart.
+    public func combineCandidates(for file: TranscriptReviewFile) -> [TranscriptReviewFile] {
+        guard canCombine(file) else { return [] }
+        let reference = file.createdDate
+        return files
+            .filter { $0.id != file.id && canCombine($0) }
+            .sorted { lhs, rhs in
+                guard let reference, let left = lhs.createdDate, let right = rhs.createdDate else {
+                    return (lhs.createdDate ?? .distantPast) > (rhs.createdDate ?? .distantPast)
+                }
+                return abs(left.timeIntervalSince(reference)) < abs(right.timeIntervalSince(reference))
+            }
+    }
+
+    /// Appends the second recording to the first and replaces both files with
+    /// the combined one, which is then selected. This cannot be undone: the
+    /// two originals are removed from the store.
+    public func combine(firstFileID: TranscriptReviewFile.ID, secondFileID: TranscriptReviewFile.ID) async {
+        guard let recordingCombiner, !isCombining, firstFileID != secondFileID,
+              let first = files.first(where: { $0.id == firstFileID }), canCombine(first),
+              let second = files.first(where: { $0.id == secondFileID }), canCombine(second)
+        else { return }
+        if selectedFileID == firstFileID || selectedFileID == secondFileID {
+            stopPlayback()
+            cancelRememberingVoice()
+        }
+        isCombining = true
+        let toastID = toastCenter.post("Combining \u{201C}\(first.displayName)\u{201D} and \u{201C}\(second.displayName)\u{201D}…", kind: .progress)
+        defer { isCombining = false }
+        let combined: TranscriptReviewFile
+        do {
+            combined = try await recordingCombiner.combine(firstFileID: firstFileID, secondFileID: secondFileID)
+        } catch {
+            toastCenter.finish(toastID, text: "Could not combine the recordings: \(Self.describe(error))", failure: true)
+            return
+        }
+        let insertAt = files.firstIndex { $0.id == firstFileID || $0.id == secondFileID } ?? 0
+        files.removeAll { $0.id == firstFileID || $0.id == secondFileID }
+        files.insert(combined, at: min(insertAt, files.count))
+        undoStacks[firstFileID] = nil
+        undoStacks[secondFileID] = nil
+        redoStacks[firstFileID] = nil
+        redoStacks[secondFileID] = nil
+        selectedFileID = combined.id
+        toastCenter.finish(toastID, text: "Combined into \u{201C}\(combined.displayName)\u{201D}.", failure: false)
+    }
+
     /// Whether the selected file still has a recording to play.
     public var canPlayAudio: Bool { selectedFile?.hasAudio ?? false }
 
@@ -903,6 +966,12 @@ public final class TranscriptViewModel {
         selectedAgentID.map(agentPreferences.modelHistory(for:)) ?? []
     }
 
+    /// The instructions sent into the selected folder (the project the agent
+    /// works in), most recent first, at most ten.
+    public var agentInstructionHistory: [String] {
+        agentPreferences.instructionHistory(forFolder: selectedAgentFolderID)
+    }
+
     /// Picks the folder the agent works in, or none at all with nil.
     public func selectAgentFolder(id: TranscriptAgentFolder.ID?) {
         selectedAgentFolderID = id
@@ -979,6 +1048,7 @@ public final class TranscriptViewModel {
         if outcome.succeeded {
             agentPreferences.recordSend(agentID: agent.id, model: request.model, effort: request.effort)
             agentPreferences.mcpURL = request.mcpURL ?? ""
+            agentPreferences.recordInstruction(request.instruction, folderID: request.folder?.id)
         }
         agentMessage = TranscriptSpeakerActionMessage(text: outcome.summary, isFailure: !outcome.succeeded)
         return outcome.succeeded

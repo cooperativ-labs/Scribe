@@ -309,6 +309,86 @@ final class ModuleIntegrationTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: source.path), "the original the user chose is untouched")
     }
 
+    /// Combining two finished recordings joins their audio and transcripts into
+    /// one new meeting, removes both originals, and leaves a run a later
+    /// retranscription recognises as the same recording.
+    func testCombiningTwoRecordingsJoinsAudioAndTranscriptsIntoOneMeeting() async throws {
+        let firstSource = try writeAudio(named: "call part 1.wav", in: root, seconds: 4)
+        let secondSource = try writeAudio(named: "call part 2.wav", in: root, seconds: 3)
+        let coordinator = try TranscriptionCoordinator(
+            configuration: .init(transcriptStoreURL: storeURL),
+            stageRunner: ScriptedWorkerStageRunner(hostStageRunner: TranscriptAssemblyStageRunner())
+        )
+        _ = try await coordinator.enqueue(TranscriptionRequest(sourceURL: firstSource, modelProfileID: "parakeet-v3"))
+        _ = try await coordinator.enqueue(TranscriptionRequest(sourceURL: secondSource, modelProfileID: "parakeet-v3"))
+        await coordinator.runPending()
+
+        let store = TranscriptStore(storeDirectoryURL: storeURL)
+        let runs = store.latestRunPerSource()
+        XCTAssertEqual(runs.count, 2)
+        let first = try XCTUnwrap(runs.first { $0.job.request.sourceURL.lastPathComponent == "call part 1.wav" })
+        let second = try XCTUnwrap(runs.first { $0.job.request.sourceURL.lastPathComponent == "call part 2.wav" })
+        let firstTranscript = try XCTUnwrap(first.transcript)
+        let secondTranscript = try XCTUnwrap(second.transcript)
+
+        let combinedFile = try await TranscriptStoreRecordingCombiner(store: store)
+            .combine(firstFileID: first.job.runID.uuidString, secondFileID: second.job.runID.uuidString)
+
+        let remaining = store.latestRunPerSource()
+        XCTAssertEqual(remaining.count, 1, "both originals are replaced by the combined meeting")
+        let combined = try XCTUnwrap(remaining.first)
+        XCTAssertEqual(combined.job.runID.uuidString, combinedFile.id)
+        XCTAssertEqual(combined.job.state, .complete)
+        XCTAssertTrue(combinedFile.hasAudio)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: first.job.sourceSnapshotURL.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: second.job.sourceSnapshotURL.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: firstSource.path), "the originals the user chose are untouched")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: secondSource.path))
+
+        let transcript = try XCTUnwrap(combined.transcript)
+        XCTAssertNoThrow(try CanonicalTranscriptValidator.validate(transcript))
+        XCTAssertEqual(transcript.transcriptID, firstTranscript.transcriptID)
+        XCTAssertEqual(transcript.segments.count, firstTranscript.segments.count + secondTranscript.segments.count)
+        XCTAssertEqual(Double(transcript.source.durationMs), 7_000, accuracy: 100)
+        let audio = try await AVURLAsset(url: combined.job.sourceSnapshotURL).load(.duration)
+        XCTAssertEqual(audio.seconds, 7, accuracy: 0.1)
+        let secondStart = try XCTUnwrap(secondTranscript.segments.first?.startMs)
+        let shifted = transcript.segments[firstTranscript.segments.count]
+        XCTAssertEqual(Double(shifted.startMs - secondStart), 4_000, accuracy: 100)
+
+        // A rerun of the combined recording stays in its meeting rather than
+        // starting a separate one.
+        let rerun = try await coordinator.retranscribe(combined.job, modelProfileID: "parakeet-v3", speakerCount: .automatic)
+        XCTAssertEqual(
+            rerun.runDirectoryURL.deletingLastPathComponent().deletingLastPathComponent().standardizedFileURL,
+            combined.runDirectoryURL.deletingLastPathComponent().deletingLastPathComponent().standardizedFileURL
+        )
+    }
+
+    /// Without its audio a recording cannot be combined, and nothing is touched.
+    func testCombiningRefusesARecordingWhoseAudioWasDeleted() async throws {
+        let firstSource = try writeAudio(named: "a.wav", in: root, seconds: 2)
+        let secondSource = try writeAudio(named: "b.wav", in: root, seconds: 3)
+        let coordinator = try TranscriptionCoordinator(
+            configuration: .init(transcriptStoreURL: storeURL),
+            stageRunner: ScriptedWorkerStageRunner(hostStageRunner: TranscriptAssemblyStageRunner())
+        )
+        _ = try await coordinator.enqueue(TranscriptionRequest(sourceURL: firstSource, modelProfileID: "parakeet-v3"))
+        _ = try await coordinator.enqueue(TranscriptionRequest(sourceURL: secondSource, modelProfileID: "parakeet-v3"))
+        await coordinator.runPending()
+        let store = TranscriptStore(storeDirectoryURL: storeURL)
+        let runs = store.latestRunPerSource()
+        try store.deleteAudio(containingRunID: runs[1].job.runID)
+
+        do {
+            try await store.combineRecordings(firstRunID: runs[0].job.runID, secondRunID: runs[1].job.runID)
+            XCTFail("combining without audio should fail")
+        } catch {
+            XCTAssertEqual(error as? TranscriptStoreError, .audioDeleted)
+        }
+        XCTAssertEqual(store.latestRunPerSource().count, 2)
+    }
+
     /// A run that fails mid-pipeline keeps its earlier checkpoints and is
     /// presented as failed rather than as an empty transcript.
     func testAFailedAssemblyIsReportedWithoutInventingATranscript() async throws {

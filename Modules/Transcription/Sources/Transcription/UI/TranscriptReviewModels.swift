@@ -106,6 +106,11 @@ public struct TranscriptReviewFile: Identifiable, Equatable, Sendable {
         return parts.isEmpty ? jobState.displayName : parts.joined(separator: " · ")
     }
 
+    /// When the transcript was made, the date the sidebar shows.
+    public var createdDate: Date? {
+        transcript.flatMap { Self.parsedDate($0.createdAt) }
+    }
+
     /// Minutes and seconds with hours only past the hour: "42:17", "1:02:05".
     public static func lengthLabel(milliseconds: Int) -> String {
         TranscriptSpeakerTimeline.timeLabel(milliseconds, includeHours: milliseconds >= 3_600_000)
@@ -394,6 +399,16 @@ public protocol TranscriptFileDeleting: Sendable {
     func delete(fileID: TranscriptReviewFile.ID) throws
     /// Removes only the recording, keeping the transcript and its revisions.
     func deleteAudio(fileID: TranscriptReviewFile.ID) throws
+}
+
+/// Joins two reviewed recordings of one call into a single file.
+///
+/// Like deleting, combining removes the files it started from, so it has its
+/// own contract; a window without one does not offer the action.
+public protocol TranscriptRecordingCombining: Sendable {
+    /// Appends `secondFileID`'s recording and transcript to `firstFileID`'s
+    /// and returns the combined file, which replaces both.
+    func combine(firstFileID: TranscriptReviewFile.ID, secondFileID: TranscriptReviewFile.ID) async throws -> TranscriptReviewFile
 }
 
 /// The result of handing dropped files to the host for transcription.

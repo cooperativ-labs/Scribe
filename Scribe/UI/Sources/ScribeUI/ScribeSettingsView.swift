@@ -296,7 +296,7 @@ public struct ScribeSettingsView: View {
                     .foregroundStyle(.secondary)
                 Picker("Speakers", selection: $settings.transcriptionSpeakerCount) {
                     Text("Automatic").tag(RecorderSpeakerCountPreference.automatic)
-                    ForEach(1...8, id: \.self) { count in
+                    ForEach(1...12, id: \.self) { count in
                         Text("Exactly \(count)").tag(RecorderSpeakerCountPreference.known(count))
                     }
                 }

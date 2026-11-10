@@ -282,6 +282,55 @@ final class TranscriptAgentHandoffTests: XCTestCase {
         XCTAssertEqual(viewModel.agentHandoffProblem, "This file has no completed transcript to send.")
     }
 
+    func testASentInstructionJoinsTheHistoryOfItsFolderOnly() async throws {
+        let dispatcher = AgentDispatcherSpy()
+        dispatcher.environment = TranscriptAgentEnvironment(agents: [Self.claude], folders: [Self.repository, Self.notes])
+        let viewModel = try makeViewModel(dispatcher)
+        await viewModel.loadAgentEnvironment()
+        XCTAssertEqual(viewModel.agentInstructionHistory, [])
+
+        viewModel.agentInstruction = "  File the bugs.  "
+        _ = await viewModel.sendToAgent()
+        viewModel.agentInstruction = "Summarize decisions."
+        _ = await viewModel.sendToAgent()
+        // Sending the same words again moves them up rather than repeating them.
+        viewModel.agentInstruction = "File the bugs."
+        _ = await viewModel.sendToAgent()
+
+        XCTAssertEqual(viewModel.agentInstructionHistory, ["File the bugs.", "Summarize decisions."])
+        viewModel.selectAgentFolder(id: Self.notes.id)
+        XCTAssertEqual(viewModel.agentInstructionHistory, [])
+        viewModel.selectAgentFolder(id: nil)
+        XCTAssertEqual(viewModel.agentInstructionHistory, [])
+    }
+
+    func testARefusedSendingIsNotRemembered() async throws {
+        let dispatcher = AgentDispatcherSpy()
+        dispatcher.environment = TranscriptAgentEnvironment(agents: [Self.claude], folders: [Self.repository])
+        dispatcher.outcome = TranscriptAgentOutcome(sessionName: nil, agentName: "Claude Code", folderName: "Scribe", errorMessage: "No.")
+        let viewModel = try makeViewModel(dispatcher)
+        await viewModel.loadAgentEnvironment()
+        viewModel.agentInstruction = "Never sent."
+
+        _ = await viewModel.sendToAgent()
+
+        XCTAssertEqual(viewModel.agentInstructionHistory, [])
+    }
+
+    func testTheInstructionHistoryKeepsTheTenMostRecent() {
+        for number in 1...12 {
+            preferences.recordInstruction("Instruction \(number)", folderID: Self.repository.id)
+        }
+        preferences.recordInstruction("   ", folderID: Self.repository.id)
+        preferences.recordInstruction("Elsewhere", folderID: nil)
+
+        let history = preferences.instructionHistory(forFolder: Self.repository.id)
+        XCTAssertEqual(history.count, TranscriptAgentPreferences.instructionHistoryLimit)
+        XCTAssertEqual(history.first, "Instruction 12")
+        XCTAssertEqual(history.last, "Instruction 3")
+        XCTAssertEqual(preferences.instructionHistory(forFolder: nil), ["Elsewhere"])
+    }
+
     func testAFolderPathIsShownWithTheHomeDirectoryAbbreviated() {
         let home = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL
         let inside = TranscriptAgentFolder(url: home.appendingPathComponent("Development/Scribe", isDirectory: true))

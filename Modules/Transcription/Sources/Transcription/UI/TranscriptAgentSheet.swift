@@ -13,6 +13,9 @@ struct TranscriptAgentSheet: View {
 
     @State private var folderAwaitingRemoval: TranscriptAgentFolder?
     @FocusState private var isInstructionFocused: Bool
+    /// Starts collapsed every time the sheet opens: the history is there when
+    /// wanted and out of the way when not.
+    @State private var isInstructionHistoryExpanded = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -190,7 +193,69 @@ struct TranscriptAgentSheet: View {
                 .padding(6)
                 .background(.background.secondary, in: RoundedRectangle(cornerRadius: 6))
                 .overlay { RoundedRectangle(cornerRadius: 6).strokeBorder(.separator) }
+            instructionHistory
         }
+    }
+
+    /// The last instructions sent into the selected folder, folded beneath the
+    /// editor behind one line until it is clicked. Choosing one replaces the
+    /// editor's text and folds the list away again; nothing is sent until the
+    /// person presses Send. Absent when the folder has no history yet.
+    @ViewBuilder
+    private var instructionHistory: some View {
+        let history = viewModel.agentInstructionHistory
+        if !history.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.15)) { isInstructionHistoryExpanded.toggle() }
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "chevron.right")
+                            .font(.caption2.weight(.semibold))
+                            .rotationEffect(.degrees(isInstructionHistoryExpanded ? 90 : 0))
+                        Text("Recent instructions")
+                        Text("\(history.count)")
+                            .monospacedDigit()
+                            .foregroundStyle(.tertiary)
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(historyHelp)
+                .accessibilityLabel("Recent instructions, \(history.count)")
+                .accessibilityValue(isInstructionHistoryExpanded ? "Expanded" : "Collapsed")
+
+                if isInstructionHistoryExpanded {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(Array(history.enumerated()), id: \.element) { index, instruction in
+                            if index > 0 { Divider() }
+                            InstructionHistoryRow(
+                                instruction: instruction,
+                                isCurrent: instruction == viewModel.agentInstruction
+                                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                            ) {
+                                viewModel.agentInstruction = instruction
+                                withAnimation(.easeInOut(duration: 0.15)) { isInstructionHistoryExpanded = false }
+                                isInstructionFocused = true
+                            }
+                        }
+                    }
+                    .background(.background.secondary, in: RoundedRectangle(cornerRadius: 6))
+                    .overlay { RoundedRectangle(cornerRadius: 6).strokeBorder(.separator) }
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .transition(.opacity)
+                }
+            }
+        }
+    }
+
+    private var historyHelp: String {
+        if let folder = viewModel.selectedAgentFolder {
+            return "The last instructions sent to agents working in \(folder.displayName)"
+        }
+        return "The last instructions sent without a folder"
     }
 
     // MARK: - Footer
@@ -228,5 +293,41 @@ struct TranscriptAgentSheet: View {
             .font(.callout)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// One remembered instruction: two lines at most, the whole text on hover,
+/// and a check beside the one already in the editor.
+private struct InstructionHistoryRow: View {
+    let instruction: String
+    let isCurrent: Bool
+    let choose: () -> Void
+
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: choose) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(instruction)
+                    .font(.callout)
+                    .lineLimit(2)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                Image(systemName: "checkmark")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .opacity(isCurrent ? 1 : 0)
+                    .accessibilityHidden(!isCurrent)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(isHovered ? Color.accentColor.opacity(0.12) : Color.clear)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .help(instruction)
+        .accessibilityHint("Replaces the instruction with this one")
     }
 }

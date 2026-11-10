@@ -401,6 +401,7 @@ final class TranscriptionHostService {
             directory: speakerDirectory(),
             revisionStore: TranscriptStoreRevisionWriter(store: store),
             fileDeleter: TranscriptStoreFileDeleter(store: store),
+            recordingCombiner: TranscriptStoreRecordingCombiner(store: store),
             fileImporter: DroppedFileImporter(host: self),
             reprocessor: TranscriptReprocessor(host: self),
             retranscriber: TranscriptRetranscriber(host: self),

@@ -433,6 +433,48 @@ final class TranscriptViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.speakerActionMessage?.text.hasPrefix("Could not delete the audio") == true)
     }
 
+    func testCombiningReplacesBothFilesWithTheCombinedOneAndSelectsIt() async throws {
+        let combiner = CombinerSpy()
+        let one = TranscriptReviewFile(id: "one", sourceSnapshotURL: URL(fileURLWithPath: "/tmp/one.m4a"), transcript: try fixture(named: "one-speaker"), jobState: .complete)
+        let two = TranscriptReviewFile(id: "two", sourceSnapshotURL: URL(fileURLWithPath: "/tmp/two.m4a"), transcript: try fixture(named: "two-speakers"), jobState: .complete)
+        let silent = TranscriptReviewFile(id: "silent", sourceSnapshotURL: URL(fileURLWithPath: "/tmp/silent.m4a"), transcript: try fixture(named: "one-speaker"), jobState: .complete, hasAudio: false)
+        let running = TranscriptReviewFile(id: "running", sourceSnapshotURL: URL(fileURLWithPath: "/tmp/running.m4a"), transcript: nil, jobState: .queued)
+        combiner.result = TranscriptReviewFile(id: "combined", sourceSnapshotURL: URL(fileURLWithPath: "/tmp/combined.m4a"), transcript: try fixture(named: "two-speakers"), jobState: .complete)
+        let viewModel = TranscriptViewModel(files: [running, one, two, silent], selectedFileID: "two", playback: PlaybackSpy(), recordingCombiner: combiner)
+
+        XCTAssertEqual(viewModel.combineCandidates(for: one).map(\.id), ["two"], "only finished files with audio can be combined")
+        XCTAssertFalse(viewModel.canCombine(silent))
+        XCTAssertFalse(viewModel.canCombine(running))
+
+        await viewModel.combine(firstFileID: "one", secondFileID: "two")
+
+        XCTAssertEqual(combiner.requests.first?.0, "one")
+        XCTAssertEqual(combiner.requests.first?.1, "two")
+        XCTAssertEqual(viewModel.files.map(\.id), ["running", "combined", "silent"])
+        XCTAssertEqual(viewModel.selectedFileID, "combined")
+        XCTAssertFalse(viewModel.isCombining)
+    }
+
+    func testAFailedCombineLeavesBothFilesInPlace() async throws {
+        let combiner = CombinerSpy()
+        combiner.error = TranscriptStoreError.audioDeleted
+        let one = TranscriptReviewFile(id: "one", sourceSnapshotURL: URL(fileURLWithPath: "/tmp/one.m4a"), transcript: try fixture(named: "one-speaker"), jobState: .complete)
+        let two = TranscriptReviewFile(id: "two", sourceSnapshotURL: URL(fileURLWithPath: "/tmp/two.m4a"), transcript: try fixture(named: "two-speakers"), jobState: .complete)
+        let viewModel = TranscriptViewModel(files: [one, two], playback: PlaybackSpy(), recordingCombiner: combiner)
+
+        await viewModel.combine(firstFileID: "one", secondFileID: "two")
+
+        XCTAssertEqual(viewModel.files.map(\.id), ["one", "two"])
+        XCTAssertEqual(viewModel.selectedFileID, "one")
+    }
+
+    func testCombiningIsNotOfferedWithoutACombiner() throws {
+        let one = TranscriptReviewFile(id: "one", sourceSnapshotURL: URL(fileURLWithPath: "/tmp/one.m4a"), transcript: try fixture(named: "one-speaker"), jobState: .complete)
+        let two = TranscriptReviewFile(id: "two", sourceSnapshotURL: URL(fileURLWithPath: "/tmp/two.m4a"), transcript: try fixture(named: "two-speakers"), jobState: .complete)
+        let viewModel = TranscriptViewModel(files: [one, two], playback: PlaybackSpy())
+        XCTAssertEqual(viewModel.combineCandidates(for: one), [])
+    }
+
     func testReprocessConfirmationSheetShowsProgressAndCompletion() async throws {
         let transcript = try fixture(named: "two-speakers")
         let file = TranscriptReviewFile(
@@ -805,6 +847,18 @@ private final class DeleterSpy: TranscriptFileDeleting, @unchecked Sendable {
     func deleteAudio(fileID: TranscriptReviewFile.ID) throws {
         if let error { throw error }
         deletedAudio.append(fileID)
+    }
+}
+
+private final class CombinerSpy: TranscriptRecordingCombining, @unchecked Sendable {
+    var error: (any Error)?
+    var result: TranscriptReviewFile?
+    private(set) var requests: [(TranscriptReviewFile.ID, TranscriptReviewFile.ID)] = []
+
+    func combine(firstFileID: TranscriptReviewFile.ID, secondFileID: TranscriptReviewFile.ID) async throws -> TranscriptReviewFile {
+        requests.append((firstFileID, secondFileID))
+        if let error { throw error }
+        return try XCTUnwrap(result)
     }
 }
 

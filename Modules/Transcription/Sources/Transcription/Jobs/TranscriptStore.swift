@@ -131,6 +131,146 @@ public struct TranscriptStore: Sendable {
         }
     }
 
+    /// Joins two recordings of one call into a single meeting.
+    ///
+    /// The second recording's audio is appended to the first's and the two
+    /// saved transcripts are joined (`TranscriptRecordingCombiner`), so the
+    /// edits made to either are kept and nothing is transcribed again. The
+    /// result is a new meeting named after the joined audio's content, like
+    /// any import, holding one completed run; both original meetings, with
+    /// their run history, are then removed. That last step is what makes this
+    /// irreversible.
+    ///
+    /// The new meeting is fully written before either original is touched, so
+    /// a failure part way leaves both recordings as they were.
+    ///
+    /// - Returns: The combined run's ID, which is also its review file ID.
+    @discardableResult
+    public func combineRecordings(
+        firstRunID: UUID,
+        secondRunID: UUID,
+        concatenator: AudioConcatenator = AudioConcatenator(),
+        now: Date = Date()
+    ) async throws -> UUID {
+        let first = try combinable(runID: firstRunID)
+        let second = try combinable(runID: secondRunID)
+        guard first.meeting.standardizedFileURL != second.meeting.standardizedFileURL else {
+            throw TranscriptStoreError.sameRecording
+        }
+
+        let staging = storeDirectoryURL.appending(path: ".combine-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try fileManager.createDirectory(at: staging, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: staging) }
+
+        let snapshotName = "source.m4a"
+        let stagedSource = staging.appending(path: snapshotName)
+        let joined = try await concatenator.concatenate(
+            [first.run.job.sourceSnapshotURL, second.run.job.sourceSnapshotURL],
+            to: stagedSource
+        )
+        let hashed = try FileContentHash.sha256(ofFileAt: stagedSource)
+        let sourceID = String(hashed.digest.prefix(32))
+        let meeting = storeDirectoryURL.appending(path: SourceSnapshotService.meetingDirectoryPrefix + sourceID, directoryHint: .isDirectory)
+        guard !fileManager.fileExists(atPath: meeting.path) else { throw TranscriptStoreError.combinedRecordingExists }
+
+        let runID = UUID()
+        let runDirectory = meeting.appending(path: "runs/\(runID.uuidString)", directoryHint: .isDirectory)
+        let stagedRun = staging.appending(path: "runs/\(runID.uuidString)", directoryHint: .isDirectory)
+        try fileManager.createDirectory(at: stagedRun, withIntermediateDirectories: true)
+
+        // What review shows for each side, inferred speakers included, since
+        // the per-recording diarization they come from is not carried over.
+        let firstTranscript = UnknownFragmentReconciler.applied(to: first.transcript, in: first.run.runDirectoryURL) ?? first.transcript
+        let secondTranscript = UnknownFragmentReconciler.applied(to: second.transcript, in: second.run.runDirectoryURL) ?? second.transcript
+        let combined = TranscriptRecordingCombiner.combine(
+            first: firstTranscript,
+            firstSuggestions: recognition(forRunAt: first.run.runDirectoryURL)?.suggestions ?? [],
+            second: secondTranscript,
+            secondSuggestions: recognition(forRunAt: second.run.runDirectoryURL)?.suggestions ?? [],
+            offsetMs: joined.offsetsMs.count > 1 ? joined.offsetsMs[1] : firstTranscript.source.durationMs,
+            source: TranscriptSource(filename: firstTranscript.source.filename, durationMs: joined.durationMs, checksum: hashed.digest)
+        )
+        try CanonicalTranscriptValidator.validate(combined.transcript)
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+
+        let previous = first.run.job
+        let sourceURL = meeting.appending(path: snapshotName)
+        // A combined recording has no recorder session behind it, so the
+        // session's per-track evidence must not be read on a later rerun.
+        let request = TranscriptionRequest(
+            sourceURL: sourceURL,
+            languageMode: previous.request.languageMode,
+            expectedLanguage: previous.request.expectedLanguage,
+            speakerCount: previous.request.speakerCount,
+            speakerMatching: previous.request.speakerMatching,
+            speakerLibraryRevision: previous.request.speakerLibraryRevision,
+            vocabularyRevision: previous.request.vocabularyRevision,
+            modelProfileID: previous.request.modelProfileID,
+            exportDirectory: previous.request.exportDirectory,
+            title: previous.request.title
+        )
+        let job = TranscriptionJob(
+            runID: runID,
+            request: request,
+            sourceSnapshotURL: sourceURL,
+            runDirectoryURL: runDirectory,
+            sourceFingerprint: hashed.digest,
+            modelFingerprint: previous.modelFingerprint,
+            configurationFingerprint: previous.configurationFingerprint,
+            state: .complete,
+            createdAt: previous.createdAt,
+            updatedAt: now,
+            vocabularySnapshot: previous.vocabularySnapshot
+        )
+        try writer.write(try encoder.encode(job), to: stagedRun.appending(path: "job.json"))
+        try writer.write(try CanonicalTranscriptCodec.encode(combined.transcript), to: stagedRun.appending(path: TranscriptRunArtifact.canonicalTranscript))
+        if !combined.suggestions.isEmpty {
+            let record = SpeakerRecognitionRecord(
+                libraryRevision: recognition(forRunAt: first.run.runDirectoryURL)?.libraryRevision,
+                suggestions: combined.suggestions
+            )
+            try writer.write(try encoder.encode(record), to: stagedRun.appending(path: TranscriptRunArtifact.speakerRecognition))
+        }
+
+        let snapshots = SourceSnapshotService(storeDirectory: storeDirectoryURL)
+        let originals = [first.meeting, second.meeting].compactMap(snapshots.readRecord(in:))
+        let record = SourceSnapshotRecord(
+            schemaVersion: SourceSnapshotRecord.currentSchemaVersion,
+            sourceID: sourceID,
+            contentHash: hashed.digest,
+            byteCount: hashed.byteCount,
+            snapshotFileName: snapshotName,
+            originalPaths: originals.flatMap(\.originalPaths),
+            configurationHashes: [previous.configurationFingerprint],
+            createdAt: now,
+            updatedAt: now
+        )
+        try writer.write(try encoder.encode(record), to: staging.appending(path: SourceSnapshotRecord.fileName))
+
+        try fileManager.moveItem(at: staging, to: meeting)
+        try fileManager.removeItem(at: first.meeting)
+        try fileManager.removeItem(at: second.meeting)
+        return runID
+    }
+
+    /// The run, its meeting, and its saved transcript, when it can be combined.
+    private func combinable(runID: UUID) throws -> (run: StoredTranscriptRun, meeting: URL, transcript: CanonicalTranscript) {
+        guard let run = run(withRunID: runID) else {
+            throw TranscriptAssemblyError.missingArtifact("the run directory for \(runID.uuidString)")
+        }
+        let meeting = run.runDirectoryURL.deletingLastPathComponent().deletingLastPathComponent()
+        guard meeting.lastPathComponent.hasPrefix(SourceSnapshotService.meetingDirectoryPrefix) else {
+            throw TranscriptAssemblyError.missingArtifact("the meeting directory for \(runID.uuidString)")
+        }
+        guard runs(inMeetingAt: meeting).allSatisfy(\.job.state.isTerminal) else { throw TranscriptStoreError.meetingInUse }
+        guard let transcript = run.transcript else { throw TranscriptStoreError.noTranscript }
+        guard fileManager.fileExists(atPath: run.job.sourceSnapshotURL.path) else { throw TranscriptStoreError.audioDeleted }
+        return (run, meeting, transcript)
+    }
+
     /// The `TranscriptionResult` a completed run reports back to its caller.
     public func result(for run: StoredTranscriptRun) -> TranscriptionResult? {
         guard let transcript = run.transcript else { return nil }
@@ -204,10 +344,22 @@ public struct TranscriptStore: Sendable {
 public enum TranscriptStoreError: LocalizedError, Equatable, Sendable {
     /// Another run of the same meeting is still queued or running.
     case meetingInUse
+    /// Combining needs a finished transcript on both sides.
+    case noTranscript
+    /// Combining needs both recordings; one has been deleted.
+    case audioDeleted
+    /// Both runs belong to the same meeting.
+    case sameRecording
+    /// The joined audio is identical to a recording already in the store.
+    case combinedRecordingExists
 
     public var errorDescription: String? {
         switch self {
         case .meetingInUse: "A transcription of this recording is still running. Try again once it finishes."
+        case .noTranscript: "Only recordings with a finished transcript can be combined."
+        case .audioDeleted: "The audio for one of these recordings has been deleted, so they can no longer be combined."
+        case .sameRecording: "These are the same recording."
+        case .combinedRecordingExists: "These recordings have already been combined."
         }
     }
 }
@@ -387,5 +539,28 @@ public struct TranscriptStoreFileDeleter: TranscriptFileDeleting {
             throw TranscriptAssemblyError.missingArtifact("the run directory for \(fileID)")
         }
         try store.deleteAudio(containingRunID: runID)
+    }
+}
+
+/// Combines two reviewed files by joining the meetings their runs belong to.
+public struct TranscriptStoreRecordingCombiner: TranscriptRecordingCombining {
+    private let store: TranscriptStore
+
+    public init(store: TranscriptStore) {
+        self.store = store
+    }
+
+    public func combine(firstFileID: TranscriptReviewFile.ID, secondFileID: TranscriptReviewFile.ID) async throws -> TranscriptReviewFile {
+        guard let firstRunID = UUID(uuidString: firstFileID) else {
+            throw TranscriptAssemblyError.missingArtifact("the run directory for \(firstFileID)")
+        }
+        guard let secondRunID = UUID(uuidString: secondFileID) else {
+            throw TranscriptAssemblyError.missingArtifact("the run directory for \(secondFileID)")
+        }
+        let runID = try await store.combineRecordings(firstRunID: firstRunID, secondRunID: secondRunID)
+        guard let run = store.run(withRunID: runID) else {
+            throw TranscriptAssemblyError.missingArtifact("the run directory for \(runID.uuidString)")
+        }
+        return TranscriptReviewFile(run)
     }
 }
