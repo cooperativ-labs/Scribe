@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "profileID": "parakeet-v3-offline-diarization-v1",
+  "profileID": "parakeet-v3-offline-diarization-v2",
   "fluidAudio": {
     "repository": "https://github.com/FluidInference/FluidAudio.git",
-    "revision": "v0.17.4 (21493f8dac5a97e65742e6ff26f42f164c2fda0f)"
+    "revision": "v0.18.3 (c8b41f98eae668794dd0083bbe028fe7e6585051)"
   },
   "telemetry": {
     "enabled": false,
@@ -11,20 +11,22 @@
   },
   "asrRuntime": {
     "adapter": "ParakeetAdapter",
+    "encoderBundle": "Encoder_v2.mlmodelc",
+    "encoderWeightFormat": "int8_linear_per_channel",
     "input": "16 kHz mono PCM file",
     "timestampUnit": "seconds",
     "chosenComputeUnits": "cpuAndNeuralEngine",
     "allowLowPrecisionAccumulationOnGPU": true,
     "longFileProcessing": {
-      "implementation": "FluidAudio v0.17.4 disk-backed ChunkProcessor",
-      "modelWindowSeconds": 14.88,
+      "implementation": "FluidAudio v0.18.3 disk-backed ChunkProcessor",
+      "modelWindowSeconds": 14.96,
       "overlapSeconds": 2.0,
-      "leftContextSeconds": 0.08,
+      "leftContextSeconds": 0,
       "absoluteOffsets": "decoder frame timestamps are rebased by chunkStart / 1,280 samples",
       "tokenEnd": "decoder TDT duration (frames x 0.08 s, minimum one frame), carried through the chunk merge since v0.12.5; v0.15.6 additionally repairs seam gaps, final-window alignment, and merged token order"
     },
     "benchmark": {
-      "provenanceNote": "Historical synthetic measurements retained; not rerun for 0.15.7. Current release build hashes and recording sweep: docs/investigations/diarization-1004-phase5.json",
+      "provenanceNote": "Historical synthetic measurements used the original Encoder.mlmodelc. Encoder_v2.mlmodelc has compatibility smoke coverage only.",
       "machine": "Apple Silicon (arm64), macOS 27.0",
       "fixtureGenerator": "macOS local speech voices; 16 kHz mono Float32 WAV",
       "measurement": "ASRBenchmark under /usr/bin/time -l; ASR throughput excludes model load, peak RSS includes it",
@@ -46,7 +48,7 @@
   },
   "diarizationRuntime": {
     "adapter": "OfflineDiarizationAdapter",
-    "pipeline": "FluidAudio v0.17.4 OfflineDiarizerManager with pyannote segmentation, WeSpeaker embeddings, and global VBx clustering",
+    "pipeline": "FluidAudio v0.18.3 OfflineDiarizerManager with pyannote segmentation, WeSpeaker embeddings, and global VBx clustering",
     "input": "any locally readable audio; streaming conversion to 16 kHz mono Float32 disk-backed PCM",
     "knownSpeakerCount": "OfflineDiarizerConfig.withSpeakers(exactly:) when supplied; clustering.maxSpeakers for an up-to ceiling; otherwise automatic global clustering",
     "postProcessing": {
@@ -62,7 +64,7 @@
       "preprocessingVersion": "fluidaudio-offline-fbank-16khz-mono-v0.15.6",
       "normalizationVersion": "l2-unit-v1",
       "source": "DiarizationResult.speakerDatabase, re-normalized after FluidAudio's centroid averaging",
-      "compatibilityAudit": "v0.15.6 to v0.15.7: extractor, filterbank, masks, PLDA transform and vector normalization unchanged; retain preprocessingVersion. Count-constrained cluster membership can change."
+      "compatibilityAudit": "The filterbank adapter preserves centering from the staged Community-1 model so VBx and existing WeSpeaker enrollments use the same centering, overlap-mask policy and L2 normalization."
     },
     "benchmark": {
       "provenanceNote": "Historical synthetic measurements retained; not rerun for 0.15.7. Current release build hashes and recording sweep: docs/investigations/diarization-1004-phase5.json",
@@ -89,8 +91,8 @@
       }
     }
   },
-  "totalDeclaredOnDiskBytes": 607681148,
-  "totalDeclaredOnDiskSize": "607.7 MB (579.5 MiB; includes optional vocabulary group, exact staged file bytes)",
+  "totalDeclaredOnDiskBytes": 756745475,
+  "totalDeclaredOnDiskSize": "756.7 MB (721.7 MiB; includes optional vocabulary group, exact staged file bytes)",
   "vad": {
     "separateModelRequired": false,
     "reason": "The pinned pyannote segmentation bundle supplies speech activity and overlap decisions for the offline VBx pipeline."
@@ -122,13 +124,13 @@
       "id": "parakeet-v3-encoder",
       "relativePath": "parakeet-tdt-0.6b-v3-coreml",
       "upstream": { "repository": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml", "revision": "7dd20fe6b1797d35f5e3307e8b1732d9a178edfe" },
-      "checksum": { "algorithm": "SHA-256", "value": "e2020f323703477a5b21d7c2d282c403e371afb5962e79877e3033e73ba6f421", "scope": "Encoder.mlmodelc/weights/weight.bin" },
+      "checksum": { "algorithm": "SHA-256", "value": "8d2c79e15a4545e08fe3a21fe741e42b8bf24329db81de8fdfacd92388ea5a66", "scope": "Encoder_v2.mlmodelc/weights/weight.bin" },
       "license": "CC-BY-4.0",
       "requiredFiles": [
-        { "relativePath": "Encoder.mlmodelc/coremldata.bin", "bytes": 485 },
-        { "relativePath": "Encoder.mlmodelc/model.mil", "bytes": 959769 },
-        { "relativePath": "Encoder.mlmodelc/metadata.json", "bytes": 2921 },
-        { "relativePath": "Encoder.mlmodelc/weights/weight.bin", "sha256": "e2020f323703477a5b21d7c2d282c403e371afb5962e79877e3033e73ba6f421", "bytes": 445187200 }
+        { "relativePath": "Encoder_v2.mlmodelc/analytics/coremldata.bin", "sha256": "af98d71151609799efbbffc00112fcba4bd91adf0b01135a982c574e91822f9c", "bytes": 243 },
+        { "relativePath": "Encoder_v2.mlmodelc/coremldata.bin", "sha256": "70628bd4fd25fb554cc0cebc31356723930c885480132bf3ecd1b5dbe71dd0a2", "bytes": 478 },
+        { "relativePath": "Encoder_v2.mlmodelc/model.mil", "sha256": "abc621390840dd064e6833dc098101706621e47e17119ead904f8c383211dd1d", "bytes": 1002653 },
+        { "relativePath": "Encoder_v2.mlmodelc/weights/weight.bin", "sha256": "8d2c79e15a4545e08fe3a21fe741e42b8bf24329db81de8fdfacd92388ea5a66", "bytes": 594211328 }
       ]
     },
     {
@@ -172,7 +174,7 @@
       "relativePath": "speaker-diarization-coreml",
       "upstream": { "repository": "https://huggingface.co/FluidInference/speaker-diarization-coreml", "revision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594" },
       "checksum": { "algorithm": "SHA-256", "value": "c3189a64946c75bc24fcb98afe89ad78c52bdbadfdf65e857fb1b81e2cc9fbb2", "scope": "Segmentation.mlmodelc/weights/weight.bin" },
-      "license": "CC-BY-4.0 (converted model; upstream pyannote/segmentation-3.0 is MIT)",
+      "license": "CC-BY-4.0 (Community-1 segmentation conversion)",
       "requiredFiles": [
         { "relativePath": "Segmentation.mlmodelc/coremldata.bin", "bytes": 812 },
         { "relativePath": "Segmentation.mlmodelc/model.mil", "bytes": 43063 },
@@ -185,7 +187,7 @@
       "relativePath": "speaker-diarization-coreml",
       "upstream": { "repository": "https://huggingface.co/FluidInference/speaker-diarization-coreml", "revision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594" },
       "checksum": { "algorithm": "SHA-256", "value": "99356b2985b8d43880a657024d941d450b38820451ccff903f76ed4e52d1868b", "scope": "Embedding.mlmodelc/weights/weight.bin" },
-      "license": "CC-BY-4.0 (converted model; verify upstream WeSpeaker notices before distribution)",
+      "license": "CC-BY-4.0 (Community-1 WeSpeaker conversion)",
       "requiredFiles": [
         { "relativePath": "Embedding.mlmodelc/coremldata.bin", "bytes": 704 },
         { "relativePath": "Embedding.mlmodelc/model.mil", "bytes": 78432 },

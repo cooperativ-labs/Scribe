@@ -1,4 +1,5 @@
 @testable import ScribeInference
+@preconcurrency import CoreML
 import Foundation
 import FluidAudio
 import Testing
@@ -105,6 +106,38 @@ func parakeetTailDurationContract() throws {
     }
 }
 
+@Test("the enrollment filterbank keeps padding intact during Core ML prediction")
+func enrollmentFilterbankCenteringContract() throws {
+    let audio = try MLMultiArray(shape: [1, 1, 800], dataType: .float32)
+    audio.withUnsafeMutableBufferPointer(ofType: Float.self) { samples, _ in
+        for index in samples.indices { samples[index] = 0 }
+        samples[320] = 0.25
+    }
+    let featureProvider = try MLDictionaryFeatureProvider(dictionary: ["audio": audio])
+    let filterbank = EnrollmentCompatibleFilterbank(model: FilterbankPredictionProbe())
+    let prediction = try filterbank.predictions(from: MLArrayBatchProvider(array: [featureProvider]), options: .init())
+    #expect(prediction.count == 1)
+    audio.withUnsafeBufferPointer(ofType: Float.self) { samples in
+        #expect(samples[0] == .leastNormalMagnitude)
+        #expect(samples[160] == .leastNormalMagnitude)
+        #expect(samples[320] == 0.25)
+        #expect(samples[480] == .leastNormalMagnitude)
+        #expect(samples[640] == .leastNormalMagnitude)
+        #expect(samples[641] == 0)
+    }
+}
+
+private final class FilterbankPredictionProbe: MLModel {
+    override func predictions(from inputBatch: any MLBatchProvider,
+                              options: MLPredictionOptions) throws -> any MLBatchProvider {
+        let audio = try #require(inputBatch.features(at: 0).featureValue(for: "audio")?.multiArrayValue)
+        audio.withUnsafeBufferPointer(ofType: Float.self) { samples in
+            #expect(samples.filter { $0 != 0 } == [0.25])
+        }
+        return inputBatch
+    }
+}
+
 @Test("offline diarization preserves overlap, first-appearance labels, and compatible vectors")
 func offlineDiarizationContract() throws {
     let manifest = try ModelManifest.load(from: URL(fileURLWithPath: #filePath)
@@ -131,7 +164,8 @@ func offlineDiarizationContract() throws {
     #expect(result.embeddings.allSatisfy { abs($0.vector.reduce(0) { $1 * $1 + $0 }.squareRoot() - 1) < 0.0001 })
     #expect(result.embeddings.allSatisfy { $0.modelID == "wespeaker-embedding-coreml" })
     #expect(result.embeddings.allSatisfy { $0.preprocessingVersion == "fluidaudio-offline-fbank-16khz-mono-v0.15.6" })
-    #expect(result.engine.runtime == "FluidAudio 0.17.4")
+    #expect(result.engine.runtime == "FluidAudio 0.18.3")
+    #expect(manifest.fluidAudio.revision == "v0.18.3 (\(result.engine.runtimeRevision))")
     #expect(result.configuration.clusteringThreshold == 0.6)
     #expect(result.clusteringDiagnostics.separationAppearsCollapsed == false)
 }
@@ -304,14 +338,22 @@ func offlineDiarizationConfigurationControls() throws {
     func adapter(_ configuration: OfflineDiarizationAdapter.Configuration) -> OfflineDiarizationAdapter {
         .init(manifest: manifest, modelsDirectory: URL(fileURLWithPath: "/unused"), configuration: configuration)
     }
-    let config = try adapter(.init(maximumSpeakerCount: 4, minimumGapDurationSeconds: 0.5,
+    let config = try adapter(.init(maximumSpeakerCount: 12, minimumGapDurationSeconds: 0.5,
                                    minimumSegmentDurationSeconds: 1.2)).makeDiarizerConfiguration()
-    #expect(config.clustering.maxSpeakers == 4)
+    #expect(config.clustering.maxSpeakers == 12)
     #expect(config.clustering.numSpeakers == nil)
     #expect(config.clustering.threshold == 0.6)
     #expect(config.postProcessing.minGapDurationSeconds == 0.5)
     #expect(config.segmentation.minDurationOn == 1.2)
     #expect(!config.postProcessing.exclusiveSegments)
+    try config.validate()
+    let exact = try adapter(.init(knownSpeakerCount: 12)).makeDiarizerConfiguration()
+    #expect(exact.clustering.numSpeakers == 12)
+    #expect(exact.clustering.maxSpeakers == nil)
+    try exact.validate()
+    let automatic = try adapter(.init()).makeDiarizerConfiguration()
+    #expect(automatic.clustering.numSpeakers == nil)
+    #expect(automatic.clustering.maxSpeakers == nil)
     for invalid in [
         OfflineDiarizationAdapter.Configuration(maximumSpeakerCount: 0),
         .init(knownSpeakerCount: 2, maximumSpeakerCount: 4),

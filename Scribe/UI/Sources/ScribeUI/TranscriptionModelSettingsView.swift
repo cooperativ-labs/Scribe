@@ -18,7 +18,7 @@ struct TranscriptionModelSettingsView: View {
     var body: some View {
         Section("Transcription model") {
             LabeledContent("Model", value: "Parakeet v3 · Recommended")
-            Text("Runs locally on your Mac. The 505 MB download includes the compact WeSpeaker voice-embedding model used to recognize people you have chosen to remember.")
+            Text(modelDescription)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             LabeledContent("Models folder") {
@@ -95,6 +95,13 @@ struct TranscriptionModelSettingsView: View {
             case .failure(let error): folderError = error.localizedDescription
             }
         }
+    }
+
+    private var modelDescription: String {
+        let description = "Runs locally on your Mac. The model set includes WeSpeaker to recognize people you have chosen to remember."
+        guard installer.totalBytes > 0 else { return description }
+        let size = ByteCountFormatter.string(fromByteCount: installer.totalBytes, countStyle: .file)
+        return "\(description) A fresh installation downloads \(size)."
     }
 
     private func installButton(_ title: String) -> some View {

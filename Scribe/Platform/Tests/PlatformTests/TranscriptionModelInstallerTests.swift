@@ -124,6 +124,66 @@ struct TranscriptionModelInstallerTests {
         try await downloader.install(manifest: manifest, directory: directory) { _, _, _ in }
         #expect(try await downloader.isInstalled(manifest: manifest, directory: directory))
     }
+
+    /// Opt in with a real previous installation and verified corrected assets.
+    @Test func correctedEncoderUpgradeResumesAndPreservesRollback() async throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let rollbackPath = environment["SCRIBE_MODEL_UPGRADE_SMOKE_ROLLBACK"],
+              let stagedPath = environment["SCRIBE_MODEL_UPGRADE_SMOKE_STAGED"] else { return }
+        let rollback = URL(fileURLWithPath: rollbackPath, isDirectory: true)
+        let staged = URL(fileURLWithPath: stagedPath, isDirectory: true)
+        let repo = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let previous = try TranscriptionModelManifest.load(from: rollback.appendingPathComponent(
+            "Scribe.app/Contents/Resources/model_manifest.json"
+        ))
+        let current = try TranscriptionModelManifest.load(from: repo.appendingPathComponent(
+            "Workers/TranscriptionWorker/model_manifest.json"
+        ))
+        let encoder = try #require(current.assets.first {
+            $0.requiredFiles.contains { $0.relativePath.hasPrefix("Encoder_v2.mlmodelc/") }
+        })
+        let weight = try #require(encoder.requiredFiles.first { $0.relativePath.hasSuffix("/weight.bin") })
+        let metadata = try #require(encoder.requiredFiles.first { $0.relativePath == "Encoder_v2.mlmodelc/coremldata.bin" })
+        let remote = try #require(URL(string: encoder.upstream.repository))
+            .appendingPathComponent("resolve").appendingPathComponent(encoder.upstream.revision)
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        try FileManager.default.copyItem(at: rollback.appendingPathComponent("Models"), to: fixture.destination)
+        let encoderDirectory = fixture.destination.appendingPathComponent(encoder.relativePath)
+        let initialRequests = Requests()
+        let interrupted = TranscriptionModelDownloader { url in
+            await initialRequests.append(url)
+            if url == remote.appendingPathComponent(weight.relativePath) { throw CancellationError() }
+            let path = String(url.path.dropFirst(remote.path.count + 1))
+            let temporary = fixture.root.appendingPathComponent(UUID().uuidString)
+            try FileManager.default.copyItem(at: staged.appendingPathComponent(encoder.relativePath)
+                .appendingPathComponent(path), to: temporary)
+            return temporary
+        }
+        await #expect(throws: CancellationError.self) {
+            try await interrupted.install(manifest: current, directory: fixture.destination) { _, _, _ in }
+        }
+        #expect(await initialRequests.urls == encoder.requiredFiles.map { remote.appendingPathComponent($0.relativePath) })
+        #expect(!FileManager.default.fileExists(atPath: encoderDirectory.appendingPathComponent(weight.relativePath).path))
+        #expect(try await interrupted.isInstalled(manifest: previous, directory: fixture.destination))
+        #expect(try await !interrupted.isInstalled(manifest: current, directory: fixture.destination))
+
+        try Data(repeating: 0, count: metadata.bytes).write(to: encoderDirectory.appendingPathComponent(metadata.relativePath))
+        let retryRequests = Requests()
+        let retry = TranscriptionModelDownloader { url in
+            await retryRequests.append(url)
+            let path = String(url.path.dropFirst(remote.path.count + 1))
+            let temporary = fixture.root.appendingPathComponent(UUID().uuidString)
+            try FileManager.default.copyItem(at: staged.appendingPathComponent(encoder.relativePath)
+                .appendingPathComponent(path), to: temporary)
+            return temporary
+        }
+        try await retry.install(manifest: current, directory: fixture.destination) { _, _, _ in }
+        #expect(await retryRequests.urls == [metadata, weight].map { remote.appendingPathComponent($0.relativePath) })
+        #expect(try await retry.isInstalled(manifest: current, directory: fixture.destination))
+        #expect(try await retry.isInstalled(manifest: previous, directory: fixture.destination))
+    }
 }
 
 private actor Requests {

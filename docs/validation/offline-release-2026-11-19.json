@@ -1,0 +1,1201 @@
+{
+  "recorded_on": "2026-11-19",
+  "host": {
+    "macos": "27.2.1",
+    "macos_build": "26B131",
+    "xcode": "Xcode 27.2, Build version 27B52",
+    "architecture": "arm64"
+  },
+  "release_app": {
+    "identifier": "com.scribe.app",
+    "short_version": "0.2611101145.0",
+    "build": "0.2611101145.0",
+    "architecture": "arm64",
+    "signature": {
+      "CDHash": "b35a345ce3c435cf2f1f658ef7c3443158fb3df8",
+      "TeamIdentifier": "X84RPB4674"
+    },
+    "files": {
+      "Info.plist": {
+        "bytes": 2050,
+        "sha256": "9bb4fbe72cf0a532aa035bbdb4efe3ea0d6369b75cf6111907f4579671f5d997"
+      },
+      "MacOS/Scribe": {
+        "bytes": 26801200,
+        "sha256": "d6180499394a5567f1d3e91637c710d8c217db041324173648e119c0bc4f4124"
+      },
+      "Resources/model_manifest.json": {
+        "bytes": 18947,
+        "sha256": "7cbb21dfd3c88424ef139c444794af07e76c1a9c2f1bce663ebca814e6de48b3"
+      },
+      "Library/Helpers/TranscriptionWorker": {
+        "bytes": 25532416,
+        "sha256": "fe9570ff927b4004587e09b7d4d07ba3e529b17a227dd6e472458eb2095c5b6a"
+      },
+      "Library/Helpers/ffmpeg": {
+        "bytes": 440608,
+        "sha256": "538278f2de71c7ada365b10fa7e86c9a606fb51a8e750d7571c173ebc8693070"
+      },
+      "Library/Helpers/ffprobe": {
+        "bytes": 235984,
+        "sha256": "d4c8cec4a131467c7b5bf1323a680ce9593837eeb1217725ba8618c56bd1fd63"
+      }
+    },
+    "archive_app": "build/validation/ykec/release/Scribe.xcarchive/Products/Applications/Scribe.app",
+    "tested_copy": "build/validation/ykec/Relocated app verification/Scribe.app",
+    "distribution_status": "local Developer ID-signed archive",
+    "notarization_verified": false,
+    "clean_mac_gatekeeper_verified": false
+  },
+  "worker": {
+    "signature": {
+      "CDHash": "7a25da011eb62ac4b8a2c2835fdfd2f23b178a9b",
+      "TeamIdentifier": "X84RPB4674"
+    },
+    "handshake": {
+      "asrEncoderBundle": "Encoder_v2.mlmodelc",
+      "fluidAudio": "0.18.3",
+      "networking": "disabled",
+      "protocolVersion": 2,
+      "runtimeDownloads": false,
+      "stage": "handshake",
+      "telemetry": false,
+      "workerVersion": "0.2.0"
+    },
+    "fluidaudio_revision": "c8b41f98eae668794dd0083bbe028fe7e6585051"
+  },
+  "ffmpeg": {
+    "ffmpeg": {
+      "signature": {
+        "CDHash": "49ed3f267471c851991df699ea1045c69c653898",
+        "TeamIdentifier": "X84RPB4674"
+      },
+      "version_output": [
+        "ffmpeg version 9.0.2 Copyright (c) 2000-2026 the FFmpeg developers",
+        "built with Apple clang version 21.0.0 (clang-2100.4.1.1)",
+        "configuration: --prefix=<local-build-prefix> --disable-doc --disable-debug --disable-network --disable-autodetect --disable-static --enable-shared --disable-everything --disable-avdevice --disable-swscale --disable-ffplay --extra-ldflags='-Wl,-headerpad_max_install_names' --enable-avcodec --enable-avformat --enable-avutil --enable-swresample --enable-ffmpeg --enable-ffprobe --enable-avfilter --enable-filter='pan,aresample' --enable-protocol=file --enable-demuxer='wav,flac,mp3,mov,aiff,caf,ogg,matroska,avi,mpegts,mpegps,mpegvideo,flv,asf,aac,ac3,amr,dts,wavpack,ape,au,voc,w64,spdif,truehd,mlp,tta,dsf' --enable-parser='aac,flac,mpegaudio,opus,vorbis,ac3,amr,dca' --enable-muxer=wav --enable-encoder=pcm_s16le --enable-decoder='aac,aac_latm,alac,flac,mp3,mp2,opus,vorbis,wmav1,wmav2,wmapro,ac3,eac3,dca,truehd,mlp,amrnb,amrwb,wavpack,ape,nellymoser,gsm,adpcm_ima_qt,adpcm_ms,pcm_s16le,pcm_s16be,pcm_s24le,pcm_s24be,pcm_s32le,pcm_s32be,pcm_f32le,pcm_f32be,pcm_f64le,pcm_f64be,pcm_u8,pcm_mulaw,pcm_alaw'",
+        "libavutil      61.  1.102 / 61.  1.102",
+        "libavcodec     63.  1.102 / 63.  1.102",
+        "libavformat    63.  1.102 / 63.  1.102",
+        "libavfilter    12.  1.102 / 12.  1.102",
+        "libswresample   7.  1.102 /  7.  1.102"
+      ]
+    },
+    "ffprobe": {
+      "signature": {
+        "CDHash": "6bed1256a5d392cfc768220af04ee450ce8bb41f",
+        "TeamIdentifier": "X84RPB4674"
+      },
+      "version_output": [
+        "ffprobe version 9.0.2 Copyright (c) 2007-2026 the FFmpeg developers",
+        "built with Apple clang version 21.0.0 (clang-2100.4.1.1)",
+        "configuration: --prefix=<local-build-prefix> --disable-doc --disable-debug --disable-network --disable-autodetect --disable-static --enable-shared --disable-everything --disable-avdevice --disable-swscale --disable-ffplay --extra-ldflags='-Wl,-headerpad_max_install_names' --enable-avcodec --enable-avformat --enable-avutil --enable-swresample --enable-ffmpeg --enable-ffprobe --enable-avfilter --enable-filter='pan,aresample' --enable-protocol=file --enable-demuxer='wav,flac,mp3,mov,aiff,caf,ogg,matroska,avi,mpegts,mpegps,mpegvideo,flv,asf,aac,ac3,amr,dts,wavpack,ape,au,voc,w64,spdif,truehd,mlp,tta,dsf' --enable-parser='aac,flac,mpegaudio,opus,vorbis,ac3,amr,dca' --enable-muxer=wav --enable-encoder=pcm_s16le --enable-decoder='aac,aac_latm,alac,flac,mp3,mp2,opus,vorbis,wmav1,wmav2,wmapro,ac3,eac3,dca,truehd,mlp,amrnb,amrwb,wavpack,ape,nellymoser,gsm,adpcm_ima_qt,adpcm_ms,pcm_s16le,pcm_s16be,pcm_s24le,pcm_s24be,pcm_s32le,pcm_s32be,pcm_f32le,pcm_f32be,pcm_f64le,pcm_f64be,pcm_u8,pcm_mulaw,pcm_alaw'",
+        "libavutil      61.  1.102 / 61.  1.102",
+        "libavcodec     63.  1.102 / 63.  1.102",
+        "libavformat    63.  1.102 / 63.  1.102",
+        "libavfilter    12.  1.102 / 12.  1.102",
+        "libswresample   7.  1.102 /  7.  1.102"
+      ]
+    },
+    "source_tarball": {
+      "bytes": 12040788,
+      "sha256": "8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e"
+    },
+    "protocols": {
+      "input": [
+        "file"
+      ],
+      "output": [
+        "file"
+      ]
+    },
+    "libraries": {
+      "Frameworks/FFmpeg/libavcodec.63.1.102.dylib": {
+        "bytes": 1514128,
+        "sha256": "0098a2822c252e08c25b127ee6226b7c1b9bcb54b7bd5ed98b6da44316fdbe7d",
+        "signature": {
+          "CDHash": "709fb3b148b22198e9e3ed98833578e724308791",
+          "TeamIdentifier": "X84RPB4674"
+        }
+      },
+      "Frameworks/FFmpeg/libavfilter.12.1.102.dylib": {
+        "bytes": 237024,
+        "sha256": "76649c6f1ae4fd506e90b7a696d9762b70b6bb253691e08ce60a2f442a6a3703",
+        "signature": {
+          "CDHash": "104b8ecb30ca898fc94d1beabbbfb3a0038ef421",
+          "TeamIdentifier": "X84RPB4674"
+        }
+      },
+      "Frameworks/FFmpeg/libavformat.63.1.102.dylib": {
+        "bytes": 753312,
+        "sha256": "246249270258c309dc527072b9bc3e9395042a3749f29875b0ec06027e68a859",
+        "signature": {
+          "CDHash": "90bce2b29dd0f1c196b33e41cf17be67fa645a24",
+          "TeamIdentifier": "X84RPB4674"
+        }
+      },
+      "Frameworks/FFmpeg/libavutil.61.1.102.dylib": {
+        "bytes": 749840,
+        "sha256": "7fca7bed406237213c589141e86da07059d5123635446927e15a4a8be92034d2",
+        "signature": {
+          "CDHash": "412a73358dd2b50b881cad7e1365512330df568e",
+          "TeamIdentifier": "X84RPB4674"
+        }
+      },
+      "Frameworks/FFmpeg/libswresample.7.1.102.dylib": {
+        "bytes": 137600,
+        "sha256": "0e56c85860232fb32388027dac150b1bfe8a92c643c742da7b6d0843699645f2",
+        "signature": {
+          "CDHash": "a1c26e7df24ec0f60b1d39f6aebf8277b7ce20a5",
+          "TeamIdentifier": "X84RPB4674"
+        }
+      }
+    }
+  },
+  "staged_models": {
+    "profile_id": "parakeet-v3-offline-diarization-v2",
+    "total_bytes": 756745475,
+    "verification_counts": {
+      "manifest_size": 21,
+      "manifest_sha256": 27
+    },
+    "assets": [
+      {
+        "id": "parakeet-v3-preprocessor",
+        "upstream": {
+          "repository": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml",
+          "revision": "7dd20fe6b1797d35f5e3307e8b1732d9a178edfe"
+        },
+        "checksum": {
+          "algorithm": "SHA-256",
+          "value": "129b76e3aeafa8afa3ea76d995b964b145fe83700d579f6ff42c4c38fa0968ea",
+          "scope": "Preprocessor.mlmodelc/weights/weight.bin"
+        },
+        "files": {
+          "parakeet-tdt-0.6b-v3-coreml/Preprocessor.mlmodelc/coremldata.bin": {
+            "bytes": 486,
+            "sha256": "dbde3f2300842c1fd51ef3ff948a0bcffe65ffd2dca10707f2509f32c1d65b1d",
+            "manifest_sha256_verified": false
+          },
+          "parakeet-tdt-0.6b-v3-coreml/Preprocessor.mlmodelc/model.mil": {
+            "bytes": 28181,
+            "sha256": "4b8518a956450fec57f06c2a21bdffc26973f7f1fa6842fb38fe917f896b6b93",
+            "manifest_sha256_verified": false
+          },
+          "parakeet-tdt-0.6b-v3-coreml/Preprocessor.mlmodelc/metadata.json": {
+            "bytes": 2841,
+            "sha256": "2a98699e22d279dd37fa1d238aeb1c6db1df0d6fad687775324157689d8f3acf",
+            "manifest_sha256_verified": false
+          },
+          "parakeet-tdt-0.6b-v3-coreml/Preprocessor.mlmodelc/weights/weight.bin": {
+            "bytes": 491072,
+            "sha256": "129b76e3aeafa8afa3ea76d995b964b145fe83700d579f6ff42c4c38fa0968ea",
+            "manifest_sha256_verified": true
+          }
+        }
+      },
+      {
+        "id": "parakeet-v3-encoder",
+        "upstream": {
+          "repository": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml",
+          "revision": "7dd20fe6b1797d35f5e3307e8b1732d9a178edfe"
+        },
+        "checksum": {
+          "algorithm": "SHA-256",
+          "value": "8d2c79e15a4545e08fe3a21fe741e42b8bf24329db81de8fdfacd92388ea5a66",
+          "scope": "Encoder_v2.mlmodelc/weights/weight.bin"
+        },
+        "files": {
+          "parakeet-tdt-0.6b-v3-coreml/Encoder_v2.mlmodelc/analytics/coremldata.bin": {
+            "bytes": 243,
+            "sha256": "af98d71151609799efbbffc00112fcba4bd91adf0b01135a982c574e91822f9c",
+            "manifest_sha256_verified": true
+          },
+          "parakeet-tdt-0.6b-v3-coreml/Encoder_v2.mlmodelc/coremldata.bin": {
+            "bytes": 478,
+            "sha256": "70628bd4fd25fb554cc0cebc31356723930c885480132bf3ecd1b5dbe71dd0a2",
+            "manifest_sha256_verified": true
+          },
+          "parakeet-tdt-0.6b-v3-coreml/Encoder_v2.mlmodelc/model.mil": {
+            "bytes": 1002653,
+            "sha256": "abc621390840dd064e6833dc098101706621e47e17119ead904f8c383211dd1d",
+            "manifest_sha256_verified": true
+          },
+          "parakeet-tdt-0.6b-v3-coreml/Encoder_v2.mlmodelc/weights/weight.bin": {
+            "bytes": 594211328,
+            "sha256": "8d2c79e15a4545e08fe3a21fe741e42b8bf24329db81de8fdfacd92388ea5a66",
+            "manifest_sha256_verified": true
+          }
+        }
+      },
+      {
+        "id": "parakeet-v3-decoder",
+        "upstream": {
+          "repository": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml",
+          "revision": "7dd20fe6b1797d35f5e3307e8b1732d9a178edfe"
+        },
+        "checksum": {
+          "algorithm": "SHA-256",
+          "value": "48adf0f0d47c406c8253d4f7fef967436a39da14f5a65e66d5a4b407be355d41",
+          "scope": "Decoder.mlmodelc/weights/weight.bin"
+        },
+        "files": {
+          "parakeet-tdt-0.6b-v3-coreml/Decoder.mlmodelc/coremldata.bin": {
+            "bytes": 554,
+            "sha256": "18647af085d87bd8f3121c8a9b4d4564c1ede038dab63d295b4e745cf2d7fb99",
+            "manifest_sha256_verified": false
+          },
+          "parakeet-tdt-0.6b-v3-coreml/Decoder.mlmodelc/model.mil": {
+            "bytes": 13110,
+            "sha256": "ef2a0a281695398a62fde86ac269c68f73d5b578d7ed3b31f2ba91a2d1ea1f35",
+            "manifest_sha256_verified": false
+          },
+          "parakeet-tdt-0.6b-v3-coreml/Decoder.mlmodelc/metadata.json": {
+            "bytes": 3427,
+            "sha256": "a39e93cd8371b8ded92635c7804fcd0590f0d1dd9415c6d19a0484be073077d9",
+            "manifest_sha256_verified": false
+          },
+          "parakeet-tdt-0.6b-v3-coreml/Decoder.mlmodelc/weights/weight.bin": {
+            "bytes": 23604992,
+            "sha256": "48adf0f0d47c406c8253d4f7fef967436a39da14f5a65e66d5a4b407be355d41",
+            "manifest_sha256_verified": true
+          }
+        }
+      },
+      {
+        "id": "parakeet-v3-joint-decision",
+        "upstream": {
+          "repository": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml",
+          "revision": "7dd20fe6b1797d35f5e3307e8b1732d9a178edfe"
+        },
+        "checksum": {
+          "algorithm": "SHA-256",
+          "value": "4e0e63d840032f7f07ddb1d64446051166281e5491bf22da8a945c41f6eedb3e",
+          "scope": "JointDecision.mlmodelc/weights/weight.bin"
+        },
+        "files": {
+          "parakeet-tdt-0.6b-v3-coreml/JointDecision.mlmodelc/coremldata.bin": {
+            "bytes": 534,
+            "sha256": "f56ded0404498e666ffcd84dda0c393924fc3581345ad03e41429ff560cb97b6",
+            "manifest_sha256_verified": false
+          },
+          "parakeet-tdt-0.6b-v3-coreml/JointDecision.mlmodelc/model.mil": {
+            "bytes": 9723,
+            "sha256": "2cb084d7e0dc86ad3ddaa53a9631cdd5d97f19839218845b0e65ca065a4d1a5e",
+            "manifest_sha256_verified": false
+          },
+          "parakeet-tdt-0.6b-v3-coreml/JointDecision.mlmodelc/metadata.json": {
+            "bytes": 2936,
+            "sha256": "3044edab5e4ee331d37cef7100074653c944a0e58184ab618aab183a0e0707bc",
+            "manifest_sha256_verified": false
+          },
+          "parakeet-tdt-0.6b-v3-coreml/JointDecision.mlmodelc/weights/weight.bin": {
+            "bytes": 12642764,
+            "sha256": "4e0e63d840032f7f07ddb1d64446051166281e5491bf22da8a945c41f6eedb3e",
+            "manifest_sha256_verified": true
+          }
+        }
+      },
+      {
+        "id": "parakeet-v3-vocabulary",
+        "upstream": {
+          "repository": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml",
+          "revision": "7dd20fe6b1797d35f5e3307e8b1732d9a178edfe"
+        },
+        "checksum": {
+          "algorithm": "SHA-256",
+          "value": "7ec60e05f1b24480736ec0eed40900f4626bce1fa9a60fd700ec7e2a59198735",
+          "scope": "parakeet_vocab.json"
+        },
+        "files": {
+          "parakeet-tdt-0.6b-v3-coreml/parakeet_vocab.json": {
+            "bytes": 151122,
+            "sha256": "7ec60e05f1b24480736ec0eed40900f4626bce1fa9a60fd700ec7e2a59198735",
+            "manifest_sha256_verified": true
+          }
+        }
+      },
+      {
+        "id": "pyannote-segmentation-vad-overlap",
+        "upstream": {
+          "repository": "https://huggingface.co/FluidInference/speaker-diarization-coreml",
+          "revision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594"
+        },
+        "checksum": {
+          "algorithm": "SHA-256",
+          "value": "c3189a64946c75bc24fcb98afe89ad78c52bdbadfdf65e857fb1b81e2cc9fbb2",
+          "scope": "Segmentation.mlmodelc/weights/weight.bin"
+        },
+        "files": {
+          "speaker-diarization-coreml/Segmentation.mlmodelc/coremldata.bin": {
+            "bytes": 812,
+            "sha256": "ea51481b8bd3e496ad3cf16f066ddaa37f20e8772eaac76b3393c28de20e06bc",
+            "manifest_sha256_verified": false
+          },
+          "speaker-diarization-coreml/Segmentation.mlmodelc/model.mil": {
+            "bytes": 43063,
+            "sha256": "d37e4ce30b406a6b34f765f769b9baed3178cc0c2b2e299c641daa43a052dd3f",
+            "manifest_sha256_verified": false
+          },
+          "speaker-diarization-coreml/Segmentation.mlmodelc/metadata.json": {
+            "bytes": 3410,
+            "sha256": "88dbf0b07208fe142e1729c2b4c974ad3599fcb2ae5d5f18fce782b225384124",
+            "manifest_sha256_verified": false
+          },
+          "speaker-diarization-coreml/Segmentation.mlmodelc/weights/weight.bin": {
+            "bytes": 5959360,
+            "sha256": "c3189a64946c75bc24fcb98afe89ad78c52bdbadfdf65e857fb1b81e2cc9fbb2",
+            "manifest_sha256_verified": true
+          }
+        }
+      },
+      {
+        "id": "wespeaker-embeddings",
+        "upstream": {
+          "repository": "https://huggingface.co/FluidInference/speaker-diarization-coreml",
+          "revision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594"
+        },
+        "checksum": {
+          "algorithm": "SHA-256",
+          "value": "99356b2985b8d43880a657024d941d450b38820451ccff903f76ed4e52d1868b",
+          "scope": "Embedding.mlmodelc/weights/weight.bin"
+        },
+        "files": {
+          "speaker-diarization-coreml/Embedding.mlmodelc/coremldata.bin": {
+            "bytes": 704,
+            "sha256": "4a705bac27d151d9642f37609296042a15602a42253039e0921dc9e75da7e004",
+            "manifest_sha256_verified": false
+          },
+          "speaker-diarization-coreml/Embedding.mlmodelc/model.mil": {
+            "bytes": 78432,
+            "sha256": "22fa958aef72a561c21f874a07cbdcd30fdf40ee961c0bc2fb67c119273b46d3",
+            "manifest_sha256_verified": false
+          },
+          "speaker-diarization-coreml/Embedding.mlmodelc/metadata.json": {
+            "bytes": 2818,
+            "sha256": "1854371eb6b438fb8aeac96afb45c999af7902581c06afdfcd7ff3cb1ce66be5",
+            "manifest_sha256_verified": false
+          },
+          "speaker-diarization-coreml/Embedding.mlmodelc/weights/weight.bin": {
+            "bytes": 13412288,
+            "sha256": "99356b2985b8d43880a657024d941d450b38820451ccff903f76ed4e52d1868b",
+            "manifest_sha256_verified": true
+          }
+        }
+      },
+      {
+        "id": "wespeaker-filterbank",
+        "upstream": {
+          "repository": "https://huggingface.co/FluidInference/speaker-diarization-coreml",
+          "revision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594"
+        },
+        "checksum": {
+          "algorithm": "SHA-256",
+          "value": "9e83fdd3ea78064b078069e4d9141603c61c47a27fd19e7e3142ff7476f8db36",
+          "scope": "FBank.mlmodelc/weights/weight.bin"
+        },
+        "files": {
+          "speaker-diarization-coreml/FBank.mlmodelc/coremldata.bin": {
+            "bytes": 853,
+            "sha256": "57ac436bb0671cbb5527a339134d695f752eb77f7a18966b93c6835335595759",
+            "manifest_sha256_verified": false
+          },
+          "speaker-diarization-coreml/FBank.mlmodelc/model.mil": {
+            "bytes": 15667,
+            "sha256": "27aaeb21569e81bdbe2eef87789f50a37cfea800039bd134448a9417de2f30ed",
+            "manifest_sha256_verified": false
+          },
+          "speaker-diarization-coreml/FBank.mlmodelc/metadata.json": {
+            "bytes": 3409,
+            "sha256": "2623785f5d186893b82d01e84aa33a7704ef763c3309e02055f22dc9d871ce9a",
+            "manifest_sha256_verified": false
+          },
+          "speaker-diarization-coreml/FBank.mlmodelc/weights/weight.bin": {
+            "bytes": 1776896,
+            "sha256": "9e83fdd3ea78064b078069e4d9141603c61c47a27fd19e7e3142ff7476f8db36",
+            "manifest_sha256_verified": true
+          }
+        }
+      },
+      {
+        "id": "vbx-rho-model",
+        "upstream": {
+          "repository": "https://huggingface.co/FluidInference/speaker-diarization-coreml",
+          "revision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594"
+        },
+        "checksum": {
+          "algorithm": "SHA-256",
+          "value": "80f7d229202636d372428c90596f11a91545f07da77259f07153aaf225914a36",
+          "scope": "PldaRho.mlmodelc/weights/weight.bin"
+        },
+        "files": {
+          "speaker-diarization-coreml/PldaRho.mlmodelc/coremldata.bin": {
+            "bytes": 763,
+            "sha256": "4d9741477f721c79b09fcdfe455110c4b7d4272e2de3496bf1729d966d3ee418",
+            "manifest_sha256_verified": false
+          },
+          "speaker-diarization-coreml/PldaRho.mlmodelc/model.mil": {
+            "bytes": 7613,
+            "sha256": "83aee2e5310d19b5f202aea97d07a0e12102556d1b32ef3ed08b36f7f9725041",
+            "manifest_sha256_verified": false
+          },
+          "speaker-diarization-coreml/PldaRho.mlmodelc/metadata.json": {
+            "bytes": 2749,
+            "sha256": "b314cf25a93e46b4076883a6f5a2f8848b73c3851bd9d36074d067f35a1c7945",
+            "manifest_sha256_verified": false
+          },
+          "speaker-diarization-coreml/PldaRho.mlmodelc/weights/weight.bin": {
+            "bytes": 200192,
+            "sha256": "80f7d229202636d372428c90596f11a91545f07da77259f07153aaf225914a36",
+            "manifest_sha256_verified": true
+          }
+        }
+      },
+      {
+        "id": "vbx-plda-parameters",
+        "upstream": {
+          "repository": "https://huggingface.co/FluidInference/speaker-diarization-coreml",
+          "revision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594"
+        },
+        "checksum": {
+          "algorithm": "SHA-256",
+          "value": "38ee28d4269c076cef254ee760bbd811f0738a92e0f01f9699ad372828c5de8f",
+          "scope": "plda-parameters.json"
+        },
+        "files": {
+          "speaker-diarization-coreml/plda-parameters.json": {
+            "bytes": 89416,
+            "sha256": "38ee28d4269c076cef254ee760bbd811f0738a92e0f01f9699ad372828c5de8f",
+            "manifest_sha256_verified": true
+          }
+        }
+      },
+      {
+        "id": "vbx-xvector-transform",
+        "upstream": {
+          "repository": "https://huggingface.co/FluidInference/speaker-diarization-coreml",
+          "revision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594"
+        },
+        "checksum": {
+          "algorithm": "SHA-256",
+          "value": "f7cd5cc16e63e2d89db052a23018ecfc47a311998ed1e9e39838fbac65048688",
+          "scope": "xvector-transform.json"
+        },
+        "files": {
+          "speaker-diarization-coreml/xvector-transform.json": {
+            "bytes": 177499,
+            "sha256": "f7cd5cc16e63e2d89db052a23018ecfc47a311998ed1e9e39838fbac65048688",
+            "manifest_sha256_verified": true
+          }
+        }
+      },
+      {
+        "id": "parakeet-ctc-110m",
+        "optional": true,
+        "upstream": {
+          "repository": "https://huggingface.co/FluidInference/parakeet-ctc-110m-coreml",
+          "revision": "accdafd8cf8a2ff1cabe3c11e54416b405d409aa"
+        },
+        "checksum": {
+          "algorithm": "sha256",
+          "value": "16bbfbb9974ca4334ad4d10c1a7709af86115e8d386503dbde77e8d847fb22e4",
+          "scope": "required-files"
+        },
+        "files": {
+          "parakeet-ctc-110m-coreml/AudioEncoder.mlmodelc/analytics/coremldata.bin": {
+            "bytes": 243,
+            "sha256": "8906c823e9bb3bf6b16d9f0308f98cd70573526333ad85dd767dc3f9ae6b25fa",
+            "manifest_sha256_verified": true
+          },
+          "parakeet-ctc-110m-coreml/AudioEncoder.mlmodelc/coremldata.bin": {
+            "bytes": 505,
+            "sha256": "a88b002b58193b4c31211754cdfdf220a85f9651dc61caf336ab84400cbc191a",
+            "manifest_sha256_verified": true
+          },
+          "parakeet-ctc-110m-coreml/AudioEncoder.mlmodelc/metadata.json": {
+            "bytes": 3456,
+            "sha256": "4f288bfe5cbe867ef1e592cdae33578b2fe59ada69182fc12209879558f985c2",
+            "manifest_sha256_verified": true
+          },
+          "parakeet-ctc-110m-coreml/AudioEncoder.mlmodelc/model.mil": {
+            "bytes": 1060924,
+            "sha256": "2f84ef93a69115e55f3b5d8ce695b3c937de1833d4d229620634fae967cd587e",
+            "manifest_sha256_verified": true
+          },
+          "parakeet-ctc-110m-coreml/AudioEncoder.mlmodelc/weights/weight.bin": {
+            "bytes": 100778304,
+            "sha256": "af0734b4a5d7465ad9e8bb170f0c53c5e6b91ebb75a9bdf88d3f59ae4ad6aebd",
+            "manifest_sha256_verified": true
+          },
+          "parakeet-ctc-110m-coreml/MelSpectrogram.mlmodelc/analytics/coremldata.bin": {
+            "bytes": 243,
+            "sha256": "22f2a8cba1de25c984050566b534a1d8caf22a82f9fe6c1c6f3149a0dd7e8ae3",
+            "manifest_sha256_verified": true
+          },
+          "parakeet-ctc-110m-coreml/MelSpectrogram.mlmodelc/coremldata.bin": {
+            "bytes": 330,
+            "sha256": "3a32ec67c76aa0aa2faef518413c311493e89aeb7fa11289fa4b8653ab8a160c",
+            "manifest_sha256_verified": true
+          },
+          "parakeet-ctc-110m-coreml/MelSpectrogram.mlmodelc/metadata.json": {
+            "bytes": 1962,
+            "sha256": "5e11d21a65c02bcfc37db43e941978e5d60d59e0efeadfda08e41f33b4f835d3",
+            "manifest_sha256_verified": true
+          },
+          "parakeet-ctc-110m-coreml/MelSpectrogram.mlmodelc/model.mil": {
+            "bytes": 12584,
+            "sha256": "0a7cb5693b39667295218bac5c7c09053f6bcd4b32699a83d06ac35d14ac6b79",
+            "manifest_sha256_verified": true
+          },
+          "parakeet-ctc-110m-coreml/MelSpectrogram.mlmodelc/weights/weight.bin": {
+            "bytes": 567712,
+            "sha256": "0a89c055bfde9022029d3cc59a23e949385e063974460d8eaec3a7614c3eaaa8",
+            "manifest_sha256_verified": true
+          },
+          "parakeet-ctc-110m-coreml/tokenizer.json": {
+            "bytes": 360106,
+            "sha256": "9f7c517c0bf644b1b690ab037bab4d4c53aecd38e047e7154d011013ab9160db",
+            "manifest_sha256_verified": true
+          },
+          "parakeet-ctc-110m-coreml/tokenizer_config.json": {
+            "bytes": 632,
+            "sha256": "7a29ed0fec88768d8666d65be8dc00ae41a60c4b7758c4df99a912108e62a23a",
+            "manifest_sha256_verified": true
+          },
+          "parakeet-ctc-110m-coreml/vocab.json": {
+            "bytes": 16086,
+            "sha256": "319d386eead79aadc80df9c3ecc8340d1a727efb7c02a8847eb940380dd61e1f",
+            "manifest_sha256_verified": true
+          }
+        }
+      }
+    ]
+  },
+  "bundled_dictation_vad": {
+    "bundle": "silero-vad-unified-256ms-v6.2.1.mlmodelc",
+    "model_files": {
+      "analytics/coremldata.bin": {
+        "bytes": 243,
+        "sha256": "8067594eb3126ab8318af507f0c00cabfed40d5fedb8a0ee5075dd02e903d909"
+      },
+      "coremldata.bin": {
+        "bytes": 625,
+        "sha256": "7db35a4fd995222a7fb0129713473b15d1462572ab4a2e5e4d56bcaad9e40f41"
+      },
+      "metadata.json": {
+        "bytes": 3335,
+        "sha256": "2740be542c611e1ba358e1849b4e265c65cdf0b17192767e1e5de86a31ac94d6"
+      },
+      "model.mil": {
+        "bytes": 176918,
+        "sha256": "c6a9d1bf22d413265da0a07a1d14151c3ea2fad296b3aa5859275b33ef1c3270"
+      },
+      "weights/weight.bin": {
+        "bytes": 882304,
+        "sha256": "53ecc8b5081146140ab654c89109cf001f2183abddd7a2411c5081feeffff063"
+      }
+    }
+  },
+  "fixtures": {
+    "synthetic_speech_wav": {
+      "bytes": 247952,
+      "sha256": "a87c1257b94c4c9a570aa944634858801874fbbb7f5b1dbb191f23a573829850"
+    },
+    "ffmpeg_prepared_import_wav": {
+      "bytes": 247952,
+      "sha256": "a87c1257b94c4c9a570aa944634858801874fbbb7f5b1dbb191f23a573829850"
+    },
+    "six_repetitions_with_silence_wav": {
+      "bytes": 1679288,
+      "sha256": "4318718f7ebfce4124183ad55063ef4ffb98e19fa8316970aa1a9ddb9721fcd6"
+    }
+  },
+  "compute_policy": {
+    "batch_and_dictation_asr": "cpuAndNeuralEngine",
+    "diarization_segmentation_embedding_and_rho": "cpuAndNeuralEngine",
+    "wespeaker_filterbank": "cpuOnly",
+    "ctc_encoder": "cpuAndNeuralEngine",
+    "ctc_mel_spectrogram": "cpuOnly",
+    "silero": "Core ML default; loaded from the compiled bundle without an explicit configuration",
+    "asr_and_diarization_gpu_low_precision_flag": true
+  },
+  "rollback": {
+    "directory": "build/rollback/Scribe-0.2611101145.0",
+    "app": {
+      "identifier": "com.scribe.app",
+      "short_version": "0.2611101145.0",
+      "build": "0.2611101145.0",
+      "architecture": "arm64",
+      "signature": {
+        "CDHash": "1a0fcccbcaa6806d9b16f67c8b3a8b339a0bd2a2",
+        "TeamIdentifier": "X84RPB4674"
+      },
+      "files": {
+        "Info.plist": {
+          "bytes": 2057,
+          "sha256": "95f509b8c962fc4692b244abf98159356e584170a276e722ce09084dfae9ad17"
+        },
+        "MacOS/Scribe": {
+          "bytes": 25409904,
+          "sha256": "8cae1437f453b307148075ac9d8dc0d826890b98f9c0de791892cabe99bac92a"
+        },
+        "Resources/model_manifest.json": {
+          "bytes": 18683,
+          "sha256": "55c9f6a21b86e4c8864f6d32f2e3f34bbe50ea9772f7bf39fb4c36af214a3d5b"
+        },
+        "Library/Helpers/TranscriptionWorker": {
+          "bytes": 19240720,
+          "sha256": "4c86d4d7bdc2adf15ddd2e8a34b5d2583d0e5d88340a3b70cbe7624e402de5dd"
+        },
+        "Library/Helpers/ffmpeg": {
+          "bytes": 352576,
+          "sha256": "b8d21c06da7c2364f73f079d03b2610c5dbe19da503d865b86cfca3907253508"
+        },
+        "Library/Helpers/ffprobe": {
+          "bytes": 250128,
+          "sha256": "1a7990fb25b2e41acf99ced672ff9c2d9509bef90a1ea9a14fdc07c617a86226"
+        }
+      }
+    },
+    "models": {
+      "profile_id": "parakeet-v3-offline-diarization-v1",
+      "total_bytes": 607681148,
+      "verification_counts": {
+        "manifest_size": 24,
+        "manifest_sha256": 24
+      },
+      "assets": [
+        {
+          "id": "parakeet-v3-preprocessor",
+          "upstream": {
+            "repository": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml",
+            "revision": "7dd20fe6b1797d35f5e3307e8b1732d9a178edfe"
+          },
+          "checksum": {
+            "algorithm": "SHA-256",
+            "value": "129b76e3aeafa8afa3ea76d995b964b145fe83700d579f6ff42c4c38fa0968ea",
+            "scope": "Preprocessor.mlmodelc/weights/weight.bin"
+          },
+          "files": {
+            "parakeet-tdt-0.6b-v3-coreml/Preprocessor.mlmodelc/coremldata.bin": {
+              "bytes": 486,
+              "sha256": "dbde3f2300842c1fd51ef3ff948a0bcffe65ffd2dca10707f2509f32c1d65b1d",
+              "manifest_sha256_verified": false
+            },
+            "parakeet-tdt-0.6b-v3-coreml/Preprocessor.mlmodelc/model.mil": {
+              "bytes": 28181,
+              "sha256": "4b8518a956450fec57f06c2a21bdffc26973f7f1fa6842fb38fe917f896b6b93",
+              "manifest_sha256_verified": false
+            },
+            "parakeet-tdt-0.6b-v3-coreml/Preprocessor.mlmodelc/metadata.json": {
+              "bytes": 2841,
+              "sha256": "2a98699e22d279dd37fa1d238aeb1c6db1df0d6fad687775324157689d8f3acf",
+              "manifest_sha256_verified": false
+            },
+            "parakeet-tdt-0.6b-v3-coreml/Preprocessor.mlmodelc/weights/weight.bin": {
+              "bytes": 491072,
+              "sha256": "129b76e3aeafa8afa3ea76d995b964b145fe83700d579f6ff42c4c38fa0968ea",
+              "manifest_sha256_verified": true
+            }
+          }
+        },
+        {
+          "id": "parakeet-v3-encoder",
+          "upstream": {
+            "repository": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml",
+            "revision": "7dd20fe6b1797d35f5e3307e8b1732d9a178edfe"
+          },
+          "checksum": {
+            "algorithm": "SHA-256",
+            "value": "e2020f323703477a5b21d7c2d282c403e371afb5962e79877e3033e73ba6f421",
+            "scope": "Encoder.mlmodelc/weights/weight.bin"
+          },
+          "files": {
+            "parakeet-tdt-0.6b-v3-coreml/Encoder.mlmodelc/coremldata.bin": {
+              "bytes": 485,
+              "sha256": "d48034a167a82e88fc3df64f60af963ab3983538271175b8319e7d5720a0fb86",
+              "manifest_sha256_verified": false
+            },
+            "parakeet-tdt-0.6b-v3-coreml/Encoder.mlmodelc/model.mil": {
+              "bytes": 959769,
+              "sha256": "ed7b19156ca29fa7dfd6891deb9fda4b0e8893f68597c985d135736546a43808",
+              "manifest_sha256_verified": false
+            },
+            "parakeet-tdt-0.6b-v3-coreml/Encoder.mlmodelc/metadata.json": {
+              "bytes": 2921,
+              "sha256": "da24da9cca943fb29d7fa8e376d57fca7cb3aa08ca51b956b0b0e56813f087e9",
+              "manifest_sha256_verified": false
+            },
+            "parakeet-tdt-0.6b-v3-coreml/Encoder.mlmodelc/weights/weight.bin": {
+              "bytes": 445187200,
+              "sha256": "e2020f323703477a5b21d7c2d282c403e371afb5962e79877e3033e73ba6f421",
+              "manifest_sha256_verified": true
+            }
+          }
+        },
+        {
+          "id": "parakeet-v3-decoder",
+          "upstream": {
+            "repository": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml",
+            "revision": "7dd20fe6b1797d35f5e3307e8b1732d9a178edfe"
+          },
+          "checksum": {
+            "algorithm": "SHA-256",
+            "value": "48adf0f0d47c406c8253d4f7fef967436a39da14f5a65e66d5a4b407be355d41",
+            "scope": "Decoder.mlmodelc/weights/weight.bin"
+          },
+          "files": {
+            "parakeet-tdt-0.6b-v3-coreml/Decoder.mlmodelc/coremldata.bin": {
+              "bytes": 554,
+              "sha256": "18647af085d87bd8f3121c8a9b4d4564c1ede038dab63d295b4e745cf2d7fb99",
+              "manifest_sha256_verified": false
+            },
+            "parakeet-tdt-0.6b-v3-coreml/Decoder.mlmodelc/model.mil": {
+              "bytes": 13110,
+              "sha256": "ef2a0a281695398a62fde86ac269c68f73d5b578d7ed3b31f2ba91a2d1ea1f35",
+              "manifest_sha256_verified": false
+            },
+            "parakeet-tdt-0.6b-v3-coreml/Decoder.mlmodelc/metadata.json": {
+              "bytes": 3427,
+              "sha256": "a39e93cd8371b8ded92635c7804fcd0590f0d1dd9415c6d19a0484be073077d9",
+              "manifest_sha256_verified": false
+            },
+            "parakeet-tdt-0.6b-v3-coreml/Decoder.mlmodelc/weights/weight.bin": {
+              "bytes": 23604992,
+              "sha256": "48adf0f0d47c406c8253d4f7fef967436a39da14f5a65e66d5a4b407be355d41",
+              "manifest_sha256_verified": true
+            }
+          }
+        },
+        {
+          "id": "parakeet-v3-joint-decision",
+          "upstream": {
+            "repository": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml",
+            "revision": "7dd20fe6b1797d35f5e3307e8b1732d9a178edfe"
+          },
+          "checksum": {
+            "algorithm": "SHA-256",
+            "value": "4e0e63d840032f7f07ddb1d64446051166281e5491bf22da8a945c41f6eedb3e",
+            "scope": "JointDecision.mlmodelc/weights/weight.bin"
+          },
+          "files": {
+            "parakeet-tdt-0.6b-v3-coreml/JointDecision.mlmodelc/coremldata.bin": {
+              "bytes": 534,
+              "sha256": "f56ded0404498e666ffcd84dda0c393924fc3581345ad03e41429ff560cb97b6",
+              "manifest_sha256_verified": false
+            },
+            "parakeet-tdt-0.6b-v3-coreml/JointDecision.mlmodelc/model.mil": {
+              "bytes": 9723,
+              "sha256": "2cb084d7e0dc86ad3ddaa53a9631cdd5d97f19839218845b0e65ca065a4d1a5e",
+              "manifest_sha256_verified": false
+            },
+            "parakeet-tdt-0.6b-v3-coreml/JointDecision.mlmodelc/metadata.json": {
+              "bytes": 2936,
+              "sha256": "3044edab5e4ee331d37cef7100074653c944a0e58184ab618aab183a0e0707bc",
+              "manifest_sha256_verified": false
+            },
+            "parakeet-tdt-0.6b-v3-coreml/JointDecision.mlmodelc/weights/weight.bin": {
+              "bytes": 12642764,
+              "sha256": "4e0e63d840032f7f07ddb1d64446051166281e5491bf22da8a945c41f6eedb3e",
+              "manifest_sha256_verified": true
+            }
+          }
+        },
+        {
+          "id": "parakeet-v3-vocabulary",
+          "upstream": {
+            "repository": "https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml",
+            "revision": "7dd20fe6b1797d35f5e3307e8b1732d9a178edfe"
+          },
+          "checksum": {
+            "algorithm": "SHA-256",
+            "value": "7ec60e05f1b24480736ec0eed40900f4626bce1fa9a60fd700ec7e2a59198735",
+            "scope": "parakeet_vocab.json"
+          },
+          "files": {
+            "parakeet-tdt-0.6b-v3-coreml/parakeet_vocab.json": {
+              "bytes": 151122,
+              "sha256": "7ec60e05f1b24480736ec0eed40900f4626bce1fa9a60fd700ec7e2a59198735",
+              "manifest_sha256_verified": true
+            }
+          }
+        },
+        {
+          "id": "pyannote-segmentation-vad-overlap",
+          "upstream": {
+            "repository": "https://huggingface.co/FluidInference/speaker-diarization-coreml",
+            "revision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594"
+          },
+          "checksum": {
+            "algorithm": "SHA-256",
+            "value": "c3189a64946c75bc24fcb98afe89ad78c52bdbadfdf65e857fb1b81e2cc9fbb2",
+            "scope": "Segmentation.mlmodelc/weights/weight.bin"
+          },
+          "files": {
+            "speaker-diarization-coreml/Segmentation.mlmodelc/coremldata.bin": {
+              "bytes": 812,
+              "sha256": "ea51481b8bd3e496ad3cf16f066ddaa37f20e8772eaac76b3393c28de20e06bc",
+              "manifest_sha256_verified": false
+            },
+            "speaker-diarization-coreml/Segmentation.mlmodelc/model.mil": {
+              "bytes": 43063,
+              "sha256": "d37e4ce30b406a6b34f765f769b9baed3178cc0c2b2e299c641daa43a052dd3f",
+              "manifest_sha256_verified": false
+            },
+            "speaker-diarization-coreml/Segmentation.mlmodelc/metadata.json": {
+              "bytes": 3410,
+              "sha256": "88dbf0b07208fe142e1729c2b4c974ad3599fcb2ae5d5f18fce782b225384124",
+              "manifest_sha256_verified": false
+            },
+            "speaker-diarization-coreml/Segmentation.mlmodelc/weights/weight.bin": {
+              "bytes": 5959360,
+              "sha256": "c3189a64946c75bc24fcb98afe89ad78c52bdbadfdf65e857fb1b81e2cc9fbb2",
+              "manifest_sha256_verified": true
+            }
+          }
+        },
+        {
+          "id": "wespeaker-embeddings",
+          "upstream": {
+            "repository": "https://huggingface.co/FluidInference/speaker-diarization-coreml",
+            "revision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594"
+          },
+          "checksum": {
+            "algorithm": "SHA-256",
+            "value": "99356b2985b8d43880a657024d941d450b38820451ccff903f76ed4e52d1868b",
+            "scope": "Embedding.mlmodelc/weights/weight.bin"
+          },
+          "files": {
+            "speaker-diarization-coreml/Embedding.mlmodelc/coremldata.bin": {
+              "bytes": 704,
+              "sha256": "4a705bac27d151d9642f37609296042a15602a42253039e0921dc9e75da7e004",
+              "manifest_sha256_verified": false
+            },
+            "speaker-diarization-coreml/Embedding.mlmodelc/model.mil": {
+              "bytes": 78432,
+              "sha256": "22fa958aef72a561c21f874a07cbdcd30fdf40ee961c0bc2fb67c119273b46d3",
+              "manifest_sha256_verified": false
+            },
+            "speaker-diarization-coreml/Embedding.mlmodelc/metadata.json": {
+              "bytes": 2818,
+              "sha256": "1854371eb6b438fb8aeac96afb45c999af7902581c06afdfcd7ff3cb1ce66be5",
+              "manifest_sha256_verified": false
+            },
+            "speaker-diarization-coreml/Embedding.mlmodelc/weights/weight.bin": {
+              "bytes": 13412288,
+              "sha256": "99356b2985b8d43880a657024d941d450b38820451ccff903f76ed4e52d1868b",
+              "manifest_sha256_verified": true
+            }
+          }
+        },
+        {
+          "id": "wespeaker-filterbank",
+          "upstream": {
+            "repository": "https://huggingface.co/FluidInference/speaker-diarization-coreml",
+            "revision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594"
+          },
+          "checksum": {
+            "algorithm": "SHA-256",
+            "value": "9e83fdd3ea78064b078069e4d9141603c61c47a27fd19e7e3142ff7476f8db36",
+            "scope": "FBank.mlmodelc/weights/weight.bin"
+          },
+          "files": {
+            "speaker-diarization-coreml/FBank.mlmodelc/coremldata.bin": {
+              "bytes": 853,
+              "sha256": "57ac436bb0671cbb5527a339134d695f752eb77f7a18966b93c6835335595759",
+              "manifest_sha256_verified": false
+            },
+            "speaker-diarization-coreml/FBank.mlmodelc/model.mil": {
+              "bytes": 15667,
+              "sha256": "27aaeb21569e81bdbe2eef87789f50a37cfea800039bd134448a9417de2f30ed",
+              "manifest_sha256_verified": false
+            },
+            "speaker-diarization-coreml/FBank.mlmodelc/metadata.json": {
+              "bytes": 3409,
+              "sha256": "2623785f5d186893b82d01e84aa33a7704ef763c3309e02055f22dc9d871ce9a",
+              "manifest_sha256_verified": false
+            },
+            "speaker-diarization-coreml/FBank.mlmodelc/weights/weight.bin": {
+              "bytes": 1776896,
+              "sha256": "9e83fdd3ea78064b078069e4d9141603c61c47a27fd19e7e3142ff7476f8db36",
+              "manifest_sha256_verified": true
+            }
+          }
+        },
+        {
+          "id": "vbx-rho-model",
+          "upstream": {
+            "repository": "https://huggingface.co/FluidInference/speaker-diarization-coreml",
+            "revision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594"
+          },
+          "checksum": {
+            "algorithm": "SHA-256",
+            "value": "80f7d229202636d372428c90596f11a91545f07da77259f07153aaf225914a36",
+            "scope": "PldaRho.mlmodelc/weights/weight.bin"
+          },
+          "files": {
+            "speaker-diarization-coreml/PldaRho.mlmodelc/coremldata.bin": {
+              "bytes": 763,
+              "sha256": "4d9741477f721c79b09fcdfe455110c4b7d4272e2de3496bf1729d966d3ee418",
+              "manifest_sha256_verified": false
+            },
+            "speaker-diarization-coreml/PldaRho.mlmodelc/model.mil": {
+              "bytes": 7613,
+              "sha256": "83aee2e5310d19b5f202aea97d07a0e12102556d1b32ef3ed08b36f7f9725041",
+              "manifest_sha256_verified": false
+            },
+            "speaker-diarization-coreml/PldaRho.mlmodelc/metadata.json": {
+              "bytes": 2749,
+              "sha256": "b314cf25a93e46b4076883a6f5a2f8848b73c3851bd9d36074d067f35a1c7945",
+              "manifest_sha256_verified": false
+            },
+            "speaker-diarization-coreml/PldaRho.mlmodelc/weights/weight.bin": {
+              "bytes": 200192,
+              "sha256": "80f7d229202636d372428c90596f11a91545f07da77259f07153aaf225914a36",
+              "manifest_sha256_verified": true
+            }
+          }
+        },
+        {
+          "id": "vbx-plda-parameters",
+          "upstream": {
+            "repository": "https://huggingface.co/FluidInference/speaker-diarization-coreml",
+            "revision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594"
+          },
+          "checksum": {
+            "algorithm": "SHA-256",
+            "value": "38ee28d4269c076cef254ee760bbd811f0738a92e0f01f9699ad372828c5de8f",
+            "scope": "plda-parameters.json"
+          },
+          "files": {
+            "speaker-diarization-coreml/plda-parameters.json": {
+              "bytes": 89416,
+              "sha256": "38ee28d4269c076cef254ee760bbd811f0738a92e0f01f9699ad372828c5de8f",
+              "manifest_sha256_verified": true
+            }
+          }
+        },
+        {
+          "id": "vbx-xvector-transform",
+          "upstream": {
+            "repository": "https://huggingface.co/FluidInference/speaker-diarization-coreml",
+            "revision": "1ed7a662fdc7109e36d822db793ee6eebdaf8594"
+          },
+          "checksum": {
+            "algorithm": "SHA-256",
+            "value": "f7cd5cc16e63e2d89db052a23018ecfc47a311998ed1e9e39838fbac65048688",
+            "scope": "xvector-transform.json"
+          },
+          "files": {
+            "speaker-diarization-coreml/xvector-transform.json": {
+              "bytes": 177499,
+              "sha256": "f7cd5cc16e63e2d89db052a23018ecfc47a311998ed1e9e39838fbac65048688",
+              "manifest_sha256_verified": true
+            }
+          }
+        },
+        {
+          "id": "parakeet-ctc-110m",
+          "optional": true,
+          "upstream": {
+            "repository": "https://huggingface.co/FluidInference/parakeet-ctc-110m-coreml",
+            "revision": "accdafd8cf8a2ff1cabe3c11e54416b405d409aa"
+          },
+          "checksum": {
+            "algorithm": "sha256",
+            "value": "16bbfbb9974ca4334ad4d10c1a7709af86115e8d386503dbde77e8d847fb22e4",
+            "scope": "required-files"
+          },
+          "files": {
+            "parakeet-ctc-110m-coreml/AudioEncoder.mlmodelc/analytics/coremldata.bin": {
+              "bytes": 243,
+              "sha256": "8906c823e9bb3bf6b16d9f0308f98cd70573526333ad85dd767dc3f9ae6b25fa",
+              "manifest_sha256_verified": true
+            },
+            "parakeet-ctc-110m-coreml/AudioEncoder.mlmodelc/coremldata.bin": {
+              "bytes": 505,
+              "sha256": "a88b002b58193b4c31211754cdfdf220a85f9651dc61caf336ab84400cbc191a",
+              "manifest_sha256_verified": true
+            },
+            "parakeet-ctc-110m-coreml/AudioEncoder.mlmodelc/metadata.json": {
+              "bytes": 3456,
+              "sha256": "4f288bfe5cbe867ef1e592cdae33578b2fe59ada69182fc12209879558f985c2",
+              "manifest_sha256_verified": true
+            },
+            "parakeet-ctc-110m-coreml/AudioEncoder.mlmodelc/model.mil": {
+              "bytes": 1060924,
+              "sha256": "2f84ef93a69115e55f3b5d8ce695b3c937de1833d4d229620634fae967cd587e",
+              "manifest_sha256_verified": true
+            },
+            "parakeet-ctc-110m-coreml/AudioEncoder.mlmodelc/weights/weight.bin": {
+              "bytes": 100778304,
+              "sha256": "af0734b4a5d7465ad9e8bb170f0c53c5e6b91ebb75a9bdf88d3f59ae4ad6aebd",
+              "manifest_sha256_verified": true
+            },
+            "parakeet-ctc-110m-coreml/MelSpectrogram.mlmodelc/analytics/coremldata.bin": {
+              "bytes": 243,
+              "sha256": "22f2a8cba1de25c984050566b534a1d8caf22a82f9fe6c1c6f3149a0dd7e8ae3",
+              "manifest_sha256_verified": true
+            },
+            "parakeet-ctc-110m-coreml/MelSpectrogram.mlmodelc/coremldata.bin": {
+              "bytes": 330,
+              "sha256": "3a32ec67c76aa0aa2faef518413c311493e89aeb7fa11289fa4b8653ab8a160c",
+              "manifest_sha256_verified": true
+            },
+            "parakeet-ctc-110m-coreml/MelSpectrogram.mlmodelc/metadata.json": {
+              "bytes": 1962,
+              "sha256": "5e11d21a65c02bcfc37db43e941978e5d60d59e0efeadfda08e41f33b4f835d3",
+              "manifest_sha256_verified": true
+            },
+            "parakeet-ctc-110m-coreml/MelSpectrogram.mlmodelc/model.mil": {
+              "bytes": 12584,
+              "sha256": "0a7cb5693b39667295218bac5c7c09053f6bcd4b32699a83d06ac35d14ac6b79",
+              "manifest_sha256_verified": true
+            },
+            "parakeet-ctc-110m-coreml/MelSpectrogram.mlmodelc/weights/weight.bin": {
+              "bytes": 567712,
+              "sha256": "0a89c055bfde9022029d3cc59a23e949385e063974460d8eaec3a7614c3eaaa8",
+              "manifest_sha256_verified": true
+            },
+            "parakeet-ctc-110m-coreml/tokenizer.json": {
+              "bytes": 360106,
+              "sha256": "9f7c517c0bf644b1b690ab037bab4d4c53aecd38e047e7154d011013ab9160db",
+              "manifest_sha256_verified": true
+            },
+            "parakeet-ctc-110m-coreml/tokenizer_config.json": {
+              "bytes": 632,
+              "sha256": "7a29ed0fec88768d8666d65be8dc00ae41a60c4b7758c4df99a912108e62a23a",
+              "manifest_sha256_verified": true
+            },
+            "parakeet-ctc-110m-coreml/vocab.json": {
+              "bytes": 16086,
+              "sha256": "319d386eead79aadc80df9c3ecc8340d1a727efb7c02a8847eb940380dd61e1f",
+              "manifest_sha256_verified": true
+            }
+          }
+        }
+      ]
+    },
+    "worker_handshake": {
+      "fluidAudio": "0.17.4",
+      "networking": "disabled",
+      "protocolVersion": 2,
+      "runtimeDownloads": false,
+      "stage": "handshake",
+      "telemetry": false,
+      "workerVersion": "0.2.0"
+    },
+    "ffmpeg": "ffmpeg version 7.1.1 Copyright (c) 2000-2025 the FFmpeg developers",
+    "ffprobe": "ffprobe version 7.1.1 Copyright (c) 2007-2025 the FFmpeg developers"
+  },
+  "asr_window": {
+    "implementation": "FluidAudio v0.18.3 disk-backed ChunkProcessor",
+    "modelWindowSeconds": 14.96,
+    "overlapSeconds": 2.0,
+    "leftContextSeconds": 0,
+    "absoluteOffsets": "decoder frame timestamps are rebased by chunkStart / 1,280 samples",
+    "tokenEnd": "decoder TDT duration (frames x 0.08 s, minimum one frame), carried through the chunk merge since v0.12.5; v0.15.6 additionally repairs seam gaps, final-window alignment, and merged token order"
+  },
+  "speaker_controls": {
+    "worker_defaults_observed": {
+      "clusteringThreshold": 0.6,
+      "constrainedAssignment": true,
+      "embeddingExcludeOverlap": true,
+      "maximumVBxIterations": 20,
+      "minimumEmbeddingDurationSeconds": 1,
+      "minimumGapDurationSeconds": 0.1,
+      "minimumSegmentDurationSeconds": 0,
+      "preserveOverlappingIntervals": true,
+      "segmentationStepRatio": 0.2,
+      "warmStartFa": 0.07,
+      "warmStartFb": 0.8
+    },
+    "language_mode": "automatic",
+    "speaker_matching": "enabled",
+    "smoke_modes": [
+      "automatic",
+      {
+        "known": 1
+      },
+      {
+        "up_to": 2
+      }
+    ]
+  },
+  "smoke_results": {
+    "network_denial": "macOS process sandbox denied an IPv4 loopback bind",
+    "clean_install": "production downloader, live upstream",
+    "upgrade": "rollback model copy with interrupted transfer and same-size corruption simulated",
+    "media_preparation": [
+      "stereo FLAC",
+      "MP4 with AAC",
+      "both selectable Opus tracks in MKV"
+    ],
+    "import_review_and_reprocessing": [
+      {
+        "speaker_count": "automatic",
+        "run_id": "50676F33-14F5-4583-AC27-CCD1FD4965CA",
+        "duration_seconds": 7.7460625,
+        "tokens": 48,
+        "intervals": 1,
+        "canonical_segments": 1,
+        "canonical_revision": 2,
+        "canonical_status": "complete",
+        "engine_revisions": {
+          "diarization_models": "1ed7a662fdc7109e36d822db793ee6eebdaf8594",
+          "diarization_runtime": "FluidAudio 0.18.3@c8b41f98eae668794dd0083bbe028fe7e6585051"
+        },
+        "prior_enrollment_assignment": "automatic",
+        "matching_score": 0.9519598
+      },
+      {
+        "speaker_count": 1,
+        "run_id": "86FA9B68-F718-4321-B4F1-E979C159DE6C",
+        "duration_seconds": 7.7460625,
+        "tokens": 48,
+        "intervals": 1,
+        "canonical_segments": 1,
+        "canonical_revision": 1,
+        "canonical_status": "complete",
+        "engine_revisions": {
+          "diarization_models": "1ed7a662fdc7109e36d822db793ee6eebdaf8594",
+          "diarization_runtime": "FluidAudio 0.18.3@c8b41f98eae668794dd0083bbe028fe7e6585051"
+        },
+        "prior_enrollment_assignment": "automatic",
+        "matching_score": 1.0000001
+      },
+      {
+        "speaker_count": {
+          "upTo": 2
+        },
+        "run_id": "6444CA14-9958-48C3-BA26-80CC4D942B5E",
+        "duration_seconds": 7.7460625,
+        "tokens": 48,
+        "intervals": 1,
+        "canonical_segments": 1,
+        "canonical_revision": 1,
+        "canonical_status": "complete",
+        "engine_revisions": {
+          "diarization_models": "1ed7a662fdc7109e36d822db793ee6eebdaf8594",
+          "diarization_runtime": "FluidAudio 0.18.3@c8b41f98eae668794dd0083bbe028fe7e6585051"
+        },
+        "prior_enrollment_assignment": "automatic",
+        "matching_score": 0.9519598
+      }
+    ],
+    "long_batch": {
+      "duration_seconds": 52.476375,
+      "chunked_asr": true,
+      "disk_backed_diarization": true,
+      "tokens": 288,
+      "intervals": 6,
+      "final_token_end_seconds": 51.2,
+      "final_interval_end_seconds": 51.34125518798828
+    },
+    "dictation": {
+      "tokens_with_ctc": 48,
+      "tokens_without_ctc": 48,
+      "warm_and_unload": "passed"
+    }
+  }
+}

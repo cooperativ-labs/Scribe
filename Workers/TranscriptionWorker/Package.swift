@@ -16,9 +16,9 @@ let package = Package(
     dependencies: [
         // Keep the release exact: ASR token timing, long-file merge behavior,
         // and offline diarization are part of the worker protocol contract.
-        // v0.17.4 retains the VBx backend; Nemotron is not enabled by this pin.
+        // Use the default package traits for local Community-1/VBx inference.
         // Models remain staged locally; runtime downloads stay disabled.
-        .package(url: "https://github.com/FluidInference/FluidAudio.git", exact: "0.17.4"),
+        .package(url: "https://github.com/FluidInference/FluidAudio.git", exact: "0.18.3"),
         .package(path: "../../Modules/Speakers"),
     ],
     targets: [

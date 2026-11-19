@@ -1,18 +1,20 @@
-Offline speaker-diarization models
+Community-1 offline speaker diarization (Core ML)
 
-This release uses the FluidInference Core ML speaker-diarization asset set
-consumed by FluidAudio v0.17.4 (pyannote segmentation, WeSpeaker embeddings,
-and VBx clustering parameters).
+Scribe stages these artifacts from FluidInference/speaker-diarization-coreml
+at revision 1ed7a662fdc7109e36d822db793ee6eebdaf8594:
+  Segmentation.mlmodelc, FBank.mlmodelc, Embedding.mlmodelc,
+  PldaRho.mlmodelc, plda-parameters.json, xvector-transform.json.
 
-Upstream: https://huggingface.co/FluidInference/speaker-diarization-coreml
-Revision: 1ed7a662fdc7109e36d822db793ee6eebdaf8594
+Credits: pyannote (Community-1 and segmentation), WeSpeaker (speaker
+embeddings), Brno University of Technology / BUT Speech@FIT (PLDA parameters),
+and Fluid Inference (modified Core ML conversions and serialized parameters).
+The staged Community-1 artifacts are covered by Creative Commons Attribution
+4.0 International: https://creativecommons.org/licenses/by/4.0/
 
-Converted model assets are licensed under Creative Commons Attribution 4.0
-International (CC-BY-4.0): https://creativecommons.org/licenses/by/4.0/
-
-Upstream source models include:
-- pyannote/segmentation-3.0 (MIT)
-- WeSpeaker speaker embeddings (verify upstream notices before redistribution)
-
-The converted Core ML bundles are not the original training code. Ship this
-notice with every distribution that includes the staged diarization assets.
+Community-1: https://huggingface.co/pyannote/speaker-diarization-community-1
+Conversion notice and license scope:
+https://huggingface.co/FluidInference/speaker-diarization-coreml/blob/main/NOTICE.md
+PLDA license:
+https://huggingface.co/BUT-FIT/diarizen-wavlm-large-s80-md/blob/6285693ddd5b38e8229acb93f864f3d04a82bee1/plda/LICENSE
+Upstream model citations:
+https://huggingface.co/FluidInference/speaker-diarization-coreml#citations

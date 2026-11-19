@@ -7,6 +7,8 @@ import Foundation
 /// calls `AsrModels.download`, `downloadAndLoad`, `DownloadUtils`, or a cache
 /// convenience API that may attempt recovery by downloading.
 public enum OfflineModelLoader {
+    public static let asrEncoderBundle = "Encoder_v2.mlmodelc"
+
     public struct LoadedModels: Sendable {
         public let asr: AsrModels
         public let diarization: OfflineDiarizerModels
@@ -20,11 +22,9 @@ public enum OfflineModelLoader {
         configuration.allowLowPrecisionAccumulationOnGPU = true
 
         let diarizationDirectory = modelsDirectory.appending(path: "speaker-diarization-coreml", directoryHint: .isDirectory)
-        let fbankConfiguration = MLModelConfiguration()
-        fbankConfiguration.computeUnits = .cpuOnly
         let diarization = OfflineDiarizerModels(
             segmentationModel: try loadModel(diarizationDirectory.appending(path: "Segmentation.mlmodelc", directoryHint: .isDirectory), configuration: configuration),
-            fbankModel: try loadModel(diarizationDirectory.appending(path: "FBank.mlmodelc", directoryHint: .isDirectory), configuration: fbankConfiguration),
+            fbankModel: try loadSpeakerFilterbank(in: diarizationDirectory),
             embeddingModel: try loadModel(diarizationDirectory.appending(path: "Embedding.mlmodelc", directoryHint: .isDirectory), configuration: configuration),
             pldaRhoModel: try loadModel(diarizationDirectory.appending(path: "PldaRho.mlmodelc", directoryHint: .isDirectory), configuration: configuration),
             pldaPsi: try loadPLDAPsi(from: diarizationDirectory.appending(path: "plda-parameters.json")),
@@ -43,6 +43,13 @@ public enum OfflineModelLoader {
         computeUnits: ASRComputeUnits = .cpuAndNeuralEngine,
         allowLowPrecisionAccumulationOnGPU: Bool = true
     ) async throws -> AsrModels {
+        let weightPath = "\(asrEncoderBundle)/weights/weight.bin"
+        guard manifest.assets.contains(where: { asset in
+            asset.id == "parakeet-v3-encoder" && asset.optional != true
+                && asset.requiredFiles.contains { $0.relativePath == weightPath && $0.sha256 != nil }
+        }) else {
+            throw ModelSetupError.incompatibleEncoder(asrEncoderBundle)
+        }
         let report = manifest.validate(modelsDirectory: modelsDirectory)
         guard report.isValid else { throw ModelSetupError.report(report) }
         guard !manifest.telemetry.enabled, !manifest.telemetry.runtimeDownloadsAllowed else {
@@ -56,7 +63,7 @@ public enum OfflineModelLoader {
         let asrDirectory = modelsDirectory.appending(path: "parakeet-tdt-0.6b-v3-coreml", directoryHint: .isDirectory)
         let vocabulary = try loadVocabulary(from: asrDirectory.appending(path: "parakeet_vocab.json"))
         return AsrModels(
-            encoder: try loadModel(asrDirectory.appending(path: "Encoder.mlmodelc", directoryHint: .isDirectory), configuration: configuration),
+            encoder: try loadModel(asrDirectory.appending(path: asrEncoderBundle, directoryHint: .isDirectory), configuration: configuration),
             preprocessor: try loadModel(asrDirectory.appending(path: "Preprocessor.mlmodelc", directoryHint: .isDirectory), configuration: configuration),
             decoder: try loadModel(asrDirectory.appending(path: "Decoder.mlmodelc", directoryHint: .isDirectory), configuration: configuration),
             joint: try loadModel(asrDirectory.appending(path: "JointDecision.mlmodelc", directoryHint: .isDirectory), configuration: configuration),
@@ -87,13 +94,10 @@ public enum OfflineModelLoader {
         configuration.computeUnits = computeUnits.coreMLValue
         configuration.allowLowPrecisionAccumulationOnGPU = allowLowPrecisionAccumulationOnGPU
 
-        let fbankConfiguration = MLModelConfiguration()
-        fbankConfiguration.computeUnits = .cpuOnly
-
         let directory = modelsDirectory.appending(path: "speaker-diarization-coreml", directoryHint: .isDirectory)
         return OfflineDiarizerModels(
             segmentationModel: try loadModel(directory.appending(path: "Segmentation.mlmodelc", directoryHint: .isDirectory), configuration: configuration),
-            fbankModel: try loadModel(directory.appending(path: "FBank.mlmodelc", directoryHint: .isDirectory), configuration: fbankConfiguration),
+            fbankModel: try loadSpeakerFilterbank(in: directory),
             embeddingModel: try loadModel(directory.appending(path: "Embedding.mlmodelc", directoryHint: .isDirectory), configuration: configuration),
             pldaRhoModel: try loadModel(directory.appending(path: "PldaRho.mlmodelc", directoryHint: .isDirectory), configuration: configuration),
             pldaPsi: try loadPLDAPsi(from: directory.appending(path: "plda-parameters.json")),
@@ -111,6 +115,13 @@ public enum OfflineModelLoader {
 
     private static func loadModel(_ url: URL, configuration: MLModelConfiguration) throws -> MLModel {
         try MLModel(contentsOf: url, configuration: configuration)
+    }
+
+    private static func loadSpeakerFilterbank(in directory: URL) throws -> MLModel {
+        let configuration = MLModelConfiguration()
+        configuration.computeUnits = .cpuOnly
+        let model = try loadModel(directory.appending(path: "FBank.mlmodelc", directoryHint: .isDirectory), configuration: configuration)
+        return EnrollmentCompatibleFilterbank(model: model)
     }
 
     private static func loadVocabulary(from url: URL) throws -> [Int: String] {
@@ -155,12 +166,14 @@ public enum ASRComputeUnits: String, Codable, Sendable, CaseIterable {
 public enum ModelSetupError: Error, LocalizedError, Sendable {
     case report(AssetValidationReport)
     case unsafeManifest
+    case incompatibleEncoder(String)
     case invalidPLDAParameters(String)
 
     public var errorDescription: String? {
         switch self {
         case let .report(report): "Offline model setup is incomplete at \(report.modelsDirectory)."
         case .unsafeManifest: "The worker refuses a manifest that permits telemetry or runtime model downloads."
+        case let .incompatibleEncoder(bundle): "The transcription worker requires a manifest that verifies \(bundle)."
         case let .invalidPLDAParameters(path): "PLDA parameters are invalid at \(path)."
         }
     }

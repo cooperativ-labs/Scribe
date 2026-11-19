@@ -90,14 +90,7 @@ xcrun notarytool store-credentials "$NOTARYTOOL_PROFILE" \
   --team-id "$APPLE_TEAM_ID"
 
 distribution_dir="$repo_root/dist"
-# Keep the distribution directory limited to the artifacts from this release.
-# The artifacts are versioned, so removing only the current paths would leave
-# files and checksums from earlier releases behind.
-rm -f -- \
-  "$distribution_dir"/Scribe-*-macos.zip \
-  "$distribution_dir"/Scribe-*-macos.zip.sha256 \
-  "$distribution_dir"/Scribe-*-macos.dmg \
-  "$distribution_dir"/Scribe-*-macos.dmg.sha256
+# Retain prior versioned app artifacts for rollback with their matching models.
 archive_path="$distribution_dir/Scribe-$version-macos.zip"
 dmg_path="$distribution_dir/Scribe-$version-macos.dmg"
 rm -f -- "$archive_path" "$archive_path.sha256" "$dmg_path" "$dmg_path.sha256"

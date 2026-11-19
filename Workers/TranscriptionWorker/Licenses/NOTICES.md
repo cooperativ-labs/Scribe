@@ -5,10 +5,10 @@ staged ASR and diarization model assets. This directory holds the notices that
 must ship with the application. They are committed so a fresh checkout has them
 before any package or model download has run.
 
-## FluidAudio 0.17.4
+## FluidAudio 0.18.3
 
 - Upstream: <https://github.com/FluidInference/FluidAudio>
-- Pin: tag `0.17.4`, revision `21493f8dac5a97e65742e6ff26f42f164c2fda0f`
+- Pin: tag `v0.18.3`, revision `c8b41f98eae668794dd0083bbe028fe7e6585051`
 - Licence: Apache License 2.0
 - File: `FluidAudio.txt`
 
@@ -16,6 +16,7 @@ before any package or model download has run.
 
 - Upstream: <https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml>
 - Revision: `7dd20fe6b1797d35f5e3307e8b1732d9a178edfe`
+- Encoder: `Encoder_v2.mlmodelc`, per-channel int8 linear
 - Licence: Creative Commons Attribution 4.0 International
 - File: `Parakeet-CC-BY-4.0.txt`
 
@@ -23,12 +24,12 @@ These model files are user-installed data, not signed executable contents. The
 notice still ships in the app bundle so every distribution includes the required
 attribution.
 
-## Offline diarization models
+## Community-1 offline diarization (Core ML)
 
 - Upstream: <https://huggingface.co/FluidInference/speaker-diarization-coreml>
 - Revision: `1ed7a662fdc7109e36d822db793ee6eebdaf8594`
-- Licence: CC-BY-4.0 for the converted Core ML assets; see the notice for
-  upstream pyannote (MIT) and WeSpeaker terms
+- Licence: CC-BY-4.0 for the staged Community-1 artifacts. The notice credits
+  pyannote, WeSpeaker, BUT Speech@FIT, and Fluid Inference.
 - File: `Diarization-Models.txt`
 
 ## Parakeet CTC 110M (optional vocabulary boosting)

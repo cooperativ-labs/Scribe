@@ -77,7 +77,7 @@ final class TranscriptionHostService {
         settings: ScribeSettings,
         scheduler: (any ProcessingScheduler)?,
         storeDirectoryURL: URL = TranscriptStore.defaultStoreDirectoryURL(),
-        modelProfileID: String = "parakeet-v3",
+        modelProfileID: String = "parakeet-v3-offline-diarization-v2",
         vocabularyStore: VocabularyStore? = try? VocabularyStore.openApplicationSupportLibrary()
     ) throws {
         self.settings = settings

@@ -9,9 +9,10 @@ repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 
 usage() {
   cat <<'EOF'
-Usage: Scripts/package-app.sh [--inputs PATH] [--notary-profile NAME] [--output PATH] [--dmg-output PATH]
+Usage: Scripts/package-app.sh [--inputs PATH] [--signed-app-only | [--notary-profile NAME] [--output PATH] [--dmg-output PATH]]
 
 --inputs PATH  Source a local release-input environment file before validation.
+--signed-app-only  Stop after verifying the local Developer ID-signed app.
 --notary-profile NAME  Override the notarytool keychain profile from inputs.
 --output PATH  Write the notarized Scribe.zip archive to PATH.
 --dmg-output PATH  Write the signed, notarized Scribe.dmg to PATH.
@@ -19,12 +20,12 @@ Usage: Scripts/package-app.sh [--inputs PATH] [--notary-profile NAME] [--output 
 Required environment:
   DEVELOPER_ID_APPLICATION  Developer ID Application signing identity.
   DEVELOPER_TEAM_ID         Apple Developer team identifier.
-  NOTARYTOOL_PROFILE        Keychain profile configured for notarytool
-                            (or pass --notary-profile).
+  NOTARYTOOL_PROFILE        Keychain profile for notarization (or pass
+                            --notary-profile). Optional with --signed-app-only.
   SCRIBE_FFMPEG_PATH        Reviewed, pinned local ffmpeg executable.
   SCRIBE_FFPROBE_PATH       Reviewed, pinned local ffprobe executable.
   SCRIBE_NOTICE_WEBRTC, SCRIBE_NOTICE_FLUIDAUDIO, SCRIBE_NOTICE_PARAKEET,
-  SCRIBE_NOTICE_DIARIZATION, SCRIBE_NOTICE_FFMPEG
+  SCRIBE_NOTICE_DIARIZATION
 
 Optional environment:
   SCRIBE_TRANSCRIPTION_WORKER_PATH  A prebuilt helper. Otherwise it is built
@@ -63,6 +64,10 @@ Copy Scripts/release-inputs.example.env to Scripts/release-inputs.local.env and 
       source "$2"
       shift 2
       ;;
+    --signed-app-only)
+      signed_app_only=1
+      shift
+      ;;
     --notary-profile)
       (($# >= 2)) || die "--notary-profile requires a name"
       notarytool_profile_override="$2"
@@ -88,20 +93,41 @@ done
 release_root="${SCRIBE_RELEASE_ROOT:-$repo_root/build/release}"
 archive_path="$release_root/Scribe.xcarchive"
 app_path="$archive_path/Products/Applications/Scribe.app"
+model_manifest="$repo_root/Workers/TranscriptionWorker/model_manifest.json"
 distribution_dir="$release_root/distribution"
 notarization_archive="$distribution_dir/Scribe-notarization.zip"
 notices_dir="$app_path/Contents/Resources/ThirdPartyNotices"
 helpers_dir="$app_path/Contents/Library/Helpers"
 frameworks_dir="$app_path/Contents/Frameworks"
 notarytool_profile="${notarytool_profile_override:-${NOTARYTOOL_PROFILE:-}}"
+source "$repo_root/Native/FFmpeg/source.env"
+ffmpeg_source="$repo_root/Native/FFmpeg/cache/ffmpeg-$FFMPEG_VERSION.tar.xz"
 
-for command in xcodebuild swift codesign xcrun ditto diskutil find file grep readlink spctl unzip; do require_command "$command"; done
+for command in xcodebuild swift codesign xcrun ditto find file grep readlink cmp plutil sed shasum; do require_command "$command"; done
 for variable in DEVELOPER_ID_APPLICATION DEVELOPER_TEAM_ID SCRIBE_FFMPEG_PATH SCRIBE_FFPROBE_PATH; do require_value "$variable"; done
-[[ -n "$notarytool_profile" ]] || die "NOTARYTOOL_PROFILE is required; see Scripts/release-inputs.example.env"
-for variable in SCRIBE_NOTICE_WEBRTC SCRIBE_NOTICE_FLUIDAUDIO SCRIBE_NOTICE_PARAKEET SCRIBE_NOTICE_DIARIZATION SCRIBE_NOTICE_FFMPEG; do require_value "$variable"; done
+if [[ "${signed_app_only:-0}" != 1 ]]; then
+  for command in diskutil spctl unzip; do require_command "$command"; done
+  [[ -n "$notarytool_profile" ]] || die "NOTARYTOOL_PROFILE is required; see Scripts/release-inputs.example.env"
+fi
+for variable in SCRIBE_NOTICE_WEBRTC SCRIBE_NOTICE_FLUIDAUDIO SCRIBE_NOTICE_PARAKEET SCRIBE_NOTICE_DIARIZATION; do require_value "$variable"; done
 
 require_executable "$SCRIBE_FFMPEG_PATH"
 require_executable "$SCRIBE_FFPROBE_PATH"
+require_file "$ffmpeg_source"
+printf '%s  %s\n' "$FFMPEG_SOURCE_SHA256" "$ffmpeg_source" | shasum -a 256 --check --status \
+  || die "FFmpeg source archive does not match the pinned checksum; run Scripts/build-ffmpeg.sh"
+ffmpeg_version="$("$SCRIBE_FFMPEG_PATH" -version)"
+ffprobe_version="$("$SCRIBE_FFPROBE_PATH" -version)"
+check_ffmpeg_versions() {
+  local ffmpeg_build ffprobe_build
+  [[ "$1" == "ffmpeg version $FFMPEG_VERSION "* && "$2" == "ffprobe version $FFMPEG_VERSION "* ]] \
+    || die "Both FFmpeg helpers must report version $FFMPEG_VERSION"
+  ffmpeg_build="$(sed -nE '/^(configuration: |lib(av|sw)[[:alpha:]]+[[:space:]])/p' <<< "$1")"
+  ffprobe_build="$(sed -nE '/^(configuration: |lib(av|sw)[[:alpha:]]+[[:space:]])/p' <<< "$2")"
+  [[ "$ffmpeg_build" == configuration:* && "$ffmpeg_build" == "$ffprobe_build" ]] \
+    || die "ffmpeg and ffprobe must report the same build configuration and library versions"
+}
+check_ffmpeg_versions "$ffmpeg_version" "$ffprobe_version"
 if [[ "${SCRIBE_LIBFLAC_BUNDLED:-0}" == "1" ]]; then
   require_value SCRIBE_NOTICE_LIBFLAC
 fi
@@ -134,6 +160,8 @@ xcodebuild \
   archive
 
 [[ -d "$app_path" ]] || die "Xcode archive did not contain Scribe.app"
+cmp -s "$model_manifest" "$app_path/Contents/Resources/model_manifest.json" \
+  || die "Xcode archive is missing the current transcription model manifest"
 mkdir -p "$helpers_dir" "$frameworks_dir" "$notices_dir"
 
 if [[ -n "${SCRIBE_TRANSCRIPTION_WORKER_PATH:-}" ]]; then
@@ -155,6 +183,19 @@ worker_resources="$(dirname "$worker_path")/TranscriptionWorker_TranscriptionWor
 [[ -d "$worker_resources" ]] || die "Dictation VAD resource bundle is missing beside the worker: $worker_resources"
 ditto "$worker_resources" "$helpers_dir/TranscriptionWorker_TranscriptionWorkerSupport.bundle"
 ditto "$worker_resources" "$app_path/Contents/Resources/TranscriptionWorker_TranscriptionWorkerSupport.bundle"
+manifest_encoder="$(plutil -extract asrRuntime.encoderBundle raw -o - "$model_manifest")"
+worker_handshake="$(printf '%s\n' '{"version":2,"kind":"request","requestID":"release-model-check","payload":{"operation":"handshake"}}' \
+  | "$helpers_dir/TranscriptionWorker")" \
+  || die "The release worker did not complete its handshake"
+worker_encoder="$(plutil -extract payload.asrEncoderBundle raw -o - - <<< "$worker_handshake")" \
+  || die "The release worker did not report its compiled Parakeet encoder"
+[[ "$worker_encoder" == "$manifest_encoder" ]] \
+  || die "The release worker encoder ($worker_encoder) does not match the manifest ($manifest_encoder)"
+manifest_fluid_audio="$(plutil -extract fluidAudio.revision raw -o - "$model_manifest")"
+worker_fluid_audio="$(plutil -extract payload.fluidAudio raw -o - - <<< "$worker_handshake")" \
+  || die "The release worker did not report its FluidAudio version"
+[[ "$manifest_fluid_audio" == "v$worker_fluid_audio ("* ]] \
+  || die "The release worker FluidAudio version ($worker_fluid_audio) does not match the manifest ($manifest_fluid_audio)"
 bash "$repo_root/Scripts/embed-ffmpeg-runtime.sh" "$SCRIBE_FFMPEG_PATH" "$SCRIBE_FFPROBE_PATH" "$helpers_dir" "$frameworks_dir"
 bash "$repo_root/Scripts/embed-mcp-helper.sh" "$app_path" "$release_root/swiftpm/ScribeMCP"
 bash "$repo_root/Scripts/embed-assistant-connector.sh" "$app_path"
@@ -176,7 +217,12 @@ copy_notice 'Parakeet-CTC-110M.txt' "$repo_root/Workers/TranscriptionWorker/Lice
 copy_notice 'Silero-VAD.txt' "$repo_root/Workers/TranscriptionWorker/Licenses/Silero-VAD.txt"
 copy_notice 'Parakeet-CC-BY-4.0.txt' "$SCRIBE_NOTICE_PARAKEET"
 copy_notice 'Diarization-Models.txt' "$SCRIBE_NOTICE_DIARIZATION"
-copy_notice 'FFmpeg.txt' "$SCRIBE_NOTICE_FFMPEG"
+copy_notice 'FFmpeg.txt' "$repo_root/Native/FFmpeg/FFmpeg.txt"
+ffmpeg_source_dir="$notices_dir/FFmpegSource"
+mkdir -p "$ffmpeg_source_dir"/{Native/FFmpeg/cache,Scripts}
+cp "$ffmpeg_source" "$ffmpeg_source_dir/Native/FFmpeg/cache/"
+cp "$repo_root/Native/FFmpeg/source.env" "$ffmpeg_source_dir/Native/FFmpeg/"
+cp "$repo_root"/Scripts/{build-ffmpeg,embed-ffmpeg-runtime}.sh "$ffmpeg_source_dir/Scripts/"
 if [[ "${SCRIBE_LIBFLAC_BUNDLED:-0}" == "1" ]]; then
   copy_notice 'libFLAC.txt' "$SCRIBE_NOTICE_LIBFLAC"
 fi
@@ -186,7 +232,7 @@ Scribe Third-Party Notices
 
 This directory contains the notices and license terms for every third-party
 component included in this release. Runtime model files are installed as user
-data and are verified against the signed model catalog before use.
+data and are verified against the signed model_manifest.json before use.
 EOF
 
 echo "Signing nested Mach-O code with the hardened runtime…"
@@ -209,12 +255,18 @@ done < <(find "$frameworks_dir" -depth -type d -name '*.framework' -print0)
 codesign --force --sign "$DEVELOPER_ID_APPLICATION" --options runtime --timestamp \
   --preserve-metadata=identifier,entitlements,requirements "$app_path"
 codesign --verify --deep --strict --verbose=2 "$app_path"
+check_ffmpeg_versions "$("$helpers_dir/ffmpeg" -version)" "$("$helpers_dir/ffprobe" -version)"
 
 for required_notice in WebRTC.txt FluidAudio.txt Parakeet-CC-BY-4.0.txt Diarization-Models.txt FFmpeg.txt; do
   [[ -s "$notices_dir/$required_notice" ]] || die "required bundled notice missing: $required_notice"
 done
 if [[ "${SCRIBE_LIBFLAC_BUNDLED:-0}" == "1" ]]; then
   [[ -s "$notices_dir/libFLAC.txt" ]] || die "required bundled notice missing: libFLAC.txt"
+fi
+
+if [[ "${signed_app_only:-0}" == 1 ]]; then
+  echo "Verified signed app: $app_path"
+  exit 0
 fi
 
 output_archive="${output_archive:-$distribution_dir/Scribe.zip}"
@@ -251,6 +303,8 @@ trap cleanup EXIT
 unzip -q "$output_archive" -d "$verification_dir"
 extracted_app="$verification_dir/Scribe.app"
 [[ -d "$extracted_app" ]] || die "release archive did not contain Scribe.app"
+cmp -s "$model_manifest" "$extracted_app/Contents/Resources/model_manifest.json" \
+  || die "Release ZIP is missing the current transcription model manifest"
 codesign --verify --deep --strict --verbose=2 "$extracted_app"
 xcrun stapler validate "$extracted_app"
 spctl --assess --type execute --verbose=4 "$extracted_app"
@@ -271,6 +325,8 @@ spctl --assess --type open --context context:primary-signature --verbose=4 "$out
 diskutil image attach --readOnly --nobrowse --mountPoint "$mount_point" "$output_dmg"
 mounted=1
 [[ "$(readlink "$mount_point/Applications")" == /Applications ]] || die "disk image is missing the Applications link"
+cmp -s "$model_manifest" "$mount_point/Scribe.app/Contents/Resources/model_manifest.json" \
+  || die "Release DMG is missing the current transcription model manifest"
 codesign --verify --deep --strict --verbose=2 "$mount_point/Scribe.app"
 xcrun stapler validate "$mount_point/Scribe.app"
 spctl --assess --type execute --verbose=4 "$mount_point/Scribe.app"

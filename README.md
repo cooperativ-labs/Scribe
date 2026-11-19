@@ -164,6 +164,9 @@ Sandbox, and the hardened runtime. `Scripts/package-app.sh` builds an archive,
 embeds the transcription helper plus FFmpeg/ffprobe and any local runtime
 frameworks, aggregates required third-party notices, signs nested Mach-O code,
 notarizes, staples, checks Gatekeeper, and creates `build/release/distribution/Scribe.zip`.
+Run `Scripts/build-ffmpeg.sh` to prepare the pinned helpers and corresponding
+source archive for packaging. Use `Scripts/package-app.sh --signed-app-only`
+with the same local inputs to build a signed app for verification.
 It also creates a signed, notarized `Scribe.dmg` containing the app and an
 Applications shortcut. The website offers the DMG for drag-to-Applications
 installation; the ZIP remains the in-app update artifact. The release command
@@ -282,8 +285,8 @@ A recording started from the menu, with no call noticed, gets no chip.
 ### Model storage and offline operation
 
 Open **Settings → Transcription model → Install Model** to install the recommended
-Parakeet v3 model directly from Hugging Face. The roughly 505 MB download includes
-the speaker detection assets required by the transcription pipeline. No API key,
+Parakeet v3 model directly from Hugging Face. The roughly 654 MB download includes
+the corrected int8-linear encoder and the speaker detection assets. No API key,
 Python environment, or Git LFS installation is needed.
 
 Models default to `~/Library/Application Support/Scribe/Models`. **Choose Models
@@ -298,6 +301,10 @@ reuse verified files, while an interrupted file downloads again. Queued recordin
 wait for model setup and start automatically when installation completes. New
 jobs use the selected folder without an app restart; active workers retain their
 original model directory. Once installed, transcription works offline.
+
+Upgrading from the original Parakeet v3 encoder downloads the new 595 MB encoder
+bundle and reuses the verified companion files. The original encoder stays in
+the selected model folder so the previous app can still use its matching assets.
 
 Cloud models and API-key configuration are deferred. The shell installer in
 `Scripts/package-transcription-models.sh` remains available for development;

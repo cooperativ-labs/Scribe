@@ -60,7 +60,7 @@ struct ModelInstallationError: LocalizedError {
     var errorDescription: String? { message }
 }
 
-/// Disk-backed downloads keep the 445 MB encoder out of the app's heap.
+/// Disk-backed downloads keep the encoder out of the app's heap.
 /// Each file is verified before atomic publication. Retrying reuses verified
 /// files, while cancellation/failure can never publish a partial weight file.
 public actor TranscriptionModelDownloader {

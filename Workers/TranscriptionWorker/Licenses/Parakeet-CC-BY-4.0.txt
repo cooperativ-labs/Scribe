@@ -1,7 +1,8 @@
 Parakeet TDT 0.6B v3 (Core ML)
 
 This release uses the FluidInference Core ML conversion of NVIDIA Parakeet TDT
-0.6B v3 for on-device automatic speech recognition.
+0.6B v3 for on-device automatic speech recognition. It selects FluidInference's
+per-channel int8-linear Encoder_v2.mlmodelc at the revision below.
 
 Upstream: https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml
 Revision: 7dd20fe6b1797d35f5e3307e8b1732d9a178edfe

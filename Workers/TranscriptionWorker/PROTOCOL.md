@@ -46,7 +46,7 @@ The host closes the helper after unloading. No dictation audio or transcript
 is persisted by the worker.
 
 `handshake` returns a `stage_result` containing protocol and worker versions,
-the pinned FluidAudio version, and explicit `networking: "disabled"`,
+the pinned FluidAudio version and compiled `asrEncoderBundle`, and explicit `networking: "disabled"`,
 `runtimeDownloads: false`, and `telemetry: false` declarations. It performs no
 model loading and is safe to use as a launch check on a machine without models.
 

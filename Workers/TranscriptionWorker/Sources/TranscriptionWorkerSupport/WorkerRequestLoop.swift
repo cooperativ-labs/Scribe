@@ -83,6 +83,7 @@ public final class WorkerRequestLoop: @unchecked Sendable {
                 "stage": .string("handshake"), "protocolVersion": .number(Double(envelope.version)),
                 "workerVersion": .string("0.2.0"), "networking": .string("disabled"),
                 "runtimeDownloads": .bool(false), "telemetry": .bool(false), "fluidAudio": .string(OfflineDiarizationAdapter.fluidAudioVersion),
+                "asrEncoderBundle": .string(OfflineModelLoader.asrEncoderBundle),
             ])))
         case "validate_assets":
             validateAssets(requestID: envelope.requestID)

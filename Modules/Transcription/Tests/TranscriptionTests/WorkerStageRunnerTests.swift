@@ -49,12 +49,12 @@ final class WorkerStageRunnerTests: XCTestCase {
 
     func testKnownSpeakerCountIsDeliveredToTheWorkerRunRequest() async throws {
         var worker = FakeTranscriptionWorker.healthyRun()
-        worker.steps.insert(.requireRunRequestContains(#""knownSpeakerCount":2"#), at: 0)
+        worker.steps.insert(.requireRunRequestContains(#""knownSpeakerCount":12"#), at: 0)
         let runner = try makeRunner(worker)
         let coordinator = try TranscriptionCoordinator(configuration: .init(transcriptStoreURL: root.appending(path: "store")), stageRunner: runner)
         let job = try await coordinator.enqueue(.init(
             sourceURL: try makeSource(),
-            speakerCount: .known(2),
+            speakerCount: .known(12),
             modelProfileID: "parakeet-v3"
         ))
 
@@ -67,12 +67,12 @@ final class WorkerStageRunnerTests: XCTestCase {
 
     func testMaximumSpeakerCountIsDeliveredToTheWorkerRunRequest() async throws {
         var worker = FakeTranscriptionWorker.healthyRun()
-        worker.steps.insert(.requireRunRequestContains(#""maximumSpeakerCount":2"#), at: 0)
+        worker.steps.insert(.requireRunRequestContains(#""maximumSpeakerCount":12"#), at: 0)
         let runner = try makeRunner(worker)
         let coordinator = try TranscriptionCoordinator(configuration: .init(transcriptStoreURL: root.appending(path: "store")), stageRunner: runner)
         let job = try await coordinator.enqueue(.init(
             sourceURL: try makeSource(),
-            speakerCount: .upTo(2),
+            speakerCount: .upTo(12),
             modelProfileID: "parakeet-v3"
         ))
 

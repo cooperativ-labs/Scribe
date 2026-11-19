@@ -1,6 +1,6 @@
 # Offline diarization and speaker-embedding feasibility
 
-The worker uses FluidAudio **v0.17.4**'s `OfflineDiarizerManager` over one complete recording. It manually initializes `OfflineDiarizerModels` from the staged Core ML bundles, so it does not call `prepareModels()` or any download/cache helper. The adapter converts every source through `AudioSourceFactory.makeDiskBackedSource`; decoding produces a temporary 16 kHz mono mmap-backed PCM file rather than retaining a full waveform in the Swift heap. This is the selected two-hour-file memory strategy.
+The worker uses FluidAudio **v0.18.3**'s `OfflineDiarizerManager` over one complete recording. It manually initializes `OfflineDiarizerModels` from the staged Core ML bundles, so it does not call `prepareModels()` or any download/cache helper. The adapter converts every source through `AudioSourceFactory.makeDiskBackedSource`; decoding produces a temporary 16 kHz mono mmap-backed PCM file rather than retaining a full waveform in the Swift heap. This is the selected two-hour-file memory strategy.
 
 `OfflineDiarizationAdapter.Configuration.knownSpeakerCount` maps to the pinned API's `OfflineDiarizerConfig.withSpeakers(exactly:)`, constraining its one global VBx clustering pass. `maximumSpeakerCount` maps to `clustering.maxSpeakers` and lets the pipeline select fewer speakers. Exact and maximum counts are mutually exclusive. With neither count, the pipeline chooses the count. The adapter sets `postProcessing.exclusiveSegments` to `false` by default. In this pinned build, that preserves concurrent `TimedSpeakerSegment` intervals; setting it to `true` trims later intervals and is therefore not suitable for the canonical transcript.
 
@@ -27,7 +27,7 @@ operations change the vector representation even though the WeSpeaker model
 weights are unchanged. Existing v0.12.4 signatures remain stored but are
 incompatible by design and require re-enrollment before automatic matching.
 
-The v0.15.6 (`4dbf4f9f9a5ff3a53ade848d7ba4e3df13db859b`) to v0.15.7 (`41540ea237350afe5117a082b5c28eda642d0612`) source audit found only three changed offline production files: `VBxClustering.swift` fixes speaker constraints by checking both assigned and active cluster counts; `OfflineDiarizerManager.swift` introduces structured task cancellation, factors assignment into a testable helper, and adds an OS advisory; `OfflineDiarizerModels.swift` adds comments. `OfflineEmbeddingExtractor`, segmentation, reconstruction, filterbank, PLDA transforms, model assets, and normalization are unchanged. Scribe's enrollment extractor still runs the same adapter with exactly one speaker. Constrained clustering can change which samples form a centroid, but the vector representation is unchanged: **retain the v0.15.6 preprocessing version**, with no re-enrollment for this upgrade.
+Scribe retains the v0.15.6 compatibility identifier for v0.18.3. The local filterbank adapter preserves the staged Community-1 model's original centering for both batch diarization and enrollment. FluidAudio's additional silence-aware centering changed scores enough to break a synthetic match against an existing enrollment. Both paths use the same WeSpeaker assets and L2 normalization, and enrollment still requests exactly one speaker.
 
 The vectors originate from FluidAudio's result speaker database and are normalized again by the worker because the pinned reconstruction averages per-segment centroids without a final L2 normalization. The runner refuses an empty or incompatible exported representation rather than silently emitting a zero vector.
 
@@ -47,7 +47,7 @@ Two disjoint local-synthesis recordings of the same two voices were also exporte
 
 A 7,200-second 16 kHz mono Float32 looped-speech source was staged as 451,122,376 bytes of disk-backed PCM. The pinned pipeline completed conversion and model initialization but did not finish inside the available validation run, so no two-hour peak-RSS number is claimed. Keep the disk-backed source path mandatory and repeat this profile with consented long-form speech under a dedicated process monitor before release.
 
-## FluidAudio 0.17.4 upgrade
+## Historical FluidAudio 0.17.4 upgrade
 
 The offline VBx implementation and embedding extractor are source-identical to
 v0.15.7. Keep the v0.15.6 preprocessing identifier and existing voiceprints.

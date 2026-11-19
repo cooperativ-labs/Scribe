@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
-# Builds the minimal LGPL-only FFmpeg 7.1.1 toolchain used for import and decoding.
+# Builds the minimal LGPL-only FFmpeg toolchain used for import and decoding.
 # Usage: Scripts/build-ffmpeg.sh [install-prefix]
 set -euo pipefail
 
-readonly VERSION="7.1.1"
-readonly ARCHIVE="ffmpeg-${VERSION}.tar.xz"
-readonly SHA256="733984395e0dbbe5c046abda2dc49a5544e7e0e1e2366bba849222ae9e3a03b1"
-readonly SOURCE_URL="https://ffmpeg.org/releases/${ARCHIVE}"
 readonly ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${ROOT}/Native/FFmpeg/source.env"
+readonly VERSION="${FFMPEG_VERSION}"
+readonly ARCHIVE="ffmpeg-${VERSION}.tar.xz"
+readonly SOURCE_URL="https://ffmpeg.org/releases/${ARCHIVE}"
 readonly PREFIX="${1:-${ROOT}/Native/FFmpeg/prefix}"
 readonly CACHE="${ROOT}/Native/FFmpeg/cache"
 readonly BUILD="${ROOT}/Native/FFmpeg/build"
 
 mkdir -p "${CACHE}" "${BUILD}"
 if [[ ! -f "${CACHE}/${ARCHIVE}" ]]; then curl --fail --location --proto '=https' --tlsv1.2 --output "${CACHE}/${ARCHIVE}" "${SOURCE_URL}"; fi
-echo "${SHA256}  ${CACHE}/${ARCHIVE}" | shasum -a 256 --check --status
+echo "${FFMPEG_SOURCE_SHA256}  ${CACHE}/${ARCHIVE}" | shasum -a 256 --check --status
 rm -rf "${BUILD}/ffmpeg-${VERSION}"
 tar -xf "${CACHE}/${ARCHIVE}" -C "${BUILD}"
 pushd "${BUILD}/ffmpeg-${VERSION}" >/dev/null
@@ -23,10 +23,13 @@ pushd "${BUILD}/ffmpeg-${VERSION}" >/dev/null
 # --disable-autodetect keeps accidental host libraries (X11, x264, …) out of the LGPL build.
 # Demuxers cover popular audio and video containers; only audio decoders are enabled because
 # transcription extracts the soundtrack and never decodes video.
-export SOURCE_DATE_EPOCH=1736640000
+export SOURCE_DATE_EPOCH=1789699562
+# Match Scribe's minimum macOS version when building on a newer SDK.
+export MACOSX_DEPLOYMENT_TARGET=15.0
 ./configure \
   --prefix="${PREFIX}" --disable-doc --disable-debug --disable-network --disable-autodetect \
-  --disable-static --enable-shared --disable-everything --disable-avdevice --disable-postproc --disable-swscale --disable-ffplay \
+  --disable-static --enable-shared --disable-everything --disable-avdevice --disable-swscale --disable-ffplay \
+  --extra-ldflags=-Wl,-headerpad_max_install_names \
   --enable-avcodec --enable-avformat --enable-avutil --enable-swresample \
   --enable-ffmpeg --enable-ffprobe --enable-avfilter --enable-filter=pan,aresample \
   --enable-protocol=file \
