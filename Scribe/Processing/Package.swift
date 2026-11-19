@@ -9,6 +9,7 @@ let package = Package(
         .package(path: "../App"),
         .package(path: "../../Native/FLACBridge"),
         .package(path: "../../Native/WebRTCBridge"),
+        .package(path: "../../Tools/AudioMetrics"),
     ],
     targets: [
         .target(
@@ -23,6 +24,7 @@ let package = Package(
             name: "ProcessingTests",
             dependencies: [
                 "Processing",
+                .product(name: "AudioMetricsCore", package: "AudioMetrics"),
                 .product(name: "ScribeAppCore", package: "app"),
                 .product(name: "FLACBridge", package: "FLACBridge"),
                 .product(name: "WebRTCBridge", package: "WebRTCBridge"),

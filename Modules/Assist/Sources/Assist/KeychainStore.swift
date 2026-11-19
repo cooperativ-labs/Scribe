@@ -17,12 +17,8 @@ extension SecretStore {
     }
 }
 
-/// Generic-password items under one service. Tokens and API keys are kept
-/// here and nowhere else: never in UserDefaults, and never in `~/.codex`,
-/// which belongs to Codex.
+/// Generic-password items under one service. Scribe stores API keys here.
 public struct KeychainStore: SecretStore {
-    /// The ChatGPT sign-in's tokens.
-    public static let chatGPTService = "co.cooperativ.scribe.chatgpt"
     /// The OpenAI API key.
     public static let openAIService = "co.cooperativ.scribe.openai"
 

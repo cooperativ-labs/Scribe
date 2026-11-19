@@ -1,7 +1,6 @@
-import { existsSync, readFileSync, writeFileSync, renameSync, mkdirSync, rmSync } from 'node:fs';
-import { randomUUID } from 'node:crypto';
-import path from 'node:path';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { writePrivateState } from './private-state.js';
 import { libraryCalls } from './server.js';
 import { StoreError } from './store.js';
 
@@ -32,10 +31,7 @@ export class RelayCredentials {
     return value;
   }
   write(value) {
-    mkdirSync(path.dirname(this.file), { recursive: true, mode: 0o700 });
-    const temp = `${this.file}.${randomUUID()}.tmp`;
-    writeFileSync(temp, JSON.stringify(value, null, 2) + '\n', { mode: 0o600, flag: 'wx' });
-    renameSync(temp, this.file);
+    writePrivateState(this.file, JSON.stringify(value, null, 2) + '\n');
   }
   remove() { rmSync(this.file, { force: true }); }
 }

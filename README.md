@@ -323,10 +323,9 @@ Clean-machine release test:
 4. Repeat with the model folder unavailable and verify a clear setup error,
    never a runtime download attempt.
 
-`Scripts/build-native-dependencies.sh` likewise never downloads code. It
-requires pinned, reviewed sources under `Native/Vendor/webrtc` and
-`Native/Vendor/flac` before a future objective replaces the stub with the
-reproducible native build steps.
+`Scripts/build-native-dependencies.sh` runs the pinned WebRTC and FFmpeg
+builders. The FFmpeg builder fetches and verifies its source archive when
+needed. FLAC encoding uses macOS AudioToolbox.
 
 ## Workstream ownership
 

@@ -75,17 +75,6 @@ extension HTTPURLResponse {
     }
 }
 
-enum FormEncoding {
-    static func encode(_ pairs: [(String, String)]) -> Data {
-        var allowed = CharacterSet.alphanumerics
-        allowed.insert(charactersIn: "-._~")
-        return Data(pairs
-            .map { "\($0.0)=\($0.1.addingPercentEncoding(withAllowedCharacters: allowed) ?? $0.1)" }
-            .joined(separator: "&")
-            .utf8)
-    }
-}
-
 /// Reads one wire format's server-sent events into a result.
 protocol StreamDecoder {
     associatedtype Output

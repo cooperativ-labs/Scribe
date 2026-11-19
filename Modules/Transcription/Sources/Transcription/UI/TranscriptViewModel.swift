@@ -1185,7 +1185,7 @@ public final class TranscriptViewModel {
         guard let fileID = selectedFileID, let current = selectedTranscript,
               let previous = undoStacks[fileID]?.popLast() else { return }
         redoStacks[fileID, default: []].append(current)
-        replaceSelectedTranscript(previous.asRevision(current.revision + 1))
+        replaceSelectedTranscript(previous.replacing(revision: current.revision + 1))
         nextToastAction = .redo
         speakerActionMessage = TranscriptSpeakerActionMessage(text: "Undid the last edit.", isFailure: false)
     }
@@ -1194,7 +1194,7 @@ public final class TranscriptViewModel {
         guard let fileID = selectedFileID, let current = selectedTranscript,
               let next = redoStacks[fileID]?.popLast() else { return }
         undoStacks[fileID, default: []].append(current)
-        replaceSelectedTranscript(next.asRevision(current.revision + 1))
+        replaceSelectedTranscript(next.replacing(revision: current.revision + 1))
         nextToastAction = .undo
         speakerActionMessage = TranscriptSpeakerActionMessage(text: "Redid the last edit.", isFailure: false)
     }

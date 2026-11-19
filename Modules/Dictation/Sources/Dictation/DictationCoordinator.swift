@@ -433,8 +433,6 @@ public final class DictationCoordinator: ObservableObject {
 
     nonisolated static func assistantState(for error: any Error, timeout: Duration) -> DictationState {
         switch error {
-        case AssistError.signInRequired:
-            .signInRequired(AssistError.signInRequired.localizedDescription)
         case is AssistantTimeout:
             .error("No answer after \(timeout.components.seconds) seconds. Try again.")
         default:

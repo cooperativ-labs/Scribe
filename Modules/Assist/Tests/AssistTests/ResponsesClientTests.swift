@@ -8,7 +8,7 @@ final class ResponsesClientTests: XCTestCase {
     func testConcatenatesOutputTextDeltasAndReadsUsage() async throws {
         let sse = try Fixture.text("chatgpt-stream.sse")
         let transport = FakeTransport { _ in .init(status: 200, headers: ["Content-Type": "text/event-stream"], body: sse) }
-        let client = ResponsesClient(baseURL: base, headers: ["Authorization": "Bearer t", "originator": "o"], sendsCodexFields: true, transport: transport)
+        let client = ResponsesClient(baseURL: base, headers: ["Authorization": "Bearer t"], transport: transport)
 
         let result = try await client.respond(model: "gpt-6-luna", instructions: "system", input: "user")
 
@@ -20,25 +20,18 @@ final class ResponsesClientTests: XCTestCase {
         XCTAssertEqual(request.url?.absoluteString, "https://example.test/v1/responses")
         XCTAssertEqual(request.httpMethod, "POST")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "text/event-stream")
-        XCTAssertEqual(request.value(forHTTPHeaderField: "originator"), "o")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer t")
         let body = try XCTUnwrap(request.jsonBody)
         XCTAssertEqual(body["model"] as? String, "gpt-6-luna")
         XCTAssertEqual(body["instructions"] as? String, "system")
         XCTAssertEqual(body["store"] as? Bool, false)
         XCTAssertEqual(body["stream"] as? Bool, true)
-        XCTAssertEqual((body["tools"] as? [Any])?.count, 0)
-        XCTAssertEqual(body["parallel_tool_calls"] as? Bool, false)
+        XCTAssertEqual(Set(body.keys), ["model", "instructions", "input", "store", "stream"])
         let input = try XCTUnwrap(body["input"] as? [[String: Any]])
         XCTAssertEqual(input.first?["role"] as? String, "user")
         let content = try XCTUnwrap(input.first?["content"] as? [[String: Any]])
         XCTAssertEqual(content.first?["type"] as? String, "input_text")
         XCTAssertEqual(content.first?["text"] as? String, "user")
-    }
-
-    func testPublicAPIBodyLeavesOutTheCodexFields() throws {
-        let client = ResponsesClient(baseURL: base, headers: [:], transport: FakeTransport { _ in .init(status: 200, body: "") })
-        let body = client.body(model: "gpt-5-mini", instructions: "s", input: "i")
-        XCTAssertEqual(Set(body.keys), ["model", "instructions", "input", "store", "stream"])
     }
 
     func testFallsBackToTheCompletedOutputWhenNoDeltasArrive() async throws {
@@ -82,32 +75,6 @@ final class ResponsesClientTests: XCTestCase {
         }
     }
 
-    func testChatGPTUsageLimit429CarriesTheResetTime() async throws {
-        let body = try Fixture.text("chatgpt-429.json")
-        let client = ResponsesClient(baseURL: base, headers: [:], transport: FakeTransport { _ in .init(status: 429, body: body) })
-        do {
-            _ = try await client.respond(model: "m", instructions: "s", input: "i")
-            XCTFail("expected an error")
-        } catch let error as ResponsesError {
-            guard case .http(429, _, _) = error else { return XCTFail("unexpected \(error)") }
-            let parsed = try XCTUnwrap(error.errorBody)
-            XCTAssertEqual(parsed.type, "usage_limit_reached")
-            XCTAssertEqual(parsed.planType, "plus")
-            XCTAssertEqual(parsed.resetsAt, Date(timeIntervalSince1970: 1_790_003_600))
-
-            let mapped = ChatGPTAssistant.map(error, model: "m")
-            XCTAssertEqual(mapped, .usageLimitReached(resetsAt: Date(timeIntervalSince1970: 1_790_003_600)))
-        }
-    }
-
-    func testUsageLimitWithoutAbsoluteTimeUsesTheRelativeOne() throws {
-        let error = ResponsesError.http(status: 429, headers: [:], body: #"{"error":{"type":"usage_limit_reached","resets_in_seconds":120}}"#)
-        let now = Date(timeIntervalSince1970: 1_000)
-        XCTAssertEqual(ChatGPTAssistant.map(error, model: "m", now: now), .usageLimitReached(resetsAt: Date(timeIntervalSince1970: 1_120)))
-        let bare = ResponsesError.http(status: 429, headers: ["retry-after": "30"], body: "Too Many Requests")
-        XCTAssertEqual(ChatGPTAssistant.map(bare, model: "m", now: now), .usageLimitReached(resetsAt: Date(timeIntervalSince1970: 1_030)))
-    }
-
     func testAPIKey429IsARateLimitWithTheServersMessage() throws {
         let body = try Fixture.text("api-429.json")
         let error = ResponsesError.http(status: 429, headers: ["retry-after": "1"], body: body)
@@ -116,14 +83,6 @@ final class ResponsesClientTests: XCTestCase {
         }
         XCTAssertEqual(retryAfter, 1)
         XCTAssertTrue(message?.hasPrefix("Rate limit reached for gpt-5-mini") == true)
-    }
-
-    func testChatGPTStatusMapping() {
-        XCTAssertEqual(ChatGPTAssistant.map(.http(status: 401, headers: [:], body: ""), model: "m"), .signInRequired)
-        XCTAssertEqual(ChatGPTAssistant.map(.http(status: 403, headers: [:], body: #"{"detail":"Forbidden"}"#), model: "m"), .notAvailableForAccount)
-        XCTAssertEqual(ChatGPTAssistant.map(.http(status: 400, headers: [:], body: #"{"detail":"Unsupported model"}"#), model: "gpt-5-codex"), .modelUnavailable("gpt-5-codex"))
-        XCTAssertEqual(ChatGPTAssistant.map(.http(status: 400, headers: [:], body: #"{"detail":"Bad input"}"#), model: "m"), .server(provider: "OpenAI", status: 400, message: "Bad input"))
-        XCTAssertEqual(ChatGPTAssistant.map(.transport("offline"), model: "m"), .network("offline"))
     }
 
     func testAPIKeyStatusMapping() {

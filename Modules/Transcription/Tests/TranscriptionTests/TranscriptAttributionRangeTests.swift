@@ -96,7 +96,7 @@ final class TranscriptAttributionRangeTests: XCTestCase {
         let result = grouper.paragraphs(from: split.segments)
         XCTAssertEqual(result[0].sourceSegmentIDs, ["source.1", "source.2"])
         XCTAssertEqual(result[0].attributionRanges.map(\.source), split.segments)
-        let undone = transcript.asRevision(split.revision + 1)
+        let undone = transcript.replacing(revision: split.revision + 1)
         XCTAssertEqual(grouper.paragraphs(from: undone.segments), before)
         XCTAssertEqual(try CanonicalTranscriptCodec.encode(transcript), encoded)
         XCTAssertEqual(grouper.paragraphs(from: try CanonicalTranscriptCodec.decode(encoded).segments), before)

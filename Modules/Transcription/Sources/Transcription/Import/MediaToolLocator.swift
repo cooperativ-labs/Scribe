@@ -1,7 +1,6 @@
 import Foundation
 
-/// Finds the pinned `ffprobe` and `ffmpeg` executables the importer and the
-/// preparation service run.
+/// Finds the pinned `ffprobe` executable the importer runs.
 ///
 /// A packaged build keeps them in `Contents/Library/Helpers`, beside the
 /// transcription helper, so the same search that finds the worker finds these.
@@ -9,7 +8,6 @@ import Foundation
 /// binaries sit wherever `Scripts/build-ffmpeg.sh` left them.
 public enum MediaToolLocator {
     public static let ffprobeEnvironmentKey = "SCRIBE_FFPROBE_PATH"
-    public static let ffmpegEnvironmentKey = "SCRIBE_FFMPEG_PATH"
 
     public enum Error: Swift.Error, LocalizedError, Equatable {
         case missing(name: String, searchedPaths: [String])
@@ -28,14 +26,6 @@ public enum MediaToolLocator {
         fileManager: FileManager = .default
     ) throws -> URL {
         try locate(named: "ffprobe", overrideKey: ffprobeEnvironmentKey, bundle: bundle, environment: environment, fileManager: fileManager)
-    }
-
-    public static func ffmpeg(
-        bundle: Bundle = .main,
-        environment: [String: String] = ProcessInfo.processInfo.environment,
-        fileManager: FileManager = .default
-    ) throws -> URL {
-        try locate(named: "ffmpeg", overrideKey: ffmpegEnvironmentKey, bundle: bundle, environment: environment, fileManager: fileManager)
     }
 
     static func locate(

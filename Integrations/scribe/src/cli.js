@@ -72,8 +72,6 @@ try {
     if (relay) await owner.link(relay);
     const controller = new AbortController();
     for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => controller.abort());
-    // Scribe.app holds this pipe open; if the app quits or crashes, stop serving.
-    if (process.env.SCRIBE_EXIT_WITH_PARENT === '1') { for (const event of ['end', 'close']) process.stdin.on(event, () => controller.abort()); process.stdin.resume(); }
     console.error(`Connector URL: ${owner.linked().relay}/mcp`);
     await runAgent({ account: owner, library: library(), signal: controller.signal, log: message => console.error(message) });
   } else if (command === 'code') {

@@ -1,15 +1,12 @@
 #!/usr/bin/env bash
 #
-# Build every pinned native dependency Scribe links against.
+# Build the pinned WebRTC and FFmpeg components Scribe bundles.
 #
-# Scribe bundles its native audio dependencies rather than downloading them at
-# runtime (IMPLEMENTATION_PLAN.md section 1: no runtime downloads, no network).
-# Each dependency lives under Native/<Bridge>/ and owns a build script that pins
-# its own upstream revision and checksums; this script is the one entry point
-# that runs them.
+# Each component has its own build script that pins its upstream revision and
+# checksums. The system AudioToolbox FLAC encoder needs no separate build.
 #
 # Usage:
-#   Scripts/build-native-dependencies.sh                 # build everything available
+#   Scripts/build-native-dependencies.sh                 # build both components
 #   Scripts/build-native-dependencies.sh --list          # show components and status
 #   Scripts/build-native-dependencies.sh webrtc-apm      # build one component
 #   Scripts/build-native-dependencies.sh webrtc-apm -- --clean --force
@@ -22,20 +19,14 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 
 log()  { printf '\033[1m[native]\033[0m %s\n' "$*" >&2; }
-warn() { printf '\033[1;33m[native]\033[0m %s\n' "$*" >&2; }
 die()  { printf '\033[1;31m[native] error:\033[0m %s\n' "$*" >&2; exit 1; }
 
-# component name : builder script, relative to the repository root.
-# A component whose script does not exist yet is reported and skipped rather
-# than failing the run, so this stays usable while the bridges land separately.
 COMPONENT_NAMES=(
   "webrtc-apm"
-  "flac"
   "ffmpeg"
 )
 COMPONENT_SCRIPTS=(
   "Native/WebRTCBridge/Scripts/build-webrtc-apm.sh"
-  "Native/FLACBridge/Scripts/build-flac.sh"
   "Scripts/build-ffmpeg.sh"
 )
 
@@ -56,7 +47,7 @@ list_components() {
   printf 'Components:\n'
   for name in "${COMPONENT_NAMES[@]}"; do
     local relative="${COMPONENT_SCRIPTS[${index}]}"
-    local state="missing (not implemented yet)"
+    local state="missing"
     [[ -x "${REPO_ROOT}/${relative}" ]] && state="available"
     printf '  %-12s %-48s %s\n' "${name}" "${relative}" "${state}"
     index=$((index + 1))
@@ -83,18 +74,13 @@ if [[ ${#SELECTED[@]} -eq 0 ]]; then
 fi
 
 BUILT=()
-SKIPPED=()
 
 for component in "${SELECTED[@]}"; do
   relative="$(script_for "${component}")" \
     || die "unknown component: ${component} (try --list)"
   builder="${REPO_ROOT}/${relative}"
 
-  if [[ ! -x "${builder}" ]]; then
-    warn "skipping ${component}: ${relative} does not exist yet"
-    SKIPPED+=("${component}")
-    continue
-  fi
+  [[ -x "${builder}" ]] || die "missing builder for ${component}: ${relative}"
 
   log "building ${component}"
   "${builder}" ${PASSTHROUGH[@]+"${PASSTHROUGH[@]}"}
@@ -102,4 +88,3 @@ for component in "${SELECTED[@]}"; do
 done
 
 log "built: ${BUILT[*]:-none}"
-[[ ${#SKIPPED[@]} -eq 0 ]] || warn "skipped: ${SKIPPED[*]}"

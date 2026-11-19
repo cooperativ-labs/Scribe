@@ -1,5 +1,6 @@
 import Dispatch
 import Foundation
+import ScribeAppCore
 import os
 import Vocabulary
 import Transcription

@@ -43,8 +43,6 @@ public actor TranscriptionCoordinator {
     /// Read once at enqueue, including enabled packs and aliases. Actual
     /// snapshot content is authoritative; derived runs may preserve an older one.
     private let vocabularySnapshot: @Sendable () throws -> VocabularySnapshot
-    /// Compatibility with revision-only producers predating saved snapshots.
-    private let vocabularyRevision: @Sendable () -> String?
     nonisolated(unsafe) private let fileManager: FileManager
 
     private var jobs: [UUID: TranscriptionJob] = [:]
@@ -62,7 +60,6 @@ public actor TranscriptionCoordinator {
         fileManager: FileManager = .default,
         now: @escaping @Sendable () -> Date = Date.init,
         canStartJob: @escaping @Sendable () async -> Bool = { true },
-        vocabularyRevision: @escaping @Sendable () -> String? = { nil },
         vocabularySnapshot: @escaping @Sendable () throws -> VocabularySnapshot = { .init(revision: nil, terms: []) }
     ) throws {
         self.configuration = configuration
@@ -73,7 +70,6 @@ public actor TranscriptionCoordinator {
         self.writer = writer
         self.fileManager = fileManager
         self.now = now
-        self.vocabularyRevision = vocabularyRevision
         self.vocabularySnapshot = vocabularySnapshot
         try fileManager.createDirectory(at: configuration.transcriptStoreURL, withIntermediateDirectories: true)
         let indexed = try Self.readQueueIndex(at: configuration.queueFileURL, fileManager: fileManager)
@@ -127,7 +123,7 @@ public actor TranscriptionCoordinator {
             speakerMatching: request.speakerMatching,
             microphoneSpeakerPrior: request.microphoneSpeakerPrior == true,
             speakerLibraryRevision: request.speakerLibraryRevision,
-            vocabularyRevision: vocabulary.revision ?? request.vocabularyRevision ?? vocabularyRevision()
+            vocabularyRevision: vocabulary.revision ?? request.vocabularyRevision
         )
         let fingerprint: ImportFingerprint
         let snapshot: SourceSnapshot
@@ -323,8 +319,8 @@ public actor TranscriptionCoordinator {
 
     private func copySourceEnergy(from previous: TranscriptionJob, to job: TranscriptionJob) throws {
         guard previous.sourceFingerprint == job.sourceFingerprint else { return }
-        let source = previous.runDirectoryURL.appendingPathComponent("source-energy.json")
-        let target = job.runDirectoryURL.appendingPathComponent("source-energy.json")
+        let source = previous.runDirectoryURL.appendingPathComponent(TranscriptRunArtifact.sourceEnergy)
+        let target = job.runDirectoryURL.appendingPathComponent(TranscriptRunArtifact.sourceEnergy)
         guard fileManager.fileExists(atPath: source.path), !fileManager.fileExists(atPath: target.path) else { return }
         // An immutable source artifact survives recorder cleanup and fresh model runs.
         try fileManager.copyItem(at: source, to: target)

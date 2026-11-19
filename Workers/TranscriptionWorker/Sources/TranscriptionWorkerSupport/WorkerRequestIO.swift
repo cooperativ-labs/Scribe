@@ -1,4 +1,5 @@
 import Foundation
+import ScribeAppCore
 
 /// Thread-safe request and cancellation state shared by the stdin reader and
 /// the request-processing loop.
@@ -49,9 +50,10 @@ final class WorkerEnvelopeWriter: @unchecked Sendable {
     func write(_ envelope: WorkerEnvelope) {
         lock.withLock {
             do {
-                var data = try WorkerProtocol.encode(envelope)
-                data.append(0x0A)
+                let data = try WorkerWireFormat.encode(envelope)
                 FileHandle.standardOutput.write(data)
+            } catch let error as WorkerWireFormatError {
+                FileHandle.standardError.write(Data("Failed to write worker response: \(error.workerDiagnostic)\n".utf8))
             } catch {
                 FileHandle.standardError.write(Data("Failed to write worker response: \(error.localizedDescription)\n".utf8))
             }
@@ -59,8 +61,8 @@ final class WorkerEnvelopeWriter: @unchecked Sendable {
     }
 }
 
-extension JSONValue {
-    static func encoding<Value: Encodable>(_ value: Value) throws -> JSONValue {
-        try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(value))
+extension WorkerJSONValue {
+    static func encoding<Value: Encodable>(_ value: Value) throws -> WorkerJSONValue {
+        try JSONDecoder().decode(WorkerJSONValue.self, from: JSONEncoder().encode(value))
     }
 }

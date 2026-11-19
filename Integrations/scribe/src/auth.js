@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync, renameSync, mkdirSync } from 'node:fs';
-import path from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
 import { consentPage, consentProblemPage } from './consent.js';
+import { writePrivateState } from './private-state.js';
 import { InvalidClientMetadataError, InvalidGrantError, InvalidScopeError, InvalidTargetError, InvalidTokenError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 
 export const SCOPE = 'transcripts.read';
@@ -108,10 +108,7 @@ export class ScribeOAuthProvider {
       if (value.expiresAt <= now()) delete this.state[kind][key];
     }
     if (!this.stateFile) return;
-    mkdirSync(path.dirname(this.stateFile), { recursive: true, mode: 0o700 });
-    const temp = `${this.stateFile}.${randomUUID()}.tmp`;
-    writeFileSync(temp, JSON.stringify(this.state), { mode: 0o600, flag: 'wx' });
-    renameSync(temp, this.stateFile);
+    writePrivateState(this.stateFile, JSON.stringify(this.state));
   }
   // Dynamic registration runs once per connection, so on a shared relay abandoned
   // registrations would eventually exhaust the limit. Drop week-old clients that

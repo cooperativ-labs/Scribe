@@ -1,4 +1,5 @@
 import AVFAudio
+import AudioMetricsCore
 import FLACBridge
 import Foundation
 import ScribeAppCore
@@ -94,10 +95,9 @@ private let mixOrigin = 207_492.667875
     #expect(result.summary.appliedPeakGain == 1)
     #expect(result.summary.samplePeakBeforeGain <= 0.88 + 0.000_1)
 
-    var meter = TruePeakMeter(channelCount: 1)
-    meter.append(try decode(session.appendingPathComponent("final.m4a")))
-    meter.finish()
-    let dbTP = try #require(meter.truePeakDbTP)
+    let channels = try decode(session.appendingPathComponent("final.m4a"))
+    let mono = try #require(channels.first)
+    let dbTP = try #require(Signal.decibels(Signal.truePeak(mono.map(Double.init))))
     #expect(dbTP <= -1 + 0.01, "published mix measured \(String(format: "%.3f", dbTP)) dBTP")
 }
 

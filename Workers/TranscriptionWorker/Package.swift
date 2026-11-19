@@ -20,6 +20,7 @@ let package = Package(
         // Models remain staged locally; runtime downloads stay disabled.
         .package(url: "https://github.com/FluidInference/FluidAudio.git", exact: "0.18.3"),
         .package(path: "../../Modules/Speakers"),
+        .package(path: "../../Scribe/App"),
     ],
     targets: [
         .target(name: "ScribeInference", dependencies: [.product(name: "FluidAudio", package: "FluidAudio")]),
@@ -27,6 +28,7 @@ let package = Package(
             name: "TranscriptionWorkerSupport",
             dependencies: [
                 "ScribeInference",
+                .product(name: "ScribeAppCore", package: "app"),
                 .product(name: "FluidAudio", package: "FluidAudio"),
             ],
             resources: [.copy("Resources/silero-vad-unified-256ms-v6.2.1.mlmodelc")]
@@ -48,6 +50,7 @@ let package = Package(
                 "TranscriptionWorkerSupport",
                 "ScribeInference",
                 "TranscriptionWorker",
+                .product(name: "ScribeAppCore", package: "app"),
                 .product(name: "FluidAudio", package: "FluidAudio"),
             ]
         ),

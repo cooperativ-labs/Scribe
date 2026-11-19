@@ -259,36 +259,3 @@ extension TranscriptSegment {
         )
     }
 }
-
-extension CanonicalTranscript {
-    /// Copies this transcript at the next revision, replacing only what an edit
-    /// changed. A structural edit passes `subtitleCueMappings: nil` because the
-    /// cues it carried described segments that no longer exist; export rebuilds
-    /// them from the segments that do.
-    func nextRevision(
-        title: String?? = nil,
-        speakers: [TranscriptSpeaker]? = nil,
-        segments: [TranscriptSegment]? = nil,
-        subtitleCueMappings: [SubtitleCueMapping]?? = nil
-    ) -> CanonicalTranscript {
-        CanonicalTranscript(
-            schemaVersion: schemaVersion,
-            transcriptID: transcriptID,
-            revision: revision + 1,
-            title: title ?? self.title,
-            status: status,
-            createdAt: createdAt,
-            source: source,
-            language: language,
-            languageSource: languageSource,
-            timestampUnit: timestampUnit,
-            timestampOrigin: timestampOrigin,
-            speakers: speakers ?? self.speakers,
-            segments: segments ?? self.segments,
-            subtitleCueMappings: subtitleCueMappings ?? self.subtitleCueMappings,
-            processingOptions: processingOptions,
-            engineRevisions: engineRevisions,
-            warnings: warnings
-        )
-    }
-}

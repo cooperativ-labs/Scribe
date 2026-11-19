@@ -11,6 +11,8 @@ import Speakers
 public enum TranscriptRunArtifact {
     /// The worker's prepared-audio record.
     public static let prepare = "prepare.json"
+    /// Recorder source levels aligned to the working audio.
+    public static let sourceEnergy = "source-energy.json"
     /// The worker's raw ASR output, decoded as `WorkerASRTranscript`.
     public static let workerTranscript = "transcript.json"
     public static let diarization = "diarization.json"
@@ -277,7 +279,7 @@ public struct TranscriptAssemblyStageRunner: TranscriptionStageRunning {
             build = try turnBuilder.build(words: words, diarizedTurns: turns)
         }
         let acousticIntervals = diarization.acousticIntervals(sourceDurationMs: sourceDurationMs)
-        let energyURL = job.runDirectoryURL.appendingPathComponent("source-energy.json")
+        let energyURL = job.runDirectoryURL.appendingPathComponent(TranscriptRunArtifact.sourceEnergy)
         let energy = job.request.microphoneSpeakerPrior == true
             ? (try? JSONDecoder().decode(SourceEnergyTimeline.self, from: Data(contentsOf: energyURL))) : nil
         let sourcePrior = energy.flatMap { SourceEnergyPrior(timeline: $0, intervals: acousticIntervals) }
@@ -503,27 +505,13 @@ public struct TranscriptAssemblyStageRunner: TranscriptionStageRunning {
                     unresolvedSpeakerEvidence: segment.unresolvedSpeakerEvidence
                 )
             }
-            let recognized = CanonicalTranscript(
-                schemaVersion: transcript.schemaVersion,
-                transcriptID: transcript.transcriptID,
-                revision: transcript.revision,
-                title: transcript.title,
-                status: transcript.status,
-                createdAt: transcript.createdAt,
-                source: transcript.source,
-                language: transcript.language,
-                languageSource: transcript.languageSource,
-                timestampUnit: transcript.timestampUnit,
-                timestampOrigin: transcript.timestampOrigin,
+            let recognized = transcript.replacing(
                 speakers: speakers,
                 segments: segments,
-                subtitleCueMappings: transcript.subtitleCueMappings,
                 processingOptions: transcript.processingOptions.merging([
                     "speaker_library_revision": .string(library.revision.snapshotValue),
                     "speaker_matcher_version": .string(identityMatcher.configuration.matcherVersion),
-                ]) { _, new in new },
-                engineRevisions: transcript.engineRevisions,
-                warnings: transcript.warnings
+                ]) { _, new in new }
             )
             try writer.write(try CanonicalTranscriptCodec.encode(recognized), to: transcriptURL)
         }
@@ -560,12 +548,7 @@ public struct TranscriptAssemblyStageRunner: TranscriptionStageRunning {
                                      attributionSource: segment.attributionSource, speakerInference: inference,
                                      unresolvedSpeakerEvidence: segment.unresolvedSpeakerEvidence)
         }
-        let updated = CanonicalTranscript(schemaVersion: transcript.schemaVersion, transcriptID: transcript.transcriptID,
-            revision: transcript.revision, title: transcript.title, status: transcript.status, createdAt: transcript.createdAt,
-            source: transcript.source, language: transcript.language, languageSource: transcript.languageSource,
-            timestampUnit: transcript.timestampUnit, timestampOrigin: transcript.timestampOrigin, speakers: speakers,
-            segments: segments, subtitleCueMappings: transcript.subtitleCueMappings, processingOptions: transcript.processingOptions,
-            engineRevisions: transcript.engineRevisions, warnings: transcript.warnings)
+        let updated = transcript.replacing(speakers: speakers, segments: segments)
         _ = try write(updated, named: TranscriptRunArtifact.canonicalTranscript, in: job)
     }
 

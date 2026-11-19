@@ -93,7 +93,7 @@ final class SourceEnergyPriorTests: XCTestCase {
             .init(speakerID: "local", startSeconds: 0, endSeconds: 10, qualityScore: 1, overlapsAnotherSpeaker: false),
             .init(speakerID: "remote", startSeconds: 10, endSeconds: 20, qualityScore: 1, overlapsAnotherSpeaker: false)
         ], sourceDurationSeconds: 20, engine: nil, configuration: nil, clusteringDiagnostics: nil), "diarization.json")
-        try AudioPreparationService.commitSourceEnergy(timeline(), in: root)
+        try SourceEnergyCheckpoint.write(timeline(), in: root)
         let store = try SpeakerProfileStore(directoryURL: root.appendingPathComponent("library"))
         let person = try await store.createProfile(.init(displayName: "Owner"))
         for enabled in [false, true] {

@@ -1,5 +1,6 @@
 import ScribeInference
 import Foundation
+import ScribeAppCore
 
 /// A small stdin control plane that continues reading `cancel` envelopes while
 /// a model stage is running on the request-processing task. Cancellation is
@@ -29,7 +30,7 @@ public final class WorkerRequestLoop: @unchecked Sendable {
 
         while let envelope = state.next() {
             guard envelope.kind == .request else {
-                writer.write(WorkerProtocol.error(requestID: envelope.requestID, code: "invalid_request", message: "Only request and cancel envelopes may be sent to the worker."))
+                writer.write(WorkerEnvelope.error(requestID: envelope.requestID, code: "invalid_request", message: "Only request and cancel envelopes may be sent to the worker."))
                 continue
             }
             handle(envelope)
@@ -42,7 +43,7 @@ public final class WorkerRequestLoop: @unchecked Sendable {
             let data = FileHandle.standardInput.availableData
             guard !data.isEmpty else { break }
             pending.append(data)
-            while let newline = pending.firstIndex(of: 0x0A) {
+            while let newline = pending.firstIndex(of: WorkerWireFormat.recordSeparator) {
                 let line = pending.prefix(upTo: newline)
                 pending.removeSubrange(...newline)
                 guard !line.isEmpty else { continue }
@@ -55,7 +56,7 @@ public final class WorkerRequestLoop: @unchecked Sendable {
 
     private func receive(_ data: Data) {
         do {
-            let envelope = try WorkerProtocol.decode(data)
+            let envelope = try WorkerWireFormat.decode(data)
             if envelope.kind == .cancel {
                 state.cancel(envelope.requestID)
                 writer.write(WorkerEnvelope(kind: .stageResult, requestID: envelope.requestID, payload: .object([
@@ -64,17 +65,17 @@ public final class WorkerRequestLoop: @unchecked Sendable {
             } else {
                 state.enqueue(envelope)
             }
-        } catch let error as WorkerProtocolError {
-            writer.write(WorkerProtocol.error(requestID: "unknown", code: "protocol_error", message: error.localizedDescription))
+        } catch let error as WorkerWireFormatError {
+            writer.write(WorkerEnvelope.error(requestID: "unknown", code: "protocol_error", message: error.workerDiagnostic))
         } catch {
-            writer.write(WorkerProtocol.error(requestID: "unknown", code: "worker_error", message: error.localizedDescription))
+            writer.write(WorkerEnvelope.error(requestID: "unknown", code: "worker_error", message: error.localizedDescription))
         }
     }
 
     private func handle(_ envelope: WorkerEnvelope) {
         guard let payload = envelope.payload.objectValue,
               let operation = payload["operation"]?.stringValue else {
-            writer.write(WorkerProtocol.error(requestID: envelope.requestID, code: "invalid_request", message: "Expected payload.operation."))
+            writer.write(WorkerEnvelope.error(requestID: envelope.requestID, code: "invalid_request", message: "Expected payload.operation."))
             return
         }
         switch operation {
@@ -88,12 +89,12 @@ public final class WorkerRequestLoop: @unchecked Sendable {
         case "validate_assets":
             validateAssets(requestID: envelope.requestID)
         case "warm", "dictate", "unload":
-            guard envelope.version == 2 else {
-                writer.write(WorkerProtocol.error(requestID: envelope.requestID, code: "unsupported_version", message: "Dictation operations require protocol v2."))
+            guard envelope.version == WorkerEnvelope.dictationVersion else {
+                writer.write(WorkerEnvelope.error(requestID: envelope.requestID, code: "unsupported_version", message: "Dictation operations require protocol v2."))
                 return
             }
             guard mode == .dictation else {
-                writer.write(WorkerProtocol.error(requestID: envelope.requestID, code: "unsupported_operation", message: "Dictation operations require --mode dictation."))
+                writer.write(WorkerEnvelope.error(requestID: envelope.requestID, code: "unsupported_operation", message: "Dictation operations require --mode dictation."))
                 return
             }
             let semaphore = DispatchSemaphore(value: 0)
@@ -106,11 +107,11 @@ public final class WorkerRequestLoop: @unchecked Sendable {
             extractEmbedding(requestID: envelope.requestID, payload: payload)
         case "run":
             guard mode == .batch else {
-                writer.write(WorkerProtocol.error(requestID: envelope.requestID, code: "unsupported_operation", message: "Batch runs are unavailable in dictation mode."))
+                writer.write(WorkerEnvelope.error(requestID: envelope.requestID, code: "unsupported_operation", message: "Batch runs are unavailable in dictation mode."))
                 return
             }
             if state.isCancelled(envelope.requestID) {
-                writer.write(WorkerProtocol.error(requestID: envelope.requestID, code: "cancelled", message: "The request was cancelled before its first stage boundary."))
+                writer.write(WorkerEnvelope.error(requestID: envelope.requestID, code: "cancelled", message: "The request was cancelled before its first stage boundary."))
                 return
             }
             let runner = WorkerJobRunner(configuration: configuration)
@@ -121,7 +122,7 @@ public final class WorkerRequestLoop: @unchecked Sendable {
             }
             semaphore.wait()
         default:
-            writer.write(WorkerProtocol.error(requestID: envelope.requestID, code: "unsupported_operation", message: "Unsupported operation \(operation)."))
+            writer.write(WorkerEnvelope.error(requestID: envelope.requestID, code: "unsupported_operation", message: "Unsupported operation \(operation)."))
         }
     }
 
@@ -135,21 +136,21 @@ public final class WorkerRequestLoop: @unchecked Sendable {
                 "stage": .string("asset_validation"), "status": .string("ready"), "modelsDirectory": .string(configuration.modelsDirectory.path), "declaredOnDiskBytes": .number(Double(manifest.totalDeclaredOnDiskBytes)),
             ])))
         } catch ModelSetupError.unsafeManifest {
-            writer.write(WorkerProtocol.error(
+            writer.write(WorkerEnvelope.error(
                 requestID: requestID,
                 code: "unsafe_manifest",
                 message: "The manifest must disable telemetry and runtime downloads."
             ))
         } catch let ModelSetupError.report(report) {
-            let details = (try? JSONValue.encoding(report)) ?? .object([:])
-            writer.write(WorkerProtocol.error(
+            let details = (try? WorkerJSONValue.encoding(report)) ?? .object([:])
+            writer.write(WorkerEnvelope.error(
                 requestID: requestID,
                 code: "model_setup_incomplete",
                 message: "Required offline model assets are missing, corrupt, or unreadable.",
                 details: details
             ))
         } catch {
-            writer.write(WorkerProtocol.error(requestID: requestID, code: "model_setup_incomplete", message: error.localizedDescription))
+            writer.write(WorkerEnvelope.error(requestID: requestID, code: "model_setup_incomplete", message: error.localizedDescription))
         }
     }
 
@@ -157,7 +158,7 @@ public final class WorkerRequestLoop: @unchecked Sendable {
     /// transcription run. It reuses the exact diarization embedding stack and
     /// its pinned assets, but never spends time loading Parakeet or writing ASR
     /// checkpoints for excerpts the person has already confirmed.
-    private func extractEmbedding(requestID: String, payload: [String: JSONValue]) {
+    private func extractEmbedding(requestID: String, payload: [String: WorkerJSONValue]) {
         let semaphore = DispatchSemaphore(value: 0)
         Task {
             defer { semaphore.signal() }
@@ -207,7 +208,7 @@ public final class WorkerRequestLoop: @unchecked Sendable {
                     "usableSpeechDuration": .number(ranges.reduce(0) { $0 + $1.duration }),
                 ])))
             } catch {
-                writer.write(WorkerProtocol.error(
+                writer.write(WorkerEnvelope.error(
                     requestID: requestID,
                     code: "embedding_extraction_failed",
                     message: error.localizedDescription

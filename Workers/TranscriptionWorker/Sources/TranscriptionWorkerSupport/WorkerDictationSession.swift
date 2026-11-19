@@ -3,6 +3,7 @@ import ScribeInference
 @preconcurrency import CoreML
 import FluidAudio
 import Foundation
+import ScribeAppCore
 import os
 
 /// A single ASR manager is retained for the lifetime of the dictation worker,
@@ -23,9 +24,9 @@ public actor WorkerDictationSession {
         self.configuration = configuration
     }
 
-    public func handle(operation: String, requestID: String, payload: [String: JSONValue], emit: (WorkerEnvelope) -> Void) async {
+    public func handle(operation: String, requestID: String, payload: [String: WorkerJSONValue], emit: (WorkerEnvelope) -> Void) async {
         do {
-            let result: [String: JSONValue]
+            let result: [String: WorkerJSONValue]
             switch operation {
             case "warm": result = try await warm(payload)
             case "dictate": result = try await dictate(payload)
@@ -39,19 +40,19 @@ public actor WorkerDictationSession {
                 result = ["stage": .string("unload"), "status": .string("ready")]
             default: throw DictationError.invalidRequest("Unsupported operation \(operation).")
             }
-            emit(WorkerEnvelope(version: 2, kind: .stageResult, requestID: requestID, payload: .object(result)))
+            emit(WorkerEnvelope(version: WorkerEnvelope.dictationVersion, kind: .stageResult, requestID: requestID, payload: .object(result)))
         } catch {
-            emit(WorkerProtocol.error(requestID: requestID, code: "dictation_failed", message: error.localizedDescription, version: 2))
+            emit(WorkerEnvelope.error(requestID: requestID, code: "dictation_failed", message: error.localizedDescription, version: WorkerEnvelope.dictationVersion))
         }
     }
 
     /// Prepares speech recognition and, when the payload carries a snapshot with
     /// a usable term, the vocabulary booster including one representative CTC
     /// prediction. Missing or corrupt optional assets never fail the warm.
-    private func warm(_ payload: [String: JSONValue]) async throws -> [String: JSONValue] {
+    private func warm(_ payload: [String: WorkerJSONValue]) async throws -> [String: WorkerJSONValue] {
         let started = ContinuousClock.now
         let speech = try await warmSpeech()
-        var result: [String: JSONValue] = ["stage": .string("warm"), "status": .string("ready"), "speech": .string(speech)]
+        var result: [String: WorkerJSONValue] = ["stage": .string("warm"), "status": .string("ready"), "speech": .string(speech)]
         if let value = payload["vocabulary"] {
             let snapshot = try JSONDecoder().decode(WorkerVocabularySnapshot.self, from: JSONEncoder().encode(value))
             let report = await booster.warm(snapshot: snapshot, manifestURL: configuration.manifestURL,
@@ -86,7 +87,7 @@ public actor WorkerDictationSession {
         return "loaded"
     }
 
-    private func dictate(_ payload: [String: JSONValue]) async throws -> [String: JSONValue] {
+    private func dictate(_ payload: [String: WorkerJSONValue]) async throws -> [String: WorkerJSONValue] {
         guard let path = payload["audioPath"]?.stringValue, path.hasPrefix("/"),
               let runPath = payload["runDirectory"]?.stringValue, runPath.hasPrefix("/") else {
             throw DictationError.invalidRequest("dictate requires absolute audioPath and runDirectory.")
@@ -140,7 +141,7 @@ public actor WorkerDictationSession {
         let result = try await manager.transcribe(inferenceBuffer, decoderState: &state, language: language)
         let asrSeconds = (ContinuousClock.now - asrStarted).seconds
         let duration = Double(buffer.frameLength) / 16_000
-        let tokens: [JSONValue] = (result.tokenTimings ?? []).map { token in
+        let tokens: [WorkerJSONValue] = (result.tokenTimings ?? []).map { token in
             let start = min(max(0, token.startTime), duration)
             let end = min(max(start, token.endTime), duration)
             return .object([
@@ -156,7 +157,7 @@ public actor WorkerDictationSession {
                 TokenTiming(token: $0.token, tokenId: $0.tokenId, startTime: $0.startTime, endTime: min(duration, $0.endTime), confidence: $0.confidence)
             }, snapshot: snapshot, manifestURL: configuration.manifestURL, modelsDirectory: configuration.modelsDirectory)
         let report = corrected.booster
-        let timings: [String: JSONValue] = [
+        let timings: [String: WorkerJSONValue] = [
             "speechLoad": .string(speechState),
             "vadSeconds": .number(vadSeconds),
             "speechRecognitionSeconds": .number(asrSeconds),
@@ -170,7 +171,7 @@ public actor WorkerDictationSession {
         if let source = report.source, source != .retained {
             Self.logger.notice("Vocabulary booster \(source.rawValue, privacy: .public) on the dictation path; the helper process was not restarted")
         }
-        var response: [String: JSONValue] = ["stage": .string("dictate"), "status": .string("complete"),
+        var response: [String: WorkerJSONValue] = ["stage": .string("dictate"), "status": .string("complete"),
             "text": .string(corrected.text), "rawText": .string(result.text), "tokens": .array(tokens),
             "timings": .object(timings), "vocabularyBooster": .object(report.json)]
         if let warning = corrected.warning { response["vocabularyWarning"] = .string(warning) }
@@ -197,8 +198,8 @@ public actor WorkerDictationSession {
 
 extension VocabularyBooster.Report {
     /// Readiness, source and timings only; never terms.
-    var json: [String: JSONValue] {
-        var value: [String: JSONValue] = [
+    var json: [String: WorkerJSONValue] {
+        var value: [String: WorkerJSONValue] = [
             "readiness": .string(readiness.rawValue),
             "preparationSeconds": .number(preparationSeconds),
             "modelLoadSeconds": .number(modelLoadSeconds),

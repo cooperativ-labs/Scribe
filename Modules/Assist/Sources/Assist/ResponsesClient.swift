@@ -1,23 +1,18 @@
 import Foundation
 
-/// One streamed Responses-API request, written once for both accounts: the
-/// ChatGPT backend (`chatgpt.com/backend-api/codex`) and the public API
-/// (`api.openai.com/v1`) differ only in base URL and headers.
+/// One streamed request to the public OpenAI Responses API.
 ///
 /// The answer is inserted once, at completion, so the stream is only read to
 /// concatenate `response.output_text.delta` events and to learn the usage.
 public struct ResponsesClient: Sendable {
     public var baseURL: URL
-    /// Sent on every request: authorization, account and originator headers.
+    /// Sent on every request, including authorization.
     public var headers: [String: String]
-    /// The Codex backend insists on these fields being present; the public API accepts them.
-    public var sendsCodexFields: Bool
     private let transport: HTTPTransport
 
-    public init(baseURL: URL, headers: [String: String], sendsCodexFields: Bool = false, transport: HTTPTransport = URLSessionTransport()) {
+    public init(baseURL: URL, headers: [String: String], transport: HTTPTransport = URLSessionTransport()) {
         self.baseURL = baseURL
         self.headers = headers
-        self.sendsCodexFields = sendsCodexFields
         self.transport = transport
     }
 
@@ -33,7 +28,7 @@ public struct ResponsesClient: Sendable {
     }
 
     func body(model: String, instructions: String, input: String) -> [String: Any] {
-        var body: [String: Any] = [
+        [
             "model": model,
             "instructions": instructions,
             "input": [[
@@ -44,14 +39,6 @@ public struct ResponsesClient: Sendable {
             "store": false,
             "stream": true,
         ]
-        if sendsCodexFields {
-            // What Codex always sends alongside (codex-rs/core/src/client.rs): no tools.
-            body["tools"] = [Any]()
-            body["tool_choice"] = "auto"
-            body["parallel_tool_calls"] = false
-            body["include"] = [Any]()
-        }
-        return body
     }
 }
 
@@ -86,19 +73,13 @@ public enum ResponsesError: Error, Equatable, Sendable {
 
 /// The fields of a provider's error body that change what the person is told.
 ///
-/// The ChatGPT backend's usage-limit 429 looks like
-/// `{"error":{"type":"usage_limit_reached","plan_type":"plus","resets_at":…,"resets_in_seconds":…}}`
-/// (codex-rs parses the same fields); the public API's errors are
-/// `{"error":{"message":…,"type":…,"code":…}}`; some backend errors are `{"detail":…}`.
+/// OpenAI errors carry an object with `message`, `type`, and `code`.
 /// Anthropic sends `{"type":"error","error":{"type":…,"message":…}}`, and Gemini's
 /// OpenAI-compatible endpoint wraps its error object in a one-element array.
 public struct ResponsesErrorBody: Sendable, Equatable {
     public var type: String?
     public var code: String?
     public var message: String?
-    public var planType: String?
-    public var resetsAt: Date?
-    public var resetsInSeconds: TimeInterval?
 
     public init?(json: String) {
         guard let data = json.data(using: .utf8), let parsed = try? JSONSerialization.jsonObject(with: data),
@@ -107,9 +88,6 @@ public struct ResponsesErrorBody: Sendable, Equatable {
             type = error["type"] as? String
             code = error["code"] as? String
             message = error["message"] as? String
-            planType = error["plan_type"] as? String
-            resetsAt = (error["resets_at"] as? Double).map(Date.init(timeIntervalSince1970:))
-            resetsInSeconds = error["resets_in_seconds"] as? Double
         } else if let error = object["error"] as? String {
             code = error
             message = object["error_description"] as? String ?? object["message"] as? String
@@ -122,11 +100,6 @@ public struct ResponsesErrorBody: Sendable, Equatable {
             return nil
         }
         code = code ?? object["code"] as? String
-    }
-
-    /// When the limit resets: the absolute time if given, else relative to `now`.
-    public func resetDate(now: Date = .now) -> Date? {
-        resetsAt ?? resetsInSeconds.map { now.addingTimeInterval($0) }
     }
 }
 
@@ -145,10 +118,7 @@ struct ResponsesStreamDecoder: StreamDecoder {
 
     /// The result once the response has completed, else nil.
     mutating func consume(_ line: String) throws -> ResponsesResult? {
-        guard line.hasPrefix("data:") else { return nil }
-        let payload = line.dropFirst(5).trimmingCharacters(in: .whitespaces)
-        guard payload != "[DONE]", let data = payload.data(using: .utf8),
-              let event = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return nil }
+        guard let event = eventPayload(line) else { return nil }
         switch event["type"] as? String {
         case "response.output_text.delta":
             text += event["delta"] as? String ?? ""

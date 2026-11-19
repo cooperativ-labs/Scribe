@@ -1,15 +1,10 @@
 import Foundation
 
-/// Host-side copy of the worker's newline-delimited JSON envelope.
-///
-/// Field names and the size bound match `WorkerProtocol.swift` in
-/// `Workers/TranscriptionWorker`. The copy exists for the same reason as
-/// `WorkerASRTranscript`: the helper package pulls in FluidAudio and the Core ML
-/// model stack, and none of that belongs in the process that draws the UI. The
-/// integration test in this module drives the real binary, so a drift in either
-/// direction fails a test rather than only a production run.
+/// Newline-delimited JSON envelope exchanged by the app and its bundled
+/// transcription worker. Versions identify the batch and dictation contracts.
 public struct WorkerEnvelope: Codable, Sendable, Equatable {
     public static let currentVersion = 1
+    public static let dictationVersion = 2
 
     public enum Kind: String, Codable, Sendable {
         case request
@@ -113,7 +108,7 @@ public enum WorkerWireFormat {
         let envelope: WorkerEnvelope
         do { envelope = try JSONDecoder().decode(WorkerEnvelope.self, from: data) }
         catch { throw WorkerWireFormatError.malformedMessage(error.localizedDescription) }
-        guard envelope.version == 1 || envelope.version == 2 else {
+        guard envelope.version == WorkerEnvelope.currentVersion || envelope.version == WorkerEnvelope.dictationVersion else {
             throw WorkerWireFormatError.unsupportedVersion(envelope.version)
         }
         return envelope

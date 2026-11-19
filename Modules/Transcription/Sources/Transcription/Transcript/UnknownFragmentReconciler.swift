@@ -115,7 +115,7 @@ public struct UnknownFragmentReconciler: Sendable {
               let record = try? JSONDecoder().decode(DiarizationRecord.self, from: data)
         else { return transcript }
         let intervals = record.acousticIntervals(sourceDurationMs: transcript.source.durationMs)
-        let energyURL = runDirectoryURL.appendingPathComponent("source-energy.json")
+        let energyURL = runDirectoryURL.appendingPathComponent(TranscriptRunArtifact.sourceEnergy)
         let energy = transcript.processingOptions["microphone_speaker_prior_enabled"] == .boolean(true)
             ? (try? JSONDecoder().decode(SourceEnergyTimeline.self, from: Data(contentsOf: energyURL))) : nil
         let prior = energy.flatMap { SourceEnergyPrior(timeline: $0, intervals: intervals) }
@@ -126,7 +126,7 @@ public struct UnknownFragmentReconciler: Sendable {
             sourceEnergyPrior: prior
         )
         guard segments != transcript.segments else { return transcript }
-        return transcript.replacingSegments(segments)
+        return transcript.replacing(segments: segments)
     }
 
     // MARK: - Decisions
@@ -412,29 +412,6 @@ extension DiarizationRecord {
     }
 }
 
-extension CanonicalTranscript {
-    func replacingSegments(_ segments: [TranscriptSegment]) -> CanonicalTranscript {
-        CanonicalTranscript(
-            schemaVersion: schemaVersion,
-            transcriptID: transcriptID,
-            revision: revision,
-            title: title,
-            status: status,
-            createdAt: createdAt,
-            source: source,
-            language: language,
-            languageSource: languageSource,
-            timestampUnit: timestampUnit,
-            timestampOrigin: timestampOrigin,
-            speakers: speakers,
-            segments: segments,
-            subtitleCueMappings: subtitleCueMappings,
-            processingOptions: processingOptions,
-            engineRevisions: engineRevisions,
-            warnings: warnings
-        )
-    }
-}
 
 extension TranscriptSegment {
     fileprivate func withInference(_ inference: TranscriptSpeakerInference) -> TranscriptSegment {

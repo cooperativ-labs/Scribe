@@ -146,7 +146,7 @@ final class TranscriptionCoordinatorTests: XCTestCase {
         let coordinator = try TranscriptionCoordinator(configuration: .init(transcriptStoreURL: root.appendingPathComponent("store")), stageRunner: RecordingRunner())
         let original = try await coordinator.enqueue(.init(sourceURL: source, modelProfileID: "default"))
         let timeline = SourceEnergyTimeline(windows: [.init(startMs: 0, endMs: 100, microphonePower: 0.1, systemPower: 0)])
-        try AudioPreparationService.commitSourceEnergy(timeline, in: original.runDirectoryURL)
+        try SourceEnergyCheckpoint.write(timeline, in: original.runDirectoryURL)
         let revised = try await coordinator.reprocess(original, speakerCount: .automatic, microphoneSpeakerPrior: true)
         XCTAssertEqual(revised.request.microphoneSpeakerPrior, true)
         XCTAssertNotEqual(original.configurationFingerprint, revised.configurationFingerprint)
@@ -165,7 +165,7 @@ final class TranscriptionCoordinatorTests: XCTestCase {
         let coordinator = try TranscriptionCoordinator(
             configuration: .init(transcriptStoreURL: store),
             stageRunner: RecordingRunner(),
-            vocabularyRevision: { "vocab-current" }
+            vocabularySnapshot: { .init(revision: "vocab-current", terms: []) }
         )
         let original = try await coordinator.enqueue(.init(
             sourceURL: source,
@@ -184,6 +184,7 @@ final class TranscriptionCoordinatorTests: XCTestCase {
         XCTAssertEqual(revised.request.modelProfileID, "parakeet-v3")
         XCTAssertEqual(revised.request.speakerCount, .known(3))
         XCTAssertNil(revised.request.vocabularyRevision, "Unset revision lets enqueue record the glossary in force now.")
+        XCTAssertEqual(revised.vocabularySnapshot?.revision, "vocab-current")
         XCTAssertEqual(revised.sourceSnapshotURL, original.sourceSnapshotURL)
         XCTAssertTrue(revised.checkpoints.isEmpty)
         XCTAssertTrue(FileManager.default.fileExists(atPath: original.jobFileURL.path))

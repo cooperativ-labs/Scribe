@@ -103,7 +103,7 @@ final class TranscriptionHostService {
                     )
                 },
                 sourceEnergyPreparation: { job in
-                    let destination = job.runDirectoryURL.appendingPathComponent("source-energy.json")
+                    let destination = job.runDirectoryURL.appendingPathComponent(TranscriptRunArtifact.sourceEnergy)
                     guard !FileManager.default.fileExists(atPath: destination.path),
                           let session = job.request.recorderSessionDirectory else { return }
                     let manifestURL = session.appendingPathComponent("metadata.json")
@@ -111,7 +111,7 @@ final class TranscriptionHostService {
                           let manifest = try? RecorderSessionManifestCodec.decode(data),
                           manifest.tracks.finalTrack?.checksum == job.sourceFingerprint else { return }
                     if let timeline = try SourceEnergyPreparation.timeline(sessionDirectory: session) {
-                        try AudioPreparationService.commitSourceEnergy(timeline, in: job.runDirectoryURL)
+                        try SourceEnergyCheckpoint.write(timeline, in: job.runDirectoryURL)
                     }
                 }
             )
@@ -202,11 +202,11 @@ final class TranscriptionHostService {
         else { return }
 
         do {
-            let energyURL = job.runDirectoryURL.appendingPathComponent("source-energy.json")
+            let energyURL = job.runDirectoryURL.appendingPathComponent(TranscriptRunArtifact.sourceEnergy)
             if request.microphoneSpeakerPrior == true,
                !FileManager.default.fileExists(atPath: energyURL.path),
                let timeline = try SourceEnergyPreparation.timeline(sessionDirectory: sessionDirectory) {
-                try AudioPreparationService.commitSourceEnergy(timeline, in: job.runDirectoryURL)
+                try SourceEnergyCheckpoint.write(timeline, in: job.runDirectoryURL)
             }
             try RecorderSessionCleanup.removeSession(
                 at: sessionDirectory,

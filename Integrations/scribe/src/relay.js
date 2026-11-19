@@ -1,6 +1,5 @@
 import { randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync, renameSync, mkdirSync } from 'node:fs';
-import path from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
 import express from 'express';
 import { rateLimit } from 'express-rate-limit';
 import { createHTTPApp } from './http.js';
@@ -9,6 +8,7 @@ import { createSiteRouter } from './site.js';
 import { createLegalRouter } from './legal.js';
 import { DEMO_OWNER, DemoLibrary } from './demo.js';
 import { StoreError } from './store.js';
+import { writePrivateState } from './private-state.js';
 
 // The Scribe relay gives every Scribe library one stable HTTPS MCP endpoint without
 // a tunnel. Each Mac links once, becoming an owner with its own secret, then keeps
@@ -46,10 +46,7 @@ export class OwnerDirectory {
   }
   save() {
     if (!this.stateFile) return;
-    mkdirSync(path.dirname(this.stateFile), { recursive: true, mode: 0o700 });
-    const temp = `${this.stateFile}.${randomUUID()}.tmp`;
-    writeFileSync(temp, JSON.stringify(this.state), { mode: 0o600, flag: 'wx' });
-    renameSync(temp, this.stateFile);
+    writePrivateState(this.stateFile, JSON.stringify(this.state));
   }
   register() {
     if (Object.keys(this.state.owners).length >= this.maxOwners) throw new Error('This relay cannot link more libraries.');

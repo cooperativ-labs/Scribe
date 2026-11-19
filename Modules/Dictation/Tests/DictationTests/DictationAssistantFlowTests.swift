@@ -34,9 +34,9 @@ final class DictationAssistantFlowTests: XCTestCase {
     }
 
     func testErrorsMapToIndicatorStates() {
-        XCTAssertEqual(DictationCoordinator.assistantState(for: AssistError.signInRequired, timeout: .seconds(60)),
-                       .signInRequired("Sign in to ChatGPT again to use Voice Assistant."))
-        XCTAssertEqual(DictationCoordinator.assistantState(for: AssistError.notAvailableForAccount, timeout: .seconds(60)),
-                       .error("Voice Assistant is not available for this ChatGPT account."))
+        XCTAssertEqual(DictationCoordinator.assistantState(for: CodexAppServerError.notSignedIn, timeout: .seconds(60)),
+                       .error("Sign in to ChatGPT through Codex in Voice Assistant settings."))
+        XCTAssertEqual(DictationCoordinator.assistantState(for: DictationCoordinator.AssistantTimeout(), timeout: .seconds(60)),
+                       .error("No answer after 60 seconds. Try again."))
     }
 }

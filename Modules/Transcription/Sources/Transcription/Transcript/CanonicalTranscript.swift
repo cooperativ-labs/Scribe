@@ -26,6 +26,54 @@ public struct CanonicalTranscript: Codable, Sendable, Equatable, Identifiable {
 
     public var id: String { transcriptID }
 
+    /// Copies the transcript, preserving fields the caller leaves out. Pass
+    /// `.some(nil)` to clear the title or subtitle cue mappings.
+    func replacing(
+        revision: Int? = nil,
+        title: String?? = nil,
+        speakers: [TranscriptSpeaker]? = nil,
+        segments: [TranscriptSegment]? = nil,
+        subtitleCueMappings: [SubtitleCueMapping]?? = nil,
+        processingOptions: [String: TranscriptJSONValue]? = nil
+    ) -> CanonicalTranscript {
+        CanonicalTranscript(
+            schemaVersion: schemaVersion,
+            transcriptID: transcriptID,
+            revision: revision ?? self.revision,
+            title: title ?? self.title,
+            status: status,
+            createdAt: createdAt,
+            source: source,
+            language: language,
+            languageSource: languageSource,
+            timestampUnit: timestampUnit,
+            timestampOrigin: timestampOrigin,
+            speakers: speakers ?? self.speakers,
+            segments: segments ?? self.segments,
+            subtitleCueMappings: subtitleCueMappings ?? self.subtitleCueMappings,
+            processingOptions: processingOptions ?? self.processingOptions,
+            engineRevisions: engineRevisions,
+            warnings: warnings
+        )
+    }
+
+    /// A structural edit clears the old subtitle cue mappings so export can
+    /// rebuild them from the new segments.
+    func nextRevision(
+        title: String?? = nil,
+        speakers: [TranscriptSpeaker]? = nil,
+        segments: [TranscriptSegment]? = nil,
+        subtitleCueMappings: [SubtitleCueMapping]?? = nil
+    ) -> CanonicalTranscript {
+        replacing(
+            revision: revision + 1,
+            title: title,
+            speakers: speakers,
+            segments: segments,
+            subtitleCueMappings: subtitleCueMappings
+        )
+    }
+
     private enum CodingKeys: String, CodingKey {
         case schemaVersion = "schema_version"
         case transcriptID = "transcript_id"
@@ -439,25 +487,7 @@ public enum CanonicalTranscriptCodec {
             ))
         }
         guard speakers != transcript.speakers else { return transcript }
-        return CanonicalTranscript(
-            schemaVersion: transcript.schemaVersion,
-            transcriptID: transcript.transcriptID,
-            revision: transcript.revision,
-            title: transcript.title,
-            status: transcript.status,
-            createdAt: transcript.createdAt,
-            source: transcript.source,
-            language: transcript.language,
-            languageSource: transcript.languageSource,
-            timestampUnit: transcript.timestampUnit,
-            timestampOrigin: transcript.timestampOrigin,
-            speakers: speakers,
-            segments: transcript.segments,
-            subtitleCueMappings: transcript.subtitleCueMappings,
-            processingOptions: transcript.processingOptions,
-            engineRevisions: transcript.engineRevisions,
-            warnings: transcript.warnings
-        )
+        return transcript.replacing(speakers: speakers)
     }
 }
 

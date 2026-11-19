@@ -242,7 +242,7 @@ def verify_bundle(bundle, lock=None):
 def source_files():
     host = ROOT/'Modules/Transcription/Sources/Transcription'
     names = ['SourceEnergyPrior', 'CanonicalTranscriptValidator', 'UnknownFragmentReconciler', 'TranscriptParagraph', 'CanonicalTranscript', 'WorkerASRTranscript', 'TokenTimingReconciler', 'SpeakerTurnBuilder', 'TranscriptDisplayGrouper']
-    return [host/f'Transcript/{n}.swift' for n in names] + [host/'Import/AudioPreparationService.swift', host/'Jobs/TranscriptAssemblyStageRunner.swift', host/'UI/TranscriptReviewPresentation.swift', ROOT/'Scribe/App/Sources/ScribeAppCore/SourceEnergyTimeline.swift'] + list(pathlib.Path(__file__).parent.glob('*.py')) + [pathlib.Path(__file__).with_name('Replay.swift'), ROOT/'Workers/TranscriptionWorker/model_manifest.json', ROOT/'Workers/TranscriptionWorker/Package.resolved']
+    return [host/f'Transcript/{n}.swift' for n in names] + [host/'Import/AudioTimeMapping.swift', host/'Jobs/TranscriptAssemblyStageRunner.swift', host/'UI/TranscriptReviewPresentation.swift', ROOT/'Scribe/App/Sources/ScribeAppCore/SourceEnergyTimeline.swift'] + list(pathlib.Path(__file__).parent.glob('*.py')) + [pathlib.Path(__file__).with_name('Replay.swift'), ROOT/'Workers/TranscriptionWorker/model_manifest.json', ROOT/'Workers/TranscriptionWorker/Package.resolved']
 
 
 def freeze(args):

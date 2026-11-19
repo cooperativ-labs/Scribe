@@ -381,8 +381,12 @@ public final class ScribeSettings: ObservableObject {
         if let models = defaults.dictionary(forKey: Key.assistantAPIModels) as? [String: String] {
             assistantAPIModels = models
         } else {
-            // Before there were providers, the one API-key model was OpenAI's.
-            assistantAPIModels = defaults.string(forKey: Key.legacyAssistantAPIKeyModel).map { ["openai": $0] } ?? [:]
+            // Migrate the old OpenAI choice into the per-provider dictionary.
+            let models = defaults.string(forKey: Key.legacyAssistantAPIKeyModel).map { ["openai": $0] } ?? [:]
+            if !models.isEmpty {
+                defaults.set(models, forKey: Key.assistantAPIModels)
+            }
+            assistantAPIModels = models
         }
         assistantCustomEndpointURL = defaults.string(forKey: Key.assistantCustomEndpointURL) ?? ""
         assistantChatGPTPlan = defaults.string(forKey: Key.assistantChatGPTPlan)

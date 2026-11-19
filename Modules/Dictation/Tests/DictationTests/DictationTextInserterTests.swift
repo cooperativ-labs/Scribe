@@ -121,7 +121,8 @@ final class DictationTextInserterTests: XCTestCase {
             ax.secureSubrole = !role
             ax.directWorks = true
             let paste = FakePaste()
-            let inserter = DictationTextInserter(locator: FocusedFieldLocator(client: ax), paste: paste)
+            let inserter = DictationTextInserter(locator: FocusedFieldLocator(client: ax), paste: paste,
+                                                secureInputEnabled: { false })
             let outcome = await inserter.insertDictation("hello", frontmostPID: ax.targetPID, screenTop: 100,
                                                         screens: [], allowsUnverifiedPaste: true,
                                                         currentPID: { ax.targetPID })
@@ -226,7 +227,8 @@ final class DictationTextInserterTests: XCTestCase {
         let ax = FakeAX()
         ax.exposesFocusedElement = false
         let paste = FakePaste()
-        let inserter = DictationTextInserter(locator: FocusedFieldLocator(client: ax), paste: paste)
+        let inserter = DictationTextInserter(locator: FocusedFieldLocator(client: ax), paste: paste,
+                                            secureInputEnabled: { false })
         let outcome = await inserter.insertDictation("hello", frontmostPID: ax.targetPID, screenTop: 100,
                                                     screens: [], allowsUnverifiedPaste: true,
                                                     currentPID: { ax.targetPID })
@@ -264,7 +266,8 @@ final class DictationTextInserterTests: XCTestCase {
         let ax = FakeAX()
         ax.exposesFocusedElement = false
         let paste = FakePaste()
-        let inserter = DictationTextInserter(locator: FocusedFieldLocator(client: ax), paste: paste)
+        let inserter = DictationTextInserter(locator: FocusedFieldLocator(client: ax), paste: paste,
+                                            secureInputEnabled: { false })
         let outcome = await inserter.insertDictation("hello", frontmostPID: ax.targetPID, screenTop: 100,
                                                     screens: [], allowsUnverifiedPaste: true,
                                                     currentPID: { 999 })

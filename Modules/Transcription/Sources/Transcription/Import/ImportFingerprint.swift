@@ -33,6 +33,13 @@ extension Digest {
     var scribeHexString: String { map { String(format: "%02x", $0) }.joined() }
 }
 
+/// The channel policy recorded in import fingerprints.
+public enum AudioChannelSelection: String, Codable, Sendable, CaseIterable {
+    case downmix
+    case left
+    case right
+}
+
 /// The processing inputs that decide whether two runs over the same audio are
 /// comparable.
 ///

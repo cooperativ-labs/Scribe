@@ -207,7 +207,7 @@ public actor WorkerClient {
     @discardableResult
     public func handshake(requestID: String = UUID().uuidString) async throws -> WorkerHandshake {
         try start()
-        let expectedVersion = configuration.installation.mode == "dictation" ? 2 : WorkerEnvelope.currentVersion
+        let expectedVersion = configuration.installation.mode == "dictation" ? WorkerEnvelope.dictationVersion : WorkerEnvelope.currentVersion
         try send(WorkerEnvelope(version: expectedVersion, kind: .request, requestID: requestID, payload: .object(["operation": .string("handshake")])))
         while true {
             let envelope = try await receive(stage: "handshake")
@@ -335,7 +335,7 @@ public actor WorkerClient {
         try start()
         var body = payload
         body["operation"] = .string(operation)
-        try send(WorkerEnvelope(version: 2, kind: .request, requestID: requestID, payload: .object(body)))
+        try send(WorkerEnvelope(version: WorkerEnvelope.dictationVersion, kind: .request, requestID: requestID, payload: .object(body)))
         while true {
             let envelope = try await receive(stage: operation)
             guard envelope.requestID == requestID else { continue }

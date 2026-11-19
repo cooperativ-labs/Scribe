@@ -70,12 +70,6 @@ public struct AssistResponse: Sendable, Equatable {
         self.model = model
         self.usage = usage
     }
-
-    /// A short line for the indicator, e.g. "1,204 in · 180 out".
-    public var usageLine: String? {
-        guard let usage else { return nil }
-        return "\(usage.inputTokens.formatted()) in · \(usage.outputTokens.formatted()) out"
-    }
 }
 
 public struct AssistUsage: Sendable, Equatable {
@@ -90,12 +84,6 @@ public struct AssistUsage: Sendable, Equatable {
 
 /// What went wrong, in the terms the indicator and Settings show.
 public enum AssistError: Error, Equatable, Sendable, LocalizedError {
-    /// The ChatGPT sign-in is missing, expired or revoked (401, or a refresh error).
-    case signInRequired
-    /// The ChatGPT plan's Codex limit is used up (429); `resetsAt` when the backend said.
-    case usageLimitReached(resetsAt: Date?)
-    /// The backend refused this account (403: the plan has no Codex, or the route is closed).
-    case notAvailableForAccount
     /// The provider's API key is missing or was rejected (401).
     case invalidAPIKey(provider: String)
     /// The API key's rate or quota limit (429).
@@ -112,16 +100,6 @@ public enum AssistError: Error, Equatable, Sendable, LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .signInRequired:
-            "Sign in to ChatGPT again to use Voice Assistant."
-        case .usageLimitReached(let resetsAt):
-            if let resetsAt {
-                "ChatGPT usage limit reached. It resets at \(resetsAt.formatted(Self.resetStyle(for: resetsAt)))."
-            } else {
-                "ChatGPT usage limit reached. Try again later."
-            }
-        case .notAvailableForAccount:
-            "Voice Assistant is not available for this ChatGPT account."
         case .invalidAPIKey(let provider):
             "\(provider) did not accept the API key."
         case .rateLimited(let provider, _, let message):

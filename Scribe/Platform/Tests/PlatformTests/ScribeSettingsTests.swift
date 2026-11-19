@@ -156,6 +156,9 @@ final class ScribeSettingsTests: XCTestCase {
         XCTAssertEqual(settings.assistantAccountType, .apiKey)
         XCTAssertEqual(settings.assistantAPIProvider, "openai")
         XCTAssertEqual(settings.assistantAPIModels, ["openai": "gpt-6-luna"])
+        defaults.removeObject(forKey: "scribe.settings.assistant.apiKeyModel")
+        let relaunched = ScribeSettings(defaults: defaults, defaultRecordingsFolderURL: folder)
+        XCTAssertEqual(relaunched.assistantAPIModels, ["openai": "gpt-6-luna"])
     }
 
     func testAssistantKeyNeverMatchesTheDictationKey() throws {

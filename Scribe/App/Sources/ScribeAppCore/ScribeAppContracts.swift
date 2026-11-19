@@ -191,26 +191,6 @@ public struct TranscriptionDiagnostic: Codable, Sendable, Equatable {
     }
 }
 
-public struct TranscriptionResult: Codable, Sendable, Equatable {
-    public let transcriptID: UUID
-    public let revision: Int
-    public let canonicalTranscriptURL: URL
-    public let status: TranscriptionResultStatus
-
-    public init(transcriptID: UUID, revision: Int, canonicalTranscriptURL: URL, status: TranscriptionResultStatus) {
-        self.transcriptID = transcriptID
-        self.revision = revision
-        self.canonicalTranscriptURL = canonicalTranscriptURL
-        self.status = status
-    }
-}
-
-public enum TranscriptionResultStatus: String, Codable, Sendable, Equatable {
-    case complete
-    case completeWithWarnings
-    case noSpeech
-}
-
 // MARK: - Recorder session manifest
 
 /// A versioned recorder-session `metadata.json` manifest.

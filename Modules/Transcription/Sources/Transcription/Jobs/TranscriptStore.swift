@@ -271,22 +271,6 @@ public struct TranscriptStore: Sendable {
         return (run, meeting, transcript)
     }
 
-    /// The `TranscriptionResult` a completed run reports back to its caller.
-    public func result(for run: StoredTranscriptRun) -> TranscriptionResult? {
-        guard let transcript = run.transcript else { return nil }
-        let status: TranscriptionResultStatus = switch transcript.status {
-        case .complete: .complete
-        case .completeWithWarnings: .completeWithWarnings
-        case .noSpeech: .noSpeech
-        }
-        return TranscriptionResult(
-            transcriptID: run.job.request.requestID,
-            revision: transcript.revision,
-            canonicalTranscriptURL: run.canonicalTranscriptURL,
-            status: status
-        )
-    }
-
     // MARK: - Private
 
     private func meetingDirectories() -> [URL] {

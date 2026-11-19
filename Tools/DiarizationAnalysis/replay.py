@@ -28,12 +28,7 @@ def main():
     host = root / 'Modules/Transcription/Sources/Transcription'
     with tempfile.TemporaryDirectory(prefix='scribe-host-replay-') as temp:
         temp = pathlib.Path(temp)
-        # Extract the complete production mapping type, avoiding AVFoundation's
-        # unrelated preparation/service dependencies. Do not reimplement it.
-        source = (host / 'Import/AudioPreparationService.swift').read_text()
-        mapping = source.split('public struct AudioTimeMapping:', 1)[1].split('\npublic struct PhaseCancellationWarning:', 1)[0]
-        mapping_path = temp / 'AudioTimeMapping.swift'
-        mapping_path.write_text('import Foundation\npublic struct AudioTimeMapping:' + mapping)
+        mapping_path = host / 'Import/AudioTimeMapping.swift'
         bundle_path = temp / 'Bundle.swift'
         bundle_path.write_text('import Foundation\nextension Bundle { static var module: Bundle { .main } }\n')
         assembly = (host / 'Jobs/TranscriptAssemblyStageRunner.swift').read_text()

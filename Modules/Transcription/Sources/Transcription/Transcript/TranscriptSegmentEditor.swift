@@ -255,30 +255,3 @@ public enum TranscriptSegmentEditor {
         text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 }
-
-extension CanonicalTranscript {
-    /// This content, saved as revision `revision`. Undo restores an earlier
-    /// state as a newer revision rather than rewinding the number, so the store
-    /// and every window still see revisions only ever go up.
-    func asRevision(_ revision: Int) -> CanonicalTranscript {
-        CanonicalTranscript(
-            schemaVersion: schemaVersion,
-            transcriptID: transcriptID,
-            revision: revision,
-            title: title,
-            status: status,
-            createdAt: createdAt,
-            source: source,
-            language: language,
-            languageSource: languageSource,
-            timestampUnit: timestampUnit,
-            timestampOrigin: timestampOrigin,
-            speakers: speakers,
-            segments: segments,
-            subtitleCueMappings: subtitleCueMappings,
-            processingOptions: processingOptions,
-            engineRevisions: engineRevisions,
-            warnings: warnings
-        )
-    }
-}

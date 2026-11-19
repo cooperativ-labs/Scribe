@@ -1,4 +1,5 @@
 import Foundation
+import ScribeAppCore
 
 /// How the helper left, for the message on a structured crash failure.
 struct WorkerProcessExit: Sendable, Equatable {

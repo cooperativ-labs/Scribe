@@ -2,8 +2,7 @@
 import XCTest
 
 final class KeychainStoreTests: XCTestCase {
-    /// Round-trips a generic-password item under a throwaway service, so the
-    /// real `co.cooperativ.scribe.chatgpt` items are never touched.
+    /// Round-trips a generic-password item under a throwaway service.
     func testWriteReadOverwriteDelete() throws {
         let store = KeychainStore(service: "co.cooperativ.scribe.tests.\(UUID().uuidString)")
         do {
@@ -20,10 +19,5 @@ final class KeychainStoreTests: XCTestCase {
         try store.delete("item")
         XCTAssertNil(try store.read("item"))
         XCTAssertNoThrow(try store.delete("item"), "deleting a missing item is not an error")
-    }
-
-    func testServicesAreScribesOwn() {
-        XCTAssertEqual(KeychainStore.chatGPTService, "co.cooperativ.scribe.chatgpt")
-        XCTAssertNotEqual(KeychainStore.openAIService, KeychainStore.chatGPTService)
     }
 }

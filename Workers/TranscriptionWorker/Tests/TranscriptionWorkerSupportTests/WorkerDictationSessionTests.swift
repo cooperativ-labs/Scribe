@@ -1,4 +1,5 @@
 import Foundation
+import ScribeAppCore
 import Testing
 @testable import TranscriptionWorkerSupport
 

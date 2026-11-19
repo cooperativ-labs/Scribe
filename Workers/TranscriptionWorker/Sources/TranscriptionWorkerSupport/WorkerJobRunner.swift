@@ -2,6 +2,7 @@ import ScribeInference
 @preconcurrency import AVFoundation
 import CryptoKit
 import Foundation
+import ScribeAppCore
 
 /// Runs one transcription request as independently committed checkpoints.
 ///
@@ -50,7 +51,7 @@ public struct WorkerJobRunner: Sendable {
     /// error; no transcript-sized value is returned over stdout.
     public func run(
         requestID: String,
-        payload: [String: JSONValue],
+        payload: [String: WorkerJSONValue],
         isCancelled: @escaping CancellationCheck,
         emit: @escaping Emitter
     ) async {
@@ -76,14 +77,14 @@ public struct WorkerJobRunner: Sendable {
             try stopIfCancelled(afterStage: "embed", isCancelled: isCancelled)
             emit(stageResult(requestID: requestID, stage: "complete", status: "complete"))
         } catch let cancellation as Cancellation {
-            emit(WorkerProtocol.error(requestID: requestID, code: "cancelled", message: cancellation.localizedDescription, details: .object([
+            emit(WorkerEnvelope.error(requestID: requestID, code: "cancelled", message: cancellation.localizedDescription, details: .object([
                 "stage": .string(cancellation.afterStage),
                 "checkpointsPreserved": .bool(true),
             ])))
         } catch let setup as ModelSetupError {
-            emit(WorkerProtocol.error(requestID: requestID, code: "model_setup_incomplete", message: setup.localizedDescription))
+            emit(WorkerEnvelope.error(requestID: requestID, code: "model_setup_incomplete", message: setup.localizedDescription))
         } catch {
-            emit(WorkerProtocol.error(requestID: requestID, code: "job_failed", message: error.localizedDescription))
+            emit(WorkerEnvelope.error(requestID: requestID, code: "job_failed", message: error.localizedDescription))
         }
     }
 
@@ -196,7 +197,7 @@ public struct WorkerJobRunner: Sendable {
     }
 
     private func stageResult(requestID: String, stage: String, status: String = "complete", resultURL: URL? = nil) -> WorkerEnvelope {
-        var payload: [String: JSONValue] = ["stage": .string(stage), "status": .string(status)]
+        var payload: [String: WorkerJSONValue] = ["stage": .string(stage), "status": .string(status)]
         if let resultURL {
             payload["resultPath"] = .string(resultURL.lastPathComponent)
             payload["sha256"] = .string(sha256(of: resultURL))
@@ -237,7 +238,7 @@ private struct Job {
     let testStageDelayMilliseconds: Int
     let testCrashDuringStage: String?
 
-    init(payload: [String: JSONValue]) throws {
+    init(payload: [String: WorkerJSONValue]) throws {
         guard let sourcePath = payload["sourcePath"]?.stringValue else { throw WorkerJobRunner.Error.missingValue("sourcePath") }
         guard let runPath = payload["runDirectory"]?.stringValue else { throw WorkerJobRunner.Error.missingValue("runDirectory") }
         guard sourcePath.hasPrefix("/"), runPath.hasPrefix("/") else { throw WorkerJobRunner.Error.invalidPath("sourcePath and runDirectory must be absolute local paths.") }

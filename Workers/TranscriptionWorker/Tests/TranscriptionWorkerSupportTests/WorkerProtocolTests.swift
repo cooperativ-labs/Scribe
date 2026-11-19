@@ -2,6 +2,7 @@
 @preconcurrency import CoreML
 import Foundation
 import FluidAudio
+import ScribeAppCore
 import Testing
 @testable import TranscriptionWorkerSupport
 
@@ -10,15 +11,17 @@ func envelopeRoundTrip() throws {
     let expected = WorkerEnvelope(kind: .request, requestID: "request-1", payload: .object([
         "operation": .string("handshake"),
     ]))
-    let decoded = try WorkerProtocol.decode(WorkerProtocol.encode(expected))
+    let record = try WorkerWireFormat.encode(expected)
+    #expect(record.last == WorkerWireFormat.recordSeparator)
+    let decoded = try WorkerWireFormat.decode(record.dropLast())
     #expect(decoded == expected)
 }
 
 @Test("protocol rejects records larger than the bounded control plane")
 func oversizedRecordIsRejected() {
-    let oversized = Data(repeating: 0x20, count: WorkerProtocol.maximumMessageBytes + 1)
-    #expect(throws: WorkerProtocolError.self) {
-        try WorkerProtocol.decode(oversized)
+    let oversized = Data(repeating: 0x20, count: WorkerWireFormat.maximumMessageBytes + 1)
+    #expect(throws: WorkerWireFormatError.self) {
+        try WorkerWireFormat.decode(oversized)
     }
 }
 

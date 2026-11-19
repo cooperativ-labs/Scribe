@@ -234,6 +234,14 @@ public struct AssistModel: Sendable, Hashable, Codable, Identifiable {
         self.displayName = displayName
         self.maxOutputTokens = maxOutputTokens
     }
+
+    /// Prefer GPT-6 Luna (light) when the account offers it.
+    public static func preferredDefault(in models: [AssistModel]) -> AssistModel? {
+        models.first { model in
+            let name = "\(model.slug) \(model.displayName)".lowercased()
+            return name.contains("luna") && name.contains("light")
+        } ?? models.first
+    }
 }
 
 enum APIKeyErrors {
