@@ -10,18 +10,27 @@ public struct TranscriptWindow: View {
     @State private var fileAwaitingAudioDeletion: TranscriptReviewFile?
     @State private var fileAwaitingRetranscription: TranscriptReviewFile?
     @State private var fileAwaitingCombination: TranscriptReviewFile?
+    @State private var fileAwaitingDraftDeletion: TranscriptReviewFile?
     @State private var fileFilter = ""
 
     @State private var isRenaming = false
+    /// The row being renamed, fixed when renaming starts: the commit goes to
+    /// this row even if the selection has moved by the time focus leaves.
+    @State private var renamingFileID: TranscriptReviewFile.ID?
     @State private var draftTitle = ""
     @State private var editingSegmentID: TranscriptSegment.ID?
     @State private var draftText = ""
     @State private var splitSegment: TranscriptSegment?
     @State private var newPersonScope: TranscriptSpeakerScope?
     @State private var isShowingShortcuts = false
-    @State private var isShowingAgentSheet = false
+    /// The tray the Send to Agent sheet was opened for, fixed at opening.
+    @State private var agentSheetTarget: AgentHandoffTarget?
     @State private var isDropTargeted = false
     @State private var isShowingImportSheet = false
+    /// The notes editor has keyboard focus.
+    @State private var isEditingNotes = false
+    /// The notes section above a finished transcript is folded away.
+    @State private var areNotesCollapsed = false
     @FocusState private var isSearchFocused: Bool
     @FocusState private var isTitleFocused: Bool
 
@@ -31,7 +40,7 @@ public struct TranscriptWindow: View {
 
     /// While words are being typed the unmodified shortcuts (space, arrows)
     /// must reach the field, not the transport.
-    private var isTyping: Bool { isSearchFocused || isTitleFocused || editingSegmentID != nil }
+    private var isTyping: Bool { isSearchFocused || isTitleFocused || editingSegmentID != nil || isEditingNotes }
 
     private var toastStack: some View {
         TranscriptToastStack(center: viewModel.toastCenter) { action in
@@ -50,6 +59,8 @@ public struct TranscriptWindow: View {
             ZStack(alignment: .bottomTrailing) {
                 if let file = viewModel.selectedFile, let transcript = file.transcript {
                     transcriptDetail(file: file, transcript: transcript)
+                } else if let file = viewModel.selectedFile, file.draft != nil {
+                    placeholderDetail(file: file)
                 } else if let file = viewModel.selectedFile {
                     ContentUnavailableView(file.jobState.displayName, systemImage: "waveform", description: Text(file.processingError ?? "A transcript will appear here when processing is complete."))
                 } else {
@@ -69,7 +80,7 @@ public struct TranscriptWindow: View {
             TranscriptImportSheet(viewModel: viewModel)
         }
         .onChange(of: viewModel.selectedFileID) {
-            isRenaming = false
+            commitRename()
             editingSegmentID = nil
             splitSegment = nil
             newPersonScope = nil
@@ -176,17 +187,29 @@ public struct TranscriptWindow: View {
                     Button("Open in Finder") {
                         openTranscriptFolder(for: file)
                     }
+                    .disabled(file.isPlaceholder && !FileManager.default.fileExists(atPath: file.sourceSnapshotURL.path))
                     Button("Retranscribe…") { fileAwaitingRetranscription = file }
                         .disabled(!viewModel.canRetranscribe(file))
                     Divider()
                     Button("Rename…") { beginRenaming(file) }
-                        .disabled(file.transcript == nil)
+                        .disabled(file.transcript == nil && file.draft == nil)
                     Button("Combine With Another Recording…") { fileAwaitingCombination = file }
                         .disabled(viewModel.isCombining || viewModel.combineCandidates(for: file).isEmpty)
                     Button("Delete Audio…", role: .destructive) { fileAwaitingAudioDeletion = file }
                         .disabled(!viewModel.canDeleteAudio(file))
                     Button("Delete Transcript and Audio…", role: .destructive) { fileAwaitingDeletion = file }
                         .disabled(!viewModel.canDelete(file))
+                    if file.draft != nil, file.isPlaceholder {
+                        Divider()
+                        if file.draft?.canTranscribeNow == true {
+                            Button("Transcribe Now") { Task { await viewModel.transcribeDraftNow(fileID: file.id) } }
+                        }
+                        if case .notSaved = file.draft?.saveState {
+                            Button("Retry Saving") { viewModel.retrySavingDraft(fileID: file.id) }
+                        }
+                        Button("Delete Draft…", role: .destructive) { fileAwaitingDraftDeletion = file }
+                            .disabled(!viewModel.canDeleteDraft(file))
+                    }
                 }
             }
         }
@@ -220,8 +243,22 @@ public struct TranscriptWindow: View {
         ) { file in
             Button("Delete", role: .destructive) { viewModel.delete(fileID: file.id) }
             Button("Cancel", role: .cancel) {}
-        } message: { _ in
-            Text("The transcript and the copy of the recording kept beside it are removed. Exported files are left alone.")
+        } message: { file in
+            Text(Self.meetingDeletionMessage(for: file))
+        }
+        .confirmationDialog(
+            "Delete the draft \u{201C}\(fileAwaitingDraftDeletion?.displayName ?? "")\u{201D}?",
+            isPresented: Binding(
+                get: { fileAwaitingDraftDeletion != nil },
+                set: { if !$0 { fileAwaitingDraftDeletion = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: fileAwaitingDraftDeletion
+        ) { file in
+            Button("Delete Draft", role: .destructive) { Task { await viewModel.deleteDraft(fileID: file.id) } }
+            Button("Cancel", role: .cancel) {}
+        } message: { file in
+            Text(Self.draftDeletionMessage(for: file))
         }
         .confirmationDialog(
             "Delete the audio for \u{201C}\(fileAwaitingAudioDeletion?.displayName ?? "")\u{201D}?",
@@ -234,8 +271,8 @@ public struct TranscriptWindow: View {
         ) { file in
             Button("Delete Audio", role: .destructive) { viewModel.deleteAudio(fileID: file.id) }
             Button("Cancel", role: .cancel) {}
-        } message: { _ in
-            Text("The transcript and its edits are kept. Scribe's copy of the recording is removed, so it can no longer be played, retranscribed, or used to remember a voice. The original file you imported is left alone.")
+        } message: { file in
+            Text(Self.audioDeletionMessage(for: file))
         }
         .confirmationDialog(
             "Retranscribe \u{201C}\(fileAwaitingRetranscription?.displayName ?? "")\u{201D}?",
@@ -258,27 +295,225 @@ public struct TranscriptWindow: View {
 
     /// Opens the meeting folder that holds the retained source and run history.
     private func openTranscriptFolder(for file: TranscriptReviewFile) {
-        let folderURL = file.sourceSnapshotURL.deletingLastPathComponent()
+        // A placeholder has no meeting folder yet; its URL is the recorder
+        // session's own folder.
+        let folderURL = file.isPlaceholder ? file.sourceSnapshotURL : file.sourceSnapshotURL.deletingLastPathComponent()
         NSWorkspace.shared.open(folderURL)
     }
 
     private func beginRenaming(_ file: TranscriptReviewFile) {
-        guard file.transcript != nil else { return }
+        guard file.transcript != nil || file.draft != nil else { return }
         if viewModel.selectedFileID != file.id { viewModel.selectedFileID = file.id }
         draftTitle = file.displayName
+        renamingFileID = file.id
         isRenaming = true
         isTitleFocused = true
     }
 
+    /// Commits to the row renaming started on, never to whatever is selected
+    /// now. Clearing the field, or typing the default name back, removes the
+    /// person's title.
     private func commitRename() {
-        guard isRenaming else { return }
+        guard isRenaming, let fileID = renamingFileID else {
+            isRenaming = false
+            return
+        }
         isRenaming = false
+        renamingFileID = nil
         let title = draftTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let file = viewModel.selectedFile else { return }
-        if title.isEmpty || title == file.filename {
-            if file.transcript?.title != nil { viewModel.rename(to: nil) }
-        } else if title != file.transcript?.title {
-            viewModel.rename(to: title)
+        guard let file = viewModel.files.first(where: { $0.id == fileID }) else { return }
+        let current = file.draft.map { $0.title } ?? file.transcript?.title
+        let isDefault = title.isEmpty || title == file.filename
+            || (file.draft != nil && file.draft?.title == nil && title == file.displayName)
+        if isDefault {
+            if current != nil { viewModel.rename(fileID: fileID, to: nil) }
+        } else if title != current {
+            viewModel.rename(fileID: fileID, to: title)
+        }
+    }
+
+    static func meetingDeletionMessage(for file: TranscriptReviewFile) -> String {
+        let count = file.draft?.noteCount ?? 0
+        let notes = count == 0 ? "" : " Its \(count == 1 ? "note is" : "\(count) notes are") deleted too."
+        return "The transcript and the copy of the recording kept beside it are removed.\(notes) Exported files are left alone."
+    }
+
+    static func audioDeletionMessage(for file: TranscriptReviewFile) -> String {
+        let notes = (file.draft?.noteCount ?? 0) > 0 ? " Notes are kept, but their times no longer play the recording." : ""
+        return "The transcript and its edits are kept. Scribe's copy of the recording is removed, so it can no longer be played, retranscribed, or used to remember a voice.\(notes) The original file you imported is left alone."
+    }
+
+    static func draftDeletionMessage(for file: TranscriptReviewFile) -> String {
+        let count = file.draft?.noteCount ?? 0
+        let notes = count == 0 ? "Its name is removed." : "Its name and \(count) note\(count == 1 ? "" : "s") are removed."
+        return "\(notes) This draft has no transcript, and this cannot be undone. Raw recordings in the recordings folder are left alone."
+    }
+
+    // MARK: - Placeholder
+
+    /// A meeting with no transcript yet: recording, waiting for
+    /// transcription, or notes whose recording is gone. The title can be
+    /// edited here; it becomes the transcript's title when processing ends.
+    ///
+    /// Notes fill the pane: during a meeting this is where they are written.
+    /// The status line above them is the only thing the one-second clock
+    /// redraws, so the editor's text and caret are never touched by it.
+    @ViewBuilder
+    private func placeholderDetail(file: TranscriptReviewFile) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 6) {
+                titleHeader(file: file, showsChips: false)
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                        Label(placeholderHeadline(file: file, now: context.date), systemImage: placeholderSymbol(file: file))
+                            .monospacedDigit()
+                    }
+                    .font(.callout)
+                    .foregroundStyle(file.isRecording ? AnyShapeStyle(Color.red) : AnyShapeStyle(.secondary))
+                    Spacer(minLength: 8)
+                    placeholderActions(file: file)
+                        .controlSize(.small)
+                }
+                Text(placeholderDescription(file: file))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal)
+            .padding(.top, 12)
+            .padding(.bottom, 10)
+            Divider()
+            if let draft = file.draft {
+                notesEditor(file: file, draft: draft)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // The handoff is set up while the meeting is still going:
+                // a tinted tray under the notes. A notes-only draft has no
+                // recording left, so it has nothing to send.
+                if viewModel.canSendToAgent, !draft.isOrphaned {
+                    AgentHandoffTray(
+                        viewModel: viewModel,
+                        target: .draft(draft.id),
+                        style: .full,
+                        isPromptCollapsed: isEditingNotes
+                    )
+                }
+            } else {
+                Spacer()
+            }
+        }
+        .navigationTitle(file.displayName)
+    }
+
+    // MARK: - Notes
+
+    /// The meeting's notes, bound to its draft by ID. Each draft gets its own
+    /// editor (and so its own undo history).
+    @ViewBuilder
+    private func notesEditor(file: TranscriptReviewFile, draft: MeetingDraftSummary) -> some View {
+        // Its own view, so typing redraws the editor and not the transcript;
+        // the floating notes panel shows the same draft the same way.
+        MeetingNotesEditorPane(
+            viewModel: viewModel,
+            draftID: draft.id,
+            canSeek: { [viewModel] offset in
+                viewModel.selectedFile.map { viewModel.canSeek(toNoteOffset: offset, in: $0) } ?? false
+            },
+            onSeek: { [viewModel] offset in viewModel.seek(toNoteOffset: offset) },
+            onFocusChange: { focused in isEditingNotes = focused }
+        )
+        .id(draft.id)
+    }
+
+    /// Notes above a finished transcript: a bounded, foldable section, so
+    /// the transcript keeps most of the pane.
+    @ViewBuilder
+    private func finishedNotesSection(file: TranscriptReviewFile, draft: MeetingDraftSummary) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.15)) { areNotesCollapsed.toggle() }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "chevron.right")
+                        .rotationEffect(.degrees(areNotesCollapsed ? 0 : 90))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text("Notes")
+                        .font(.headline)
+                    if let count = draft.noteCountText {
+                        Text(count)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if !file.hasAudio {
+                        Text("Recording deleted \u{2014} times no longer play")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(areNotesCollapsed ? "Show notes" : "Hide notes")
+            .padding(.horizontal)
+            .padding(.vertical, 6)
+            if !areNotesCollapsed {
+                notesEditor(file: file, draft: draft)
+                    .frame(minHeight: 72, idealHeight: 140, maxHeight: 200)
+            }
+            // Where the meeting goes, in one line; the full settings open in
+            // the Send to Agent sheet.
+            if viewModel.canSendToAgent {
+                AgentHandoffTray(
+                    viewModel: viewModel,
+                    target: .draft(draft.id),
+                    style: .compact,
+                    onEditSettings: { agentSheetTarget = .draft(draft.id) }
+                )
+                .padding(.horizontal)
+                .padding(.bottom, 8)
+            }
+            Divider()
+        }
+    }
+
+    private func placeholderHeadline(file: TranscriptReviewFile, now: Date) -> String {
+        if file.isRecording { return file.sidebarDetail(now: now) }
+        if file.isInProgress { return file.jobState.displayName }
+        return file.draft?.status ?? file.jobState.displayName
+    }
+
+    private func placeholderSymbol(file: TranscriptReviewFile) -> String {
+        if case .notSaved = file.draft?.saveState { return "exclamationmark.triangle" }
+        if file.isRecording { return "record.circle" }
+        if file.draft?.isOrphaned == true { return "note.text" }
+        return "waveform"
+    }
+
+    private func placeholderDescription(file: TranscriptReviewFile) -> String {
+        if case let .notSaved(message) = file.draft?.saveState {
+            return "Changes to this meeting could not be saved: \(message)"
+        }
+        if let explanation = file.draft?.explanation { return explanation }
+        if file.isRecording {
+            return "Each paragraph you write below is a note, stamped with the recording time. The transcript appears here once the recording has been processed."
+        }
+        return "The transcript will appear here when processing is complete. Notes written here stay with it."
+    }
+
+    @ViewBuilder
+    private func placeholderActions(file: TranscriptReviewFile) -> some View {
+        HStack {
+            if case .notSaved = file.draft?.saveState {
+                Button("Retry") { viewModel.retrySavingDraft(fileID: file.id) }
+            }
+            if file.draft?.canTranscribeNow == true {
+                Button("Transcribe Now") { Task { await viewModel.transcribeDraftNow(fileID: file.id) } }
+            }
+            if viewModel.canDeleteDraft(file), file.draft?.isOrphaned == true {
+                Button("Delete Draft…", role: .destructive) { fileAwaitingDraftDeletion = file }
+            }
         }
     }
 
@@ -297,6 +532,9 @@ public struct TranscriptWindow: View {
             .padding(.top, 12)
             .padding(.bottom, 10)
             Divider()
+            if let draft = file.draft {
+                finishedNotesSection(file: file, draft: draft)
+            }
             transcriptList(transcript: transcript)
         }
         .navigationTitle(file.displayName)
@@ -317,16 +555,20 @@ public struct TranscriptWindow: View {
         .sheet(item: $splitSegment) { segment in
             TranscriptSplitSheet(viewModel: viewModel, segment: segment)
         }
-        .sheet(isPresented: $isShowingAgentSheet) {
-            TranscriptAgentSheet(viewModel: viewModel, transcriptName: file.displayName) {
-                isShowingAgentSheet = false
+        .sheet(item: $agentSheetTarget) { target in
+            TranscriptAgentSheet(
+                viewModel: viewModel,
+                target: target,
+                transcriptName: viewModel.handoffFile(for: target)?.displayName ?? file.displayName
+            ) {
+                agentSheetTarget = nil
             }
         }
         .background { keyboardShortcuts }
     }
 
     @ViewBuilder
-    private func titleHeader(file: TranscriptReviewFile) -> some View {
+    private func titleHeader(file: TranscriptReviewFile, showsChips: Bool = true) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 if isRenaming {
@@ -344,7 +586,9 @@ public struct TranscriptWindow: View {
                     TranscriptTitle(file: file) { beginRenaming(file) }
                 }
             }
-            TranscriptMetadataChips(viewModel: viewModel)
+            if showsChips {
+                TranscriptMetadataChips(viewModel: viewModel)
+            }
         }
     }
 
@@ -524,9 +768,11 @@ public struct TranscriptWindow: View {
             .help("Save a copy of this transcript as TXT, Scribe JSON, Knowledgebase JSON, or SRT, or copy Knowledgebase JSON to the clipboard. This does not change the recordings folder in Settings.")
             .transcriptToolbarGlassStyle()
             if viewModel.canSendToAgent {
-                Button("Send to Agent", systemImage: "paperplane") { isShowingAgentSheet = true }
+                Button("Send to Agent", systemImage: "paperplane") {
+                    agentSheetTarget = viewModel.selectedFile.map(viewModel.handoffTarget(for:))
+                }
                     .disabled(viewModel.selectedTranscript == nil)
-                    .help("Hand this transcript to a coding agent working in a folder you have connected. The session opens in Latch.")
+                    .help("Hand this transcript, its notes and a prompt to a coding agent. The session opens in Latch.")
                     .transcriptToolbarGlassStyle()
             }
             moreMenu
@@ -842,7 +1088,23 @@ private struct TranscriptFileRow: View {
         HStack(alignment: .center, spacing: 8) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(file.displayName).lineLimit(1)
-                if file.isInProgress {
+                if file.isRecording {
+                    // Derived from the start time each second; nothing else
+                    // in the row is rebuilt by the clock.
+                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                        Label(file.sidebarDetail(now: context.date), systemImage: "record.circle")
+                            .labelStyle(.titleAndIcon)
+                            .monospacedDigit()
+                            .foregroundStyle(.red)
+                    }
+                    .font(.caption)
+                    .lineLimit(1)
+                } else if file.draft != nil, file.isPlaceholder, !file.isInProgress {
+                    Text(file.sidebarDetail())
+                        .font(.caption)
+                        .foregroundStyle(isDraftAttention ? AnyShapeStyle(Color.red) : AnyShapeStyle(.secondary))
+                        .lineLimit(1)
+                } else if file.isInProgress {
                     Text("Transcribing")
                         .font(.caption)
                         .foregroundStyle(Color.accentColor)
@@ -876,6 +1138,11 @@ private struct TranscriptFileRow: View {
         }
         .contentShape(Rectangle())
         .onHover { isHovering = $0 }
+    }
+
+    private var isDraftAttention: Bool {
+        if case .notSaved = file.draft?.saveState { return true }
+        return file.draft?.isOrphaned == true
     }
 
     /// Present or deleted, so a person can tell which recordings still take

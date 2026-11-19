@@ -15,6 +15,7 @@ public final class RecorderMenuModel: ObservableObject {
     private let coordinator: any RecordingCoordinating
     private let now: @MainActor () -> Date
     private let pasteTimestampShortcut: @MainActor () -> GlobalShortcut
+    private let meetingNotesShortcut: @MainActor () -> GlobalShortcut
     private var snapshot: RecorderSnapshot
     private var observation: RecorderObservationToken?
     private var elapsedTimeTicker: Timer?
@@ -22,16 +23,19 @@ public final class RecorderMenuModel: ObservableObject {
     public init(
         coordinator: any RecordingCoordinating,
         now: @escaping @MainActor () -> Date = { Date() },
-        pasteTimestampShortcut: @escaping @MainActor () -> GlobalShortcut = { .defaultPasteTimestamp }
+        pasteTimestampShortcut: @escaping @MainActor () -> GlobalShortcut = { .defaultPasteTimestamp },
+        meetingNotesShortcut: @escaping @MainActor () -> GlobalShortcut = { .defaultMeetingNotes }
     ) {
         self.coordinator = coordinator
         self.now = now
         self.pasteTimestampShortcut = pasteTimestampShortcut
+        self.meetingNotesShortcut = meetingNotesShortcut
         snapshot = coordinator.snapshot
         presentation = MenuPresentation(
             snapshot: coordinator.snapshot,
             at: now(),
-            pasteTimestampShortcut: pasteTimestampShortcut()
+            pasteTimestampShortcut: pasteTimestampShortcut(),
+            meetingNotesShortcut: meetingNotesShortcut()
         )
         recordMessages(in: snapshot, previous: nil)
         observation = coordinator.observeSnapshot { [weak self] snapshot in
@@ -48,7 +52,8 @@ public final class RecorderMenuModel: ObservableObject {
         presentation = MenuPresentation(
             snapshot: snapshot,
             at: now(),
-            pasteTimestampShortcut: pasteTimestampShortcut()
+            pasteTimestampShortcut: pasteTimestampShortcut(),
+            meetingNotesShortcut: meetingNotesShortcut()
         )
     }
 

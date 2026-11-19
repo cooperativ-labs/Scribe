@@ -51,26 +51,35 @@ public enum TranscriptExportError: Swift.Error, Equatable, Sendable, CustomStrin
 /// another revision, and never mutates the transcript. Every format resolves speaker display names
 /// through the revision's `label_snapshot` table so the documents agree with each other. All output
 /// is UTF-8.
+///
+/// `notes` are the meeting's notes, which belong to the meeting rather than the revision. TXT adds
+/// a Notes section after the transcript, Scribe JSON a top-level `notes` array and Knowledgebase
+/// JSON a `notes` array in its `ai.scribe` pipeline extension; SRT stays subtitles only. With no
+/// notes every format is exactly what it was before notes existed.
 public enum TranscriptExporter {
-    public static func export(_ transcript: CanonicalTranscript, as format: TranscriptExportFormat) throws -> Data {
+    public static func export(
+        _ transcript: CanonicalTranscript,
+        as format: TranscriptExportFormat,
+        notes: [TranscriptExportNote] = []
+    ) throws -> Data {
         switch format {
-        case .plainText: return try TranscriptTextExporter.data(transcript)
-        case .json: return try TranscriptJSONExporter.data(transcript)
-        case .knowledgebase: return try KnowledgebaseTranscriptExporter.data(transcript)
+        case .plainText: return try TranscriptTextExporter.data(transcript, notes: notes)
+        case .json: return try TranscriptJSONExporter.data(transcript, notes: notes)
+        case .knowledgebase: return try KnowledgebaseTranscriptExporter.data(transcript, notes: notes)
         case .subtitles: return try TranscriptSRTExporter.data(transcript)
         }
     }
 
-    public static func plainText(_ transcript: CanonicalTranscript) throws -> String {
-        try TranscriptTextExporter.export(transcript)
+    public static func plainText(_ transcript: CanonicalTranscript, notes: [TranscriptExportNote] = []) throws -> String {
+        try TranscriptTextExporter.export(transcript, notes: notes)
     }
 
-    public static func json(_ transcript: CanonicalTranscript) throws -> String {
-        try TranscriptJSONExporter.export(transcript)
+    public static func json(_ transcript: CanonicalTranscript, notes: [TranscriptExportNote] = []) throws -> String {
+        try TranscriptJSONExporter.export(transcript, notes: notes)
     }
 
-    public static func knowledgebaseJSON(_ transcript: CanonicalTranscript) throws -> String {
-        try KnowledgebaseTranscriptExporter.export(transcript)
+    public static func knowledgebaseJSON(_ transcript: CanonicalTranscript, notes: [TranscriptExportNote] = []) throws -> String {
+        try KnowledgebaseTranscriptExporter.export(transcript, notes: notes)
     }
 
     public static func srt(_ transcript: CanonicalTranscript) throws -> String {

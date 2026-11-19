@@ -90,7 +90,9 @@ export function demoRuns(now = Date.now()) {
     return { id: meeting.id, meeting: `meeting--${meeting.id}`, createdAt: new Date(start.valueOf() + durationMs + 180_000).toISOString(),
       transcript: { schema_version: 1, transcript_id: meeting.id, revision: 1, title: meeting.title, created_at: start.toISOString(), status: 'complete',
         source: { filename: `${meeting.title}.m4a`, duration_ms: durationMs }, language: 'en', timestamp_unit: 'milliseconds', timestamp_origin: 'source_start',
-        speakers, segments, warnings: [] } };
+        speakers, segments, warnings: [] },
+      // The synthetic meetings have no notes of their own.
+      notes: [] };
   });
 }
 

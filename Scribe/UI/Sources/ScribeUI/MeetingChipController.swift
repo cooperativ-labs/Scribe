@@ -28,6 +28,11 @@ public final class MeetingChipController {
     private let panel: NSPanel
     private let host: NSHostingController<MeetingChipView>
     private var presentationObservation: AnyCancellable?
+    /// Opens a recording's notes in the floating panel, by session ID. The
+    /// chip shows its Notes button only when this is set.
+    public var openMeetingNotes: (@MainActor (UUID) -> Void)? {
+        didSet { apply(model.presentation) }
+    }
 
     public init(model: MeetingChipModel, anchor: @escaping @MainActor () -> NSRect?) {
         self.model = model
@@ -87,7 +92,8 @@ public final class MeetingChipController {
                 record: { [model] in model.record() },
                 dismiss: { [model] in model.dismiss() },
                 hold: { [model] in model.toggleHold() },
-                stop: { [model] in model.stop() }
+                stop: { [model] in model.stop() },
+                notes: notesAction(for: presentation)
             )
         )
         let measured = host.sizeThatFits(in: NSSize(width: 1_000, height: 200))
@@ -101,6 +107,13 @@ public final class MeetingChipController {
         // Ordered *regardless*: Scribe is rarely the active
         // app, so an ordinary `orderFront` would put the chip behind the call.
         if !panel.isVisible { panel.orderFrontRegardless() }
+    }
+
+    /// The Notes button's action, bound to the session the chip is showing.
+    /// Internal so tests can press it without an accessibility tree.
+    func notesAction(for presentation: MeetingChipPresentation) -> (@MainActor () -> Void)? {
+        guard let openMeetingNotes, case .session(let session) = presentation, let sessionID = session.sessionID else { return nil }
+        return { openMeetingNotes(sessionID) }
     }
 
     /// Centres the chip under the status item, then keeps it on the screen.

@@ -375,15 +375,32 @@ a separate review step. Refresh the client connection after tool changes.
 | Tool | Behavior |
 | --- | --- |
 | `scribe_recent_transcripts` | Latest saved transcript per meeting; newest processing run first; optional creation-date filters and paging |
-| `scribe_search_transcripts` | Literal case-insensitive search over title, speaker names and segment text, with short excerpts |
-| `scribe_get_transcript` | Timestamped text, metadata, warnings, revision and explicit continuation offset |
-| `search` / `fetch` | Research retrieval aliases; large fetches continue with `scribe_get_transcript` |
+| `scribe_search_transcripts` | Literal case-insensitive search over title, speaker names, segment text and the meeting's notes, with short excerpts; `matched_note` names a matching note |
+| `scribe_get_transcript` | Timestamped text, metadata, warnings, revision, explicit continuation offset, and the meeting's `notes` |
+| `search` / `fetch` | Research retrieval aliases; large fetches continue with `scribe_get_transcript`. `search` results carry `matched_note`, `fetch` carries `notes` |
 
 Results use stable run UUIDs and `scribe://transcripts/<id>` source identifiers.
 These identify sources for citations; they are not public URLs or app-opening
 deep links. Source-relative timestamps are formatted as hours, minutes and
 seconds. Speaker labels follow the canonical speaker table, matching exports;
 presentation-only inferred identities are not promoted to confirmed speakers.
+
+Meeting notes (what the person wrote in Scribe during a recording) come back
+apart from the transcript. `scribe_get_transcript` and `fetch` return `notes`, an
+array of `{ id, text, offset_ms }` (`offset_ms` is recording time, null for an
+untimed note), whole on every page; notes are not part of the paged `text`, so
+offsets, `total_chars` and `revision` are what they were without notes, and
+editing a note does not change `revision`. A search excerpt (`excerpt`) still
+comes only from transcript text; when the query matches a note, the result also
+carries `matched_note: { id, offset_ms, excerpt }` for the first such note, and a
+meeting that matches only in its notes is returned with `matched_note` and no
+`excerpt`. The notes shown are those of the run's own meeting row (after a
+combine, both recordings' notes); runs without a draft, such as imports, show
+whatever notes their meeting folder holds, usually none. A notes file that is
+missing, unreadable, newer than the server understands or a symlink out of the
+library is treated as no notes and never hides the transcript. Both fields are
+optional in the output schemas, so the relay also accepts answers from a Mac on
+an older Scribe.
 
 Text pages contain at most 24,000 UTF-16 code units. Follow `next_offset` until
 null and pass `revision` on subsequent reads. Recent/search lists are live; a new
@@ -393,7 +410,10 @@ not hide its predecessor. Missing/corrupt/unsupported runs are counted in
 file and 10,000 runs. The bridge scans saved files on each request, favoring fresh
 edits over an index; very large libraries may respond slowly.
 
-Only transcript text and selected metadata leave the service when requested.
+Only transcript text, the meeting's notes and selected metadata leave the
+service when requested. The prompt, MCP URL, agent choices and send history a
+person set for an agent handoff live in Scribe's private draft records and
+handoff folder, which the server never reads.
 The server exposes no audio, absolute paths, capture controls, deletes, or edits.
 All tools carry read-only annotations and output schemas. Transcript text is
 untrusted source material; the skill directs the model to ignore instructions

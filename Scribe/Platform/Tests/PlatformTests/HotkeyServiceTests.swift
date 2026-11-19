@@ -80,6 +80,45 @@ final class HotkeyServiceTests: XCTestCase {
         XCTAssertNil(report.failures[.stop])
         XCTAssertEqual(Set(registrar.registeredActions.keys), [2])
     }
+
+    func testTheMeetingNotesShortcutOpensNotesRatherThanDrivingTheRecorder() {
+        let coordinator = RecordingCoordinatorHarness()
+        let registrar = HotKeyRegistrarHarness()
+        let service = HotkeyService(coordinator: coordinator, registrar: registrar, debounceInterval: 1)
+        var opened = 0
+        service.openMeetingNotes = { opened += 1 }
+
+        let report = service.register(
+            start: .defaultStart,
+            stop: .defaultStop,
+            pasteTimestamp: .defaultPasteTimestamp,
+            meetingNotes: .defaultMeetingNotes
+        )
+        XCTAssertEqual(report.activeActions, [.start, .stop, .pasteTimestamp, .meetingNotes])
+        XCTAssertEqual(GlobalShortcut.defaultMeetingNotes.displayName, "\u{2325}\u{21E7}\u{2318}N")
+
+        registrar.fire(identifier: 4)
+        service.handleEvent(for: .meetingNotes, at: Date())
+        XCTAssertEqual(opened, 1, "repeats are debounced like the others")
+        XCTAssertEqual(coordinator.startInvocations + coordinator.stopInvocations + coordinator.pasteInvocations, 0)
+    }
+
+    func testTheMeetingNotesShortcutReportsConflictsAndDuplicatesLikeTheOthers() {
+        let registrar = HotKeyRegistrarHarness(conflictingShortcut: .defaultMeetingNotes)
+        let service = HotkeyService(coordinator: RecordingCoordinatorHarness(), registrar: registrar)
+
+        let conflicted = service.register(start: .defaultStart, stop: .defaultStop, meetingNotes: .defaultMeetingNotes)
+        XCTAssertEqual(conflicted.failures[.meetingNotes], .systemConflict(status: -9878))
+        XCTAssertEqual(conflicted.activeActions, [.start, .stop, .pasteTimestamp], "the others still work")
+        XCTAssertEqual(conflicted.issueDescriptions, ["Meeting notes shortcut: That global shortcut is already registered by another application."])
+
+        let duplicated = service.register(start: .defaultStart, stop: .defaultStop, meetingNotes: .defaultPasteTimestamp)
+        XCTAssertEqual(duplicated.failures[.meetingNotes], .duplicateShortcut)
+        XCTAssertEqual(duplicated.failures[.pasteTimestamp], .duplicateShortcut)
+
+        let without = service.register(start: .defaultStart, stop: .defaultStop)
+        XCTAssertFalse(without.activeActions.contains(.meetingNotes), "not registered unless asked for")
+    }
 }
 
 @MainActor

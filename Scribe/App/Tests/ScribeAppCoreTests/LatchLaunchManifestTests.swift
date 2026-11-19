@@ -71,4 +71,24 @@ final class LatchLaunchManifestTests: XCTestCase {
         XCTAssertEqual(report.session.name, "scribe-standup")
         XCTAssertEqual(report.session.state, "running")
     }
+
+    func testAReusedSessionAndARefusalAreBothReadFromLatchsRequestIDContract() throws {
+        // What `latch create --request-id … --json` prints for a repeat of the same send.
+        let reused = try LatchCreateReport.decode(Data(#"{"protocolVersion":2,"session":{"id":"s1","name":"scribe-standup","state":"running","createdAt":"t"},"reused":true}"#.utf8))
+        XCTAssertEqual(reused.session.id, "s1")
+        XCTAssertEqual(reused.reused, true)
+        // A report without the field, from an older Latch or a create with no ID.
+        let plain = try LatchCreateReport.decode(Data(#"{"protocolVersion":1,"session":{"id":"s2"}}"#.utf8))
+        XCTAssertNil(plain.reused)
+
+        let refusal = try LatchCreateErrorReport.decode(Data(#"{"protocolVersion":2,"error":{"code":"request_id_conflict","message":"this request id already started a session with a different directory"}}"#.utf8))
+        XCTAssertEqual(refusal.error.code, "request_id_conflict")
+        XCTAssertNil(refusal.error.sessionId)
+        XCTAssertThrowsError(try LatchCreateErrorReport.decode(Data(#"{"protocolVersion":2,"session":{"id":"s1"}}"#.utf8)))
+
+        let capabilities = try LatchCapabilitiesReport.decode(Data(#"{"protocolVersion":2,"capabilities":{"create":true,"extensions":["agent-launch","create-request-id"]}}"#.utf8))
+        XCTAssertTrue(capabilities.capabilities.extensions.contains(LatchCapabilitiesReport.createRequestIDExtension))
+        let older = try LatchCapabilitiesReport.decode(Data(#"{"protocolVersion":1,"capabilities":{"create":true}}"#.utf8))
+        XCTAssertTrue(older.capabilities.extensions.isEmpty)
+    }
 }

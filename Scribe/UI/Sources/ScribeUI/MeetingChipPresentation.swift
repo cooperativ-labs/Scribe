@@ -61,13 +61,24 @@ public enum MeetingChipPresentation: Equatable, Sendable {
         public let isStopEnabled: Bool
         /// The meeting's name, when the recording has one.
         public let title: String?
+        /// The recording this transport is for, so its Notes button opens
+        /// that recording's notes; nil while capture is still starting.
+        public let sessionID: UUID?
 
-        public init(elapsedText: String, isPaused: Bool, isHoldEnabled: Bool, isStopEnabled: Bool, title: String? = nil) {
+        public init(
+            elapsedText: String,
+            isPaused: Bool,
+            isHoldEnabled: Bool,
+            isStopEnabled: Bool,
+            title: String? = nil,
+            sessionID: UUID? = nil
+        ) {
             self.elapsedText = elapsedText
             self.isPaused = isPaused
             self.isHoldEnabled = isHoldEnabled
             self.isStopEnabled = isStopEnabled
             self.title = title
+            self.sessionID = sessionID
         }
     }
 
@@ -130,7 +141,8 @@ public enum MeetingChipPresentation: Equatable, Sendable {
                 isPaused: snapshot.state.isPaused,
                 isHoldEnabled: snapshot.state.isCapturing,
                 isStopEnabled: snapshot.state.isCapturing,
-                title: snapshot.state.activity?.title
+                title: snapshot.state.activity?.title,
+                sessionID: snapshot.state.isCapturing ? snapshot.state.activity?.sessionID : nil
             ))
             return
         }

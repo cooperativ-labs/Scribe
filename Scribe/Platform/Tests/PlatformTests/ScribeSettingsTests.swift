@@ -292,6 +292,8 @@ final class ScribeSettingsTests: XCTestCase {
         firstLaunch.rememberedRecordingMode = .microphoneOnly
         firstLaunch.startShortcut = GlobalShortcut(keyCode: 18, modifiers: 256)
         firstLaunch.pasteTimestampShortcut = GlobalShortcut(keyCode: 17, modifiers: 256)
+        XCTAssertEqual(firstLaunch.meetingNotesShortcut, .defaultMeetingNotes)
+        firstLaunch.meetingNotesShortcut = GlobalShortcut(keyCode: 45, modifiers: 256 | 4096)
         firstLaunch.transcribeWhenFinalRecordingIsReady = true
         firstLaunch.keepRecordingFilesForDebugging = true
         firstLaunch.transcriptionSpeakerCount = .known(2)
@@ -302,6 +304,7 @@ final class ScribeSettingsTests: XCTestCase {
         XCTAssertEqual(secondLaunch.rememberedRecordingMode, .microphoneOnly)
         XCTAssertEqual(secondLaunch.startShortcut, GlobalShortcut(keyCode: 18, modifiers: 256))
         XCTAssertEqual(secondLaunch.pasteTimestampShortcut, GlobalShortcut(keyCode: 17, modifiers: 256))
+        XCTAssertEqual(secondLaunch.meetingNotesShortcut, GlobalShortcut(keyCode: 45, modifiers: 256 | 4096))
         XCTAssertTrue(secondLaunch.transcribeWhenFinalRecordingIsReady)
         XCTAssertTrue(secondLaunch.keepRecordingFilesForDebugging)
         XCTAssertEqual(secondLaunch.transcriptionSpeakerCount, .known(2))

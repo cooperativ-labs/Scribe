@@ -9,7 +9,14 @@ import Speakers
 public final class TranscriptViewModel {
     public private(set) var files: [TranscriptReviewFile]
     public var selectedFileID: TranscriptReviewFile.ID? {
-        didSet { selectFileIfNeeded() }
+        didSet {
+            // Leaving a meeting writes its notes now rather than after the
+            // quiet period.
+            if oldValue != selectedFileID, let oldValue, let draftID = files.first(where: { $0.id == oldValue })?.draft?.id {
+                flushNotes(draftID: draftID)
+            }
+            selectFileIfNeeded()
+        }
     }
     public private(set) var selectedSegmentID: TranscriptSegment.ID?
     public let toastCenter = TranscriptToastCenter()
@@ -83,13 +90,18 @@ public final class TranscriptViewModel {
     @ObservationIgnored private let retranscriber: (any TranscriptRetranscribing)?
     /// Hands a finished transcript to a coding agent. Absent in a build with no
     /// agent host, which hides the action rather than offering a dead end.
-    @ObservationIgnored private let agentDispatcher: (any TranscriptAgentDispatching)?
-    /// What the send sheet remembers between sendings.
-    @ObservationIgnored private let agentPreferences: TranscriptAgentPreferences
+    @ObservationIgnored let agentDispatcher: (any TranscriptAgentDispatching)?
+    /// What sending remembers: last agent, models, efforts, prompts per folder.
+    @ObservationIgnored let agentPreferences: TranscriptAgentPreferences
     /// Opens the vocabulary editor in the host's Settings window. Absent in a
     /// build with no settings surface — the toolbar then hides the button
     /// rather than offering a route that goes nowhere.
     @ObservationIgnored private let openVocabularySettings: (@MainActor () -> Void)?
+    /// Edits meeting drafts by ID. Absent when the host keeps no drafts.
+    @ObservationIgnored let draftEditor: (any MeetingDraftEditing)?
+    /// Queues, cancels and confirms a meeting's "Send after processing".
+    /// Absent where nothing can fire a queued send, which hides the control.
+    @ObservationIgnored let sendController: (any MeetingSendControlling)?
 
     /// The outcome of the last drop, shown in the sidebar until the next one.
     public private(set) var importMessage: TranscriptSpeakerActionMessage?
@@ -97,30 +109,25 @@ public final class TranscriptViewModel {
     public private(set) var isImporting = false
     @ObservationIgnored private var importToastID: UUID?
 
-    /// What the host found for the send sheet, or nil until it has been asked.
-    public private(set) var agentEnvironment: TranscriptAgentEnvironment?
-    /// Changing the agent brings back the model and effort it was last sent with.
-    public var selectedAgentID: TranscriptAgent.ID? {
-        didSet { if selectedAgentID != oldValue { restoreAgentRunSettings() } }
-    }
-    /// The model to run, as the agent's own command line names it. Empty means
-    /// whatever the agent uses by default.
-    public var agentModel = ""
-    /// Nil leaves the effort to the agent.
-    public var agentEffort: TranscriptAgentEffort?
-    /// Nil means no folder: the agent answers in its session and saves nothing.
-    public private(set) var selectedAgentFolderID: TranscriptAgentFolder.ID?
-    /// True once the person has picked "No Folder", so a refresh does not put
-    /// a folder back for them.
-    private var agentFolderDeclined = false
-    /// An MCP server the agent is told holds related information. Optional.
-    public var agentMCPURL: String
-    /// What the person wants done with the transcript, starting as the default.
-    public var agentInstruction = TranscriptAgentRequest.defaultInstruction
-    /// True while the agent's session is being created.
-    public private(set) var isSendingToAgent = false
-    /// The outcome of the last send, shown until the next one.
-    public private(set) var agentMessage: TranscriptSpeakerActionMessage?
+    /// What the host found for the handoff tray: installed agents and
+    /// connected folders. Machine facts, shared by every tray; nil until the
+    /// host has been asked.
+    public internal(set) var agentEnvironment: TranscriptAgentEnvironment?
+    /// Handoff settings of rows with no meeting draft (imports, pasted
+    /// transcripts), each seeded from the remembered preferences the first
+    /// time its tray is shown and kept while the window is open. A meeting's
+    /// own settings live in its draft.
+    var transcriptHandoffs: [TranscriptReviewFile.ID: MeetingHandoffSettings] = [:]
+    /// Each tray's manual send, by what it is bound to.
+    public internal(set) var handoffStatuses: [AgentHandoffTarget: AgentHandoffSendStatus] = [:]
+    /// Bumped when a draft's handoff settings are written from here, so
+    /// views reading them through the draft editor redraw.
+    var handoffRevision = 0
+    /// Bumped when a draft's notes are written from here, so every editor
+    /// showing that draft (window and floating panel) picks the edit up.
+    /// Read only by `notesContent(draftID:)`, which only the editors' own
+    /// small views call, so a keystroke never redraws a whole transcript.
+    var notesRevision = 0
 
     public init(
         files: [TranscriptReviewFile],
@@ -138,9 +145,13 @@ public final class TranscriptViewModel {
         retranscriber: (any TranscriptRetranscribing)? = nil,
         agentDispatcher: (any TranscriptAgentDispatching)? = nil,
         agentPreferences: TranscriptAgentPreferences = TranscriptAgentPreferences(),
-        openVocabularySettings: (@MainActor () -> Void)? = nil
+        openVocabularySettings: (@MainActor () -> Void)? = nil,
+        draftEditor: (any MeetingDraftEditing)? = nil,
+        sendController: (any MeetingSendControlling)? = nil
     ) {
         self.files = files
+        self.draftEditor = draftEditor
+        self.sendController = sendController
         self.selectedFileID = selectedFileID ?? files.first?.id
         self.playback = playback
         self.exportWriter = exportWriter
@@ -155,7 +166,6 @@ public final class TranscriptViewModel {
         self.retranscriber = retranscriber
         self.agentDispatcher = agentDispatcher
         self.agentPreferences = agentPreferences
-        agentMCPURL = agentPreferences.mcpURL
         self.openVocabularySettings = openVocabularySettings
         selectFileIfNeeded()
         playback.setPlaybackObserver { [weak self] event in self?.handle(event) }
@@ -194,9 +204,22 @@ public final class TranscriptViewModel {
     public func reload(files incoming: [TranscriptReviewFile]) {
         let previousSelection = selectedFile
         let edited = Dictionary(files.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        self.files = incoming.map { file in
-            guard let existing = edited[file.id],
-                  let existingTranscript = existing.transcript,
+        self.files = incoming.map { incomingFile in
+            var file = incomingFile
+            guard let existing = edited[file.id] else { return file }
+            // A row keyed by its meeting draft keeps its key when a rerun
+            // replaces the run behind it; the undo history belonged to the old
+            // run's revisions and must not be replayed onto the new one.
+            if existing.runID != file.runID {
+                undoStacks[file.id] = nil
+                redoStacks[file.id] = nil
+                return file
+            }
+            if let existingDraft = existing.draft, let incomingDraft = file.draft,
+               existingDraft.revision > incomingDraft.revision {
+                file = file.replacingDraft(existingDraft)
+            }
+            guard let existingTranscript = existing.transcript,
                   let incomingTranscript = file.transcript,
                   existingTranscript.revision > incomingTranscript.revision
             else { return file }
@@ -597,9 +620,10 @@ public final class TranscriptViewModel {
     /// left to the coordinator: pulling its directory out from under it is
     /// worse than waiting for it to finish or fail.
     public func canDelete(_ file: TranscriptReviewFile) -> Bool {
+        guard !file.isPlaceholder else { return false }
         switch file.jobState {
-        case .ready, .queued, .processing: false
-        case .complete, .completeWithWarnings, .noSpeech, .failed: true
+        case .recording, .ready, .queued, .processing: return false
+        case .complete, .completeWithWarnings, .noSpeech, .failed: return true
         }
     }
 
@@ -608,8 +632,9 @@ public final class TranscriptViewModel {
     public func delete(fileID: TranscriptReviewFile.ID) {
         guard let index = files.firstIndex(where: { $0.id == fileID }), canDelete(files[index]) else { return }
         let file = files[index]
+        guard let runID = file.runID else { return }
         do {
-            try fileDeleter?.delete(fileID: fileID)
+            try fileDeleter?.delete(fileID: runID)
         } catch {
             speakerActionMessage = TranscriptSpeakerActionMessage(
                 text: "Could not delete \(file.filename): \(Self.describe(error))",
@@ -621,6 +646,10 @@ public final class TranscriptViewModel {
         if selectedFileID == fileID {
             let neighbour = files.indices.contains(index) ? files[index] : files.last
             selectedFileID = neighbour?.id
+        }
+        // The meeting is gone, so its draft record goes with it.
+        if let draft = file.draft, let draftEditor {
+            Task { try? await draftEditor.deleteDraft(draftID: draft.id) }
         }
     }
 
@@ -640,8 +669,9 @@ public final class TranscriptViewModel {
             stopPlayback()
             cancelRememberingVoice()
         }
+        guard let runID = file.runID else { return }
         do {
-            try fileDeleter?.deleteAudio(fileID: fileID)
+            try fileDeleter?.deleteAudio(fileID: runID)
         } catch {
             speakerActionMessage = TranscriptSpeakerActionMessage(
                 text: "Could not delete the audio for \(file.filename): \(Self.describe(error))",
@@ -661,6 +691,9 @@ public final class TranscriptViewModel {
     /// its recording still here, and nothing of it still running.
     public func canCombine(_ file: TranscriptReviewFile) -> Bool {
         guard recordingCombiner != nil, file.transcript != nil, file.hasAudio else { return false }
+        // A send that is queued, held, claimed or of unknown outcome must be
+        // resolved first (decision 12).
+        if file.draft?.sendBlocksCombine == true { return false }
         return canDelete(file)
     }
 
@@ -694,13 +727,25 @@ public final class TranscriptViewModel {
         isCombining = true
         let toastID = toastCenter.post("Combining \u{201C}\(first.displayName)\u{201D} and \u{201C}\(second.displayName)\u{201D}…", kind: .progress)
         defer { isCombining = false }
-        let combined: TranscriptReviewFile
+        var combined: TranscriptReviewFile
+        guard let firstRunID = first.runID, let secondRunID = second.runID else { return }
+        // Both meetings' notes are written before the combine reads them; a
+        // send under way on either refuses it.
+        let draftIDs = [first.draft?.id, second.draft?.id].compactMap { $0 }
+        if let draftEditor, !draftIDs.isEmpty, let reason = await draftEditor.prepareForCombine(draftIDs: draftIDs) {
+            toastCenter.finish(toastID, text: "Could not combine the recordings: \(reason)", failure: true)
+            return
+        }
         do {
-            combined = try await recordingCombiner.combine(firstFileID: firstFileID, secondFileID: secondFileID)
+            combined = try await recordingCombiner.combine(firstFileID: firstRunID, secondFileID: secondRunID)
         } catch {
             toastCenter.finish(toastID, text: "Could not combine the recordings: \(Self.describe(error))", failure: true)
             return
         }
+        // The combined meeting keeps the first recording's row (else the
+        // second's), so it stays selected under the same key.
+        let owner = first.draft ?? second.draft
+        if let owner { combined = combined.keyed(byDraft: owner) }
         let insertAt = files.firstIndex { $0.id == firstFileID || $0.id == secondFileID } ?? 0
         files.removeAll { $0.id == firstFileID || $0.id == secondFileID }
         files.insert(combined, at: min(insertAt, files.count))
@@ -710,6 +755,11 @@ public final class TranscriptViewModel {
         redoStacks[secondFileID] = nil
         selectedFileID = combined.id
         toastCenter.finish(toastID, text: "Combined into \u{201C}\(combined.displayName)\u{201D}.", failure: false)
+        // Both meetings' notes now live in the combined one. The owning row
+        // loses its handoff settings; the other draft's record goes.
+        if let draftEditor, !draftIDs.isEmpty {
+            await draftEditor.finishCombine(ownerDraftID: owner?.id, absorbedDraftIDs: draftIDs)
+        }
     }
 
     /// Whether the selected file still has a recording to play.
@@ -726,9 +776,9 @@ public final class TranscriptViewModel {
     /// an open reprocess sheet blocks another queue until that one settles,
     /// and a file whose recording was deleted has no audio to diarize.
     public var canReprocess: Bool {
-        guard reprocessor != nil, let file = selectedFile, file.hasAudio, reprocessSession == nil else { return false }
+        guard reprocessor != nil, let file = selectedFile, !file.isPlaceholder, file.hasAudio, reprocessSession == nil else { return false }
         switch file.jobState {
-        case .ready, .queued, .processing: return false
+        case .recording, .ready, .queued, .processing: return false
         case .complete, .completeWithWarnings, .noSpeech, .failed: return true
         }
     }
@@ -738,9 +788,9 @@ public final class TranscriptViewModel {
     /// its first pass is writing checkpoints is more confusing than useful.
     /// Without its recording there is nothing to run again.
     public func canRetranscribe(_ file: TranscriptReviewFile) -> Bool {
-        guard retranscriber != nil, file.hasAudio else { return false }
+        guard retranscriber != nil, !file.isPlaceholder, file.hasAudio else { return false }
         switch file.jobState {
-        case .ready, .queued, .processing: return false
+        case .recording, .ready, .queued, .processing: return false
         case .complete, .completeWithWarnings, .noSpeech, .failed: return true
         }
     }
@@ -749,8 +799,9 @@ public final class TranscriptViewModel {
     /// queued until the person confirms on that screen.
     public func presentReprocessConfirmation(speakerCount: TranscriptionSpeakerCount) {
         guard canReprocess, let file = selectedFile else { return }
+        guard let runID = file.runID else { return }
         reprocessSession = TranscriptReprocessSession(
-            fileID: file.id,
+            fileID: runID,
             displayName: file.displayName,
             speakerCount: speakerCount
         )
@@ -818,8 +869,9 @@ public final class TranscriptViewModel {
     /// settings. The reviewed transcript stays on screen until the new run
     /// finishes and becomes the latest for that source.
     public func retranscribe(fileID: TranscriptReviewFile.ID) async {
-        guard let retranscriber, let file = files.first(where: { $0.id == fileID }), canRetranscribe(file) else { return }
-        let outcome = await retranscriber.retranscribe(fileID: fileID)
+        guard let retranscriber, let file = files.first(where: { $0.id == fileID }), canRetranscribe(file),
+              let runID = file.runID else { return }
+        let outcome = await retranscriber.retranscribe(fileID: runID)
         speakerActionMessage = TranscriptSpeakerActionMessage(text: outcome.message, isFailure: outcome.isFailure)
     }
 
@@ -861,13 +913,34 @@ public final class TranscriptViewModel {
             text = "Exported \(successes.count) format\(successes.count == 1 ? "" : "s"); \(failures.count) failed."
         }
         let finderURL = successes.first?.destinationURL
+        if let warning = exportNotesWarning, !successes.isEmpty {
+            toastCenter.post(text + " " + warning, kind: .failure, action: finderURL.map { .showInFinder($0) })
+            return
+        }
         toastCenter.post(text, kind: failures.isEmpty ? .result : .failure,
                          action: finderURL.map { .showInFinder($0) })
+    }
+
+    /// Set while announcing an export whose meeting notes could not be read
+    /// and were left out, so the toast says so instead of reporting success.
+    @ObservationIgnored private var exportNotesWarning: String?
+
+    /// The notes an export of `file` carries: none for imports and pasted
+    /// transcripts (they have no notes), else what the row shows. Notes that
+    /// cannot be read are left out with a warning rather than blocking the
+    /// transcript's export.
+    func exportNotes(for file: TranscriptReviewFile?) -> (notes: [TranscriptExportNote], warning: String?) {
+        guard let draft = file?.draft, let draftEditor else { return ([], nil) }
+        switch draftEditor.exportNotes(draftID: draft.id) {
+        case .success(let notes): return (notes, nil)
+        case .failure(let error): return ([], "Meeting notes were left out: \(error.message)")
+        }
     }
 
     /// Exports each requested format separately so an SRT failure does not lose valid TXT/JSON.
     public func export(_ formats: Set<TranscriptExportFormat>, to directoryURL: URL, basename: String? = nil) {
         exportMessage = nil
+        exportNotesWarning = nil
         guard let transcript = selectedTranscript else {
             exportOutcomes = formats.map {
                 TranscriptExportOutcome(format: $0, destinationURL: nil, errorMessage: "This file has no completed transcript to export.")
@@ -875,12 +948,15 @@ public final class TranscriptViewModel {
             return
         }
         let name = basename ?? FileTranscriptExportWriter.basename(for: transcript)
-        exportOutcomes = exportWriter.write(transcript, formats: formats, to: directoryURL, basename: name)
+        let notes = exportNotes(for: selectedFile)
+        exportNotesWarning = notes.warning
+        exportOutcomes = exportWriter.write(transcript, notes: notes.notes, formats: formats, to: directoryURL, basename: name)
     }
 
     /// Writes one format to the exact file the Save panel chose, including a renamed file.
     public func export(_ format: TranscriptExportFormat, toFile fileURL: URL) {
         exportMessage = nil
+        exportNotesWarning = nil
         guard let transcript = selectedTranscript else {
             exportOutcomes = [
                 TranscriptExportOutcome(
@@ -891,7 +967,10 @@ public final class TranscriptViewModel {
             ]
             return
         }
-        exportOutcomes = [exportWriter.write(transcript, format: format, toFile: fileURL)]
+        let notes = exportNotes(for: selectedFile)
+        // SRT carries no notes, so unreadable notes change nothing about it.
+        exportNotesWarning = format == .subtitles ? nil : notes.warning
+        exportOutcomes = [exportWriter.write(transcript, notes: notes.notes, format: format, toFile: fileURL)]
     }
 
     /// Brings saved labels up to date with the library, then exports that revision.
@@ -924,11 +1003,13 @@ public final class TranscriptViewModel {
         }
 
         do {
-            let document = try TranscriptExporter.knowledgebaseJSON(transcript)
+            let notes = exportNotes(for: selectedFile)
+            let document = try TranscriptExporter.knowledgebaseJSON(transcript, notes: notes.notes)
             if clipboard.write(document) {
                 exportMessage = TranscriptExportMessage(
-                    text: "Copied Knowledgebase JSON to the clipboard.",
-                    isFailure: false
+                    text: notes.warning.map { "Copied Knowledgebase JSON to the clipboard. \($0)" }
+                        ?? "Copied Knowledgebase JSON to the clipboard.",
+                    isFailure: notes.warning != nil
                 )
             } else {
                 exportMessage = TranscriptExportMessage(
@@ -944,159 +1025,181 @@ public final class TranscriptViewModel {
         }
     }
 
-    // MARK: - Sending to an agent
-
-    /// Whether the window offers the send action at all. Without a host
-    /// dispatcher there is nothing to send to, so the toolbar leaves it out
-    /// rather than opening a sheet that can do nothing.
-    public var canSendToAgent: Bool { agentDispatcher != nil }
-
-    public var agents: [TranscriptAgent] { agentEnvironment?.agents ?? [] }
-    public var agentFolders: [TranscriptAgentFolder] { agentEnvironment?.folders ?? [] }
-
-    public var selectedAgent: TranscriptAgent? {
-        agents.first { $0.id == selectedAgentID }
-    }
-
-    public var selectedAgentFolder: TranscriptAgentFolder? {
-        agentFolders.first { $0.id == selectedAgentFolderID }
-    }
-
-    /// Why the send button is not available yet, in the person's terms, or nil
-    /// when everything it needs is chosen. The sheet shows this rather than
-    /// leaving a disabled button unexplained.
-    public var agentHandoffProblem: String? {
-        if let reason = agentEnvironment?.unavailableReason { return reason }
-        if selectedTranscript == nil { return "This file has no completed transcript to send." }
-        if agents.isEmpty { return "No coding agent was found on this Mac." }
-        if selectedAgent == nil { return "Choose an agent." }
-        if let folder = selectedAgentFolder, !folder.isReachable {
-            return "\(folder.displayName) is no longer where it was. Connect it again."
-        }
-        if !Self.isAcceptableMCPURL(agentMCPURL) { return "The MCP URL should start with http:// or https://." }
-        return nil
-    }
-
-    /// The models typed for the selected agent before, most recent first.
-    public var agentModelHistory: [String] {
-        selectedAgentID.map(agentPreferences.modelHistory(for:)) ?? []
-    }
-
-    /// The instructions sent into the selected folder (the project the agent
-    /// works in), most recent first, at most ten.
-    public var agentInstructionHistory: [String] {
-        agentPreferences.instructionHistory(forFolder: selectedAgentFolderID)
-    }
-
-    /// Picks the folder the agent works in, or none at all with nil.
-    public func selectAgentFolder(id: TranscriptAgentFolder.ID?) {
-        selectedAgentFolderID = id
-        agentFolderDeclined = id == nil
-    }
-
-    /// Empty is fine — the URL is optional — but what is there has to be one.
-    private static func isAcceptableMCPURL(_ text: String) -> Bool {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty { return true }
-        guard let url = URL(string: trimmed), let scheme = url.scheme?.lowercased() else { return false }
-        return (scheme == "http" || scheme == "https") && url.host?.isEmpty == false
-    }
-
-    private func restoreAgentRunSettings() {
-        guard let selectedAgentID else { return }
-        agentModel = agentPreferences.lastModel(for: selectedAgentID)
-        agentEffort = agentPreferences.effort(for: selectedAgentID)
-    }
-
-    public var canSubmitAgentHandoff: Bool { agentHandoffProblem == nil && !isSendingToAgent }
-
-    /// Asks the host what is available and keeps the two choices valid.
-    ///
-    /// Called each time the sheet opens: an agent can be installed and a folder
-    /// moved between one sending and the next, and a selection that no longer
-    /// names anything must not survive as an invisible choice.
-    public func loadAgentEnvironment() async {
-        guard let agentDispatcher else { return }
-        apply(await agentDispatcher.environment())
-    }
-
-    /// Sends the person to the host's folder chooser, then selects whatever
-    /// came back so the folder they just connected is the one that is used.
-    public func connectAgentFolder() async {
-        guard let agentDispatcher else { return }
-        let known = Set(agentFolders.map(\.id))
-        let environment = await agentDispatcher.connectFolder()
-        apply(environment)
-        if let connected = environment.folders.first(where: { !known.contains($0.id) }) {
-            selectAgentFolder(id: connected.id)
-        }
-    }
-
-    public func disconnectAgentFolder(id: TranscriptAgentFolder.ID) async {
-        guard let agentDispatcher else { return }
-        apply(await agentDispatcher.disconnectFolder(id: id))
-    }
-
-    /// Brings saved labels up to date with the library, then starts the agent on
-    /// that revision. Labels are refreshed first for the same reason exporting
-    /// refreshes them: the agent should read the names the library holds now,
-    /// not the ones diarization guessed.
-    ///
-    /// Returns whether the session was created, so the sheet can close on
-    /// success and stay open with the reason on failure.
-    @discardableResult
-    public func sendToAgent() async -> Bool {
-        guard let agentDispatcher, canSubmitAgentHandoff else { return false }
-        await refreshLabelsFromLibrary(announceUnchanged: false)
-        guard let transcript = selectedTranscript, let agent = selectedAgent else { return false }
-        isSendingToAgent = true
-        defer { isSendingToAgent = false }
-        let request = TranscriptAgentRequest(
-            transcript: transcript,
-            agent: agent,
-            model: agentModel,
-            effort: agentEffort,
-            folder: selectedAgentFolder,
-            mcpURL: agentMCPURL,
-            instruction: agentInstruction
-        )
-        let outcome = await agentDispatcher.send(request)
-        if outcome.succeeded {
-            agentPreferences.recordSend(agentID: agent.id, model: request.model, effort: request.effort)
-            agentPreferences.mcpURL = request.mcpURL ?? ""
-            agentPreferences.recordInstruction(request.instruction, folderID: request.folder?.id)
-        }
-        agentMessage = TranscriptSpeakerActionMessage(text: outcome.summary, isFailure: !outcome.succeeded)
-        return outcome.succeeded
-    }
-
-    public func dismissAgentMessage() {
-        agentMessage = nil
-    }
-
-    /// Adopts a refreshed environment, moving each selection onto something
-    /// that still exists rather than leaving it naming an agent or folder that
-    /// has gone.
-    private func apply(_ environment: TranscriptAgentEnvironment) {
-        agentEnvironment = environment
-        if selectedAgentID == nil || !environment.agents.contains(where: { $0.id == selectedAgentID }) {
-            let remembered = environment.agents.first { $0.id == agentPreferences.lastAgentID }
-            selectedAgentID = (remembered ?? environment.agents.first)?.id
-        }
-        let folderIsGone = selectedAgentFolderID != nil && !environment.folders.contains { $0.id == selectedAgentFolderID }
-        if folderIsGone || (selectedAgentFolderID == nil && !agentFolderDeclined) {
-            selectedAgentFolderID = environment.folders.first(where: \.isReachable)?.id ?? environment.folders.first?.id
-        }
-    }
-
     // MARK: - Naming
 
     /// Gives the transcript a name of its own, or clears it back to the source
     /// filename with nil. Like every edit, this is a saved revision.
     public func rename(to title: String?) {
-        applyEdit({ try TranscriptSegmentEditor.renaming(to: title, in: $0) }) { revised in
-            revised.title.map { "Renamed to \u{201C}\($0)\u{201D}." } ?? "Cleared the name; the transcript goes by its source filename."
+        guard let selectedFileID else { return }
+        rename(fileID: selectedFileID, to: title)
+    }
+
+    /// Renames one row, named by its key rather than by whatever is selected
+    /// when the work finishes. A transcript gets a renamed revision now; a
+    /// meeting draft records the title too, so a placeholder can be named
+    /// while recording and a later run opens under the same name.
+    public func rename(fileID: TranscriptReviewFile.ID, to title: String?) {
+        guard let file = files.first(where: { $0.id == fileID }) else { return }
+        if file.transcript != nil {
+            let before = file.transcript
+            applyEdit(toFileID: fileID, { try TranscriptSegmentEditor.renaming(to: title, in: $0) }) { revised in
+                revised.title.map { "Renamed to \u{201C}\($0)\u{201D}." } ?? "Cleared the name; the transcript goes by its source filename."
+            }
+            // A refused name (a blank one) is not passed on to the draft.
+            if files.first(where: { $0.id == fileID })?.transcript == before, before?.title != title { return }
+        } else if let title, title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            speakerActionMessage = TranscriptSpeakerActionMessage(text: Self.describe(TranscriptSegmentEditError.emptyTitle), isFailure: true)
+            return
         }
+        let title = title?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let draft = file.draft, let draftEditor, draft.title != title else { return }
+        let draftID = draft.id
+        let revision = draft.revision
+        let previousTitle = draft.title
+        Task { [weak self] in
+            do {
+                let summary = try await draftEditor.setTitle(draftID: draftID, title: title, basedOnRevision: revision, previousTitle: previousTitle)
+                self?.applyDraftSummary(summary, toFileID: fileID)
+                if file.transcript == nil {
+                    self?.speakerActionMessage = TranscriptSpeakerActionMessage(
+                        text: title.map { "Renamed to \u{201C}\($0)\u{201D}. The transcript will use this name." }
+                            ?? "Cleared the name; the meeting goes by its default name.",
+                        isFailure: false
+                    )
+                }
+            } catch {
+                self?.speakerActionMessage = TranscriptSpeakerActionMessage(text: "Could not rename: \(Self.describe(error))", isFailure: true)
+            }
+        }
+    }
+
+    // MARK: - Meeting notes
+
+    /// The notes a row shows, or nil for rows that have none: imports and
+    /// pasted transcripts get no notes pane (decision 11).
+    public func notesContent(for file: TranscriptReviewFile) -> MeetingNotesContent? {
+        guard let draft = file.draft else { return nil }
+        return notesContent(draftID: draft.id)
+    }
+
+    /// A draft's notes, read so that a view showing them redraws when any
+    /// editor changes them: the Transcripts window and the floating notes
+    /// panel edit the same draft through this model, and each shows the
+    /// other's edits as they are made.
+    public func notesContent(draftID: UUID) -> MeetingNotesContent? {
+        _ = notesRevision
+        return draftEditor?.notes(draftID: draftID)
+    }
+
+    /// Replaces the notes of the draft named, never "the selected one": the
+    /// editor captured the ID when it was given the notes.
+    public func setNotes(draftID: UUID, notes: [MeetingNote]) {
+        guard let draftEditor else { return }
+        draftEditor.setNotes(draftID: draftID, notes: notes)
+        notesRevision &+= 1
+    }
+
+    /// An edit to the draft that is not written yet, or whose write failed.
+    public func hasUnsavedEdits(draftID: UUID) -> Bool {
+        draftEditor?.hasUnsavedEdits(draftID: draftID) ?? false
+    }
+
+    /// The time a note written now in this draft is stamped with.
+    public func noteClock(draftID: UUID) -> Int? {
+        draftEditor?.noteClock(draftID: draftID)
+    }
+
+    /// Writes the draft's notes now: on leaving it or closing the window.
+    public func flushNotes(draftID: UUID) {
+        guard let draftEditor else { return }
+        Task { await draftEditor.flushNotes(draftID: draftID) }
+    }
+
+    /// Whether a note's stamp can move playback there: the selected row has
+    /// a transcript and its recording, and the time is inside the recording.
+    public func canSeek(toNoteOffset milliseconds: Int?, in file: TranscriptReviewFile) -> Bool {
+        guard let milliseconds, milliseconds >= 0, file.id == selectedFileID,
+              file.transcript != nil, file.hasAudio else { return false }
+        let duration = file.transcript?.source.durationMs ?? 0
+        return milliseconds <= duration
+    }
+
+    /// Moves playback to a note's time and highlights the turn nearest it,
+    /// without starting sound.
+    public func seek(toNoteOffset milliseconds: Int) {
+        guard let file = selectedFile, canSeek(toNoteOffset: milliseconds, in: file) else { return }
+        playheadMilliseconds = milliseconds
+        playback.seek(toMilliseconds: milliseconds)
+        guard let nearest = Self.nearestSegment(to: milliseconds, in: chronologicalSegments) else { return }
+        selectedSegmentID = nearest.id
+        if playingSegmentID != nil { playingSegmentID = nearest.id }
+    }
+
+    /// The turn a note at `milliseconds` refers to: one that spans the time,
+    /// else whichever starts or ends closest to it.
+    public static func nearestSegment(to milliseconds: Int, in segments: [TranscriptSegment]) -> TranscriptSegment? {
+        if let containing = segments.last(where: { $0.startMs <= milliseconds && milliseconds <= $0.endMs }) {
+            return containing
+        }
+        return segments.min { lhs, rhs in
+            distance(milliseconds, lhs) < distance(milliseconds, rhs)
+        }
+    }
+
+    private static func distance(_ milliseconds: Int, _ segment: TranscriptSegment) -> Int {
+        milliseconds < segment.startMs ? segment.startMs - milliseconds : milliseconds - segment.endMs
+    }
+
+    // MARK: - Meeting drafts
+
+    /// Retries writing a draft whose last save failed.
+    public func retrySavingDraft(fileID: TranscriptReviewFile.ID) {
+        guard let draft = files.first(where: { $0.id == fileID })?.draft, let draftEditor else { return }
+        let draftID = draft.id
+        Task { [weak self] in
+            let summary = await draftEditor.retrySave(draftID: draftID)
+            self?.applyDraftSummary(summary, toFileID: fileID)
+        }
+    }
+
+    /// Whether the row offers "Delete Draft": a placeholder or notes-only row
+    /// that is not recording. A draft with a run is deleted with its transcript.
+    public func canDeleteDraft(_ file: TranscriptReviewFile) -> Bool {
+        draftEditor != nil && file.isPlaceholder && (file.draft?.canDeleteDraft ?? false)
+    }
+
+    /// Removes a placeholder's draft, its title and its notes.
+    public func deleteDraft(fileID: TranscriptReviewFile.ID) async {
+        guard let index = files.firstIndex(where: { $0.id == fileID }), canDeleteDraft(files[index]),
+              let draft = files[index].draft, let draftEditor else { return }
+        let name = files[index].displayName
+        do {
+            try await draftEditor.deleteDraft(draftID: draft.id)
+        } catch {
+            speakerActionMessage = TranscriptSpeakerActionMessage(text: "Could not delete \(name): \(Self.describe(error))", isFailure: true)
+            return
+        }
+        guard let current = files.firstIndex(where: { $0.id == fileID }) else { return }
+        files.remove(at: current)
+        if selectedFileID == fileID {
+            let neighbour = files.indices.contains(current) ? files[current] : files.last
+            selectedFileID = neighbour?.id
+        }
+    }
+
+    /// Hands a finished recording that was not sent automatically to transcription.
+    public func transcribeDraftNow(fileID: TranscriptReviewFile.ID) async {
+        guard let draft = files.first(where: { $0.id == fileID })?.draft, draft.canTranscribeNow, let draftEditor else { return }
+        if let failure = await draftEditor.transcribeNow(draftID: draft.id) {
+            speakerActionMessage = TranscriptSpeakerActionMessage(text: failure, isFailure: true)
+        }
+    }
+
+    private func applyDraftSummary(_ summary: MeetingDraftSummary?, toFileID fileID: TranscriptReviewFile.ID) {
+        guard let summary, let index = files.firstIndex(where: { $0.id == fileID }),
+              files[index].draft?.id == summary.id,
+              (files[index].draft?.revision ?? 0) <= summary.revision else { return }
+        files[index] = files[index].replacingDraft(summary)
     }
 
     // MARK: - Editing turns
@@ -1416,7 +1519,19 @@ public final class TranscriptViewModel {
         _ edit: (CanonicalTranscript) throws -> CanonicalTranscript,
         success: (CanonicalTranscript) -> String
     ) {
-        guard let fileID = selectedFileID, let transcript = selectedTranscript else {
+        guard let fileID = selectedFileID else {
+            speakerActionMessage = TranscriptSpeakerActionMessage(text: "This file has no transcript to edit.", isFailure: true)
+            return
+        }
+        applyEdit(toFileID: fileID, edit, success: success)
+    }
+
+    private func applyEdit(
+        toFileID fileID: TranscriptReviewFile.ID,
+        _ edit: (CanonicalTranscript) throws -> CanonicalTranscript,
+        success: (CanonicalTranscript) -> String
+    ) {
+        guard let transcript = files.first(where: { $0.id == fileID })?.transcript else {
             speakerActionMessage = TranscriptSpeakerActionMessage(text: "This file has no transcript to edit.", isFailure: true)
             return
         }
@@ -1425,7 +1540,7 @@ public final class TranscriptViewModel {
             guard revised != transcript else { return }
             undoStacks[fileID, default: []].append(transcript)
             redoStacks[fileID] = []
-            replaceSelectedTranscript(revised)
+            replaceTranscript(revised, inFileID: fileID)
             nextToastAction = .undo
             speakerActionMessage = TranscriptSpeakerActionMessage(text: success(revised), isFailure: false)
         } catch {
@@ -1437,11 +1552,17 @@ public final class TranscriptViewModel {
     /// disk. A revision that cannot be persisted is still shown, and the failure
     /// is reported rather than swallowed: the words are unchanged either way.
     private func replaceSelectedTranscript(_ transcript: CanonicalTranscript) {
-        guard let index = files.firstIndex(where: { $0.id == selectedFileID }) else { return }
+        guard let selectedFileID else { return }
+        replaceTranscript(transcript, inFileID: selectedFileID)
+    }
+
+    private func replaceTranscript(_ transcript: CanonicalTranscript, inFileID fileID: TranscriptReviewFile.ID) {
+        guard let index = files.firstIndex(where: { $0.id == fileID }) else { return }
         let file = files[index].replacingTranscript(transcript)
         files[index] = file
         do {
-            try revisionStore?.save(transcript, forFileID: file.id)
+            guard let runID = file.runID else { return }
+            try revisionStore?.save(transcript, forFileID: runID)
         } catch {
             speakerActionMessage = TranscriptSpeakerActionMessage(
                 text: "Revision \(transcript.revision) is shown here but could not be saved: \(Self.describe(error))",
@@ -1466,7 +1587,7 @@ public final class TranscriptViewModel {
             exportMessage = nil
             return
         }
-        playback.load(sourceSnapshotURL: file.sourceSnapshotURL)
+        if !file.isPlaceholder { playback.load(sourceSnapshotURL: file.sourceSnapshotURL) }
         selectedSegmentID = nil
         exportMessage = nil
     }

@@ -122,7 +122,12 @@ public struct FinalRecordingHandoff: Sendable {
     /// Verifies a session and returns the request to submit for its final mix.
     ///
     /// Throws `FinalRecordingHandoffRefusal` — never a partially trusted result.
-    public func request(forSessionAt sessionDirectory: URL) throws -> TranscriptionRequest {
+    ///
+    /// The request ID is derived from the session ID, so publishing the same
+    /// session twice yields the same request and the transcription side
+    /// recognises it instead of starting a second run. `draftID` names the
+    /// meeting draft opened when capture started, when there is one.
+    public func request(forSessionAt sessionDirectory: URL, draftID: UUID? = nil) throws -> TranscriptionRequest {
         let manifest = try readManifest(in: sessionDirectory)
 
         guard supportedSchemaVersions.contains(manifest.schemaVersion) else {
@@ -158,6 +163,7 @@ public struct FinalRecordingHandoff: Sendable {
         }
 
         return TranscriptionRequest(
+            requestID: TranscriptionRequest.recorderRequestID(forSession: manifest.sessionID),
             sourceURL: finalURL,
             speakerCount: speakerCount,
             microphoneSpeakerPrior: microphoneSpeakerPrior,
@@ -165,8 +171,17 @@ public struct FinalRecordingHandoff: Sendable {
             modelProfileID: modelProfileID,
             exportDirectory: exportDirectory,
             provenance: TranscriptionProvenance(producerID: Self.producerID, sessionID: manifest.sessionID),
-            title: manifest.title
+            title: manifest.title,
+            draftID: draftID
         )
+    }
+
+    /// The session ID a session directory's manifest declares, without any of
+    /// the checks `request(forSessionAt:)` makes. Used to look up the session's
+    /// meeting draft before the handoff is built.
+    public static func sessionID(forSessionAt sessionDirectory: URL) -> UUID? {
+        let url = sessionDirectory.appendingPathComponent("metadata.json")
+        return (try? RecorderSessionManifestCodec.decode(Data(contentsOf: url)))?.sessionID
     }
 
     private func readManifest(in sessionDirectory: URL) throws -> RecorderSessionManifest {

@@ -8,6 +8,9 @@ import Speakers
 /// This deliberately models the states the eventual coordinator owns so fixture-backed UI has
 /// the same presentation contract as a live job.
 public enum TranscriptJobState: Equatable, Sendable {
+    /// The meeting is being recorded now. The clock is derived from
+    /// `startedAt`; the recording clock keeps running while paused.
+    case recording(startedAt: Date, isPaused: Bool)
     case ready
     case queued
     case processing(progress: Double?)
@@ -18,6 +21,7 @@ public enum TranscriptJobState: Equatable, Sendable {
 
     public var displayName: String {
         switch self {
+        case .recording(_, let isPaused): isPaused ? "Paused" : "Recording"
         case .ready: "Ready"
         case .queued: "Queued"
         case .processing: "Processing"
@@ -40,8 +44,17 @@ public enum TranscriptJobState: Equatable, Sendable {
 }
 
 /// A transcript together with the immutable source copy used to validate it during review.
+///
+/// `id` is the row key: the meeting draft's ID for a recording made in Scribe,
+/// so the row keeps its identity from the moment recording starts through
+/// every later run; the run ID otherwise. Run operations (revisions, delete,
+/// combine, reprocess) are addressed to `runID`, never to the row key.
 public struct TranscriptReviewFile: Identifiable, Equatable, Sendable {
     public let id: String
+    /// The run this row shows, or nil for a placeholder with no run yet.
+    public let runID: String?
+    /// The meeting draft behind this row, for recordings made in Scribe.
+    public let draft: MeetingDraftSummary?
     public let sourceSnapshotURL: URL
     public let transcript: CanonicalTranscript?
     public let jobState: TranscriptJobState
@@ -52,16 +65,23 @@ public struct TranscriptReviewFile: Identifiable, Equatable, Sendable {
     /// Similarity evidence recorded by speaker recognition.
     public var suggestions: [TranscriptSpeakerSuggestion]
 
+    /// `runID` defaults to the row key for rows without a draft, where the
+    /// two are the same run.
     public init(
         id: String? = nil,
+        runID: String? = nil,
         sourceSnapshotURL: URL,
         transcript: CanonicalTranscript?,
         jobState: TranscriptJobState,
         processingError: String? = nil,
         hasAudio: Bool = true,
-        suggestions: [TranscriptSpeakerSuggestion] = []
+        suggestions: [TranscriptSpeakerSuggestion] = [],
+        draft: MeetingDraftSummary? = nil
     ) {
-        self.id = id ?? transcript?.transcriptID ?? sourceSnapshotURL.absoluteString
+        let id = id ?? transcript?.transcriptID ?? sourceSnapshotURL.absoluteString
+        self.id = id
+        self.runID = draft == nil ? (runID ?? id) : runID
+        self.draft = draft
         self.sourceSnapshotURL = sourceSnapshotURL
         self.transcript = transcript
         self.jobState = jobState
@@ -70,27 +90,54 @@ public struct TranscriptReviewFile: Identifiable, Equatable, Sendable {
         self.suggestions = suggestions
     }
 
+    /// The stable key the sidebar selects by. Same as `id`.
+    public var rowKey: String { id }
+
+    /// True while there is no run behind the row: a recording in progress,
+    /// one waiting for transcription, or notes whose recording is gone.
+    public var isPlaceholder: Bool { runID == nil }
+
     public var filename: String {
-        transcript?.source.filename ?? sourceSnapshotURL.lastPathComponent
+        if let transcript { return transcript.source.filename }
+        if let draft, runID == nil { return draft.defaultTitle }
+        return sourceSnapshotURL.lastPathComponent
     }
 
-    /// The name shown for this file: the title a person gave it, or the source
-    /// filename until they do.
+    /// The name shown for this file: the title a person gave the meeting,
+    /// then the transcript's title, then the meeting's default (the calendar
+    /// event or the dated session name), then the source filename.
     public var displayName: String {
-        transcript?.title ?? filename
+        draft?.title ?? transcript?.title ?? draft?.defaultTitle ?? filename
     }
 
     /// Queued or still running: the sidebar shows "Transcribing" instead of a date.
     public var isInProgress: Bool {
         switch jobState {
         case .queued, .processing: true
-        case .ready, .complete, .completeWithWarnings, .noSpeech, .failed: false
+        case .recording, .ready, .complete, .completeWithWarnings, .noSpeech, .failed: false
         }
     }
 
+    public var isRecording: Bool {
+        if case .recording = jobState { return true }
+        return false
+    }
+
     /// The sidebar's second line: day and length ("Wed 24 Sep · 42:17") once a
-    /// transcript exists, otherwise the job state.
-    public func sidebarDetail(locale: Locale = .current, timeZone: TimeZone = .current) -> String {
+    /// transcript exists, otherwise the job state. A recording shows its clock
+    /// and note count ("Recording · 12:41 · 4 notes"); a placeholder its
+    /// draft's state; an unsaved draft says so above everything else.
+    public func sidebarDetail(locale: Locale = .current, timeZone: TimeZone = .current, now: Date = Date()) -> String {
+        if case .notSaved = draft?.saveState { return "Not saved" }
+        if case let .recording(startedAt, isPaused) = jobState {
+            let elapsed = Int(max(0, now.timeIntervalSince(startedAt)) * 1_000)
+            return ([isPaused ? "Paused" : "Recording", Self.lengthLabel(milliseconds: elapsed), draft?.noteCountText]
+                .compactMap { $0 })
+                .joined(separator: " · ")
+        }
+        if let draft, transcript == nil, !isInProgress, !jobState.isFailure {
+            return draft.status
+        }
         guard let transcript else { return jobState.displayName }
         var parts: [String] = []
         if let date = Self.parsedDate(transcript.createdAt) {
@@ -128,12 +175,45 @@ public struct TranscriptReviewFile: Identifiable, Equatable, Sendable {
     public func replacingTranscript(_ transcript: CanonicalTranscript) -> TranscriptReviewFile {
         TranscriptReviewFile(
             id: id,
+            runID: runID,
             sourceSnapshotURL: sourceSnapshotURL,
             transcript: transcript,
             jobState: jobState,
             processingError: processingError,
             hasAudio: hasAudio,
-            suggestions: suggestions
+            suggestions: suggestions,
+            draft: draft
+        )
+    }
+
+    /// The same row with refreshed draft facts.
+    public func replacingDraft(_ draft: MeetingDraftSummary?) -> TranscriptReviewFile {
+        TranscriptReviewFile(
+            id: id,
+            runID: runID,
+            sourceSnapshotURL: sourceSnapshotURL,
+            transcript: transcript,
+            jobState: jobState,
+            processingError: processingError,
+            hasAudio: hasAudio,
+            suggestions: suggestions,
+            draft: draft
+        )
+    }
+
+    /// The same run shown on a meeting draft's row: keyed by the draft, run
+    /// operations still addressed to the run.
+    public func keyed(byDraft draft: MeetingDraftSummary) -> TranscriptReviewFile {
+        TranscriptReviewFile(
+            id: draft.id.uuidString,
+            runID: runID,
+            sourceSnapshotURL: sourceSnapshotURL,
+            transcript: transcript,
+            jobState: jobState,
+            processingError: processingError,
+            hasAudio: hasAudio,
+            suggestions: suggestions,
+            draft: draft
         )
     }
 
@@ -141,12 +221,14 @@ public struct TranscriptReviewFile: Identifiable, Equatable, Sendable {
     public func removingAudio() -> TranscriptReviewFile {
         TranscriptReviewFile(
             id: id,
+            runID: runID,
             sourceSnapshotURL: sourceSnapshotURL,
             transcript: transcript,
             jobState: jobState,
             processingError: processingError,
             hasAudio: false,
-            suggestions: suggestions
+            suggestions: suggestions,
+            draft: draft
         )
     }
 }
@@ -283,9 +365,12 @@ public struct TranscriptExportOutcome: Identifiable, Equatable, Sendable {
 }
 
 /// Writes individual export formats independently, retaining successes when one format fails.
+///
+/// `notes` are the meeting's notes; formats that carry notes include them and SRT ignores them.
 public protocol TranscriptExportWriting: Sendable {
     func write(
         _ transcript: CanonicalTranscript,
+        notes: [TranscriptExportNote],
         formats: Set<TranscriptExportFormat>,
         to directoryURL: URL,
         basename: String
@@ -293,6 +378,7 @@ public protocol TranscriptExportWriting: Sendable {
 
     func write(
         _ transcript: CanonicalTranscript,
+        notes: [TranscriptExportNote],
         format: TranscriptExportFormat,
         toFile fileURL: URL
     ) -> TranscriptExportOutcome
@@ -302,15 +388,35 @@ extension TranscriptExportWriting {
     /// Names files after the transcript when the caller has not chosen a different name.
     public func write(
         _ transcript: CanonicalTranscript,
+        notes: [TranscriptExportNote] = [],
         formats: Set<TranscriptExportFormat>,
         to directoryURL: URL
     ) -> [TranscriptExportOutcome] {
         write(
             transcript,
+            notes: notes,
             formats: formats,
             to: directoryURL,
             basename: FileTranscriptExportWriter.basename(for: transcript)
         )
+    }
+
+    /// A transcript with no meeting notes, such as an import.
+    public func write(
+        _ transcript: CanonicalTranscript,
+        formats: Set<TranscriptExportFormat>,
+        to directoryURL: URL,
+        basename: String
+    ) -> [TranscriptExportOutcome] {
+        write(transcript, notes: [], formats: formats, to: directoryURL, basename: basename)
+    }
+
+    public func write(
+        _ transcript: CanonicalTranscript,
+        format: TranscriptExportFormat,
+        toFile fileURL: URL
+    ) -> TranscriptExportOutcome {
+        write(transcript, notes: [], format: format, toFile: fileURL)
     }
 }
 
@@ -354,6 +460,7 @@ public struct FileTranscriptExportWriter: TranscriptExportWriting {
 
     public func write(
         _ transcript: CanonicalTranscript,
+        notes: [TranscriptExportNote],
         formats: Set<TranscriptExportFormat>,
         to directoryURL: URL,
         basename: String
@@ -361,17 +468,18 @@ public struct FileTranscriptExportWriter: TranscriptExportWriting {
         TranscriptExportFormat.allCases.compactMap { format in
             guard formats.contains(format) else { return nil }
             let destination = directoryURL.appendingPathComponent(basename).appendingPathExtension(format.fileExtension)
-            return write(transcript, format: format, toFile: destination)
+            return write(transcript, notes: notes, format: format, toFile: destination)
         }
     }
 
     public func write(
         _ transcript: CanonicalTranscript,
+        notes: [TranscriptExportNote],
         format: TranscriptExportFormat,
         toFile fileURL: URL
     ) -> TranscriptExportOutcome {
         do {
-            let data = try TranscriptExporter.export(transcript, as: format)
+            let data = try TranscriptExporter.export(transcript, as: format, notes: notes)
             try data.write(to: fileURL, options: .atomic)
             return TranscriptExportOutcome(format: format, destinationURL: fileURL, errorMessage: nil)
         } catch {

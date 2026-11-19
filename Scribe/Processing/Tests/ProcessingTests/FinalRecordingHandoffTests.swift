@@ -30,6 +30,21 @@ import Testing
         #expect(enabled.recorderSessionDirectory == session.directory)
     }
 
+    @Test func publishingASessionTwiceIsOneRequestCarryingItsDraft() throws {
+        let session = try handoffSession(finalContents: "verified-final-mix")
+        let draftID = UUID()
+        let handoff = FinalRecordingHandoff(checksumOfFile: fakeChecksum)
+        let first = try handoff.request(forSessionAt: session.directory, draftID: draftID)
+        let again = try handoff.request(forSessionAt: session.directory, draftID: draftID)
+
+        #expect(first.requestID == again.requestID)
+        #expect(first.requestID == TranscriptionRequest.recorderRequestID(forSession: session.sessionID))
+        #expect(first.draftID == draftID)
+        #expect(FinalRecordingHandoff.sessionID(forSessionAt: session.directory) == session.sessionID)
+        // A session recorded before drafts existed hands off without one.
+        #expect(try handoff.request(forSessionAt: session.directory).draftID == nil)
+    }
+
     @Test func theMeetingTitleTravelsWithTheRequest() throws {
         let session = try handoffSession(finalContents: "verified-final-mix", title: "Weekly Sync")
         let request = try FinalRecordingHandoff(checksumOfFile: fakeChecksum)

@@ -169,13 +169,59 @@ public struct LatchCreateReport: Decodable, Equatable, Sendable {
 
     public let protocolVersion: Int?
     public let session: Session
+    /// Present when Scribe passed `--request-id`: true when an earlier
+    /// attempt of the same send had already started this session.
+    public let reused: Bool?
 
-    public init(protocolVersion: Int?, session: Session) {
+    public init(protocolVersion: Int?, session: Session, reused: Bool? = nil) {
         self.protocolVersion = protocolVersion
         self.session = session
+        self.reused = reused
     }
 
     public static func decode(_ data: Data) throws -> LatchCreateReport {
         try JSONDecoder().decode(LatchCreateReport.self, from: data)
+    }
+}
+
+/// What `latch create --request-id … --json` writes instead of a report when
+/// the request started nothing: a stable code and a sentence.
+public struct LatchCreateErrorReport: Decodable, Equatable, Sendable {
+    public struct ErrorBody: Decodable, Equatable, Sendable {
+        public let code: String
+        public let message: String
+        public let sessionId: String?
+    }
+
+    public let error: ErrorBody
+
+    public static func decode(_ data: Data) throws -> LatchCreateErrorReport {
+        try JSONDecoder().decode(LatchCreateErrorReport.self, from: data)
+    }
+}
+
+/// The part of `latch capabilities --json` Scribe reads.
+public struct LatchCapabilitiesReport: Decodable, Equatable, Sendable {
+    /// `latch create` takes `--request-id` and starts at most one session
+    /// per ID.
+    public static let createRequestIDExtension = "create-request-id"
+
+    public struct Capabilities: Decodable, Equatable, Sendable {
+        public let extensions: [String]
+
+        public init(extensions: [String]) { self.extensions = extensions }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            extensions = try container.decodeIfPresent([String].self, forKey: .extensions) ?? []
+        }
+
+        enum CodingKeys: String, CodingKey { case extensions }
+    }
+
+    public let capabilities: Capabilities
+
+    public static func decode(_ data: Data) throws -> LatchCapabilitiesReport {
+        try JSONDecoder().decode(LatchCapabilitiesReport.self, from: data)
     }
 }

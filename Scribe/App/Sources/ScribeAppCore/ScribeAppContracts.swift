@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 /// The contract implemented by `ProcessingQueue` and consumed by local jobs such
@@ -58,6 +59,11 @@ public struct TranscriptionRequest: Codable, Sendable, Equatable, Identifiable {
     /// meeting the recording was made during. `nil` leaves the transcript named
     /// after its source file until a person renames it.
     public let title: String?
+    /// The meeting draft a recorder session opened when capture started. It
+    /// travels into the job record, so the link from a placeholder row to its
+    /// run survives an outbox claim followed by a crash. Absent for imports and
+    /// for every request written before drafts existed.
+    public let draftID: UUID?
 
     public var id: UUID { requestID }
 
@@ -75,7 +81,8 @@ public struct TranscriptionRequest: Codable, Sendable, Equatable, Identifiable {
         modelProfileID: String,
         exportDirectory: URL? = nil,
         provenance: TranscriptionProvenance? = nil,
-        title: String? = nil
+        title: String? = nil,
+        draftID: UUID? = nil
     ) {
         self.requestID = requestID
         self.sourceURL = sourceURL
@@ -91,6 +98,36 @@ public struct TranscriptionRequest: Codable, Sendable, Equatable, Identifiable {
         self.exportDirectory = exportDirectory
         self.provenance = provenance
         self.title = title
+        self.draftID = draftID
+    }
+
+    /// The request ID the recorder uses for a session's final handoff.
+    ///
+    /// Deterministic (a name-based UUID of the session ID), so a request
+    /// published twice for one recording — after a crash, or by launch
+    /// reconciliation — is recognisable as the same request and never
+    /// allocates a second transcription run.
+    public static func recorderRequestID(forSession sessionID: UUID) -> UUID {
+        NameBasedUUID.make(namespace: recorderRequestNamespace, name: sessionID.uuidString.lowercased())
+    }
+
+    /// A fixed namespace for `recorderRequestID(forSession:)`. Changing it would
+    /// stop old outbox files from deduplicating against new ones.
+    static let recorderRequestNamespace = UUID(uuidString: "6F2C5A44-0B8E-4C55-9C1E-7A0D3E5B9F21")!
+}
+
+/// RFC 4122 version 5 (SHA-1, name-based) UUIDs.
+public enum NameBasedUUID {
+    public static func make(namespace: UUID, name: String) -> UUID {
+        var bytes = withUnsafeBytes(of: namespace.uuid) { Array($0) }
+        bytes.append(contentsOf: Array(name.utf8))
+        var digest = Array(Insecure.SHA1.hash(data: bytes)).prefix(16).map { $0 }
+        digest[6] = (digest[6] & 0x0F) | 0x50
+        digest[8] = (digest[8] & 0x3F) | 0x80
+        return UUID(uuid: (
+            digest[0], digest[1], digest[2], digest[3], digest[4], digest[5], digest[6], digest[7],
+            digest[8], digest[9], digest[10], digest[11], digest[12], digest[13], digest[14], digest[15]
+        ))
     }
 }
 

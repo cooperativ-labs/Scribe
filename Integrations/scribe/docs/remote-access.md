@@ -120,10 +120,10 @@ by a headless-Chrome test (`test/browser.test.js`, skipped without Chrome).
 | Scoped access | `transcripts.read` only, audience-bound to `https://<relay>/mcp`. The agent executes only `list` and `get`, and checks them against strict schemas (`libraryCalls` in `src/server.js`). A compromised relay therefore cannot request deletes, audio, arbitrary paths or larger pages. |
 | Revocation | Per grant, all grants, client-initiated, or unlink. Each takes effect on the next request, because tokens are checked against server state rather than being self-contained. |
 | No cross-library reads | Transcript IDs are not capabilities. A token for owner A reaches only A's Mac, so B's transcript IDs are "not found". Tests cover this with two live Macs (`test/relay.test.js`). Two mutation checks confirmed that breaking owner routing, or letting one Mac answer another's calls, fails those tests. |
-| Data at rest | The relay persists only owner IDs, hashes of agent secrets and tokens, and OAuth client registrations, in mode-0600 JSON files. Transcript text exists in relay memory only while one response is in flight. It is never logged or stored. |
+| Data at rest | The relay persists only owner IDs, hashes of agent secrets and tokens, and OAuth client registrations, in mode-0600 JSON files. Transcript text and meeting notes exist in relay memory only while one response is in flight. They are never logged or stored. |
 
 **What the relay can see.** TLS ends at the relay, which is also the MCP server
-that ChatGPT talks to. The relay therefore handles transcript text in plaintext
+that ChatGPT talks to. The relay therefore handles transcript text and meeting notes in plaintext
 while relaying a response, the same way any hosted MCP server does. End-to-end
 encryption to ChatGPT is not possible, because ChatGPT needs the text. The
 operator's controls are: no request or response logging, no persistence, a

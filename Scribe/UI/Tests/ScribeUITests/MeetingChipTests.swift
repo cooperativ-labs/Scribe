@@ -149,8 +149,10 @@ final class MeetingChipTests: XCTestCase {
             elapsedText: "00:02",
             isPaused: false,
             isHoldEnabled: true,
-            isStopEnabled: true
+            isStopEnabled: true,
+            sessionID: coordinator.snapshot.state.activity?.sessionID
         )))
+        XCTAssertNotNil(coordinator.snapshot.state.activity?.sessionID, "the transport names the recording it is for")
     }
 
     func testTheTransportWithdrawsThreeSecondsIntoTheRecording() async {
@@ -316,7 +318,8 @@ final class MeetingChipTests: XCTestCase {
             elapsedText: "00:02",
             isPaused: true,
             isHoldEnabled: true,
-            isStopEnabled: true
+            isStopEnabled: true,
+            sessionID: coordinator.snapshot.state.activity?.sessionID
         )))
     }
 
@@ -462,6 +465,26 @@ final class MeetingChipTests: XCTestCase {
         // the meeting would be worse than not appearing at all.
         XCTAssertFalse(controller.window.canBecomeKey && controller.window.isKeyWindow)
         XCTAssertTrue(controller.window.isFloatingPanel)
+    }
+
+    func testTheTransportOffersNotesForTheRecordingItIsShowing() async throws {
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
+        let model = makeModel(coordinator)
+        let controller = MeetingChipController(model: model, anchor: { NSRect(x: 900, y: 1_000, width: 24, height: 22) })
+        var opened: [UUID] = []
+        model.meetingWasDetected(zoomCall())
+        model.record()
+        await coordinator.waitUntilIdle()
+        let sessionID = try XCTUnwrap(coordinator.snapshot.state.activity?.sessionID)
+        guard case .session(let session) = model.presentation else { return XCTFail("expected the transport") }
+        XCTAssertEqual(session.sessionID, sessionID)
+
+        let withoutNotes = controller.window.frame.width
+        controller.openMeetingNotes = { opened.append($0) }
+        XCTAssertGreaterThan(controller.window.frame.width, withoutNotes, "the Notes button takes its place on the chip")
+        try XCTUnwrap(controller.notesAction(for: model.presentation))()
+        XCTAssertEqual(opened, [sessionID], "bound to the chip's own recording")
+        XCTAssertNil(controller.notesAction(for: .hidden))
     }
 
     // MARK: Helpers

@@ -8,6 +8,8 @@ struct MeetingChipActions {
     var dismiss: @MainActor () -> Void = {}
     var hold: @MainActor () -> Void = {}
     var stop: @MainActor () -> Void = {}
+    /// Opens this recording's notes; nil hides the button.
+    var notes: (@MainActor () -> Void)?
 }
 
 /// The floating chip that appears under the menu bar icon.
@@ -121,6 +123,17 @@ struct MeetingChipView: View {
             Spacer(minLength: 16)
 
             HStack(spacing: 6) {
+                // The way into the notes for the meeting just started: the
+                // floating panel, over the call, without leaving it.
+                if let notes = actions.notes, session.sessionID != nil {
+                    circleButton(
+                        symbol: "note.text",
+                        label: "Meeting Notes",
+                        help: "Write notes for this meeting",
+                        action: notes
+                    )
+                }
+
                 circleButton(
                     symbol: session.isPaused ? "play.fill" : "pause.fill",
                     label: session.isPaused ? "Resume" : "Pause",

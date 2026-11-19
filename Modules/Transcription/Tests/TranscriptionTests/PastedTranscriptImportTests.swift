@@ -78,11 +78,17 @@ final class PastedTranscriptImportTests: XCTestCase {
         XCTAssertEqual(reloaded, [imported])
         XCTAssertEqual(try store.confinedCompletedRuns().runs.count, 1)
         model.reload(files: reloaded)
-        await model.loadAgentEnvironment()
-        XCTAssertTrue(model.canSubmitAgentHandoff)
-        let sent = await model.sendToAgent()
+        // A pasted transcript gets the shared tray with no notes area and
+        // still sends at once.
+        let target = model.handoffTarget(for: imported)
+        XCTAssertEqual(target, .transcript(imported.id))
+        XCTAssertNil(model.handoffNotes(for: target))
+        await model.loadAgentEnvironment(for: target)
+        XCTAssertTrue(model.canSubmitHandoff(target))
+        let sent = await model.sendToAgent(target)
         XCTAssertTrue(sent)
         XCTAssertEqual(dispatcher.request?.transcript, imported.transcript)
+        XCTAssertEqual(dispatcher.request?.notes, [])
         try store.deleteMeeting(containingRunID: UUID(uuidString: imported.id)!)
         XCTAssertTrue(store.runs().isEmpty)
     }

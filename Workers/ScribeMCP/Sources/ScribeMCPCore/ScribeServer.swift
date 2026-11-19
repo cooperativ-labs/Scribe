@@ -84,7 +84,9 @@ public enum ScribeServer {
             let found = try library.list(request)
             let results = found.objectValue?["transcripts"]?.arrayValue?.map { item -> Value in
                 let fields = item.objectValue ?? [:]
-                return ["id": fields["id"] ?? .null, "title": fields["title"] ?? .null, "url": fields["url"] ?? .null]
+                var result: [String: Value] = ["id": fields["id"] ?? .null, "title": fields["title"] ?? .null, "url": fields["url"] ?? .null]
+                if let note = fields["matched_note"] { result["matched_note"] = note }
+                return .object(result)
             } ?? []
             return ["results": .array(results), "next_offset": found.objectValue?["next_offset"] ?? .null]
         case "fetch":

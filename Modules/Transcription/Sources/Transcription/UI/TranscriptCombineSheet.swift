@@ -26,7 +26,7 @@ struct TranscriptCombineSheet: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             if candidates.isEmpty {
-                Text("No other recording can be combined with this one. Both need a finished transcript and their audio.")
+                Text("No other recording can be combined with this one. Both need a finished transcript and their audio, and no send to an agent under way.")
                     .font(.callout)
             } else {
                 Picker("Combine with", selection: $partnerID) {
@@ -44,7 +44,7 @@ struct TranscriptCombineSheet: View {
             }
 
             Label {
-                Text("This cannot be undone. The two recordings and their transcripts are replaced by the combined one, and their earlier transcription runs are removed. People recognised as the same speaker in both parts are joined; anyone else stays a separate speaker you can merge afterwards. The original files you imported are left alone.")
+                Text("This cannot be undone. The two recordings and their transcripts are replaced by the combined one, and their earlier transcription runs are removed. People recognised as the same speaker in both parts are joined; anyone else stays a separate speaker you can merge afterwards. Notes from both meetings are kept, the second meeting\u{2019}s times moved to where its audio now starts; agent handoff settings are cleared. The original files you imported are left alone.")
                     .fixedSize(horizontal: false, vertical: true)
             } icon: {
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)

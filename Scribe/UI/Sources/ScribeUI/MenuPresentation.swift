@@ -37,6 +37,12 @@ public struct MenuPresentation: Equatable, Sendable {
     public let pasteTimestampShortcut: GlobalShortcut
     /// True while a recording has an elapsed figure that can be pasted.
     public let isPasteTimestampEnabled: Bool
+    /// The global shortcut shown beside Meeting Notes.
+    public let meetingNotesShortcut: GlobalShortcut
+    /// The live recording's session — recording or held — whose notes
+    /// Meeting Notes opens. Captured when the menu is drawn, so the row
+    /// opens the meeting it was shown for.
+    public let liveSessionID: UUID?
     /// A live session — recording or held. What the status item's red dot
     /// reports, since the chip only stays on screen for the first few seconds
     /// of it.
@@ -45,7 +51,12 @@ public struct MenuPresentation: Equatable, Sendable {
     public let recoveryNotice: String?
     public let recordingsFolderName: String
 
-    public init(snapshot: RecorderSnapshot, at date: Date, pasteTimestampShortcut: GlobalShortcut = .defaultPasteTimestamp) {
+    public init(
+        snapshot: RecorderSnapshot,
+        at date: Date,
+        pasteTimestampShortcut: GlobalShortcut = .defaultPasteTimestamp,
+        meetingNotesShortcut: GlobalShortcut = .defaultMeetingNotes
+    ) {
         let permissions = snapshot.permissions
         let isReady = permissions.isReadyToRecord(for: snapshot.recordingMode)
 
@@ -108,6 +119,8 @@ public struct MenuPresentation: Equatable, Sendable {
         shortcutIssues = snapshot.shortcutIssues
         self.pasteTimestampShortcut = pasteTimestampShortcut
         isPasteTimestampEnabled = RecordingTimestamp.pastableText(state: snapshot.state, at: date) != nil
+        self.meetingNotesShortcut = meetingNotesShortcut
+        liveSessionID = snapshot.state.isCapturing ? snapshot.state.activity?.sessionID : nil
         isCapturing = snapshot.state.isCapturing
         recoveryNotice = snapshot.recoveryNotice
         recordingsFolderName = snapshot.recordingsFolderURL.lastPathComponent

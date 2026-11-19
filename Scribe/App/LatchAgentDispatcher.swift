@@ -54,6 +54,12 @@ final class AgentHandoffService {
         panel.allowsMultipleSelection = false
         panel.prompt = "Connect"
         panel.message = "Choose the folder the agent should work in."
+        // Asked from the floating notes panel, Scribe is usually not the
+        // active app and the person may be on a full-screen meeting's Space:
+        // the dialog opens on the Space they are on, over that meeting, and
+        // Scribe is activated so it takes the keyboard.
+        panel.collectionBehavior.formUnion([.moveToActiveSpace, .fullScreenAuxiliary])
+        if !NSApp.isActive { NSApp.activate(ignoringOtherApps: true) }
         if panel.runModal() == .OK, let url = panel.url {
             settings.connectAgentFolder(url)
         }
@@ -67,22 +73,32 @@ final class AgentHandoffService {
         return await environment()
     }
 
-    /// Writes the transcript, creates the Latch session, and brings Latch
-    /// forward. A failure at any step is reported as one sentence a person can
-    /// act on; nothing half-done is left behind that they have to clean up.
+    /// Writes the transcript (and long notes), creates the Latch session, and
+    /// brings Latch forward. A failure at any step is reported as one sentence
+    /// a person can act on. What the agent is told, and every file written for
+    /// it, is `AgentHandoffPayload`'s: handoff files are owner-only, named
+    /// after the send, and deleted after `AgentHandoffPayload.retention`.
     func send(_ request: TranscriptAgentRequest) async -> TranscriptAgentOutcome {
-        func failure(_ message: String) -> TranscriptAgentOutcome {
+        func failure(_ message: String, definite: Bool = true) -> TranscriptAgentOutcome {
             TranscriptAgentOutcome(
                 sessionName: nil,
                 agentName: request.agent.displayName,
                 folderName: request.folder?.displayName,
-                errorMessage: message
+                errorMessage: message,
+                failureIsDefinite: definite
             )
         }
 
         let tools = await toolLocator.locate()
         guard let latchURL = tools.latchURL else {
             return failure(Self.latchMissingMessage)
+        }
+        // The operation ID goes to Latch as its request ID whenever Latch
+        // accepts one, so a repeat of this send can never start a second
+        // agent. A send that fires with nobody watching requires it.
+        let supportsRequestID = await LatchCommand.supportsRequestID(latchURL: latchURL)
+        if request.delivery == .background, !supportsRequestID {
+            return failure("This version of Latch can\u{2019}t guarantee a queued send starts only one agent, so nothing was sent. Update Latch, then send it yourself.")
         }
         guard let executableURL = tools.agents.first(where: { $0.agent.id == request.agent.id })?.executableURL else {
             return failure("\(request.agent.displayName) is no longer installed on this Mac.")
@@ -94,31 +110,48 @@ final class AgentHandoffService {
             }
         }
 
-        let transcriptFileURL: URL
+        // Old handoffs go first: what is written next must not be pruned.
+        AgentHandoffPayload.pruneFiles(in: handoffDirectoryURL)
+        let files: AgentHandoffPayload.Files
         do {
-            transcriptFileURL = try writeHandoffFile(for: request.transcript)
+            files = try AgentHandoffPayload.writeFiles(for: request, in: handoffDirectoryURL)
         } catch {
             return failure("The transcript could not be written for the agent: \(error.localizedDescription)")
         }
 
-        let manifest = Self.manifest(
-            for: request,
-            executableURL: executableURL,
-            transcriptFileURL: transcriptFileURL
-        )
+        let manifest = AgentHandoffPayload.manifest(for: request, executableURL: executableURL, files: files)
         let report: LatchCreateReport
         do {
-            report = try await LatchCommand.create(manifest: manifest, latchURL: latchURL)
+            report = try await LatchCommand.create(
+                manifest: manifest,
+                latchURL: latchURL,
+                requestID: supportsRequestID ? request.operationID : nil
+            )
+        } catch let error as LatchCommandError {
+            return failure("Latch could not start \(request.agent.displayName): \(Self.describe(error))", definite: error.startedNothing)
         } catch {
             return failure("Latch could not start \(request.agent.displayName): \(Self.describe(error))")
         }
 
-        await Self.bringLatchForward(sessionID: report.session.id, latchURL: latchURL)
+        // A send nobody is watching never takes the screen; its notification
+        // offers to open the session instead.
+        if request.delivery == .manual {
+            await Self.bringLatchForward(sessionID: report.session.id, latchURL: latchURL)
+        }
         return TranscriptAgentOutcome(
             sessionName: report.session.name,
+            sessionID: report.session.id,
             agentName: request.agent.displayName,
             folderName: request.folder?.displayName
         )
+    }
+
+    /// Puts a session that already exists in front of the person again.
+    func openSession(id: String) async -> String? {
+        let tools = await toolLocator.locate()
+        guard let latchURL = tools.latchURL else { return Self.latchMissingMessage }
+        await Self.bringLatchForward(sessionID: id, latchURL: latchURL)
+        return nil
     }
 
     // MARK: - Folders
@@ -140,124 +173,6 @@ final class AgentHandoffService {
     }
 
     private static let latchMissingMessage = "Latch was not found on this Mac. Install the `latch` command line tool, then open this sheet again."
-
-    // MARK: - The transcript the agent reads
-
-    /// Writes the document the agent is pointed at: the same Knowledgebase
-    /// export the window saves and copies, byte for byte, so what an agent
-    /// files in the Knowledgebase is what Scribe itself would have uploaded.
-    /// Handing over a file rather than a very long command keeps the
-    /// transcript out of every process listing on the machine, and lets the
-    /// agent re-read it as it works.
-    private func writeHandoffFile(for transcript: CanonicalTranscript) throws -> URL {
-        try FileManager.default.createDirectory(at: handoffDirectoryURL, withIntermediateDirectories: true)
-        let document = try TranscriptExporter.export(transcript, as: .knowledgebase)
-        let name = FileTranscriptExportWriter.basename(for: transcript)
-        let stamp = Self.fileStampFormatter.string(from: Date())
-        let destination = handoffDirectoryURL
-            .appendingPathComponent("\(Self.fileSafe(name))-\(stamp)")
-            .appendingPathExtension(TranscriptExportFormat.knowledgebase.fileExtension)
-        try document.write(to: destination, options: .atomic)
-        return destination
-    }
-
-    /// Keeps a transcript's name usable as one path component without changing
-    /// what it says: separators and dots out, everything else left alone.
-    private static func fileSafe(_ name: String) -> String {
-        let cleaned = name.map { character -> Character in
-            character == "/" || character == ":" || character == "." ? "-" : character
-        }
-        let trimmed = String(cleaned).trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? "transcript" : String(trimmed.prefix(60))
-    }
-
-    private static let fileStampFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyyMMdd-HHmmss"
-        return formatter
-    }()
-
-    // MARK: - The manifest
-
-    /// Builds the launch manifest for one send.
-    ///
-    /// `argv` is the resolved agent binary, the options naming the model and
-    /// effort, and the prompt, which every agent Scribe offers accepts as a
-    /// positional argument that starts an interactive session. The absolute
-    /// path matters: the session inherits
-    /// whatever environment Latch runs with, and an agent installed under a
-    /// version manager is not reliably on that `PATH`.
-    ///
-    /// Without a folder the session opens where the transcript was written: a
-    /// place that is Scribe's own, where the agent can read the file and has
-    /// no repository to wander into.
-    static func manifest(
-        for request: TranscriptAgentRequest,
-        executableURL: URL,
-        transcriptFileURL: URL
-    ) -> LatchLaunchManifest {
-        let workingDirectory = request.folder?.url.standardizedFileURL
-            ?? transcriptFileURL.deletingLastPathComponent().standardizedFileURL
-        let prompt = prompt(for: request, transcriptFileURL: transcriptFileURL)
-        let title = request.transcript.title ?? request.transcript.source.filename
-        return LatchLaunchManifest(
-            launch: .init(
-                argv: [executableURL.path] + runOptions(for: request) + [prompt],
-                cwd: workingDirectory.path,
-                // The transcript's location, so a person or the agent can reach
-                // the file again from the session's own shell.
-                env: ["SCRIBE_TRANSCRIPT_FILE": transcriptFileURL.path]
-            ),
-            display: .init(
-                name: "scribe-\(fileSafe(title).lowercased().replacingOccurrences(of: " ", with: "-"))",
-                title: title,
-                commandLabel: request.agent.commandLabel,
-                source: .init(kind: "scribe", externalRunID: request.transcript.transcriptID)
-            )
-        )
-    }
-
-    /// The person's instruction, then only what they could not have written
-    /// themselves: where the transcript is, the MCP server they named, and
-    /// whether a report belongs on disk. A report is saved only into a folder
-    /// the person chose; otherwise the agent answers in its session.
-    static func prompt(for request: TranscriptAgentRequest, transcriptFileURL: URL) -> String {
-        var paragraphs = [
-            request.instruction,
-            "The transcript is at \(transcriptFileURL.path). Read that file first: it is Scribe's Knowledgebase transcript export (\(KnowledgebaseTranscriptExporter.schema) JSON), with the speakers, timestamps, and every segment.",
-        ]
-        if let mcpURL = request.mcpURL {
-            paragraphs.append("Related information can be found at this MCP URL: \(mcpURL)")
-        }
-        if let folder = request.folder {
-            paragraphs.append("Save your report as a Markdown file in \(folder.url.standardizedFileURL.path), the folder this session opened in.")
-        } else {
-            paragraphs.append("Print your summary here in this session. Do not save it to a file unless the instruction above asks for one.")
-        }
-        return paragraphs.joined(separator: "\n\n")
-    }
-
-    /// How each agent's command line names a model and an effort, as each
-    /// documents it: `claude --model … --effort …`, `codex -m … -c
-    /// model_reasoning_effort="…"` (a TOML value, hence the quotes),
-    /// `gemini -m …`, `cursor-agent --model …`. The last two take no effort.
-    static func runOptions(for request: TranscriptAgentRequest) -> [String] {
-        var options: [String] = []
-        switch request.agent.id {
-        case "claude":
-            if let model = request.model { options += ["--model", model] }
-            if let effort = request.effort { options += ["--effort", effort.rawValue] }
-        case "codex":
-            if let model = request.model { options += ["-m", model] }
-            if let effort = request.effort { options += ["-c", "model_reasoning_effort=\"\(effort.rawValue)\""] }
-        case "gemini":
-            if let model = request.model { options += ["-m", model] }
-        default:
-            if let model = request.model { options += ["--model", model] }
-        }
-        return options
-    }
 
     // MARK: - Showing the session
 
@@ -286,6 +201,12 @@ final class AgentHandoffService {
 enum LatchCommandError: LocalizedError {
     case failed(command: String, status: Int32, message: String)
     case unreadableReport(String)
+    /// `latch create --request-id` refused or failed and said why: nothing
+    /// was started.
+    case createRefused(code: String, message: String)
+    /// `latch` did not finish normally (killed, or it exited without saying
+    /// what happened), so whether it started a session is unknown.
+    case outcomeUnknown(String)
 
     var errorDescription: String? {
         switch self {
@@ -294,6 +215,27 @@ enum LatchCommandError: LocalizedError {
             return detail.isEmpty ? "`\(command)` exited with status \(status)." : detail
         case .unreadableReport(let detail):
             return "Latch reported something Scribe could not read: \(detail)"
+        case let .createRefused(code, message):
+            switch code {
+            case "request_id_conflict":
+                return "Latch already has a different send under this ID, so nothing was started. (\(message))"
+            case "request_id_session_removed":
+                return "Latch already started this send, but that session has since been removed."
+            default:
+                return message
+            }
+        case .outcomeUnknown(let detail):
+            return detail
+        }
+    }
+
+    /// True when Latch certainly started nothing. An unreadable report or
+    /// an interrupted `latch` may hide a session that did start.
+    var startedNothing: Bool {
+        switch self {
+        case .createRefused: true
+        case .failed: true
+        case .unreadableReport, .outcomeUnknown: false
         }
     }
 }
@@ -301,14 +243,55 @@ enum LatchCommandError: LocalizedError {
 /// The two Latch commands Scribe uses, run as documented: the manifest goes in
 /// over standard input, and the JSON report comes back out.
 enum LatchCommand {
-    static func create(manifest: LatchLaunchManifest, latchURL: URL) async throws -> LatchCreateReport {
+    /// `latch create`. With a request ID (an operation ID), Latch starts at
+    /// most one session for it: a repeat returns the first session. A
+    /// refusal is reported on standard output as a JSON error with a code;
+    /// anything Scribe cannot read after a request ID was sent is an unknown
+    /// outcome, never "nothing started".
+    static func create(manifest: LatchLaunchManifest, latchURL: URL, requestID: UUID? = nil) async throws -> LatchCreateReport {
         let payload = try manifest.encoded()
-        let output = try await run(latchURL, arguments: ["create", "--manifest-file", "-", "--json"], standardInput: payload)
-        do {
-            return try LatchCreateReport.decode(output)
-        } catch {
-            throw LatchCommandError.unreadableReport(error.localizedDescription)
+        var arguments = ["create", "--manifest-file", "-", "--json"]
+        if let requestID { arguments += ["--request-id", requestID.uuidString.lowercased()] }
+        let result = try await execute(latchURL, arguments: arguments, standardInput: payload)
+        if result.exitedNormally, result.status == 0 {
+            do {
+                return try LatchCreateReport.decode(result.output)
+            } catch {
+                throw LatchCommandError.unreadableReport(error.localizedDescription)
+            }
         }
+        guard requestID != nil else {
+            throw LatchCommandError.failed(command: "latch create", status: result.status, message: result.errorText)
+        }
+        if result.exitedNormally, let refusal = try? LatchCreateErrorReport.decode(result.output) {
+            throw LatchCommandError.createRefused(code: refusal.error.code, message: refusal.error.message)
+        }
+        throw LatchCommandError.outcomeUnknown(
+            result.exitedNormally
+                ? (result.errorText.isEmpty ? "`latch create` exited with status \(result.status) without saying whether it started the session." : result.errorText)
+                : "`latch create` was stopped before it said whether it started the session."
+        )
+    }
+
+    /// Whether this `latch` takes `--request-id` on `create`
+    /// (`create-request-id` in `latch capabilities --json`). Asked once per
+    /// executable; an older Latch is asked again next time, in case it was
+    /// updated meanwhile.
+    static func supportsRequestID(latchURL: URL) async -> Bool {
+        if await RequestIDSupport.shared.isKnownSupported(latchURL) { return true }
+        guard let result = try? await execute(latchURL, arguments: ["capabilities", "--json"], standardInput: nil),
+              result.exitedNormally, result.status == 0,
+              let capabilities = try? LatchCapabilitiesReport.decode(result.output) else { return false }
+        let supported = capabilities.capabilities.extensions.contains(LatchCapabilitiesReport.createRequestIDExtension)
+        if supported { await RequestIDSupport.shared.markSupported(latchURL) }
+        return supported
+    }
+
+    private actor RequestIDSupport {
+        static let shared = RequestIDSupport()
+        private var supported: Set<URL> = []
+        func isKnownSupported(_ url: URL) -> Bool { supported.contains(url) }
+        func markSupported(_ url: URL) { supported.insert(url) }
     }
 
     static func openViewer(sessionID: String, latchURL: URL) async throws {
@@ -325,6 +308,30 @@ enum LatchCommand {
     /// Standard error is kept for the failure message: `latch` explains a
     /// rejected manifest there, and that explanation is the useful half.
     private static func run(_ executableURL: URL, arguments: [String], standardInput: Data?) async throws -> Data {
+        let result = try await execute(executableURL, arguments: arguments, standardInput: standardInput)
+        guard result.exitedNormally, result.status == 0 else {
+            throw LatchCommandError.failed(
+                command: "latch " + arguments.joined(separator: " "),
+                status: result.status,
+                message: result.errorText
+            )
+        }
+        return result.output
+    }
+
+    struct Result: Sendable {
+        let status: Int32
+        /// False when the process was killed by a signal.
+        let exitedNormally: Bool
+        let output: Data
+        let errorOutput: Data
+
+        var errorText: String {
+            String(decoding: errorOutput, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+    }
+
+    private static func execute(_ executableURL: URL, arguments: [String], standardInput: Data?) async throws -> Result {
         try await Task.detached(priority: .userInitiated) {
             let process = Process()
             process.executableURL = executableURL
@@ -349,15 +356,12 @@ enum LatchCommand {
             let output = outputPipe.fileHandleForReading.readDataToEndOfFile()
             let errorOutput = errorPipe.fileHandleForReading.readDataToEndOfFile()
             process.waitUntilExit()
-
-            guard process.terminationStatus == 0 else {
-                throw LatchCommandError.failed(
-                    command: "latch " + arguments.joined(separator: " "),
-                    status: process.terminationStatus,
-                    message: String(decoding: errorOutput, as: UTF8.self)
-                )
-            }
-            return output
+            return Result(
+                status: process.terminationStatus,
+                exitedNormally: process.terminationReason == .exit,
+                output: output,
+                errorOutput: errorOutput
+            )
         }.value
     }
 }
@@ -504,6 +508,11 @@ struct LatchTranscriptAgentDispatcher: TranscriptAgentDispatching {
             )
         }
         return await service.send(request)
+    }
+
+    func openSession(id: String) async -> String? {
+        guard let service = await resolve() else { return Self.goneReason }
+        return await service.openSession(id: id)
     }
 
     private func resolve() async -> AgentHandoffService? {

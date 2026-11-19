@@ -26,6 +26,13 @@ public final class LiveRecordingCoordinator: RecordingCoordinating {
     /// launch scan is asynchronous, so it is always assigned before the result
     /// arrives.
     public var recoveryReporter: RecoveryReporter?
+    /// Told about each session's capture lifecycle — started, paused or
+    /// resumed, stopped with its reason, or failed while finishing — so the
+    /// app can keep a meeting draft per session. Set after construction.
+    public var lifecycleHandler: (@MainActor (RecordingLifecycleEvent) -> Void)?
+    /// The session capture is running or finishing, until its stop is
+    /// committed. A failure while stopping is reported against it.
+    private var capturingSessionID: UUID?
 
     private let permissions: any RecordingPermissionProviding
     private let sourceProvider: any CaptureSourceProviding
@@ -231,8 +238,32 @@ public final class LiveRecordingCoordinator: RecordingCoordinating {
 
     private func receive(_ event: RecordingCoordinatorEvent) {
         switch event {
+        case .captureStarted(let started):
+            capturingSessionID = started.activity.sessionID
+            lifecycleHandler?(.captureStarted(
+                sessionID: started.activity.sessionID,
+                startedAt: started.activity.startedAt,
+                title: started.activity.title,
+                sessionDirectory: started.sessionDirectory
+            ))
         case .stateChanged(let state):
+            let previous = snapshot.state
             snapshot.state = Self.menuState(from: state)
+            switch state {
+            case .paused(let activity) where !previous.isPaused:
+                lifecycleHandler?(.pauseChanged(sessionID: activity.sessionID, isPaused: true))
+            case .recording(let activity) where previous.isPaused:
+                lifecycleHandler?(.pauseChanged(sessionID: activity.sessionID, isPaused: false))
+            case .error(let failure):
+                // Finishing the session failed after capture had run: the
+                // stop and final-ready events will never come for it.
+                if let sessionID = capturingSessionID {
+                    capturingSessionID = nil
+                    lifecycleHandler?(.captureFailed(sessionID: sessionID, message: failure.message))
+                }
+            default:
+                break
+            }
             if case .idle = state { permissionMonitor?.stopMonitoring() }
             let captureIsActive: Bool
             switch state {
@@ -242,8 +273,14 @@ public final class LiveRecordingCoordinator: RecordingCoordinating {
             if let captureActivityHandler {
                 Task { await captureActivityHandler(captureIsActive) }
             }
-        case .recordingStopped:
-            break // The next event makes processing visible without blocking capture.
+        case .recordingStopped(let stopped):
+            // The next event makes processing visible without blocking capture.
+            if capturingSessionID == stopped.sessionID { capturingSessionID = nil }
+            lifecycleHandler?(.captureStopped(
+                sessionID: stopped.sessionID,
+                sessionDirectory: stopped.sessionDirectory,
+                reason: stopped.reason
+            ))
         case .finalRecordingReady(let ready):
             noteBackgroundJob(id: ready.processingJob.id, title: "Processing recording")
             if let processingSubmission {
@@ -309,4 +346,15 @@ public final class LiveRecordingCoordinator: RecordingCoordinating {
             }
         })
     }
+}
+
+/// A session's capture lifecycle, as the app composition root sees it.
+public enum RecordingLifecycleEvent: Sendable, Equatable {
+    /// Capture is active. Sent once per session, not on resume.
+    case captureStarted(sessionID: UUID, startedAt: Date, title: String?, sessionDirectory: URL)
+    case pauseChanged(sessionID: UUID, isPaused: Bool)
+    /// Raw capture is committed, with the reason it ended.
+    case captureStopped(sessionID: UUID, sessionDirectory: URL, reason: RecordingStopReason)
+    /// The session could not be finished after capture had started.
+    case captureFailed(sessionID: UUID, message: String)
 }

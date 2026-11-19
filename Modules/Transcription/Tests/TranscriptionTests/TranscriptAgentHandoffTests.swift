@@ -2,198 +2,207 @@ import Foundation
 import XCTest
 @testable import Transcription
 
+/// The handoff tray's behaviour through the view model: every call names the
+/// tray it is for, so these tests drive a row with no draft (an import or a
+/// pasted transcript) and meetings with drafts side by side.
 @MainActor
 final class TranscriptAgentHandoffTests: XCTestCase {
     func testWithoutAHostDispatcherTheActionIsNotOffered() async throws {
-        let viewModel = TranscriptViewModel(files: [try reviewFile()], playback: AgentPlaybackStub())
+        let file = try reviewFile()
+        let viewModel = TranscriptViewModel(files: [file], playback: AgentPlaybackStub())
+        let target = viewModel.handoffTarget(for: file)
 
         XCTAssertFalse(viewModel.canSendToAgent)
-        await viewModel.loadAgentEnvironment()
+        await viewModel.loadAgentEnvironment(for: target)
         XCTAssertNil(viewModel.agentEnvironment)
         // A keyboard route could still reach the model; it must be inert.
-        let sent = await viewModel.sendToAgent()
+        let sent = await viewModel.sendToAgent(target)
         XCTAssertFalse(sent)
-        XCTAssertNil(viewModel.agentMessage)
+        XCTAssertNil(viewModel.handoffStatus(for: target))
     }
 
-    func testLoadingTakesTheFirstAgentAndTheFirstFolderThatIsStillThere() async throws {
-        let dispatcher = AgentDispatcherSpy()
-        dispatcher.environment = TranscriptAgentEnvironment(
-            agents: [Self.claude, Self.codex],
-            folders: [Self.missingFolder, Self.repository]
-        )
-        let viewModel = try makeViewModel(dispatcher)
+    // MARK: - Imports and pasted transcripts: no notes, immediate send
 
-        XCTAssertTrue(viewModel.canSendToAgent)
-        await viewModel.loadAgentEnvironment()
-
-        XCTAssertEqual(viewModel.selectedAgentID, Self.claude.id)
-        // The first folder is gone, so the selection lands on the one that
-        // can actually be sent to rather than on a dead-end choice.
-        XCTAssertEqual(viewModel.selectedAgentFolderID, Self.repository.id)
-        XCTAssertNil(viewModel.agentHandoffProblem)
-        XCTAssertTrue(viewModel.canSubmitAgentHandoff)
-    }
-
-    func testASelectionThatNoLongerExistsIsMovedOntoSomethingThatDoes() async throws {
-        let dispatcher = AgentDispatcherSpy()
-        dispatcher.environment = TranscriptAgentEnvironment(agents: [Self.claude, Self.codex], folders: [Self.repository])
-        let viewModel = try makeViewModel(dispatcher)
-        await viewModel.loadAgentEnvironment()
-        viewModel.selectedAgentID = Self.codex.id
-
-        dispatcher.environment = TranscriptAgentEnvironment(agents: [Self.claude], folders: [Self.repository])
-        await viewModel.loadAgentEnvironment()
-
-        XCTAssertEqual(viewModel.selectedAgentID, Self.claude.id)
-    }
-
-    func testConnectingAFolderSelectsTheOneThatWasJustConnected() async throws {
-        let dispatcher = AgentDispatcherSpy()
-        dispatcher.environment = TranscriptAgentEnvironment(agents: [Self.claude], folders: [Self.repository])
-        let viewModel = try makeViewModel(dispatcher)
-        await viewModel.loadAgentEnvironment()
-        XCTAssertEqual(viewModel.selectedAgentFolderID, Self.repository.id)
-
-        dispatcher.environment = TranscriptAgentEnvironment(agents: [Self.claude], folders: [Self.notes, Self.repository])
-        await viewModel.connectAgentFolder()
-
-        XCTAssertEqual(viewModel.selectedAgentFolderID, Self.notes.id)
-    }
-
-    func testSendingCarriesTheChosenAgentFolderAndInstruction() async throws {
+    func testARowWithNoDraftHasNoNotesAndSendsImmediately() async throws {
         let dispatcher = AgentDispatcherSpy()
         dispatcher.environment = TranscriptAgentEnvironment(agents: [Self.claude, Self.codex], folders: [Self.repository, Self.notes])
-        let viewModel = try makeViewModel(dispatcher)
-        await viewModel.loadAgentEnvironment()
-        viewModel.selectedAgentID = Self.codex.id
-        viewModel.selectAgentFolder(id: Self.notes.id)
-        viewModel.agentInstruction = "  Turn the action items into issues.  "
+        let (viewModel, target) = try makeViewModel(dispatcher)
+        XCTAssertEqual(target, .transcript(viewModel.files[0].id))
+        XCTAssertNil(viewModel.handoffNotes(for: target), "imports and pasted transcripts get no notes area")
 
-        let sent = await viewModel.sendToAgent()
+        await viewModel.loadAgentEnvironment(for: target)
+        viewModel.selectHandoffAgent(Self.codex.id, for: target)
+        viewModel.selectHandoffFolder(.folder(Self.notes.id), for: target)
+        viewModel.setHandoffPrompt("  Turn the action items into issues.  ", for: target)
+
+        let sent = await viewModel.sendToAgent(target)
 
         XCTAssertTrue(sent)
         let request = try XCTUnwrap(dispatcher.requests.first)
         XCTAssertEqual(request.agent.id, Self.codex.id)
         XCTAssertEqual(request.folder?.id, Self.notes.id)
         XCTAssertEqual(request.instruction, "Turn the action items into issues.")
+        XCTAssertEqual(request.notes, [])
         XCTAssertEqual(request.transcript.transcriptID, try fixture(named: "two-speakers").transcriptID)
-        XCTAssertEqual(viewModel.agentMessage?.isFailure, false)
-        XCTAssertEqual(
-            viewModel.agentMessage?.text,
-            "Sent to Codex in Notes as \u{201C}scribe-review\u{201D}. Open Latch to watch it work."
-        )
+        guard case .sent(let outcome)? = viewModel.handoffStatus(for: target) else {
+            return XCTFail("the tray shows Sent")
+        }
+        XCTAssertEqual(outcome.sentDescription, "Sent to Codex in Notes")
+        XCTAssertEqual(outcome.sessionID, "session-1")
     }
 
-    func testAnEmptyInstructionBecomesTheDefaultRatherThanNothingToDo() async throws {
+    func testLoadingTakesTheLastAgentElseTheFirstAndTheFirstFolderThatIsStillThere() async throws {
+        let dispatcher = AgentDispatcherSpy()
+        dispatcher.environment = TranscriptAgentEnvironment(agents: [Self.claude, Self.codex], folders: [Self.missingFolder, Self.repository])
+        let (viewModel, target) = try makeViewModel(dispatcher)
+
+        XCTAssertTrue(viewModel.canSendToAgent)
+        await viewModel.loadAgentEnvironment(for: target)
+
+        XCTAssertEqual(viewModel.handoffAgent(for: target)?.id, Self.claude.id)
+        // Unset resolves to the first folder that can actually be sent to.
+        XCTAssertEqual(viewModel.handoffSettings(for: target).folder, .unset)
+        XCTAssertEqual(viewModel.handoffFolder(for: target)?.id, Self.repository.id)
+        XCTAssertNil(viewModel.handoffProblem(for: target))
+        XCTAssertTrue(viewModel.canSubmitHandoff(target))
+
+        preferences.recordSend(agentID: Self.codex.id, model: "gpt-5.5", effort: .high)
+        let (later, laterTarget) = try makeViewModel(dispatcher)
+        await later.loadAgentEnvironment(for: laterTarget)
+        XCTAssertEqual(later.handoffAgent(for: laterTarget)?.id, Self.codex.id)
+        XCTAssertEqual(later.handoffSettings(for: laterTarget).model, "gpt-5.5")
+        XCTAssertEqual(later.handoffEffort(for: laterTarget), .high)
+    }
+
+    func testAnAgentThatIsGoneIsNamedRatherThanSilentlyReplaced() async throws {
+        let dispatcher = AgentDispatcherSpy()
+        dispatcher.environment = TranscriptAgentEnvironment(agents: [Self.claude, Self.codex], folders: [Self.repository])
+        let (viewModel, target) = try makeViewModel(dispatcher)
+        await viewModel.loadAgentEnvironment(for: target)
+        viewModel.selectHandoffAgent(Self.codex.id, for: target)
+
+        dispatcher.environment = TranscriptAgentEnvironment(agents: [Self.claude], folders: [Self.repository])
+        await viewModel.loadAgentEnvironment(for: target)
+
+        XCTAssertNil(viewModel.handoffAgent(for: target))
+        XCTAssertEqual(viewModel.handoffProblem(for: target), "codex is not installed on this Mac. Choose another agent.")
+        XCTAssertFalse(viewModel.canSubmitHandoff(target))
+        viewModel.selectHandoffAgent(Self.claude.id, for: target)
+        XCTAssertNil(viewModel.handoffProblem(for: target))
+    }
+
+    // MARK: - Folder: unset, No folder, a folder
+
+    func testConnectingAFolderPointsThisTrayAtIt() async throws {
         let dispatcher = AgentDispatcherSpy()
         dispatcher.environment = TranscriptAgentEnvironment(agents: [Self.claude], folders: [Self.repository])
-        let viewModel = try makeViewModel(dispatcher)
-        await viewModel.loadAgentEnvironment()
-        viewModel.agentInstruction = "   \n "
+        let (viewModel, target) = try makeViewModel(dispatcher)
+        await viewModel.loadAgentEnvironment(for: target)
+        XCTAssertEqual(viewModel.handoffFolder(for: target)?.id, Self.repository.id)
 
-        _ = await viewModel.sendToAgent()
+        dispatcher.environment = TranscriptAgentEnvironment(agents: [Self.claude], folders: [Self.notes, Self.repository])
+        await viewModel.connectAgentFolder(for: target)
 
-        XCTAssertEqual(dispatcher.requests.first?.instruction, TranscriptAgentRequest.defaultInstruction)
+        XCTAssertEqual(viewModel.handoffSettings(for: target).folder, .folder(Self.notes.id))
+        XCTAssertEqual(viewModel.handoffFolder(for: target)?.id, Self.notes.id)
     }
 
-    func testARefusalKeepsTheReasonAndReportsThatNothingWasSent() async throws {
+    func testNoFolderIsAChoiceThatSurvivesARefreshAndIsSentWithoutOne() async throws {
         let dispatcher = AgentDispatcherSpy()
         dispatcher.environment = TranscriptAgentEnvironment(agents: [Self.claude], folders: [Self.repository])
-        dispatcher.outcome = TranscriptAgentOutcome(
-            sessionName: nil,
-            agentName: "Claude Code",
-            folderName: "Scribe",
-            errorMessage: "Latch could not start Claude Code: the manifest was rejected."
-        )
-        let viewModel = try makeViewModel(dispatcher)
-        await viewModel.loadAgentEnvironment()
+        let (viewModel, target) = try makeViewModel(dispatcher)
+        await viewModel.loadAgentEnvironment(for: target)
 
-        let sent = await viewModel.sendToAgent()
+        viewModel.selectHandoffFolder(.none, for: target)
+        await viewModel.loadAgentEnvironment(for: target)
 
-        XCTAssertFalse(sent)
-        XCTAssertEqual(viewModel.agentMessage?.isFailure, true)
-        XCTAssertEqual(viewModel.agentMessage?.text, "Latch could not start Claude Code: the manifest was rejected.")
-        viewModel.dismissAgentMessage()
-        XCTAssertNil(viewModel.agentMessage)
+        XCTAssertEqual(viewModel.handoffSettings(for: target).folder, MeetingHandoffFolder.none)
+        XCTAssertNil(viewModel.handoffFolder(for: target))
+        XCTAssertNil(viewModel.handoffProblem(for: target))
+        _ = await viewModel.sendToAgent(target)
+        XCTAssertNil(try XCTUnwrap(dispatcher.requests.first).folder)
     }
 
-    func testTheHostsUnavailableReasonIsWhatTheSheetExplains() async throws {
-        let dispatcher = AgentDispatcherSpy()
-        dispatcher.environment = TranscriptAgentEnvironment(unavailableReason: "Latch was not found on this Mac.")
-        let viewModel = try makeViewModel(dispatcher)
-        await viewModel.loadAgentEnvironment()
-
-        XCTAssertEqual(viewModel.agentHandoffProblem, "Latch was not found on this Mac.")
-        XCTAssertFalse(viewModel.canSubmitAgentHandoff)
-        let sent = await viewModel.sendToAgent()
-        XCTAssertFalse(sent)
-        XCTAssertTrue(dispatcher.requests.isEmpty)
-    }
-
-    func testTheInstructionStartsAsTheEditableDefault() async throws {
-        let viewModel = try makeViewModel(AgentDispatcherSpy())
-
-        XCTAssertEqual(viewModel.agentInstruction, TranscriptAgentRequest.defaultInstruction)
-        XCTAssertEqual(
-            TranscriptAgentRequest.defaultInstruction,
-            "Review this transcript and create meeting notes in the Tough Leaf workspace in the Knowledgebase."
-        )
-    }
-
-    func testWithNoFolderConnectedTheAgentIsSentWithoutOne() async throws {
+    func testWithNoFolderConnectedUnsetSendsWithoutOne() async throws {
         let dispatcher = AgentDispatcherSpy()
         dispatcher.environment = TranscriptAgentEnvironment(agents: [Self.claude], folders: [])
-        let viewModel = try makeViewModel(dispatcher)
-        await viewModel.loadAgentEnvironment()
+        let (viewModel, target) = try makeViewModel(dispatcher)
+        await viewModel.loadAgentEnvironment(for: target)
 
-        XCTAssertNil(viewModel.agentHandoffProblem)
-        let sent = await viewModel.sendToAgent()
+        XCTAssertEqual(viewModel.handoffDestinationSummary(for: target), "Claude Code \u{00B7} no folder")
+        let sent = await viewModel.sendToAgent(target)
 
         XCTAssertTrue(sent)
         XCTAssertNil(try XCTUnwrap(dispatcher.requests.first).folder)
-        XCTAssertEqual(
-            viewModel.agentMessage?.text,
-            "Sent to Claude Code as \u{201C}scribe-review\u{201D}. Open Latch to watch it work."
-        )
     }
 
-    func testChoosingNoFolderSurvivesARefresh() async throws {
+    func testAnExplicitFolderThatIsNoLongerConnectedIsReportedNotReplaced() async throws {
         let dispatcher = AgentDispatcherSpy()
+        dispatcher.environment = TranscriptAgentEnvironment(agents: [Self.claude], folders: [Self.repository, Self.notes])
+        let (viewModel, target) = try makeViewModel(dispatcher)
+        await viewModel.loadAgentEnvironment(for: target)
+        viewModel.selectHandoffFolder(.folder(Self.notes.id), for: target)
+
         dispatcher.environment = TranscriptAgentEnvironment(agents: [Self.claude], folders: [Self.repository])
-        let viewModel = try makeViewModel(dispatcher)
-        await viewModel.loadAgentEnvironment()
-        XCTAssertEqual(viewModel.selectedAgentFolderID, Self.repository.id)
+        await viewModel.loadAgentEnvironment(for: target)
 
-        viewModel.selectAgentFolder(id: nil)
-        await viewModel.loadAgentEnvironment()
-
-        XCTAssertNil(viewModel.selectedAgentFolderID)
-        XCTAssertNil(viewModel.agentHandoffProblem)
+        XCTAssertTrue(viewModel.handoffFolderIsMissing(for: target))
+        XCTAssertNil(viewModel.handoffFolder(for: target))
+        XCTAssertEqual(viewModel.handoffProblem(for: target), "The folder chosen for this is no longer connected. Choose a folder, or No Folder.")
+        XCTAssertTrue(viewModel.handoffDestinationSummary(for: target).hasSuffix("folder missing"))
     }
 
-    func testSendingCarriesTheModelEffortAndMCPURL() async throws {
+    func testDisconnectingThisTraysFolderReturnsItToTheDefault() async throws {
+        let dispatcher = AgentDispatcherSpy()
+        dispatcher.environment = TranscriptAgentEnvironment(agents: [Self.claude], folders: [Self.repository, Self.notes])
+        let (viewModel, target) = try makeViewModel(dispatcher)
+        await viewModel.loadAgentEnvironment(for: target)
+        viewModel.selectHandoffFolder(.folder(Self.notes.id), for: target)
+
+        dispatcher.environment = TranscriptAgentEnvironment(agents: [Self.claude], folders: [Self.repository])
+        await viewModel.disconnectAgentFolder(id: Self.notes.id, for: target)
+
+        XCTAssertEqual(viewModel.handoffSettings(for: target).folder, .unset)
+        XCTAssertEqual(viewModel.handoffFolder(for: target)?.id, Self.repository.id)
+        XCTAssertEqual(dispatcher.disconnected, [Self.notes.id])
+    }
+
+    func testAFolderThatHasMovedIsNamedRatherThanSilentlyUsed() async throws {
+        let dispatcher = AgentDispatcherSpy()
+        dispatcher.environment = TranscriptAgentEnvironment(agents: [Self.claude], folders: [Self.missingFolder])
+        let (viewModel, target) = try makeViewModel(dispatcher)
+        await viewModel.loadAgentEnvironment(for: target)
+
+        XCTAssertEqual(viewModel.handoffFolder(for: target)?.id, Self.missingFolder.id)
+        XCTAssertEqual(viewModel.handoffProblem(for: target), "Gone is no longer where it was. Connect it again.")
+        XCTAssertFalse(viewModel.canSubmitHandoff(target))
+    }
+
+    // MARK: - Model and effort
+
+    func testSendingCarriesTheModelEffortAndMCPURLAndAnAgentWithoutEffortNeverGetsOne() async throws {
         let dispatcher = AgentDispatcherSpy()
         dispatcher.environment = TranscriptAgentEnvironment(agents: [Self.claude, Self.gemini], folders: [])
-        let viewModel = try makeViewModel(dispatcher)
-        await viewModel.loadAgentEnvironment()
-        viewModel.agentModel = " opus "
-        viewModel.agentEffort = .xhigh
-        viewModel.agentMCPURL = " https://kb.example.com/mcp "
+        let (viewModel, target) = try makeViewModel(dispatcher)
+        await viewModel.loadAgentEnvironment(for: target)
+        viewModel.setHandoffModel(" opus ", for: target)
+        viewModel.setHandoffEffort(.xhigh, for: target)
+        viewModel.setHandoffMCPURL(" https://kb.example.com/mcp ", for: target)
 
-        _ = await viewModel.sendToAgent()
+        _ = await viewModel.sendToAgent(target)
 
         let request = try XCTUnwrap(dispatcher.requests.first)
         XCTAssertEqual(request.model, "opus")
         XCTAssertEqual(request.effort, .xhigh)
         XCTAssertEqual(request.mcpURL, "https://kb.example.com/mcp")
 
-        // An agent with no effort setting is never sent one, whatever the
-        // picker last held.
-        viewModel.selectedAgentID = Self.gemini.id
-        viewModel.agentEffort = .high
-        viewModel.agentModel = ""
-        _ = await viewModel.sendToAgent()
+        // Gemini takes no effort: the tray hides the pill and the request
+        // never carries one, whatever the settings last held.
+        viewModel.selectHandoffAgent(Self.gemini.id, for: target)
+        viewModel.updateHandoff(target) { $0.effort = TranscriptAgentEffort.high.rawValue }
+        XCTAssertNil(viewModel.handoffEffort(for: target))
+        XCTAssertFalse(viewModel.handoffDestinationSummary(for: target).contains("effort"))
+        _ = await viewModel.sendToAgent(target)
         let second = try XCTUnwrap(dispatcher.requests.last)
         XCTAssertNil(second.effort)
         XCTAssertNil(second.model)
@@ -202,43 +211,35 @@ final class TranscriptAgentHandoffTests: XCTestCase {
     func testAnMCPURLThatIsNotOneIsNamedBeforeSending() async throws {
         let dispatcher = AgentDispatcherSpy()
         dispatcher.environment = TranscriptAgentEnvironment(agents: [Self.claude], folders: [])
-        let viewModel = try makeViewModel(dispatcher)
-        await viewModel.loadAgentEnvironment()
-        viewModel.agentMCPURL = "knowledgebase"
+        let (viewModel, target) = try makeViewModel(dispatcher)
+        await viewModel.loadAgentEnvironment(for: target)
+        viewModel.setHandoffMCPURL("knowledgebase", for: target)
 
-        XCTAssertEqual(viewModel.agentHandoffProblem, "The MCP URL should start with http:// or https://.")
-        XCTAssertFalse(viewModel.canSubmitAgentHandoff)
+        XCTAssertEqual(viewModel.handoffProblem(for: target), "The MCP URL should start with http:// or https://.")
+        XCTAssertFalse(viewModel.canSubmitHandoff(target))
     }
 
-    func testEachAgentKeepsItsOwnModelHistoryAndStartsOnTheLastOneUsed() async throws {
+    func testModelAndEffortAreScopedPerAgent() async throws {
         let dispatcher = AgentDispatcherSpy()
         dispatcher.environment = TranscriptAgentEnvironment(agents: [Self.claude, Self.codex], folders: [])
-        let viewModel = try makeViewModel(dispatcher)
-        await viewModel.loadAgentEnvironment()
+        let (viewModel, target) = try makeViewModel(dispatcher)
+        await viewModel.loadAgentEnvironment(for: target)
 
         for model in ["opus", "sonnet", "opus"] {
-            viewModel.agentModel = model
-            viewModel.agentEffort = .high
-            _ = await viewModel.sendToAgent()
+            viewModel.setHandoffModel(model, for: target)
+            viewModel.setHandoffEffort(.high, for: target)
+            _ = await viewModel.sendToAgent(target)
         }
-        XCTAssertEqual(viewModel.agentModelHistory, ["opus", "sonnet"])
+        XCTAssertEqual(viewModel.handoffModelHistory(for: target), ["opus", "sonnet"])
 
-        viewModel.selectedAgentID = Self.codex.id
-        XCTAssertEqual(viewModel.agentModel, "")
-        XCTAssertNil(viewModel.agentEffort)
-        XCTAssertEqual(viewModel.agentModelHistory, [])
-        viewModel.agentModel = "gpt-5.5"
-        _ = await viewModel.sendToAgent()
+        viewModel.selectHandoffAgent(Self.codex.id, for: target)
+        XCTAssertEqual(viewModel.handoffSettings(for: target).model, "")
+        XCTAssertNil(viewModel.handoffEffort(for: target))
+        XCTAssertEqual(viewModel.handoffModelHistory(for: target), [])
 
-        // A later window starts on the agent, model, and effort last sent, and
-        // going back to the other agent brings its own choices with it.
-        let later = try makeViewModel(dispatcher)
-        await later.loadAgentEnvironment()
-        XCTAssertEqual(later.selectedAgentID, Self.codex.id)
-        XCTAssertEqual(later.agentModel, "gpt-5.5")
-        later.selectedAgentID = Self.claude.id
-        XCTAssertEqual(later.agentModel, "opus")
-        XCTAssertEqual(later.agentEffort, .high)
+        viewModel.selectHandoffAgent(Self.claude.id, for: target)
+        XCTAssertEqual(viewModel.handoffSettings(for: target).model, "opus")
+        XCTAssertEqual(viewModel.handoffEffort(for: target), .high)
     }
 
     func testTheModelHistoryKeepsTheTenMostRecentUniqueNames() {
@@ -257,64 +258,87 @@ final class TranscriptAgentHandoffTests: XCTestCase {
         XCTAssertEqual(preferences.lastModel(for: "claude"), "")
     }
 
-    func testAFolderThatHasMovedIsNamedRatherThanSilentlyUsed() async throws {
-        let dispatcher = AgentDispatcherSpy()
-        dispatcher.environment = TranscriptAgentEnvironment(agents: [Self.claude], folders: [Self.missingFolder])
-        let viewModel = try makeViewModel(dispatcher)
-        await viewModel.loadAgentEnvironment()
+    // MARK: - Prompt origin and folder swap
 
-        XCTAssertEqual(viewModel.selectedAgentFolderID, Self.missingFolder.id)
-        XCTAssertEqual(viewModel.agentHandoffProblem, "Gone is no longer where it was. Connect it again.")
-        XCTAssertFalse(viewModel.canSubmitAgentHandoff)
-    }
-
-    func testAFileWithNoTranscriptHasNothingToSend() async {
-        let dispatcher = AgentDispatcherSpy()
-        dispatcher.environment = TranscriptAgentEnvironment(agents: [Self.claude], folders: [Self.repository])
-        let queued = TranscriptReviewFile(
-            sourceSnapshotURL: URL(fileURLWithPath: "/tmp/scribe-agent-queued.flac"),
-            transcript: nil,
-            jobState: .queued
-        )
-        let viewModel = TranscriptViewModel(files: [queued], playback: AgentPlaybackStub(), agentDispatcher: dispatcher, agentPreferences: preferences)
-        await viewModel.loadAgentEnvironment()
-
-        XCTAssertEqual(viewModel.agentHandoffProblem, "This file has no completed transcript to send.")
-    }
-
-    func testASentInstructionJoinsTheHistoryOfItsFolderOnly() async throws {
+    func testAnUneditedPromptFollowsTheFolderAndAnEditedOneStays() async throws {
+        preferences.recordInstruction("File the bugs.", folderID: Self.repository.id)
         let dispatcher = AgentDispatcherSpy()
         dispatcher.environment = TranscriptAgentEnvironment(agents: [Self.claude], folders: [Self.repository, Self.notes])
-        let viewModel = try makeViewModel(dispatcher)
-        await viewModel.loadAgentEnvironment()
-        XCTAssertEqual(viewModel.agentInstructionHistory, [])
+        let (viewModel, target) = try makeViewModel(dispatcher)
+        XCTAssertEqual(viewModel.handoffSettings(for: target).prompt, TranscriptAgentRequest.defaultInstruction)
 
-        viewModel.agentInstruction = "  File the bugs.  "
-        _ = await viewModel.sendToAgent()
-        viewModel.agentInstruction = "Summarize decisions."
-        _ = await viewModel.sendToAgent()
-        // Sending the same words again moves them up rather than repeating them.
-        viewModel.agentInstruction = "File the bugs."
-        _ = await viewModel.sendToAgent()
+        // Unset resolves to Repository, whose last prompt takes over.
+        await viewModel.loadAgentEnvironment(for: target)
+        XCTAssertEqual(viewModel.handoffSettings(for: target).prompt, "File the bugs.")
+        XCTAssertEqual(viewModel.handoffSettings(for: target).promptOrigin, .folderHistory)
 
-        XCTAssertEqual(viewModel.agentInstructionHistory, ["File the bugs.", "Summarize decisions."])
-        viewModel.selectAgentFolder(id: Self.notes.id)
-        XCTAssertEqual(viewModel.agentInstructionHistory, [])
-        viewModel.selectAgentFolder(id: nil)
-        XCTAssertEqual(viewModel.agentInstructionHistory, [])
+        // A folder with no history brings the default back.
+        viewModel.selectHandoffFolder(.folder(Self.notes.id), for: target)
+        XCTAssertEqual(viewModel.handoffSettings(for: target).prompt, TranscriptAgentRequest.defaultInstruction)
+        XCTAssertEqual(viewModel.handoffSettings(for: target).promptOrigin, .default)
+
+        // Words the person typed are never swapped out.
+        viewModel.setHandoffPrompt("Summarise the decisions only.", for: target)
+        XCTAssertEqual(viewModel.handoffSettings(for: target).promptOrigin, .edited)
+        viewModel.selectHandoffFolder(.folder(Self.repository.id), for: target)
+        XCTAssertEqual(viewModel.handoffSettings(for: target).prompt, "Summarise the decisions only.")
+
+        // A prompt chosen from Recent is a choice too; resetting hands the
+        // prompt back to the folder.
+        viewModel.chooseRecentPrompt("File the bugs.", for: target)
+        viewModel.selectHandoffFolder(.none, for: target)
+        XCTAssertEqual(viewModel.handoffSettings(for: target).prompt, "File the bugs.")
+        viewModel.resetHandoffPrompt(for: target)
+        XCTAssertEqual(viewModel.handoffSettings(for: target).prompt, TranscriptAgentRequest.defaultInstruction)
+        XCTAssertNotEqual(viewModel.handoffSettings(for: target).promptOrigin, .edited)
     }
 
-    func testARefusedSendingIsNotRemembered() async throws {
+    func testAnEmptyPromptBecomesTheDefaultRatherThanNothingToDo() async throws {
         let dispatcher = AgentDispatcherSpy()
         dispatcher.environment = TranscriptAgentEnvironment(agents: [Self.claude], folders: [Self.repository])
-        dispatcher.outcome = TranscriptAgentOutcome(sessionName: nil, agentName: "Claude Code", folderName: "Scribe", errorMessage: "No.")
-        let viewModel = try makeViewModel(dispatcher)
-        await viewModel.loadAgentEnvironment()
-        viewModel.agentInstruction = "Never sent."
+        let (viewModel, target) = try makeViewModel(dispatcher)
+        await viewModel.loadAgentEnvironment(for: target)
+        viewModel.setHandoffPrompt("   \n ", for: target)
 
-        _ = await viewModel.sendToAgent()
+        _ = await viewModel.sendToAgent(target)
 
-        XCTAssertEqual(viewModel.agentInstructionHistory, [])
+        XCTAssertEqual(dispatcher.requests.first?.instruction, TranscriptAgentRequest.defaultInstruction)
+    }
+
+    // MARK: - History only after a confirmed send
+
+    func testHistoryIsWrittenOnlyAfterLatchConfirmsTheSend() async throws {
+        let dispatcher = AgentDispatcherSpy()
+        dispatcher.environment = TranscriptAgentEnvironment(agents: [Self.claude, Self.codex], folders: [Self.repository, Self.notes])
+        dispatcher.outcome = TranscriptAgentOutcome(sessionName: nil, agentName: "Codex", folderName: "Notes", errorMessage: "Latch could not start Codex: the manifest was rejected.")
+        let (viewModel, target) = try makeViewModel(dispatcher)
+        await viewModel.loadAgentEnvironment(for: target)
+        viewModel.selectHandoffAgent(Self.codex.id, for: target)
+        viewModel.setHandoffModel("gpt-5.5", for: target)
+        viewModel.setHandoffMCPURL("https://kb.example.com/mcp", for: target)
+        viewModel.setHandoffPrompt("Never sent.", for: target)
+
+        let refused = await viewModel.sendToAgent(target)
+
+        XCTAssertFalse(refused)
+        XCTAssertEqual(viewModel.handoffStatus(for: target), .failed("Latch could not start Codex: the manifest was rejected."))
+        XCTAssertNil(preferences.lastAgentID)
+        XCTAssertEqual(preferences.modelHistory(for: Self.codex.id), [])
+        XCTAssertEqual(preferences.mcpURL, "")
+        XCTAssertEqual(preferences.instructionHistory(forFolder: Self.repository.id), [])
+
+        // Try again, and this time Latch creates the session.
+        dispatcher.outcome = nil
+        let sent = await viewModel.sendToAgent(target)
+
+        XCTAssertTrue(sent)
+        XCTAssertEqual(preferences.lastAgentID, Self.codex.id)
+        XCTAssertEqual(preferences.modelHistory(for: Self.codex.id), ["gpt-5.5"])
+        XCTAssertEqual(preferences.mcpURL, "https://kb.example.com/mcp")
+        XCTAssertEqual(preferences.instructionHistory(forFolder: Self.repository.id), ["Never sent."])
+        XCTAssertEqual(preferences.instructionHistory(forFolder: Self.notes.id), [])
+        // Every press is its own operation.
+        XCTAssertEqual(Set(dispatcher.requests.map(\.operationID)).count, 2)
     }
 
     func testTheInstructionHistoryKeepsTheTenMostRecent() {
@@ -331,6 +355,58 @@ final class TranscriptAgentHandoffTests: XCTestCase {
         XCTAssertEqual(preferences.instructionHistory(forFolder: nil), ["Elsewhere"])
     }
 
+    // MARK: - Tray states
+
+    func testSentOffersOpenInLatchAndSendAgainMakesANewOperation() async throws {
+        let dispatcher = AgentDispatcherSpy()
+        dispatcher.environment = TranscriptAgentEnvironment(agents: [Self.claude], folders: [Self.repository])
+        let (viewModel, target) = try makeViewModel(dispatcher)
+        await viewModel.loadAgentEnvironment(for: target)
+
+        _ = await viewModel.sendToAgent(target)
+        await viewModel.openHandoffSession(for: target)
+        XCTAssertEqual(dispatcher.opened, ["session-1"])
+
+        _ = await viewModel.sendToAgent(target)
+        XCTAssertEqual(dispatcher.requests.count, 2)
+        XCTAssertNotEqual(dispatcher.requests[0].operationID, dispatcher.requests[1].operationID)
+    }
+
+    func testTheHostsUnavailableReasonIsWhatTheTrayExplains() async throws {
+        let dispatcher = AgentDispatcherSpy()
+        dispatcher.environment = TranscriptAgentEnvironment(unavailableReason: "Latch was not found on this Mac.")
+        let (viewModel, target) = try makeViewModel(dispatcher)
+        await viewModel.loadAgentEnvironment(for: target)
+
+        XCTAssertEqual(viewModel.handoffProblem(for: target), "Latch was not found on this Mac.")
+        XCTAssertFalse(viewModel.canSubmitHandoff(target))
+        let sent = await viewModel.sendToAgent(target)
+        XCTAssertFalse(sent)
+        XCTAssertTrue(dispatcher.requests.isEmpty)
+    }
+
+    func testAFileWithNoTranscriptHasNothingToSend() async {
+        let dispatcher = AgentDispatcherSpy()
+        dispatcher.environment = TranscriptAgentEnvironment(agents: [Self.claude], folders: [Self.repository])
+        let queued = TranscriptReviewFile(
+            sourceSnapshotURL: URL(fileURLWithPath: "/tmp/scribe-agent-queued.flac"),
+            transcript: nil,
+            jobState: .queued
+        )
+        let viewModel = TranscriptViewModel(files: [queued], playback: AgentPlaybackStub(), agentDispatcher: dispatcher, agentPreferences: preferences)
+        let target = viewModel.handoffTarget(for: queued)
+        await viewModel.loadAgentEnvironment(for: target)
+
+        XCTAssertEqual(viewModel.handoffProblem(for: target), "The transcript isn\u{2019}t ready yet.")
+    }
+
+    func testTheDefaultPromptIsUnchanged() {
+        XCTAssertEqual(
+            TranscriptAgentRequest.defaultInstruction,
+            "Review this transcript and create meeting notes in the Tough Leaf workspace in the Knowledgebase."
+        )
+    }
+
     func testAFolderPathIsShownWithTheHomeDirectoryAbbreviated() {
         let home = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL
         let inside = TranscriptAgentFolder(url: home.appendingPathComponent("Development/Scribe", isDirectory: true))
@@ -343,15 +419,15 @@ final class TranscriptAgentHandoffTests: XCTestCase {
 
     // MARK: - Fixtures
 
-    private static let claude = TranscriptAgent(id: "claude", displayName: "Claude Code", commandLabel: "claude", supportsEffort: true)
-    private static let codex = TranscriptAgent(id: "codex", displayName: "Codex", commandLabel: "codex", supportsEffort: true)
-    private static let gemini = TranscriptAgent(id: "gemini", displayName: "Gemini CLI", commandLabel: "gemini")
-    private static let repository = TranscriptAgentFolder(url: URL(fileURLWithPath: "/tmp/scribe-agent-repository"))
-    private static let notes = TranscriptAgentFolder(url: URL(fileURLWithPath: "/tmp/Notes"))
-    private static let missingFolder = TranscriptAgentFolder(url: URL(fileURLWithPath: "/tmp/Gone"), isReachable: false)
+    nonisolated static let claude = TranscriptAgent(id: "claude", displayName: "Claude Code", commandLabel: "claude", supportsEffort: true)
+    nonisolated static let codex = TranscriptAgent(id: "codex", displayName: "Codex", commandLabel: "codex", supportsEffort: true)
+    nonisolated static let gemini = TranscriptAgent(id: "gemini", displayName: "Gemini CLI", commandLabel: "gemini")
+    nonisolated static let repository = TranscriptAgentFolder(url: URL(fileURLWithPath: "/tmp/scribe-agent-repository"))
+    nonisolated static let notes = TranscriptAgentFolder(url: URL(fileURLWithPath: "/tmp/Notes"))
+    nonisolated static let missingFolder = TranscriptAgentFolder(url: URL(fileURLWithPath: "/tmp/Gone"), isReachable: false)
 
     /// Every test gets defaults of its own: what one sending remembers must
-    /// not decide where the next test's sheet starts.
+    /// not decide where the next test's tray starts.
     private let defaultsSuite = "TranscriptAgentHandoffTests-\(UUID().uuidString)"
     private lazy var preferences = TranscriptAgentPreferences(defaults: UserDefaults(suiteName: defaultsSuite)!)
 
@@ -360,13 +436,15 @@ final class TranscriptAgentHandoffTests: XCTestCase {
         super.tearDown()
     }
 
-    private func makeViewModel(_ dispatcher: AgentDispatcherSpy) throws -> TranscriptViewModel {
-        TranscriptViewModel(
-            files: [try reviewFile()],
+    private func makeViewModel(_ dispatcher: AgentDispatcherSpy) throws -> (TranscriptViewModel, AgentHandoffTarget) {
+        let file = try reviewFile()
+        let viewModel = TranscriptViewModel(
+            files: [file],
             playback: AgentPlaybackStub(),
             agentDispatcher: dispatcher,
             agentPreferences: preferences
         )
+        return (viewModel, viewModel.handoffTarget(for: file))
     }
 
     private func reviewFile() throws -> TranscriptReviewFile {
@@ -383,26 +461,37 @@ final class TranscriptAgentHandoffTests: XCTestCase {
     }
 }
 
-private final class AgentDispatcherSpy: TranscriptAgentDispatching, @unchecked Sendable {
+final class AgentDispatcherSpy: TranscriptAgentDispatching, @unchecked Sendable {
     var environment = TranscriptAgentEnvironment()
     var outcome: TranscriptAgentOutcome?
     private(set) var requests: [TranscriptAgentRequest] = []
+    private(set) var opened: [String] = []
+    private(set) var disconnected: [String] = []
 
     func environment() async -> TranscriptAgentEnvironment { environment }
     func connectFolder() async -> TranscriptAgentEnvironment { environment }
-    func disconnectFolder(id _: TranscriptAgentFolder.ID) async -> TranscriptAgentEnvironment { environment }
+    func disconnectFolder(id: TranscriptAgentFolder.ID) async -> TranscriptAgentEnvironment {
+        disconnected.append(id)
+        return environment
+    }
 
     func send(_ request: TranscriptAgentRequest) async -> TranscriptAgentOutcome {
         requests.append(request)
         return outcome ?? TranscriptAgentOutcome(
             sessionName: "scribe-review",
+            sessionID: "session-\(requests.count)",
             agentName: request.agent.displayName,
             folderName: request.folder?.displayName
         )
     }
+
+    func openSession(id: String) async -> String? {
+        opened.append(id)
+        return nil
+    }
 }
 
-private final class AgentPlaybackStub: TranscriptPlaybackSeeking {
+final class AgentPlaybackStub: TranscriptPlaybackSeeking {
     func load(sourceSnapshotURL _: URL) {}
     func seek(toMilliseconds _: Int) {}
 }

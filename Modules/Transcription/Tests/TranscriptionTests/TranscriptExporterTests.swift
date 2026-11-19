@@ -91,6 +91,120 @@ final class TranscriptExporterTests: XCTestCase {
         XCTAssertEqual(silence["end_ms"] as? Int, 9_000)
     }
 
+    // MARK: - Meeting notes
+
+    private let draftA = UUID(uuidString: "AAAAAAAA-0000-4000-8000-000000000001")!
+    private let draftB = UUID(uuidString: "BBBBBBBB-0000-4000-8000-000000000002")!
+
+    private func sampleNotes() -> [TranscriptExportNote] {
+        [
+            TranscriptExportNote(id: UUID(uuidString: "11111111-0000-4000-8000-000000000001")!,
+                                 text: "  Ask Dana about the launch\r\n\n   and the budget  ", offsetMs: 350_000, draftID: draftA),
+            TranscriptExportNote(id: UUID(uuidString: "22222222-0000-4000-8000-000000000002")!,
+                                 text: "Untimed thought", offsetMs: nil, draftID: draftA),
+            TranscriptExportNote(id: UUID(), text: " \u{3000}\n\t", offsetMs: 9_000, draftID: draftA),
+            TranscriptExportNote(id: UUID(uuidString: "33333333-0000-4000-8000-000000000003")!,
+                                 text: "From the second call", offsetMs: 3_723_000, draftID: draftB),
+        ]
+    }
+
+    func testPlainTextAddsANotesSectionAfterTheTranscript() throws {
+        let transcript = try transcript(named: "one-speaker")
+        let plain = try TranscriptExporter.plainText(transcript)
+        let withNotes = try TranscriptExporter.plainText(transcript, notes: sampleNotes())
+        XCTAssertEqual(withNotes, plain.dropLast() + """
+
+
+        Notes
+
+        [05:50] Ask Dana about the launch
+                and the budget
+
+        [--:--] Untimed thought
+
+        [1:02:03] From the second call
+
+        """, "a note with no words is left out; later lines indent under the first")
+        XCTAssertEqual(try TranscriptExporter.plainText(transcript, notes: []), plain, "no notes, no section")
+        XCTAssertEqual(try TranscriptExporter.plainText(transcript, notes: [sampleNotes()[2]]), plain, "only blank notes, no section")
+
+        let silent = try TranscriptExporter.plainText(self.transcript(named: "no-speech"), notes: [sampleNotes()[1]])
+        XCTAssertEqual(silent, "\(TranscriptTextExporter.noSpeechStatement)\n\nNotes\n\n[--:--] Untimed thought\n")
+    }
+
+    func testJSONAddsATopLevelNotesArrayThatCanonicalReadersIgnore() throws {
+        let schema = try XCTUnwrap(try JSONSerialization.jsonObject(with: CanonicalTranscriptSchema.data) as? [String: Any])
+        let validator = JSONSchemaFixtureValidator(rootSchema: schema)
+        for name in goldenFixtures {
+            let original = try transcript(named: name)
+            let exported = try TranscriptExporter.export(original, as: .json, notes: sampleNotes())
+            try validator.validate(try JSONSerialization.jsonObject(with: exported))
+            // A reader that predates notes decodes the same transcript.
+            XCTAssertEqual(try CanonicalTranscriptCodec.decode(exported), original, name)
+        }
+
+        let original = try transcript(named: "one-speaker")
+        let document = try TranscriptExporter.json(original, notes: sampleNotes())
+        XCTAssertTrue(document.hasPrefix(try TranscriptExporter.json(original).dropLast(3)), "the canonical members come first, unchanged")
+        let object = try object(from: Data(document.utf8))
+        XCTAssertEqual(Array(object.keys.filter { $0 == "notes" }), ["notes"])
+        let notes = try XCTUnwrap(object["notes"] as? [[String: Any]])
+        XCTAssertEqual(notes.count, 3)
+        XCTAssertEqual(notes[0]["id"] as? String, "11111111-0000-4000-8000-000000000001")
+        XCTAssertEqual(notes[0]["text"] as? String, "Ask Dana about the launch\nand the budget")
+        XCTAssertEqual(notes[0]["offset_ms"] as? Int, 350_000)
+        XCTAssertEqual(notes[0]["draft_id"] as? String, "aaaaaaaa-0000-4000-8000-000000000001")
+        XCTAssertTrue(notes[1]["offset_ms"] is NSNull, "an untimed note says so with null")
+        XCTAssertEqual(notes[2]["draft_id"] as? String, "bbbbbbbb-0000-4000-8000-000000000002", "a combined note keeps its draft")
+        XCTAssertEqual(notes.map { $0.keys.sorted() }, Array(repeating: ["draft_id", "id", "offset_ms", "text"], count: 3))
+        XCTAssertEqual(orderOfKeys(["notes", "warnings"], in: document), ["warnings", "notes"])
+
+        XCTAssertNil(try self.object(from: TranscriptExporter.export(original, as: .json, notes: [sampleNotes()[2]]))["notes"],
+                     "without notes the document is the canonical transcript exactly")
+    }
+
+    func testKnowledgebaseCarriesNotesInItsExtensionAndStillValidatesAsVersionOne() throws {
+        let schemaURL = try XCTUnwrap(Bundle.module.url(forResource: "scribe-transcript-upload.schema", withExtension: "json"))
+        let schema = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(contentsOf: schemaURL)) as? [String: Any])
+        let validator = JSONSchemaFixtureValidator(rootSchema: schema)
+        for name in goldenFixtures {
+            let exported = try TranscriptExporter.export(transcript(named: name), as: .knowledgebase, notes: sampleNotes())
+            // The schema is Knowledgebase's own, which rejects unknown top-level
+            // and segment members: an importer that predates notes accepts this.
+            try validator.validate(try JSONSerialization.jsonObject(with: exported))
+        }
+
+        let original = try transcript(named: "one-speaker")
+        let exported = try object(from: TranscriptExporter.export(original, as: .knowledgebase, notes: sampleNotes()))
+        XCTAssertEqual(exported["schema"] as? String, KnowledgebaseTranscriptExporter.schema)
+        XCTAssertEqual(KnowledgebaseTranscriptExporter.schema, "kb.transcript-upload/1")
+        XCTAssertEqual(Set(exported.keys), ["schema", "recording", "transcript", "pipeline", "segments"])
+        let scribe = try XCTUnwrap(((exported["pipeline"] as? [String: Any])?["extensions"] as? [String: Any])?["ai.scribe"] as? [String: Any])
+        let notes = try XCTUnwrap(scribe["notes"] as? [[String: Any]])
+        XCTAssertEqual(notes.map { $0["text"] as? String }, ["Ask Dana about the launch\nand the budget", "Untimed thought", "From the second call"])
+        XCTAssertEqual(notes.map { $0.keys.sorted() }, Array(repeating: ["id", "offset_ms", "text"], count: 3))
+        XCTAssertTrue(notes[1]["offset_ms"] is NSNull)
+
+        let plain = try TranscriptExporter.export(original, as: .knowledgebase)
+        XCTAssertEqual(try TranscriptExporter.export(original, as: .knowledgebase, notes: []), plain)
+        let segments = try XCTUnwrap(exported["segments"] as? [[String: Any]])
+        XCTAssertEqual(segments.count, try XCTUnwrap(object(from: plain)["segments"] as? [Any]).count, "notes never become segments")
+    }
+
+    func testSubtitlesNeverCarryNotes() throws {
+        for name in goldenFixtures {
+            let original = try transcript(named: name)
+            XCTAssertEqual(try TranscriptExporter.export(original, as: .subtitles, notes: sampleNotes()),
+                           try TranscriptExporter.export(original, as: .subtitles))
+        }
+    }
+
+    func testTheAgentHandoffAndTheTextExportFormatNotesAlike() {
+        let notes = [MeetingNote(text: "Ask Dana\n  and Sam", recordingOffsetMilliseconds: 350_000), MeetingNote(text: "Untimed")]
+        let block = AgentHandoffPayload.notesBlock(notes)
+        XCTAssertEqual(block, AgentHandoffPayload.notesHeading + "\n[05:50] Ask Dana\n        and Sam\n[--:--] Untimed")
+    }
+
     func testKnowledgebaseExportUsesDistinctCompoundExtension() {
         XCTAssertEqual(TranscriptExportFormat.knowledgebase.fileExtension, "kb.json")
         XCTAssertEqual(TranscriptExportFormat.knowledgebase.contentType, .json)

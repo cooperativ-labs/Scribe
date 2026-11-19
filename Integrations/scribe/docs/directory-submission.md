@@ -61,15 +61,17 @@ Every tool has `readOnlyHint: true`, `destructiveHint: false`, `openWorldHint: f
 | Tool | Justification |
 |------|---------------|
 | `scribe_recent_transcripts` | Read-only: lists meeting metadata (title, date, duration, speakers) from the connected user's own Scribe library and changes nothing. Not destructive: it has no write path. Closed world: it reads one private library bounded by the OAuth grant, never the public internet. |
-| `scribe_search_transcripts` | Read-only: literal text search over the connected library, returning matching meetings with a short excerpt. No state changes, no side effects. Closed world: bounded to the one library the user approved. |
-| `scribe_get_transcript` | Read-only: returns one transcript's text with speaker labels and timestamps, paged. Cannot edit or delete. Closed world: the user's own library only; transcript IDs from any other library return "not found". |
+| `scribe_search_transcripts` | Read-only: literal text search over the connected library (titles, speakers, transcript text and meeting notes), returning matching meetings with a short excerpt and, when a note matched, which note. No state changes, no side effects. Closed world: bounded to the one library the user approved. |
+| `scribe_get_transcript` | Read-only: returns one transcript's text with speaker labels and timestamps, paged, and the meeting's notes in a separate field. Cannot edit or delete. Closed world: the user's own library only; transcript IDs from any other library return "not found". |
 | `search` | Read-only research alias of search, returning IDs, titles and `scribe://` URIs. Same bounds as above. |
 | `fetch` | Read-only research alias of `scribe_get_transcript`. Same bounds as above. |
 | `scribe_profile` | Read-only: returns an opaque, stable identifier for the connected library, so ChatGPT can tell two connected Scribe libraries apart (`openai/profile`). Contains no personal data. |
 
 Data minimization: results carry meeting data only (titles, dates, durations,
-language, speaker names, excerpts, transcript text). They never include owner or
-account IDs, tokens, file paths, audio, or request/trace IDs. `processed_at` and
+language, speaker names, excerpts, transcript text, and the notes the person
+wrote during the meeting). They never include owner or account IDs, tokens, file
+paths, audio, request/trace IDs, or the prompt, MCP URL and send history a
+person set for an agent handoff. `processed_at` and
 `revision` are kept on purpose: the assistant needs them to page through long
 transcripts consistently, and ordering by processing time is disclosed in the
 tool description. Everything returned is disclosed in the privacy policy.

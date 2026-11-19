@@ -7,14 +7,34 @@ import Foundation
 /// revision carries them, and speaker labels come from the revision's snapshot table. Key order is
 /// the schema's declaration order and dictionary-backed objects are key-sorted, so two exports of
 /// one revision are byte-identical.
+///
+/// A meeting with notes gets one more top-level member after `warnings`: `notes`, an array of
+/// `{ id, text, offset_ms, draft_id }` with `offset_ms` null for an untimed note. It is not a
+/// canonical field (the canonical schema allows additional top-level members), so a reader of the
+/// canonical transcript decodes the document unchanged and ignores it. Without notes the member is
+/// absent and the document is the canonical transcript exactly.
 public enum TranscriptJSONExporter {
-    public static func export(_ transcript: CanonicalTranscript) throws -> String {
-        String(decoding: try data(transcript), as: UTF8.self)
+    public static func export(_ transcript: CanonicalTranscript, notes: [TranscriptExportNote] = []) throws -> String {
+        String(decoding: try data(transcript, notes: notes), as: UTF8.self)
     }
 
-    public static func data(_ transcript: CanonicalTranscript) throws -> Data {
+    public static func data(_ transcript: CanonicalTranscript, notes: [TranscriptExportNote] = []) throws -> Data {
         try TranscriptExporter.validate(transcript)
-        return try ExportJSONWriter.data(document(for: transcript))
+        guard case .object(var members) = document(for: transcript) else { preconditionFailure("A transcript document is an object") }
+        let exported = TranscriptExportNote.exportable(notes)
+        if !exported.isEmpty {
+            members.append(.init("notes", .array(exported.map(note))))
+        }
+        return try ExportJSONWriter.data(.object(members))
+    }
+
+    private static func note(_ note: TranscriptExportNote) -> ExportJSON {
+        .object([
+            .init("id", .string(note.id.uuidString.lowercased())),
+            .init("text", .string(note.exportedText)),
+            .init("offset_ms", note.offsetMs.map(ExportJSON.integer) ?? .null),
+            .init("draft_id", .string(note.draftID.uuidString.lowercased())),
+        ])
     }
 
     private static func document(for transcript: CanonicalTranscript) -> ExportJSON {

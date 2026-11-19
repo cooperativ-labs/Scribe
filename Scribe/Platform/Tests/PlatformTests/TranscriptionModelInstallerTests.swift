@@ -4,6 +4,60 @@ import Testing
 @testable import Platform
 
 struct TranscriptionModelInstallerTests {
+    @Test func cleanupWaitsForVerifiedInstallationAndPreservesUnrelatedFiles() async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let manifest = try fixture.manifestWithObsoletePaths(["test-model/Old.mlmodelc"])
+        let old = fixture.destination.appendingPathComponent("test-model/Old.mlmodelc/weight.bin")
+        let unrelated = fixture.destination.appendingPathComponent("other-model/keep.bin")
+        for file in [old, unrelated] {
+            try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data("keep".utf8).write(to: file)
+        }
+        let failed = TranscriptionModelDownloader { _ in throw CancellationError() }
+        await #expect(throws: CancellationError.self) {
+            try await failed.install(manifest: manifest, directory: fixture.destination) { _, _, _ in }
+        }
+        #expect(FileManager.default.fileExists(atPath: old.path))
+        let downloader = TranscriptionModelDownloader { _ in
+            let temporary = fixture.root.appendingPathComponent(UUID().uuidString)
+            try fixture.payload.write(to: temporary)
+            return temporary
+        }
+        try await downloader.install(manifest: manifest.selecting(.transcription), directory: fixture.destination) { _, _, _ in }
+        #expect(!FileManager.default.fileExists(atPath: old.path))
+        #expect(FileManager.default.fileExists(atPath: unrelated.path))
+        #expect(try await downloader.isInstalled(manifest: manifest, directory: fixture.destination))
+    }
+
+    @Test func obsoletePathsCannotContainRequiredFilesOrEscapeDestination() throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        for path in ["test-model", "../outside", "test-model/Model.mlmodelc/weights/weight.bin"] {
+            #expect(throws: (any Error).self) { try fixture.manifestWithObsoletePaths([path]) }
+        }
+    }
+
+    @Test func cleanupDoesNotFollowSymbolicLinkParents() async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let manifest = try fixture.manifestWithObsoletePaths(["linked/Old.mlmodelc"])
+        let outside = fixture.root.appendingPathComponent("outside")
+        let old = outside.appendingPathComponent("Old.mlmodelc")
+        try FileManager.default.createDirectory(at: old, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: fixture.destination, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: fixture.destination.appendingPathComponent("linked"), withDestinationURL: outside)
+        let downloader = TranscriptionModelDownloader { _ in
+            let temporary = fixture.root.appendingPathComponent(UUID().uuidString)
+            try fixture.payload.write(to: temporary)
+            return temporary
+        }
+        await #expect(throws: (any Error).self) {
+            try await downloader.install(manifest: manifest, directory: fixture.destination) { _, _, _ in }
+        }
+        #expect(FileManager.default.fileExists(atPath: old.path))
+    }
+
     @Test func installationUsesPinnedURLsAndReusesVerifiedFiles() async throws {
         let fixture = try Fixture()
         defer { fixture.remove() }
@@ -126,7 +180,7 @@ struct TranscriptionModelInstallerTests {
     }
 
     /// Opt in with a real previous installation and verified corrected assets.
-    @Test func correctedEncoderUpgradeResumesAndPreservesRollback() async throws {
+    @Test func correctedEncoderUpgradeResumesAndRemovesOldEncoder() async throws {
         let environment = ProcessInfo.processInfo.environment
         guard let rollbackPath = environment["SCRIBE_MODEL_UPGRADE_SMOKE_ROLLBACK"],
               let stagedPath = environment["SCRIBE_MODEL_UPGRADE_SMOKE_STAGED"] else { return }
@@ -182,7 +236,7 @@ struct TranscriptionModelInstallerTests {
         try await retry.install(manifest: current, directory: fixture.destination) { _, _, _ in }
         #expect(await retryRequests.urls == [metadata, weight].map { remote.appendingPathComponent($0.relativePath) })
         #expect(try await retry.isInstalled(manifest: current, directory: fixture.destination))
-        #expect(try await retry.isInstalled(manifest: previous, directory: fixture.destination))
+        #expect(try await !retry.isInstalled(manifest: previous, directory: fixture.destination))
     }
 }
 
@@ -213,4 +267,11 @@ private struct Fixture: Sendable {
         manifest = try TranscriptionModelManifest.load(from: manifestURL)
     }
     func remove() { try? FileManager.default.removeItem(at: root) }
+    func manifestWithObsoletePaths(_ paths: [String]) throws -> TranscriptionModelManifest {
+        var json = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: manifestURL)) as? [String: Any])
+        json["obsoleteTranscriptionPaths"] = paths
+        let url = root.appendingPathComponent("obsolete-manifest.json")
+        try JSONSerialization.data(withJSONObject: json).write(to: url)
+        return try TranscriptionModelManifest.load(from: url)
+    }
 }

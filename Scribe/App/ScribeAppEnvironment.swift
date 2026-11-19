@@ -60,6 +60,11 @@ final class ScribeAppEnvironment: ObservableObject {
     }
     private var transcriptWindow: NSWindow?
     private var speakersWindow: NSWindow?
+    /// The floating notes panel, made the first time it is opened.
+    private(set) var meetingNotesPanel: MeetingNotesPanelController?
+    /// Says briefly why a command had nothing to act on. Set by the app
+    /// delegate, which owns the status item the hint hangs from.
+    var showHint: ((String) -> Void)?
 
     private let triggerMonitor = DictationTriggerMonitor()
     private(set) var dictationCoordinator: DictationCoordinator?
@@ -118,7 +123,8 @@ final class ScribeAppEnvironment: ObservableObject {
         self.coordinator = coordinator
         menuModel = RecorderMenuModel(
             coordinator: coordinator,
-            pasteTimestampShortcut: { settings.pasteTimestampShortcut }
+            pasteTimestampShortcut: { settings.pasteTimestampShortcut },
+            meetingNotesShortcut: { settings.meetingNotesShortcut }
         )
         meetingChipModel = MeetingChipModel(
             coordinator: coordinator,
@@ -142,6 +148,10 @@ final class ScribeAppEnvironment: ObservableObject {
         // The review window's Send to Agent action reaches Latch through this
         // service; the window itself never launches anything.
         transcription?.agentDispatcher = LatchTranscriptAgentDispatcher(service: agentHandoff)
+        // A queued send's notification, clicked, shows its meeting.
+        transcription?.revealMeeting = { [weak self] draftID in
+            self?.revealMeetingInTranscripts(draftID: draftID)
+        }
 
         // Set here rather than passed in: the review window's Vocabulary button
         // has to reach the settings window, which the app delegate owns.
@@ -150,16 +160,30 @@ final class ScribeAppEnvironment: ObservableObject {
         }
 
         coordinator.terminationHandler = { NSApplication.shared.terminate(nil) }
+        // Each recording gets a meeting draft from the moment capture is
+        // active: the placeholder row, its title and, later, its notes.
+        coordinator.lifecycleHandler = { [weak self] event in
+            self?.recordingLifecycleDidChange(event)
+        }
+        // A meeting note is stamped with the Paste Timestamp figure for the
+        // session being captured, and with nothing while paused or stopped.
+        transcription?.noteClock = { [weak coordinator] sessionID in
+            guard let state = coordinator?.snapshot.state, state.activity?.sessionID == sessionID else { return nil }
+            return RecordingTimestamp.noteOffsetMilliseconds(
+                state: state,
+                at: Date(),
+                offset: TimeInterval(settings.pasteTimestampOffsetSeconds)
+            )
+        }
+        transcription?.publishFinishedRecording = { [weak self] directory, draftID in
+            await self?.publishFinishedRecording(sessionDirectory: directory, draftID: draftID)
+                ?? "Transcription is not available right now."
+        }
         coordinator.recoveryReporter = { [weak self] recovered in
             self?.reportRepairedCaptures(recovered)
         }
-        coordinator.reportShortcutRegistration(
-            hotkeys.register(
-                start: settings.startShortcut,
-                stop: settings.stopShortcut,
-                pasteTimestamp: settings.pasteTimestampShortcut
-            )
-        )
+        hotkeys.openMeetingNotes = { [weak self] in self?.openLiveMeetingNotes() }
+        registerShortcuts()
         observeProcessingQueue()
         adoptWorkFoundAtLaunch()
         transcription?.start { [weak self] status in
@@ -414,11 +438,18 @@ final class ScribeAppEnvironment: ObservableObject {
     func settingsWindowDidClose() {
         syncTriggerMonitors()
         coordinator.setRecordingsFolder(settings.recordingsFolderURL)
+        registerShortcuts()
+    }
+
+    /// Registers every global shortcut and reports conflicts in the menu.
+    /// Meeting Notes is registered only where there are meeting notes.
+    private func registerShortcuts() {
         coordinator.reportShortcutRegistration(
             hotkeys.register(
                 start: settings.startShortcut,
                 stop: settings.stopShortcut,
-                pasteTimestamp: settings.pasteTimestampShortcut
+                pasteTimestamp: settings.pasteTimestampShortcut,
+                meetingNotes: transcription == nil ? nil : settings.meetingNotesShortcut
             )
         )
     }
@@ -430,13 +461,7 @@ final class ScribeAppEnvironment: ObservableObject {
         if isActive {
             hotkeys.unregisterAll()
         } else {
-            coordinator.reportShortcutRegistration(
-                hotkeys.register(
-                    start: settings.startShortcut,
-                    stop: settings.stopShortcut,
-                    pasteTimestamp: settings.pasteTimestampShortcut
-                )
-            )
+            registerShortcuts()
         }
     }
 
@@ -503,6 +528,7 @@ final class ScribeAppEnvironment: ObservableObject {
         case .completed(let job):
             coordinator.finishBackgroundJob(id: job.id)
             await handOffForTranscription(job)
+            transcription?.recordingProcessingDidChange()
             retireRecoveryNotice(for: job.id)
         case .failed(let job, let message):
             coordinator.finishBackgroundJob(id: job.id)
@@ -511,6 +537,7 @@ final class ScribeAppEnvironment: ObservableObject {
                 message: "Audio cleanup failed for one recording: \(message)",
                 recoveryHint: "The original tracks were kept. Open the recordings folder to reprocess."
             ))
+            transcription?.recordingProcessingDidChange()
             retireRecoveryNotice(for: job.id)
         }
     }
@@ -522,28 +549,77 @@ final class ScribeAppEnvironment: ObservableObject {
     /// the meeting and would be wrong in a way nobody would notice.
     private func handOffForTranscription(_ job: ProcessingQueue.QueuedJob) async {
         guard settings.transcribeWhenFinalRecordingIsReady else { return }
-        do {
-            let handoff = FinalRecordingHandoff(speakerCount: Self.transcriptionSpeakerCount(settings.transcriptionSpeakerCount), microphoneSpeakerPrior: settings.microphoneSpeakerPrior)
-            let request = try handoff.request(forSessionAt: job.sessionDirectory)
-            try await outbox.submit(request)
+        let draftID = await transcription?.draftIDForHandoff(sessionDirectory: job.sessionDirectory)
+        if await publishFinishedRecording(sessionDirectory: job.sessionDirectory, draftID: draftID) == nil {
             // The request is durable now, so transcription can be told to pick it
             // up. If this call never happens — a crash, or a build with no
             // transcription module — the next launch consumes the outbox instead.
             transcription?.recordingWasPublished()
+        }
+    }
+
+    /// Verifies a finished session and writes its request to the outbox.
+    ///
+    /// The request ID is derived from the session, so publishing twice (the
+    /// processing event and launch reconciliation, say) is one request. Returns
+    /// a failure message, or nil once the request is on file; refusals are
+    /// also reported in the menu, since a meeting nobody transcribed looks the
+    /// same as one that is still processing.
+    @discardableResult
+    private func publishFinishedRecording(sessionDirectory: URL, draftID: UUID?) async -> String? {
+        do {
+            let handoff = FinalRecordingHandoff(speakerCount: Self.transcriptionSpeakerCount(settings.transcriptionSpeakerCount), microphoneSpeakerPrior: settings.microphoneSpeakerPrior)
+            let request = try handoff.request(forSessionAt: sessionDirectory, draftID: draftID)
+            try await outbox.submit(request)
+            return nil
         } catch let refusal as FinalRecordingHandoffRefusal {
-            guard !refusal.isTransient else { return }
+            guard !refusal.isTransient else { return refusal.message }
             coordinator.reportBackgroundFailure(RecorderFailure(
                 code: refusal.code,
                 message: refusal.message,
                 recoveryHint: refusal.recoveryHint
             ))
+            return refusal.message
         } catch {
+            let message = "The final recording is ready but could not be handed to transcription: \(error.localizedDescription)"
             coordinator.reportBackgroundFailure(RecorderFailure(
                 code: "handoff.notSubmitted",
-                message: "The final recording is ready but could not be handed to transcription: \(error.localizedDescription)",
+                message: message,
                 recoveryHint: "Open the recordings folder; the recording itself is complete."
             ))
+            return message
         }
+    }
+
+    /// Forwards capture facts to the meeting drafts. Session-ID based, so a
+    /// resume (which re-reports recording) never opens a second draft.
+    private func recordingLifecycleDidChange(_ event: RecordingLifecycleEvent) {
+        guard let transcription else { return }
+        switch event {
+        case let .captureStarted(sessionID, startedAt, title, sessionDirectory):
+            transcription.draftCaptureStarted(
+                sessionID: sessionID,
+                startedAt: startedAt,
+                title: title,
+                sessionName: sessionDirectory.lastPathComponent
+            )
+        case let .pauseChanged(sessionID, isPaused):
+            transcription.draftPauseChanged(sessionID: sessionID, isPaused: isPaused)
+        case let .captureStopped(sessionID, _, reason):
+            transcription.draftCaptureStopped(sessionID: sessionID, reason: MeetingStopReason(journalReason: reason.journalReason))
+        case let .captureFailed(sessionID, message):
+            transcription.draftCaptureFailed(sessionID: sessionID, message: message)
+        }
+    }
+
+    /// Saves pending meeting-draft edits before the app exits.
+    func flushDraftsForTermination(then completion: @escaping @MainActor () -> Void) {
+        guard let transcription else {
+            // Never reply inside applicationShouldTerminate itself.
+            Task { @MainActor in completion() }
+            return
+        }
+        transcription.flushDraftsForTermination(then: completion)
     }
 
     private static func transcriptionSpeakerCount(_ preference: RecorderSpeakerCountPreference) -> TranscriptionSpeakerCount {
@@ -612,8 +688,61 @@ extension ScribeAppEnvironment {
             openTranscripts: { [weak self] in self?.openTranscriptWindow() },
             openSpeakers: transcription.speakersAreAvailable ? { [weak self] in self?.openSpeakersWindow() } : nil,
             transcribeFolder: { transcription.chooseFolderToTranscribe() },
-            openTranscriptionsFolder: { NSWorkspace.shared.open(transcription.storeDirectoryURL) }
+            openTranscriptionsFolder: { NSWorkspace.shared.open(transcription.storeDirectoryURL) },
+            openMeetingNotes: { [weak self] sessionID in self?.openMeetingNotes(sessionID: sessionID) }
         )
+    }
+
+    // MARK: - Meeting notes panel
+
+    static let noRecordingHint = "Nothing is being recorded. Meeting Notes opens during a recording."
+
+    /// The Meeting Notes shortcut: the notes of the recording in progress
+    /// (recording or held), and nothing else (decision 13). With nothing
+    /// recording it only says so.
+    func openLiveMeetingNotes() {
+        let state = coordinator.snapshot.state
+        guard transcription != nil, state.isCapturing, let sessionID = state.activity?.sessionID else {
+            showHint?(Self.noRecordingHint)
+            return
+        }
+        openMeetingNotes(sessionID: sessionID)
+    }
+
+    /// Opens the floating notes panel on the draft of the recording with
+    /// this session ID: the one the chip or the menu row was showing.
+    func openMeetingNotes(sessionID: UUID) {
+        guard let transcription else { return }
+        Task { [weak self] in
+            // A press in the first moment of a recording waits for its draft.
+            guard let draftID = await transcription.draftID(forSession: sessionID) else {
+                self?.showHint?("This recording has no notes yet. Try again in a moment.")
+                return
+            }
+            self?.showMeetingNotes(draftID: draftID)
+        }
+    }
+
+    private func showMeetingNotes(draftID: UUID) {
+        guard let transcription else { return }
+        // The same review model as the Transcripts window, so the panel and
+        // the window edit one draft session.
+        let model = transcription.makeOrRefreshReviewModel()
+        let panel: MeetingNotesPanelController
+        if let meetingNotesPanel, meetingNotesPanel.viewModel === model {
+            panel = meetingNotesPanel
+        } else {
+            panel = MeetingNotesPanelController(viewModel: model)
+            panel.openInTranscripts = { [weak self] draftID in self?.revealMeetingInTranscripts(draftID: draftID) }
+            meetingNotesPanel = panel
+        }
+        panel.show(draftID: draftID)
+    }
+
+    /// "Open in Transcripts": the window, with the meeting's row selected.
+    func revealMeetingInTranscripts(draftID: UUID) {
+        openTranscriptWindow()
+        transcription?.reviewModel?.selectedFileID = draftID.uuidString
     }
 
     /// Opens the review window, or brings the existing one forward.

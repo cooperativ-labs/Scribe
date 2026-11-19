@@ -108,9 +108,23 @@ public actor TranscriptionCoordinator {
     }
 
     /// Snapshots a request source and creates an independent run directory.
+    ///
+    /// A request whose ID already has a persisted job — a recorder handoff
+    /// published again after a crash, or drained twice — returns that job
+    /// instead of allocating a second run. The source checksum is never the
+    /// test: two recordings with identical audio are two requests.
     @discardableResult
     public func enqueue(_ request: TranscriptionRequest) throws -> TranscriptionJob {
-        try enqueue(request, snapshot: nil)
+        if let existing = persistedJob(forRequestID: request.requestID) { return existing }
+        return try enqueue(request, snapshot: nil)
+    }
+
+    /// The job already recorded for a request ID, in memory or in the store.
+    public func persistedJob(forRequestID requestID: UUID) -> TranscriptionJob? {
+        if let live = jobs.values.first(where: { $0.request.requestID == requestID }) { return live }
+        return Self.discoverRecoverableJobs(in: configuration.transcriptStoreURL, fileManager: fileManager)
+            .filter { $0.request.requestID == requestID }
+            .min { $0.createdAt < $1.createdAt }
     }
 
     private func enqueue(_ request: TranscriptionRequest, snapshot preserved: VocabularySnapshot?) throws -> TranscriptionJob {
@@ -243,14 +257,24 @@ public actor TranscriptionCoordinator {
     /// ASR or diarization artifact could mix incompatible output. The prior run
     /// directory, including any review revisions, is never touched.
     @discardableResult
-    public func reprocess(_ previous: TranscriptionJob, speakerCount: TranscriptionSpeakerCount, microphoneSpeakerPrior: Bool? = nil) throws -> TranscriptionJob {
+    ///
+    /// `title` is the name the new run's transcript opens under; nil keeps the
+    /// original request's title. The host passes the name a person gave the
+    /// meeting, so a rerun does not revert a rename.
+    public func reprocess(
+        _ previous: TranscriptionJob,
+        speakerCount: TranscriptionSpeakerCount,
+        microphoneSpeakerPrior: Bool? = nil,
+        title: String? = nil
+    ) throws -> TranscriptionJob {
         let request = retainedSourceRequest(
             from: previous,
             speakerCount: speakerCount,
             speakerLibraryRevision: previous.request.speakerLibraryRevision,
             vocabularyRevision: previous.request.vocabularyRevision,
             modelProfileID: previous.request.modelProfileID,
-            microphoneSpeakerPrior: microphoneSpeakerPrior
+            microphoneSpeakerPrior: microphoneSpeakerPrior,
+            title: title
         )
         return try enqueueDerivedRun(from: previous, request: request, snapshot: previous.vocabularySnapshot ?? .init(revision: previous.request.vocabularyRevision, terms: []))
     }
@@ -265,7 +289,8 @@ public actor TranscriptionCoordinator {
         _ previous: TranscriptionJob,
         modelProfileID: String,
         speakerCount: TranscriptionSpeakerCount,
-        microphoneSpeakerPrior: Bool? = nil
+        microphoneSpeakerPrior: Bool? = nil,
+        title: String? = nil
     ) throws -> TranscriptionJob {
         let request = retainedSourceRequest(
             from: previous,
@@ -273,7 +298,8 @@ public actor TranscriptionCoordinator {
             speakerLibraryRevision: nil,
             vocabularyRevision: nil,
             modelProfileID: modelProfileID,
-            microphoneSpeakerPrior: microphoneSpeakerPrior
+            microphoneSpeakerPrior: microphoneSpeakerPrior,
+            title: title
         )
         return try enqueueDerivedRun(from: previous, request: request)
     }
@@ -284,8 +310,11 @@ public actor TranscriptionCoordinator {
         speakerLibraryRevision: String?,
         vocabularyRevision: String?,
         modelProfileID: String,
-        microphoneSpeakerPrior: Bool?
+        microphoneSpeakerPrior: Bool?,
+        title: String?
     ) -> TranscriptionRequest {
+        // A fresh request ID: a rerun is a new request, not a replay. The
+        // draft link is kept so the meeting's row and notes stay with it.
         TranscriptionRequest(
             sourceURL: previous.sourceSnapshotURL,
             languageMode: previous.request.languageMode,
@@ -300,7 +329,8 @@ public actor TranscriptionCoordinator {
             modelProfileID: modelProfileID,
             exportDirectory: previous.request.exportDirectory,
             provenance: previous.request.provenance,
-            title: previous.request.title
+            title: title ?? previous.request.title,
+            draftID: previous.request.draftID
         )
     }
 

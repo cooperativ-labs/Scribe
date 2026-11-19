@@ -67,11 +67,51 @@ final class TranscriptionHostService {
     /// Hands a reviewed transcript to a coding agent through Latch. Set by the
     /// environment for the same reason, and absent in a build with no agent
     /// host, which hides the action rather than offering a dead end.
-    var agentDispatcher: (any TranscriptAgentDispatching)?
+    var agentDispatcher: (any TranscriptAgentDispatching)? {
+        didSet { sendRunner?.dispatcher = agentDispatcher }
+    }
+
+    /// Shows a meeting's row in the Transcripts window, for a notification
+    /// the person clicked. Set by the environment, which owns the window.
+    var revealMeeting: (@MainActor (_ draftID: UUID) -> Void)?
+
+    /// Fires "Send after processing" when a meeting's transcript is ready.
+    /// Owned here, not by the window: a queued send fires with the window
+    /// closed and is picked up again after a relaunch.
+    private(set) var sendRunner: QueuedHandoffRunner?
+    private var sendNotifications: QueuedHandoffNotifications?
+
+    /// Publishes a finished recorder session to the transcription outbox,
+    /// with its draft ID. Set by the environment, which owns the handoff
+    /// policy; returns a failure message, or nil once the request is on file.
+    var publishFinishedRecording: (@MainActor (_ sessionDirectory: URL, _ draftID: UUID?) async -> String?)?
+
+    /// The recording time a meeting note written now gets for a recorder
+    /// session: the capture clock less the Paste Timestamp offset, nil unless
+    /// that session is capturing audio. Set by the environment, which owns
+    /// the recorder.
+    var noteClock: (@MainActor (_ sessionID: UUID) -> Int?)? {
+        didSet { drafts?.captureClock = noteClock }
+    }
 
     private var modelObservation: AnyCancellable?
     private var eventTask: Task<Void, Never>?
     private var statusDidChange: (@MainActor (Status) -> Void)?
+
+    /// Meeting drafts: one per recording, from capture start to long after
+    /// its transcript exists. Opened asynchronously because the draft store
+    /// is an actor; `drafts` is nil only until that finishes.
+    private let draftStore: MeetingDraftStore
+    private var draftsTask: Task<MeetingDraftLifecycle, Never>?
+    private(set) var drafts: MeetingDraftLifecycle?
+    /// Drafts' capture and job events run one after another, so a stop can
+    /// never be applied before the start it follows, and termination can
+    /// wait for everything already reported.
+    private var draftChain: Task<Void, Never>?
+    /// The durable facts the last reconciliation read, reused to describe rows.
+    private var reviewSessions: [UUID: RecorderSessionEvidence] = [:]
+    private var reviewPendingRequests: [TranscriptionRequest] = []
+    private var reviewRefreshScheduled = false
 
     init(
         settings: ScribeSettings,
@@ -138,6 +178,12 @@ final class TranscriptionHostService {
         )
         prober = (try? MediaToolLocator.ffprobe()).map { MediaProber(ffprobeURL: $0) }
         importer = prober.map { FolderImportService(prober: $0) }
+        draftStore = MeetingDraftStore()
+        let draftStore = draftStore
+        let transcriptStore = store
+        draftsTask = Task { @MainActor in
+            await MeetingDraftLifecycle(store: draftStore, transcriptStore: transcriptStore, preferences: TranscriptAgentPreferences())
+        }
     }
 
     deinit { eventTask?.cancel() }
@@ -163,10 +209,217 @@ final class TranscriptionHostService {
         observeJobEvents()
         Task { [weak self] in
             guard let self else { return }
+            await self.openDrafts()
             _ = try? await self.coordinator.recoverPendingJobs()
             await self.consumeHandoffRequests()
+            await self.reconcileDrafts(isLaunch: true)
             await self.runPending()
         }
+    }
+
+    // MARK: - Meeting drafts
+
+    private func openDrafts() async {
+        guard drafts == nil, let lifecycle = await draftsTask?.value else { return }
+        lifecycle.didChange = { [weak self] in self?.scheduleReviewRefresh() }
+        lifecycle.summarize = { [weak self, weak lifecycle] draft, saveState in
+            MeetingDraftReviewMerger.summary(
+                for: draft,
+                saveState: saveState,
+                run: nil,
+                environment: self?.reviewEnvironment(live: lifecycle?.liveCapture) ?? .init()
+            )
+        }
+        lifecycle.publishHandoff = { [weak self] directory, draftID in
+            await self?.publish(sessionDirectory: directory, draftID: draftID) ?? "Transcription is not available right now."
+        }
+        lifecycle.sessionDirectory = { [weak self] sessionID in
+            self?.reviewSessions[sessionID]?.directoryURL
+        }
+        lifecycle.captureClock = noteClock
+        drafts = lifecycle
+        openSendRunner(lifecycle)
+        let unreadable = await draftStore.unreadableFiles
+        if !unreadable.isEmpty {
+            report(failure: "\(unreadable.count) meeting draft\(unreadable.count == 1 ? "" : "s") could not be read and \(unreadable.count == 1 ? "was" : "were") left in place.")
+        }
+    }
+
+    private func openSendRunner(_ lifecycle: MeetingDraftLifecycle) {
+        let notifications = QueuedHandoffNotifications()
+        let runner = QueuedHandoffRunner(
+            lifecycle: lifecycle,
+            dispatcher: agentDispatcher,
+            preferences: TranscriptAgentPreferences(),
+            notifier: notifications,
+            isCaptureActive: { [weak lifecycle] in lifecycle?.liveCapture != nil }
+        )
+        let store = store
+        runner.currentRuns = { store.runs() }
+        runner.agentNames = Self.agentNames
+        notifications.confirm = { [weak self] draftID, operationID in
+            await self?.sendRunner?.confirmSend(draftID: draftID, operationID: operationID, interactive: false)
+        }
+        notifications.cancel = { [weak self] draftID, operationID in
+            _ = await self?.sendRunner?.cancelSend(draftID: draftID, operationID: operationID)
+        }
+        notifications.openSession = { [weak self] sessionID in
+            _ = await self?.agentDispatcher?.openSession(id: sessionID)
+        }
+        notifications.showMeeting = { [weak self] draftID in self?.revealMeeting?(draftID) }
+        sendNotifications = notifications
+        sendRunner = runner
+    }
+
+    private static let agentNames = Dictionary(
+        AgentToolLocator.catalog.map { ($0.id, $0.displayName) },
+        uniquingKeysWith: { first, _ in first }
+    )
+
+    /// Runs one draft step after every earlier one.
+    private func enqueueDraftWork(_ work: @escaping @MainActor (MeetingDraftLifecycle) async -> Void) {
+        let previous = draftChain
+        draftChain = Task { [weak self] in
+            await previous?.value
+            guard let self else { return }
+            if self.drafts == nil { await self.openDrafts() }
+            guard let drafts = self.drafts else { return }
+            await work(drafts)
+        }
+    }
+
+    /// Capture became active for a session: its placeholder row appears now.
+    func draftCaptureStarted(sessionID: UUID, startedAt: Date, title: String?, sessionName: String) {
+        enqueueDraftWork { drafts in
+            await drafts.captureStarted(sessionID: sessionID, startedAt: startedAt, title: title, sessionName: sessionName)
+        }
+    }
+
+    func draftPauseChanged(sessionID: UUID, isPaused: Bool) {
+        enqueueDraftWork { drafts in drafts.capturePaused(isPaused, sessionID: sessionID) }
+    }
+
+    func draftCaptureStopped(sessionID: UUID, reason: MeetingStopReason) {
+        enqueueDraftWork { [weak self] drafts in
+            await drafts.captureStopped(sessionID: sessionID, reason: reason)
+            await self?.reconcileDrafts(isLaunch: false)
+        }
+    }
+
+    func draftCaptureFailed(sessionID: UUID, message: String) {
+        enqueueDraftWork { drafts in await drafts.captureFailed(sessionID: sessionID, message: message) }
+    }
+
+    /// The draft for a recorder session, flushed so the handoff and the draft
+    /// agree on disk. Nil for sessions recorded before drafts existed.
+    func draftIDForHandoff(sessionDirectory: URL) async -> UUID? {
+        await draftChain?.value
+        if drafts == nil { await openDrafts() }
+        guard let drafts, let sessionID = FinalRecordingHandoff.sessionID(forSessionAt: sessionDirectory),
+              let draftID = drafts.draftID(forSession: sessionID) else { return nil }
+        await drafts.flush(draftID: draftID)
+        return draftID
+    }
+
+    /// The draft of a recording being captured, once the capture-start work
+    /// queued ahead of this has made it. For the Meeting Notes entry points,
+    /// which name the recording by its session.
+    func draftID(forSession sessionID: UUID) async -> UUID? {
+        await draftChain?.value
+        if drafts == nil { await openDrafts() }
+        return drafts?.draftID(forSession: sessionID)
+    }
+
+    /// Background processing changed a session's state (cleanup finished or
+    /// failed, or a handoff was refused): re-derive the drafts' rows.
+    func recordingProcessingDidChange() {
+        enqueueDraftWork { [weak self] _ in await self?.reconcileDrafts(isLaunch: false) }
+    }
+
+    /// Writes every pending draft edit, waiting for capture and job events
+    /// already reported. Bounded, so a stuck disk cannot hold up quitting.
+    func flushDraftsForTermination(then completion: @escaping @MainActor () -> Void) {
+        let chain = draftChain
+        let store = draftStore
+        Task { @MainActor in
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask {
+                    await chain?.value
+                    await store.flushAll()
+                }
+                group.addTask { try? await Task.sleep(for: .seconds(3)) }
+                await group.next()
+                group.cancelAll()
+            }
+            completion()
+        }
+    }
+
+    /// Joins session manifests, outbox requests, job records and drafts, and
+    /// repairs whatever a missed event or a crash left out of step.
+    func reconcileDrafts(isLaunch: Bool) async {
+        if drafts == nil { await openDrafts() }
+        guard let drafts else { return }
+        reviewSessions = RecorderSessionEvidence.scan(recordingsDirectory: settings.recordingsFolderURL)
+        reviewPendingRequests = (try? await outbox.pendingRequests()) ?? []
+        await drafts.reconcile(
+            sessions: reviewSessions,
+            pendingRequests: reviewPendingRequests,
+            runs: store.runs(),
+            autoTranscribe: settings.transcribeWhenFinalRecordingIsReady,
+            isLaunch: isLaunch
+        )
+        // Read again: reconciliation may have renamed transcripts and
+        // attached notes, which is what a queued send waits for.
+        await sendRunner?.reconcile(runs: store.runs())
+        await refreshReview()
+    }
+
+    private func publish(sessionDirectory: URL, draftID: UUID) async -> String? {
+        guard let publishFinishedRecording else { return "Transcription is not available right now." }
+        let failure = await publishFinishedRecording(sessionDirectory, draftID)
+        if failure == nil {
+            await consumeHandoffRequests()
+            Task { [weak self] in await self?.runPending() }
+        }
+        return failure
+    }
+
+    private func reviewEnvironment(live: LiveCaptureState?) -> MeetingDraftReviewMerger.Environment {
+        MeetingDraftReviewMerger.Environment(
+            live: live,
+            sessions: reviewSessions,
+            pendingRequests: reviewPendingRequests,
+            autoTranscribe: settings.transcribeWhenFinalRecordingIsReady,
+            transcriptionBlockedReason: transcriptionBlockedReason,
+            noteCounts: drafts?.noteCounts ?? [:],
+            agentNames: Self.agentNames
+        )
+    }
+
+    private var transcriptionBlockedReason: String? {
+        if workerUnavailableReason != nil { return "Transcription unavailable" }
+        if !hasScheduler { return "Transcription paused" }
+        if settings.modelInstaller.state != .installed { return "Waiting for model setup" }
+        return nil
+    }
+
+    /// Coalesces the bursts of changes a reconciliation makes into one reload.
+    private func scheduleReviewRefresh() {
+        guard !reviewRefreshScheduled else { return }
+        reviewRefreshScheduled = true
+        Task { [weak self] in
+            await Task.yield()
+            self?.reviewRefreshScheduled = false
+            await self?.refreshReview()
+        }
+    }
+
+    /// The title a rerun should carry: the person's title for the meeting,
+    /// else the reviewed transcript's.
+    private func effectiveTitle(for run: StoredTranscriptRun) -> String? {
+        if let draftID = run.job.draftID, let title = drafts?.drafts[draftID]?.title { return title }
+        return run.transcript?.title
     }
 
     // MARK: - Producer handoff
@@ -180,6 +433,10 @@ final class TranscriptionHostService {
     func consumeHandoffRequests() async {
         do {
             let consumer = TranscriptionHandoffConsumer(source: outbox) { @MainActor [weak self] request, job in
+                // Bound before the recorder's files go: the job record carries
+                // the draft ID either way, so a crash here is repaired by
+                // reconciliation rather than lost.
+                await self?.drafts?.jobQueued(job)
                 self?.retireRecorderSession(afterQueuing: request, job: job)
             }
             let outcome = try await consumer.drain(into: coordinator)
@@ -395,6 +652,7 @@ final class TranscriptionHostService {
             reviewModel.reload(files: reviewFiles())
             return reviewModel
         }
+        Task { [weak self] in await self?.reconcileDrafts(isLaunch: false) }
         let model = TranscriptViewModel(
             files: reviewFiles(),
             playback: AVFoundationTranscriptPlayback(),
@@ -407,7 +665,9 @@ final class TranscriptionHostService {
             reprocessor: TranscriptReprocessor(host: self),
             retranscriber: TranscriptRetranscriber(host: self),
             agentDispatcher: agentDispatcher,
-            openVocabularySettings: openVocabularySettings
+            openVocabularySettings: openVocabularySettings,
+            draftEditor: self,
+            sendController: self
         )
         reviewModel = model
         return model
@@ -425,8 +685,16 @@ final class TranscriptionHostService {
         return model
     }
 
+    /// Drafts and stored runs merged into one list: each recording made in
+    /// Scribe is one row keyed by its draft, and the live recording is first.
     private func reviewFiles() -> [TranscriptReviewFile] {
-        store.latestRunPerSource().map(TranscriptReviewFile.init)
+        guard let drafts else { return store.latestRunPerSource().map(TranscriptReviewFile.init) }
+        return MeetingDraftReviewMerger.files(
+            drafts: drafts.allDrafts,
+            saveStates: drafts.saveStates,
+            runs: store.runs(),
+            environment: reviewEnvironment(live: drafts.liveCapture)
+        )
     }
 
     private var speakerCount: TranscriptionSpeakerCount {
@@ -445,7 +713,12 @@ final class TranscriptionHostService {
             return TranscriptReprocessingOutcome(message: "The original transcription run could not be found.", isFailure: true)
         }
         do {
-            let job = try await coordinator.reprocess(previous.job, speakerCount: speakerCount, microphoneSpeakerPrior: settings.microphoneSpeakerPrior)
+            let job = try await coordinator.reprocess(
+                previous.job,
+                speakerCount: speakerCount,
+                microphoneSpeakerPrior: settings.microphoneSpeakerPrior,
+                title: effectiveTitle(for: previous)
+            )
             await refreshAndRunPending()
             let description = switch speakerCount {
             case .automatic: "automatic speaker count"
@@ -473,7 +746,8 @@ final class TranscriptionHostService {
                 previous.job,
                 modelProfileID: modelProfileID,
                 speakerCount: speakerCount,
-                microphoneSpeakerPrior: settings.microphoneSpeakerPrior
+                microphoneSpeakerPrior: settings.microphoneSpeakerPrior,
+                title: effectiveTitle(for: previous)
             )
             await refreshAndRunPending()
             return TranscriptReprocessingOutcome(
@@ -549,7 +823,8 @@ final class TranscriptionHostService {
 
     private func handle(_ event: TranscriptionCoordinator.Event) async {
         switch event {
-        case .queued:
+        case .queued(let job):
+            await drafts?.jobQueued(job)
             await updateQueueStatus()
         case let .stageStarted(job):
             status.lines = ["Transcribing \(job.request.sourceURL.lastPathComponent) — \(job.state.rawValue)"]
@@ -560,7 +835,9 @@ final class TranscriptionHostService {
         case .completed(let job):
             reviewModel?.finishReprocess(runID: job.runID.uuidString, success: true)
             await updateQueueStatus()
-            await refreshReview()
+            // Terminal state is read back from the job record and transcript;
+            // the event only makes the attach happen now rather than later.
+            await reconcileDrafts(isLaunch: false)
         case .cancelled(let job):
             reviewModel?.finishReprocess(
                 runID: job.runID.uuidString,
@@ -568,7 +845,7 @@ final class TranscriptionHostService {
                 message: "Re-transcription was cancelled."
             )
             await updateQueueStatus()
-            await refreshReview()
+            await reconcileDrafts(isLaunch: false)
         case let .failed(job, diagnostic):
             report(failure: "Transcription of \(job.request.sourceURL.lastPathComponent) failed: \(diagnostic.message)")
             reviewModel?.finishReprocess(
@@ -576,7 +853,7 @@ final class TranscriptionHostService {
                 success: false,
                 message: diagnostic.message
             )
-            await refreshReview()
+            await reconcileDrafts(isLaunch: false)
         case let .suspended(job):
             // Recording has priority; saying so is more useful than a job that
             // silently stops making progress.
@@ -599,6 +876,115 @@ final class TranscriptionHostService {
 
     private func publishStatus() {
         statusDidChange?(status)
+    }
+}
+
+extension TranscriptionHostService: MeetingDraftEditing {
+    func setTitle(draftID: UUID, title: String?, basedOnRevision: Int, previousTitle: String?) async throws -> MeetingDraftSummary? {
+        if drafts == nil { await openDrafts() }
+        guard let drafts else { throw MeetingDraftLifecycle.LifecycleError.unknownDraft }
+        let summary = try await drafts.setTitle(draftID: draftID, title: title, basedOnRevision: basedOnRevision, previousTitle: previousTitle)
+        // A finished meeting's transcript takes the name too.
+        await reconcileDrafts(isLaunch: false)
+        return summary
+    }
+
+    func retrySave(draftID: UUID) async -> MeetingDraftSummary? {
+        let summary = await drafts?.retrySave(draftID: draftID)
+        // A notes attachment that failed is retried by reconciliation.
+        await reconcileDrafts(isLaunch: false)
+        return drafts?.summary(for: draftID) ?? summary
+    }
+
+    func deleteDraft(draftID: UUID) async throws {
+        // A send already handed to Latch records its outcome first; an
+        // unclaimed one goes with the draft.
+        await sendRunner?.waitForInFlight(draftID: draftID)
+        try await drafts?.deleteDraft(draftID: draftID)
+    }
+
+    func transcribeNow(draftID: UUID) async -> String? {
+        guard let drafts else { return "Transcription is not available right now." }
+        reviewSessions = RecorderSessionEvidence.scan(recordingsDirectory: settings.recordingsFolderURL)
+        let failure = await drafts.transcribeNow(draftID: draftID)
+        await reconcileDrafts(isLaunch: false)
+        return failure
+    }
+
+    func notes(draftID: UUID) -> MeetingNotesContent {
+        drafts?.notes(draftID: draftID) ?? .unavailable("Meeting notes are not available yet.")
+    }
+
+    func exportNotes(draftID: UUID) -> Result<[TranscriptExportNote], MeetingNotesExportError> {
+        drafts?.exportNotes(draftID: draftID) ?? .failure(MeetingNotesExportError(message: "Meeting notes are not available yet."))
+    }
+
+    func setNotes(draftID: UUID, notes: [MeetingNote]) {
+        drafts?.setNotes(draftID: draftID, notes: notes)
+    }
+
+    func flushNotes(draftID: UUID) async {
+        await drafts?.flushNotes(draftID: draftID)
+    }
+
+    func noteClock(draftID: UUID) -> Int? {
+        drafts?.noteClock(draftID: draftID)
+    }
+
+    func hasUnsavedEdits(draftID: UUID) -> Bool {
+        drafts?.hasUnsavedEdits(draftID: draftID) ?? false
+    }
+
+    func prepareForCombine(draftIDs: [UUID]) async -> String? {
+        guard let drafts else { return nil }
+        // Attach any finished meeting whose notes are still in its draft.
+        await reconcileDrafts(isLaunch: false)
+        return await drafts.prepareForCombine(draftIDs: draftIDs)
+    }
+
+    func finishCombine(ownerDraftID: UUID?, absorbedDraftIDs: [UUID]) async {
+        await drafts?.finishCombine(ownerDraftID: ownerDraftID, absorbedDraftIDs: absorbedDraftIDs)
+        // Rebinds the owning draft to the combined run.
+        await reconcileDrafts(isLaunch: false)
+    }
+
+    func handoffSettings(draftID: UUID) -> MeetingHandoffSettings? {
+        drafts?.handoffSettings(draftID: draftID)
+    }
+
+    func setHandoffSettings(draftID: UUID, _ settings: MeetingHandoffSettings) {
+        drafts?.setHandoffSettings(draftID: draftID, settings)
+    }
+}
+
+extension TranscriptionHostService: MeetingSendControlling {
+    func queueSend(draftID: UUID) async -> String? {
+        if drafts == nil { await openDrafts() }
+        guard let sendRunner else { return "Sending to an agent is not available right now." }
+        let failure = await sendRunner.queueSend(draftID: draftID)
+        await refreshReview()
+        return failure
+    }
+
+    func cancelSend(draftID: UUID, operationID: UUID?) async -> String? {
+        let failure = await sendRunner?.cancelSend(draftID: draftID, operationID: operationID)
+        await refreshReview()
+        return failure
+    }
+
+    func confirmSend(draftID: UUID, operationID: UUID?, interactive: Bool) async {
+        await sendRunner?.confirmSend(draftID: draftID, operationID: operationID, interactive: interactive)
+        await refreshReview()
+    }
+
+    func retrySend(draftID: UUID) async {
+        await sendRunner?.retrySend(draftID: draftID)
+        await refreshReview()
+    }
+
+    func clearSendOutcome(draftID: UUID) async {
+        await sendRunner?.clearSendOutcome(draftID: draftID)
+        await refreshReview()
     }
 }
 

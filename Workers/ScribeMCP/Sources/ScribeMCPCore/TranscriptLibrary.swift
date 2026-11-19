@@ -49,7 +49,7 @@ public struct TranscriptLibrary: Sendable {
                 if let after = request.after, date < after { return false }
                 if let before = request.before, date >= before { return false }
             }
-            return needle.isEmpty || ([Self.title(of: t)] + t.speakers.map(\.labelSnapshot) + t.segments.map(\.text))
+            return needle.isEmpty || ([Self.title(of: t)] + t.speakers.map(\.labelSnapshot) + t.segments.map(\.text) + run.notes.map(\.exportedText))
                 .contains { Self.find(needle, in: $0.lowercased()) != nil }
         }
         let page = matches.dropFirst(request.offset).prefix(request.limit).map { run -> Value in
@@ -57,6 +57,17 @@ public struct TranscriptLibrary: Sendable {
             if !needle.isEmpty, let match = run.transcript.segments.first(where: { Self.find(needle, in: $0.text.lowercased()) != nil }),
                let excerpt = Self.excerpt(match.text, needle: needle) {
                 result["excerpt"] = .string(excerpt)
+            }
+            // A match in the person's notes is reported apart from the
+            // transcript excerpt, naming the note, so the two are never
+            // mistaken for each other.
+            if !needle.isEmpty, let note = run.notes.first(where: { Self.find(needle, in: $0.exportedText.lowercased()) != nil }),
+               let excerpt = Self.excerpt(note.exportedText, needle: needle) {
+                result["matched_note"] = [
+                    "id": .string(note.id.uuidString.lowercased()),
+                    "offset_ms": note.offsetMs.map(Value.int) ?? .null,
+                    "excerpt": .string(excerpt),
+                ]
             }
             return .object(result)
         }
@@ -88,6 +99,9 @@ public struct TranscriptLibrary: Sendable {
         result["total_chars"] = .int(text.count)
         result["next_offset"] = end < text.count ? .int(end) : .null
         result["warnings"] = .array(run.transcript.warnings.map { ["code": .string($0.code), "message": .string($0.message)] })
+        // The meeting's notes, whole on every page: they are not part of the
+        // paged text, and editing them does not change the revision.
+        result["notes"] = .array(run.notes.map(Self.note))
         return .object(result)
     }
 
@@ -126,6 +140,15 @@ public struct TranscriptLibrary: Sendable {
             "status": .string(t.status.rawValue),
             "speakers": .array(t.speakers.map { .string($0.labelSnapshot) }),
             "url": .string("scribe://transcripts/\(id)"),
+        ]
+    }
+
+    /// A note as the relay returns it: its words and recording time only.
+    static func note(_ note: TranscriptExportNote) -> Value {
+        [
+            "id": .string(note.id.uuidString.lowercased()),
+            "text": .string(note.exportedText),
+            "offset_ms": note.offsetMs.map(Value.int) ?? .null,
         ]
     }
 

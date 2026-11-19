@@ -424,6 +424,7 @@ private final class RecordingExportWriter: TranscriptExportWriting, @unchecked S
 
     func write(
         _ transcript: CanonicalTranscript,
+        notes _: [TranscriptExportNote],
         formats: Set<TranscriptExportFormat>,
         to directoryURL: URL,
         basename: String
@@ -440,6 +441,7 @@ private final class RecordingExportWriter: TranscriptExportWriting, @unchecked S
 
     func write(
         _ transcript: CanonicalTranscript,
+        notes _: [TranscriptExportNote],
         format: TranscriptExportFormat,
         toFile fileURL: URL
     ) -> TranscriptExportOutcome {

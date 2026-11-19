@@ -39,6 +39,10 @@ public final class ScribeSettings: ObservableObject {
     @Published public var pasteTimestampShortcut: GlobalShortcut {
         didSet { storeShortcut(pasteTimestampShortcut, forKey: Key.pasteTimestampShortcut) }
     }
+    /// Opens the live recording's notes in the floating panel.
+    @Published public var meetingNotesShortcut: GlobalShortcut {
+        didSet { storeShortcut(meetingNotesShortcut, forKey: Key.meetingNotesShortcut) }
+    }
     /// Seconds Paste Timestamp backs up from the elapsed clock, since a note is
     /// usually pasted just after the moment it describes.
     @Published public var pasteTimestampOffsetSeconds: Int {
@@ -326,6 +330,7 @@ public final class ScribeSettings: ObservableObject {
         startShortcut = Self.loadShortcut(from: defaults, key: Key.startShortcut) ?? .defaultStart
         stopShortcut = Self.loadShortcut(from: defaults, key: Key.stopShortcut) ?? .defaultStop
         pasteTimestampShortcut = Self.loadShortcut(from: defaults, key: Key.pasteTimestampShortcut) ?? .defaultPasteTimestamp
+        meetingNotesShortcut = Self.loadShortcut(from: defaults, key: Key.meetingNotesShortcut) ?? .defaultMeetingNotes
         pasteTimestampOffsetSeconds = min(max(defaults.object(forKey: Key.pasteTimestampOffsetSeconds) as? Int ?? 30, 0), 300)
         transcribeWhenFinalRecordingIsReady = defaults.object(forKey: Key.transcribeWhenFinalRecordingIsReady) as? Bool ?? false
         keepRecordingFilesForDebugging = defaults.object(forKey: Key.keepRecordingFilesForDebugging) as? Bool ?? false
@@ -606,6 +611,7 @@ public final class ScribeSettings: ObservableObject {
         static let stopShortcut = "scribe.settings.stopShortcut"
         static let pasteTimestampShortcut = "scribe.settings.copyTimestampShortcut"
         static let pasteTimestampOffsetSeconds = "scribe.settings.pasteTimestampOffsetSeconds"
+        static let meetingNotesShortcut = "scribe.settings.meetingNotesShortcut"
         static let transcribeWhenFinalRecordingIsReady = "scribe.settings.transcribeWhenFinalRecordingIsReady"
         static let keepRecordingFilesForDebugging = "scribe.settings.keepRecordingFilesForDebugging"
         static let transcriptionSpeakerCount = "scribe.settings.transcriptionSpeakerCount"

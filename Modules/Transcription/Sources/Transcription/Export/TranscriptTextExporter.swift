@@ -7,6 +7,15 @@ import Foundation
 /// Annotations follow the timestamp range when they apply: `[overlap]` for a segment that shares
 /// time with another speaker, `[timing approximate]` for a segment whose timing came from the
 /// coarse fallback rather than validated word timing.
+///
+/// When the meeting has notes, a Notes section follows the transcript, one paragraph per note:
+///
+///     Notes
+///
+///     [05:50] Ask Dana about the launch date
+///             and the budget
+///
+/// Note times are recording time, `[--:--]` when a note has none.
 public enum TranscriptTextExporter {
     /// What a recording with no recognized speech says, instead of inventing a segment.
     public static let noSpeechStatement = "No speech was detected in this recording."
@@ -14,17 +23,25 @@ public enum TranscriptTextExporter {
     static let overlapAnnotation = "[overlap]"
     static let approximateTimingAnnotation = "[timing approximate]"
 
-    public static func export(_ transcript: CanonicalTranscript) throws -> String {
-        try TranscriptExporter.validate(transcript)
-        guard !transcript.segments.isEmpty else { return noSpeechStatement + "\n" }
+    /// The heading of the section that holds the meeting's notes.
+    public static let notesHeading = "Notes"
 
-        let labels = TranscriptSpeakerLabels(transcript)
-        let paragraphs = transcript.segments.map { paragraph(for: $0, label: labels.label(for: $0)) }
-        return paragraphs.joined(separator: "\n\n") + "\n"
+    public static func export(_ transcript: CanonicalTranscript, notes: [TranscriptExportNote] = []) throws -> String {
+        try TranscriptExporter.validate(transcript)
+        let body: String
+        if transcript.segments.isEmpty {
+            body = noSpeechStatement
+        } else {
+            let labels = TranscriptSpeakerLabels(transcript)
+            body = transcript.segments.map { paragraph(for: $0, label: labels.label(for: $0)) }.joined(separator: "\n\n")
+        }
+        let noteParagraphs = notes.compactMap(\.plainText)
+        guard !noteParagraphs.isEmpty else { return body + "\n" }
+        return ([body, notesHeading] + noteParagraphs).joined(separator: "\n\n") + "\n"
     }
 
-    public static func data(_ transcript: CanonicalTranscript) throws -> Data {
-        Data(try export(transcript).utf8)
+    public static func data(_ transcript: CanonicalTranscript, notes: [TranscriptExportNote] = []) throws -> Data {
+        Data(try export(transcript, notes: notes).utf8)
     }
 
     private static func paragraph(for segment: TranscriptSegment, label: String) -> String {

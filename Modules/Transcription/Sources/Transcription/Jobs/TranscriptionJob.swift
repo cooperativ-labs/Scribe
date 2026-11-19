@@ -152,6 +152,16 @@ public struct TranscriptionJob: Codable, Sendable, Equatable, Identifiable {
     }
 
     public var jobFileURL: URL { runDirectoryURL.appendingPathComponent("job.json") }
+
+    /// The meeting draft this run belongs to, copied from the request so the
+    /// link survives the outbox file being claimed. Nil for imports and for
+    /// jobs written before drafts existed.
+    public var draftID: UUID? { request.draftID }
+
+    /// The `meeting--<source>` directory holding this run.
+    public var meetingDirectoryURL: URL {
+        runDirectoryURL.deletingLastPathComponent().deletingLastPathComponent()
+    }
 }
 
 public enum TranscriptionCoordinatorError: Error, Sendable, Equatable {

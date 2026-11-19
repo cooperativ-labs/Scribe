@@ -43,6 +43,74 @@ import Testing
         }
     }
 
+    @Test func captureStartedIsReportedOnceAndNotOnResume() async throws {
+        let root = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let capture = FakeCapture()
+        let coordinator = makeCoordinator(root: root, capture: capture)
+        let stream = await coordinator.events()
+        var iterator = stream.makeAsyncIterator()
+
+        await coordinator.start(title: "Planning")
+        await coordinator.pause()
+        await coordinator.resume()
+        await coordinator.stop()
+
+        // idle, starting, recording, captureStarted, paused, recording,
+        // stopping, recordingStopped, finalRecordingReady, idle
+        var observed: [RecordingCoordinatorEvent] = []
+        for _ in 0..<10 {
+            if let event = await iterator.next() { observed.append(event) }
+        }
+        let started = observed.compactMap { event -> CaptureStartedEvent? in
+            if case .captureStarted(let started) = event { return started }
+            return nil
+        }
+        #expect(started.count == 1)
+        let directory = try onlySessionDirectory(in: root)
+        #expect(started.first?.sessionDirectory.standardizedFileURL == directory.standardizedFileURL)
+        #expect(started.first?.activity.title == "Planning")
+        let stopped = observed.compactMap { event -> RecordingStoppedEvent? in
+            if case .recordingStopped(let stopped) = event { return stopped }
+            return nil
+        }
+        #expect(stopped.map(\.sessionID) == started.map(\.activity.sessionID))
+        #expect(stopped.first?.reason.journalReason == "user-requested")
+    }
+
+    @Test func aStartThatFailsBeforeCaptureReportsNoSession() async throws {
+        let root = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let capture = FakeCapture()
+        capture.failsToStart = true
+        let coordinator = makeCoordinator(root: root, capture: capture)
+        let stream = await coordinator.events()
+        var iterator = stream.makeAsyncIterator()
+
+        await coordinator.start()
+
+        var observed: [RecordingCoordinatorEvent] = []
+        for _ in 0..<3 {
+            if let event = await iterator.next() { observed.append(event) }
+        }
+        guard case .error = await coordinator.state() else {
+            Issue.record("A failed start must end in an error state")
+            return
+        }
+        #expect(!observed.contains { if case .captureStarted = $0 { true } else { false } })
+    }
+
+    @Test func journalReasonsAreTheStopVocabularyDraftsMap() {
+        let reasons: [RecordingStopReason] = [
+            .user, .microphoneDisconnected, .selectedApplicationExited,
+            .streamFailure(RecorderFailure(code: "x", message: "x")), .sleep, .lowFreeSpace,
+        ]
+        #expect(reasons.map(\.journalReason) == [
+            "user-requested", "microphone-disconnected", "selected-application-exited",
+            "unrecoverable-stream-error", "system-sleep", "low-free-space",
+        ])
+    }
+
     @Test func pauseHoldsOneSessionAndResumeContinuesIt() async throws {
         let root = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -240,8 +308,11 @@ private final class FakeCapture: RecordingCaptureControlling, @unchecked Sendabl
 
     func setPaused(_ paused: Bool) { pauseChanges.append(paused) }
 
+    var failsToStart = false
+
     func start() async throws -> ResolvedCaptureSources {
         startCount += 1
+        if failsToStart { throw CaptureStartFailure() }
         return ResolvedCaptureSources(
             scope: CaptureScope(applicationBundleIdentifiers: ["com.example.Meeting"], processIdentifiers: [42]),
             applications: [CaptureApplicationOption(bundleIdentifier: "com.example.Meeting", name: "Meeting", processIdentifier: 42)],
@@ -260,3 +331,5 @@ private final class FakeCapture: RecordingCaptureControlling, @unchecked Sendabl
         )
     }
 }
+
+private struct CaptureStartFailure: Error {}

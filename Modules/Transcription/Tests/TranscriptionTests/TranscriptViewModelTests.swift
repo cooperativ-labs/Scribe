@@ -886,6 +886,7 @@ private struct StubExportWriter: TranscriptExportWriting {
 
     func write(
         _: CanonicalTranscript,
+        notes _: [TranscriptExportNote],
         formats _: Set<TranscriptExportFormat>,
         to _: URL,
         basename _: String
@@ -893,6 +894,7 @@ private struct StubExportWriter: TranscriptExportWriting {
 
     func write(
         _: CanonicalTranscript,
+        notes _: [TranscriptExportNote],
         format: TranscriptExportFormat,
         toFile fileURL: URL
     ) -> TranscriptExportOutcome {

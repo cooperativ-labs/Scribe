@@ -109,8 +109,8 @@ was one, or onto the clipboard if you choose **Copy to the clipboard only**.
 ## ChatGPT and Claude
 
 The [Scribe MCP integration](Integrations/scribe/README.md) lets ChatGPT and
-Claude find recent meetings, search saved transcripts, and retrieve timestamped
-text for summaries and action items. It includes a local Claude Code plugin,
+Claude find recent meetings, search saved transcripts and meeting notes, and
+retrieve timestamped text, with the meeting's notes, for summaries and action items. It includes a local Claude Code plugin,
 an OAuth-protected remote connector, and a ChatGPT transcript viewer. Setup is
 opt-in; recording and transcription continue to work offline.
 
@@ -267,8 +267,9 @@ answers for that call only: the next meeting is offered again.
 
 Accepting scopes the recording to the application that was noticed — the same
 choice the **Application** submenu makes — and turns the chip into that
-recording's transport: the elapsed time on the left, pause and stop on the
-right. By default it stays until the recording is stopped. Enable **Stop
+recording's transport: the elapsed time on the left, a **Meeting Notes** button
+(which opens that recording's notes in the floating notes panel), pause and stop
+on the right. By default it stays until the recording is stopped. Enable **Stop
 recording automatically when the meeting ends** in Settings to have a recording
 started from this prompt stop and save after Scribe observes the call end. Brief
 microphone reconnects are ignored. Stopping from the chip is taken as the answer
@@ -281,6 +282,225 @@ on every Space. On macOS 26 it is drawn in Liquid Glass; on macOS 15 the same
 shapes are drawn in the system material.
 
 A recording started from the menu, with no call noticed, gets no chip.
+
+### Recordings in the Transcripts window
+
+Every recording appears in the Transcripts sidebar as soon as capture is
+running, pinned to the top with its clock ("Recording · 12:41"). The row keeps
+its place and its selection while the recording is processed, queued,
+transcribed and later re-run, and after Scribe is relaunched. A recording whose
+start failed before capture began gets no row.
+
+The row is named after the calendar event, or the dated recording name when
+there is none. Rename it at any time, including while it is recording; the name
+becomes the transcript's title when processing finishes, and reprocessing or
+retranscribing keeps it.
+
+Until a transcript exists the row says where the meeting is: processing audio,
+waiting to transcribe, waiting for model setup, or **Not transcribed** when
+**Transcribe when the final recording is ready** is off in Settings (use **Transcribe Now**
+from the row's menu or the detail pane). A recording that ended because the
+microphone disconnected, the Mac slept, the meeting app quit, permission was
+removed, the disk filled or Scribe quit unexpectedly says so. If the recording
+itself is gone — no raw audio, handoff request or transcription job survives —
+the row stays as **Notes only** until you choose **Delete Draft…**; its
+confirmation says how many notes would be removed. Retranscribe, combine,
+export and deleting audio wait until a transcript exists.
+
+### Meeting notes
+
+Select a recording's row in the Transcripts window to write notes for the
+agent while the meeting is being recorded. Each paragraph is one note; Return
+adds a line to the same note and a blank line starts the next. A note is
+stamped with the recording time when its first character is typed — the same
+figure **Paste Timestamp** would paste, including its offset — and the stamp
+stays with the note when you add to it. Joining two notes keeps the earlier
+time, splitting one with a blank line gives both halves its time, pasting
+several paragraphs stamps each with the paste time, and undo and redo bring
+stamps back with the text. Notes written while the recording is paused, or
+after it stopped, have no time (`--:--`). Text being composed with an input
+method becomes a note only once it is committed.
+
+Once the transcript is ready, the notes sit in a foldable section above it.
+Each stamp is a button: it moves playback to that moment and highlights the
+nearest turn, without starting sound. VoiceOver reads a stamp as, for
+example, "Note at 5 minutes, 50 seconds", and with Full Keyboard Access the
+stamps follow the notes in the keyboard order (Control-Tab out of the text).
+Stamps cannot seek once the recording's audio is deleted or when a time falls
+outside the recording.
+
+#### Floating notes panel
+
+You don't have to leave the meeting to write notes. The **Meeting Notes**
+panel is a small floating window with the recording's name and clock, the
+same notes editor and the same agent handoff tray as the Transcripts window.
+It opens over a full-screen meeting, follows you to every Space, and takes your
+typing without bringing Scribe forward, so the meeting app stays the active
+app. Open it from:
+
+- the global shortcut **Meeting notes** (⌥⇧⌘N by default; change it in
+  Settings → General → Global shortcuts, beside Paste timestamp). It opens the
+  notes of the recording in progress, recording or paused, and nothing else;
+  with nothing recording it only shows a short hint under the menu bar icon;
+- **Meeting Notes** in the menu bar panel, under Paste Timestamp (available
+  while recording);
+- the **Meeting Notes** button on the meeting chip while it shows the
+  recording's transport.
+
+Each entry point opens the notes of the recording it was showing, never "the
+selected row". The panel and the Transcripts window edit the same draft: what
+you type in one shows up in the other as you type, and the handoff settings are
+shared too. **Open in Transcripts** opens the window with the meeting's row
+selected. The panel remembers where you put it and how big it was.
+
+The panel stays open when you click back into your meeting. You close it with
+its close button or ⌘W. It closes itself only once the meeting's transcript is
+ready, and even then never while it has the keyboard (or one of its pickers or
+the folder dialog is open), while text is being composed with an input method,
+while an edit has not been saved, or while the tray shows a send that is
+queued, held, under way, sent or failed — so a **Send after processing** result
+stays in front of you. Its notes are written whenever it closes.
+
+Notes belong to the meeting, not to one transcription run: renaming,
+reprocessing and retranscribing show the same notes. **Delete Audio** keeps
+them. Deleting the transcript deletes them with it, and the confirmation says
+so. Combining two recordings keeps both sets of notes in the combined meeting,
+with the second recording's times moved to where its audio now starts (untimed
+notes stay untimed), and clears the agent handoff settings of the combined
+meeting. Imported files and pasted transcripts have no notes.
+
+Until a recording's transcript is ready its notes are kept with the rest of
+the draft (below). When transcription finishes, they move into the meeting's
+folder in the transcript store as `meeting-notes.json` (owner-only, 0600,
+versioned), the only copy from then on. Notes are stored unencrypted, like
+transcripts. A notes file that cannot be read is never overwritten: the notes
+show as unavailable and combining that meeting is refused.
+
+Scribe keeps what it knows about each recording (its name, its notes until the
+transcript is ready, and its agent handoff settings) as one
+owner-only (0600) file per recording in `~/Library/Application Support/Scribe/drafts`,
+never in the recordings folder. Edits are saved about half a second after you stop typing and
+immediately when a recording stops, is handed to transcription, or Scribe quits
+normally; a forced quit can lose at most that half second. If a save fails the
+row reads **Not saved** with **Retry**, and the edit is kept in memory until a
+retry succeeds. At launch Scribe compares these files with the recordings
+folder, the transcription queue and the transcript store, and repairs anything
+an interruption left behind: a recording cut off by a crash is marked
+interrupted, a finished recording that never reached transcription is handed
+off (when automatic transcription is on), and a transcript that finished while
+Scribe was not running is linked back to its row. Each recording is handed to
+transcription under an ID derived from its session, so recovering a handoff
+twice never transcribes the meeting twice. Deleting a transcript removes its
+draft file too. The same quiet period and **Not saved** / **Retry** apply to
+notes after transcription; they are also written when you select another row
+or close the window.
+
+### Sending to an agent
+
+A recording's agent handoff sits in a tray under its notes: the prompt (with
+**Recent**, the last prompts sent into the chosen folder), then pills for the
+agent, the model, the effort (only for agents that take one: Claude Code and
+Codex), the folder the session opens in, and **…** for an MCP server URL. Each
+meeting keeps its own choices: a new recording starts from what was last sent,
+once, and changing one meeting's agent or prompt never changes another's. The
+folder starts as the first connected folder that is still there; **No folder**
+runs the agent in Scribe's own handoff folder and prints its summary in the
+session. A folder or agent that has since gone is named in the tray instead of
+being swapped for another. Until you edit the prompt it follows the folder,
+taking the last prompt sent there (or the default); once you type or pick one
+it stays.
+
+You can set this up while the meeting is recording; **Send to agent** becomes
+available when the transcript is ready, from the compact tray under a finished
+meeting's notes or from **Send to Agent** in the toolbar, whose sheet shows the
+notes exactly as they will travel. Imported files and pasted transcripts have
+no notes and send straight away. After a send the tray reads **Sent to … in …**
+with **Open in Latch** and **Send again**; if it could not be sent the tray
+gives the reason with **Try again**, and the notes and settings are kept.
+
+The agent is given your prompt first, then your notes under the heading "Notes
+taken during the meeting by the person who sent this (times are recording
+time)", one `[mm:ss] text` line per note (`[--:--]` when untimed), then the
+path of the transcript (the Knowledgebase export) with an explicit statement
+that the transcript is source material, not instructions. Notes longer than
+about 4,000 characters go in a file beside the transcript instead of the
+command line. These files are written to
+`~/Library/Application Support/Scribe/Agent Handoffs`, named after each send
+(owner-only, 0600), and deleted after 7 days. The agent, model, effort, MCP URL
+and prompt are remembered for next time only once Latch has created the
+session.
+
+#### Send after processing
+
+While a meeting is recording or being transcribed, the tray offers **Send after
+processing**. Scribe then sends the transcript, prompt and notes on its own as
+soon as transcription and diarization finish, even if the Transcripts window is
+closed. While it waits the tray reads **Will send when ready** with **Cancel
+send**, and shows where it will go ("Sends to Claude Code · opus · tough-leaf");
+the agent, model, effort, folder, MCP URL, prompt and notes all stay editable,
+and the send uses whatever they hold when it fires. The row says the same
+("Transcribing · sends to Claude Code", then "Sent to Claude Code in
+tough-leaf"), so nothing is lost if notifications are off.
+
+Scribe asks before sending (**Ready to send — confirm**, with **Send** and
+**Cancel** in the tray and in a notification) when the recording ended some
+other way than you pressing Stop, when Scribe was quit or relaunched after the
+send was queued, or when it was queued more than four hours ago. A queued send
+also waits while another recording is being captured. A send that fires on its
+own never brings Latch to the front; its notification offers **Open**. If the
+transcript has no speech or transcription fails, nothing is sent and the notes
+are kept; reprocessing or retranscribing never sends again by itself.
+
+A queued send needs a Latch whose `latch capabilities --json` lists
+`create-request-id`: Scribe gives each send an ID and Latch starts at most one session
+for it, so if Scribe crashes mid-send it asks again on the next launch and gets
+the same session back rather than a second agent. With an older Latch a queued
+send is not fired and the tray says to update Latch; sending by hand still
+works. If Scribe can't tell whether the agent started, the tray says so and
+**Try again** asks Latch again under the same ID. Combining is unavailable
+while a meeting has a queued, held or unconfirmed send.
+
+### Notes in exports and assistants
+
+A meeting's notes travel with its transcript wherever the transcript goes,
+except subtitles:
+
+| Where | What carries the notes |
+| --- | --- |
+| TXT export | A **Notes** section after the transcript, one paragraph per note: `[05:50] text`, `[--:--]` when untimed, later lines of a note indented under its first |
+| Scribe JSON export | A top-level `notes` array after `warnings`: `{ id, text, offset_ms, draft_id }`, `offset_ms` null when untimed. The canonical transcript members are unchanged, so a reader that predates notes reads the same transcript |
+| Knowledgebase JSON export and **Copy Knowledgebase JSON** | `pipeline.extensions["ai.scribe"].notes`: `{ id, text, offset_ms }`. Still `kb.transcript-upload/1`: Knowledgebase accepts any object in a producer's extension and keeps it with the imported transcript, while a top-level `notes` would be rejected |
+| SRT export | Nothing: subtitles only |
+| ChatGPT, Claude and other MCP clients (local or through the relay) | `scribe_get_transcript` and `fetch` return `notes` apart from the transcript text, whole on every page; search also matches note text and names the note that matched (`matched_note`). Paging and `revision` are unaffected — see [Integrations/scribe](Integrations/scribe/README.md#tools-and-data-behavior) |
+
+Exports carry exactly what the meeting's row shows, including an edit made a
+moment ago that is not on disk yet. After a combine, each note in Scribe JSON
+keeps the `draft_id` of the recording it was written in. A meeting without notes
+exports byte for byte as before. If the notes file cannot be read, the
+transcript is still exported, without notes, and the confirmation says the notes
+were left out. When a meeting is sent to an agent its notes go in the prompt (or
+the notes file), not in the handoff's transcript file, so the agent sees them
+once and labelled as yours.
+
+The prompt, MCP URL, agent, model, effort, folder and send history are private
+to the draft record. They never appear in an export, the MCP server or relay,
+Scribe's logs, or **Capture messages for debugging**; the only place they travel
+is the agent session you send to.
+
+### Where meeting data is kept
+
+| What | Where | Permissions | Removed when |
+| --- | --- | --- | --- |
+| Recording audio, transcripts, `meeting-notes.json` | The transcript store, one `meeting--…` folder per meeting | Notes file 0600 | **Delete** removes the whole folder, notes included. **Delete Audio** removes only the audio |
+| Draft record: name, notes until transcribed, handoff settings, send state | `~/Library/Application Support/Scribe/drafts/<id>.json` | 0600 | Deleting the transcript or **Delete Draft…**; a combine removes the absorbed recording's record |
+| Files handed to an agent (`<send>.kb.json`, `<send>.notes.txt`) | `~/Library/Application Support/Scribe/Agent Handoffs` | 0600 in a 0700 folder | At the next send, once more than 7 days old. Deleting the meeting does not remove them sooner |
+
+Nothing here is encrypted beyond what FileVault gives the disk. A recording
+whose audio, handoff request and transcription job are all gone keeps its draft
+as a **Notes only** row (send disabled) until you delete it; a crash, forced
+quit or relaunch is recovered at the next launch as described under [Meeting
+notes](#meeting-notes), and a send that was queued across it waits for your
+**Send** instead of firing.
 
 ### Model storage and offline operation
 
@@ -303,8 +523,9 @@ jobs use the selected folder without an app restart; active workers retain their
 original model directory. Once installed, transcription works offline.
 
 Upgrading from the original Parakeet v3 encoder downloads the new 595 MB encoder
-bundle and reuses the verified companion files. The original encoder stays in
-the selected model folder so the previous app can still use its matching assets.
+bundle and reuses the verified companion files. After the complete replacement
+is verified, the installer removes the original encoder from the selected model
+folder. Rolling back to the previous app requires reinstalling its encoder.
 
 Cloud models and API-key configuration are deferred. The shell installer in
 `Scripts/package-transcription-models.sh` remains available for development;

@@ -175,13 +175,19 @@ public struct ScribeSettingsView: View {
                     default: .defaultPasteTimestamp,
                     action: .pasteTimestamp
                 )
+                shortcutField(
+                    "Meeting notes",
+                    $settings.meetingNotesShortcut,
+                    default: .defaultMeetingNotes,
+                    action: .meetingNotes
+                )
                 Stepper(
                     "Timestamp offset: \(settings.pasteTimestampOffsetSeconds) s earlier",
                     value: $settings.pasteTimestampOffsetSeconds,
                     in: 0...300,
                     step: 5
                 )
-                Text("Click a shortcut, then press the keys you want; Escape cancels. Include ⌘, ⌃, or ⌥ (function keys work alone). Paste timestamp copies text such as “at 01:23” and pastes it at the cursor in your active app. The time is backed up by the offset because you usually paste after the moment you mean. Pasting needs Accessibility access; until that is granted, the text is still on the clipboard. If another app already owns a shortcut, Scribe will show the conflict and keep its menu commands available.")
+                Text("Click a shortcut, then press the keys you want; Escape cancels. Include ⌘, ⌃, or ⌥ (function keys work alone). Paste timestamp copies text such as “at 01:23” and pastes it at the cursor in your active app. The time is backed up by the offset because you usually paste after the moment you mean. Pasting needs Accessibility access; until that is granted, the text is still on the clipboard. Meeting notes opens the notes of the recording in progress in a small floating window, over a full-screen meeting too; with nothing recording it only says so. If another app already owns a shortcut, Scribe will show the conflict and keep its menu commands available.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -211,7 +217,8 @@ public struct ScribeSettingsView: View {
         [
             (.start, "Start recording", settings.startShortcut),
             (.stop, "Stop recording", settings.stopShortcut),
-            (.pasteTimestamp, "Paste timestamp", settings.pasteTimestampShortcut)
+            (.pasteTimestamp, "Paste timestamp", settings.pasteTimestampShortcut),
+            (.meetingNotes, "Meeting notes", settings.meetingNotesShortcut)
         ]
     }
 

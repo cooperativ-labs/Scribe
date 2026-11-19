@@ -18,6 +18,9 @@ public struct TranscriptionMenuCommands {
     public var openSpeakers: (() -> Void)?
     public var transcribeFolder: () -> Void
     public var openTranscriptionsFolder: () -> Void
+    /// Opens the notes of the recording with this session ID in the
+    /// floating panel. Absent when the host keeps no meeting notes.
+    public var openMeetingNotes: ((UUID) -> Void)?
 
     public init(
         statusLines: [String] = [],
@@ -25,7 +28,8 @@ public struct TranscriptionMenuCommands {
         openTranscripts: @escaping () -> Void,
         openSpeakers: (() -> Void)? = nil,
         transcribeFolder: @escaping () -> Void,
-        openTranscriptionsFolder: @escaping () -> Void
+        openTranscriptionsFolder: @escaping () -> Void,
+        openMeetingNotes: ((UUID) -> Void)? = nil
     ) {
         self.statusLines = statusLines
         self.failure = failure
@@ -33,5 +37,6 @@ public struct TranscriptionMenuCommands {
         self.openSpeakers = openSpeakers
         self.transcribeFolder = transcribeFolder
         self.openTranscriptionsFolder = openTranscriptionsFolder
+        self.openMeetingNotes = openMeetingNotes
     }
 }

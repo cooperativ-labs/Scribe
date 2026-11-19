@@ -39,4 +39,45 @@ final class RecordingTimestampTests: XCTestCase {
             "at 00:00"
         )
     }
+
+    func testNoteOffsetIsTheSameClockAsPasteTimestampInMilliseconds() {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let activity = RecordingActivity(sessionID: UUID(), startedAt: start)
+
+        XCTAssertEqual(
+            RecordingTimestamp.noteOffsetMilliseconds(state: .recording(activity), at: start.addingTimeInterval(83.4567)),
+            83_456
+        )
+        XCTAssertEqual(
+            RecordingTimestamp.noteOffsetMilliseconds(state: .recording(activity), at: start.addingTimeInterval(83), offset: 30),
+            53_000
+        )
+        XCTAssertEqual(
+            RecordingTimestamp.noteOffsetMilliseconds(state: .recording(activity), at: start.addingTimeInterval(10), offset: 30),
+            0
+        )
+    }
+
+    func testNoteOffsetIsNilUnlessAudioIsBeingCaptured() {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let activity = RecordingActivity(sessionID: UUID(), startedAt: start)
+        let later = start.addingTimeInterval(60)
+
+        XCTAssertNil(RecordingTimestamp.noteOffsetMilliseconds(state: .paused(activity), at: later))
+        XCTAssertNil(RecordingTimestamp.noteOffsetMilliseconds(state: .starting, at: later))
+        XCTAssertNil(RecordingTimestamp.noteOffsetMilliseconds(state: .stopping, at: later))
+        XCTAssertNil(RecordingTimestamp.noteOffsetMilliseconds(state: .idle, at: later))
+        XCTAssertNil(RecordingTimestamp.noteOffsetMilliseconds(startedAt: start, isPaused: true, at: later))
+        XCTAssertEqual(RecordingTimestamp.noteOffsetMilliseconds(startedAt: start, isPaused: false, at: later, offset: 5), 55_000)
+    }
+
+    func testNoteOffsetCoversLongRecordings() {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let activity = RecordingActivity(sessionID: UUID(), startedAt: start)
+        // Eleven hours in: well past the hour boundary, no overflow or wrap.
+        XCTAssertEqual(
+            RecordingTimestamp.noteOffsetMilliseconds(state: .recording(activity), at: start.addingTimeInterval(11 * 3_600 + 5)),
+            (11 * 3_600 + 5) * 1_000
+        )
+    }
 }

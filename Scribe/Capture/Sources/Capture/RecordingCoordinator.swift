@@ -43,7 +43,9 @@ public enum RecordingStopReason: Equatable, Sendable {
     case permissionRevoked(PermissionRevocation)
     case lowFreeSpace
 
-    var journalReason: String {
+    /// The wording written to the capture journal. Public because it is the
+    /// one stop vocabulary modules without a Capture dependency can map.
+    public var journalReason: String {
         switch self {
         case .user: "user-requested"
         case .microphoneDisconnected: "microphone-disconnected"
@@ -62,12 +64,25 @@ public enum RecordingStopReason: Equatable, Sendable {
 }
 
 public enum RecordingCoordinatorEvent: Sendable, Equatable {
+    /// Capture became active for a new session. Emitted once per session,
+    /// never on resume, and never for a start that failed before capture ran.
+    case captureStarted(CaptureStartedEvent)
     /// Raw capture has stopped and original CAF files are closed. Processing may
     /// still be pending or running, so consumers must not imply final output.
     case recordingStopped(RecordingStoppedEvent)
     /// The finalized session is safe for downstream processing and import.
     case finalRecordingReady(FinalRecordingReadyEvent)
     case stateChanged(RecordingCoordinatorState)
+}
+
+public struct CaptureStartedEvent: Sendable, Equatable {
+    public let activity: RecordingActivity
+    public let sessionDirectory: URL
+
+    public init(activity: RecordingActivity, sessionDirectory: URL) {
+        self.activity = activity
+        self.sessionDirectory = sessionDirectory
+    }
 }
 
 public struct RecordingStoppedEvent: Sendable, Equatable {
@@ -228,7 +243,9 @@ public actor RecordingCoordinator {
             activeCapture = capture
             let sources = try await capture.start()
             try store.updateCaptureSources(CaptureSourceUpdate(scope: sources.scope, microphone: sources.microphone))
-            transition(to: .recording(RecordingActivity(sessionID: sessionID, startedAt: now(), title: store.manifest.title)))
+            let activity = RecordingActivity(sessionID: sessionID, startedAt: now(), title: store.manifest.title)
+            transition(to: .recording(activity))
+            emit(.captureStarted(CaptureStartedEvent(activity: activity, sessionDirectory: store.sessionDirectory)))
             if let pendingInterruption {
                 self.pendingInterruption = nil
                 await stop(reason: pendingInterruption)

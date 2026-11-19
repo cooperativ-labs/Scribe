@@ -21,6 +21,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// thing at once: the chip withdraws a few seconds into a recording, and the
     /// dot takes over from there.
     private var chipVisibilityObservation: AnyCancellable?
+    /// Answers a global shortcut that had nothing to act on.
+    private var hint: TransientHintController?
     private var dictationIndicator: DictationIndicatorController?
     private var dictationStateObservation: AnyCancellable?
     private var wasDictationListening = false
@@ -104,6 +106,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         chipVisibilityObservation = environment.meetingChipModel.$presentation.sink { [weak menuBar] presentation in
             menuBar?.isMeetingChipVisible = presentation.isVisible
         }
+        // The chip's Notes button opens the notes of the recording it shows.
+        if environment.transcription != nil {
+            meetingChip?.openMeetingNotes = { [environment] sessionID in environment.openMeetingNotes(sessionID: sessionID) }
+        }
+        let hint = TransientHintController(anchor: { [weak menuBar] in menuBar?.statusItemAnchor })
+        self.hint = hint
+        environment.showHint = { [weak hint] message in hint?.show(message) }
         // Reconnects the library to the Scribe relay if it was left connected.
         AssistantRelayAgent.shared.resumeIfEnabled(package: AssistantConnectorPackage())
         environment.presentFirstRunPermissionsIfNeeded()
@@ -131,12 +140,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// recovery work on the next launch instead of as a finished recording.
     /// Background processing is not waited on — it resumes after relaunch.
     /// A paused capture is a live one: it is stopped and saved the same way.
+    ///
+    /// Meeting drafts are written before replying, even when nothing is
+    /// recording, so an edit made in the last half second is not lost to the
+    /// write delay.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         let state = environment.coordinator.snapshot.state
-        guard state.isCapturing || state.isTransitioning else { return .terminateNow }
-        environment.coordinator.stopForTermination {
-            sender.reply(toApplicationShouldTerminate: true)
+        let finish: @MainActor () -> Void = { [environment] in
+            environment.flushDraftsForTermination {
+                sender.reply(toApplicationShouldTerminate: true)
+            }
         }
+        guard state.isCapturing || state.isTransitioning else {
+            finish()
+            return .terminateLater
+        }
+        environment.coordinator.stopForTermination(then: finish)
         return .terminateLater
     }
 

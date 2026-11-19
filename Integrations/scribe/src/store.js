@@ -16,7 +16,14 @@ export const canonicalSchema = z.object({
   })),
   warnings: z.array(z.object({ code: z.string().max(200), message: z.string().max(4000) })).max(1000),
 });
-const jobSchema = z.object({ runID: z.string().uuid(), createdAt: timestamp });
+const jobSchema = z.object({ runID: z.string().uuid(), createdAt: timestamp,
+  request: z.object({ draftID: z.string().uuid().optional() }).optional().catch(undefined) });
+// meeting-notes.json beside a meeting's runs: the person's notes, by the draft
+// they were written in. Prompts, MCP URLs and send state are never in it.
+const notesSchema = z.object({ schemaVersion: z.number().int().max(1),
+  entries: z.array(z.object({ draftID: z.string().uuid(), recorderSessionID: z.string().uuid(), attachedRevision: z.number().int(),
+    ownerDraftID: z.string().uuid().nullish(),
+    notes: z.array(z.object({ id: z.string().uuid(), text: z.string(), recordingOffsetMilliseconds: z.number().int().nullish() })) })) });
 export class StoreError extends Error {}
 const MAX_FILE_BYTES = 32 * 1024 * 1024;
 
@@ -41,6 +48,24 @@ function timecode(ms) {
   const seconds = Math.floor(ms / 1000);
   return `${String(Math.floor(seconds / 3600)).padStart(2, '0')}:${String(Math.floor(seconds / 60) % 60).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
 }
+// A note's text as exports and the relay carry it: blank lines and surrounding
+// spaces dropped, line breaks inside the note kept. Notes with no words are left out.
+function noteText(text) {
+  return text.split(/\r\n|\r|\n|\u2028|\u2029|\u0085|\v|\f/).map(line => line.replace(/^[\p{Zs}\t]+|[\p{Zs}\t]+$/gu, '')).filter(Boolean).join('\n');
+}
+// The notes a run shows: those of its draft's row (own entry first, then any
+// combined into it), or every entry when the run names no draft with notes here.
+export function runNotes(sidecar, draftID) {
+  if (!sidecar) return [];
+  const id = draftID?.toLowerCase(), display = entry => (entry.ownerDraftID ?? entry.draftID).toLowerCase();
+  let entries = sidecar.entries;
+  if (id && entries.some(entry => display(entry) === id)) {
+    const shown = entries.filter(entry => display(entry) === id);
+    entries = [...shown.filter(entry => entry.draftID.toLowerCase() === id), ...shown.filter(entry => entry.draftID.toLowerCase() !== id)];
+  }
+  return entries.flatMap(entry => entry.notes).map(note => ({ id: note.id.toLowerCase(), text: noteText(note.text),
+    offset_ms: note.recordingOffsetMilliseconds ?? null })).filter(note => note.text);
+}
 function titleOf(t) { return t.title?.trim() || path.basename(t.source.filename); }
 export function summary(run) {
   const t = run.transcript;
@@ -53,6 +78,14 @@ export function transcriptText(t) {
   const speakers = new Map(t.speakers.map(s => [s.id, s.label_snapshot]));
   return t.segments.map(s => `[${timecode(s.start_ms)}–${timecode(s.end_ms)}] ${speakers.get(s.speaker_id) ?? s.speaker_label}: ${s.text}`).join('\n');
 }
+// Up to 80 code units before the match and 200 from it, on word boundaries,
+// with an ellipsis where text was cut.
+function excerpt(text, needle) {
+  const index = text.toLocaleLowerCase().indexOf(needle);
+  const start = index <= 80 ? 0 : text.indexOf(' ', index - 80) + 1 || index;
+  const end = index + 200 >= text.length ? text.length : text.lastIndexOf(' ', index + 200) > index + needle.length ? text.lastIndexOf(' ', index + 200) : index + 200;
+  return `${start > 0 ? '…' : ''}${text.slice(start, end)}${end < text.length ? '…' : ''}`;
+}
 export class TranscriptLibrary {
   constructor(root) { this.root = path.resolve(root); }
   async snapshot() {
@@ -62,6 +95,9 @@ export class TranscriptLibrary {
     const runs = [];
     let skipped = 0, count = 0;
     for (const meeting of meetings.filter(entry => entry.name.startsWith('meeting--'))) {
+      // Unreadable notes never cost the transcript; the run is served without them.
+      let sidecar;
+      try { sidecar = notesSchema.parse(await readJSON(root, path.join(root, meeting.name, 'meeting-notes.json'))); } catch { sidecar = undefined; }
       const folder = path.join(root, meeting.name, 'runs');
       let entries;
       try { entries = await directories(root, folder); } catch { skipped++; continue; }
@@ -74,7 +110,8 @@ export class TranscriptLibrary {
           // TranscriptStore identifies runs by job.runID. Historical stores can
           // have a different UUID directory name; never treat it as the identity.
           const transcript = canonicalSchema.parse(await readJSON(root, path.join(dir, 'canonical-transcript.json')));
-          runs.push({ id: job.runID.toLowerCase(), meeting: meeting.name, createdAt: job.createdAt, transcript });
+          runs.push({ id: job.runID.toLowerCase(), meeting: meeting.name, createdAt: job.createdAt, transcript,
+            notes: runNotes(sidecar, job.request?.draftID) });
         } catch { skipped++; }
       }
     }
@@ -90,20 +127,18 @@ export class TranscriptLibrary {
       const date = Date.parse(run.transcript.created_at);
       if (after && date < Date.parse(after) || before && date >= Date.parse(before)) return false;
       const t = run.transcript;
-      return !needle || [titleOf(t), ...t.speakers.map(s => s.label_snapshot), ...t.segments.map(s => s.text)]
+      return !needle || [titleOf(t), ...t.speakers.map(s => s.label_snapshot), ...t.segments.map(s => s.text), ...run.notes.map(n => n.text)]
         .some(text => text.toLocaleLowerCase().includes(needle));
     });
     return { transcripts: matches.slice(offset, offset + limit).map(run => {
       const result = summary(run);
       if (needle) {
         const match = run.transcript.segments.find(s => s.text.toLocaleLowerCase().includes(needle));
-        if (match) {
-          const index = match.text.toLocaleLowerCase().indexOf(needle);
-          // Start and end on word boundaries, with an ellipsis where text was cut.
-          const start = index <= 80 ? 0 : match.text.indexOf(' ', index - 80) + 1 || index;
-          const end = index + 200 >= match.text.length ? match.text.length : match.text.lastIndexOf(' ', index + 200) > index + needle.length ? match.text.lastIndexOf(' ', index + 200) : index + 200;
-          result.excerpt = `${start > 0 ? '…' : ''}${match.text.slice(start, end)}${end < match.text.length ? '…' : ''}`;
-        }
+        if (match) result.excerpt = excerpt(match.text, needle);
+        // A match in the person's notes is reported apart from the transcript
+        // excerpt, naming the note, so the two are never mistaken for each other.
+        const note = run.notes.find(n => n.text.toLocaleLowerCase().includes(needle));
+        if (note) result.matched_note = { id: note.id, offset_ms: note.offset_ms, excerpt: excerpt(note.text, needle) };
       }
       return result;
     }), total: matches.length, next_offset: offset + limit < matches.length ? offset + limit : null, skipped_runs: skipped };
@@ -120,6 +155,9 @@ export class TranscriptLibrary {
     if (end < text.length && /[\uD800-\uDBFF]/.test(text[end - 1])) end--;
     return { ...summary(run), text: text.slice(offset, end), offset,
       total_chars: text.length, next_offset: end < text.length ? end : null,
-      warnings: run.transcript.warnings };
+      warnings: run.transcript.warnings,
+      // The meeting's notes, whole on every page: they are not part of the
+      // paged text, and editing them does not change the revision.
+      notes: run.notes };
   }
 }

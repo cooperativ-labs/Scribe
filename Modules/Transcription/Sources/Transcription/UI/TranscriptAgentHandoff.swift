@@ -71,11 +71,25 @@ public struct TranscriptAgentEnvironment: Equatable, Sendable {
     }
 }
 
+/// How a send reaches the person.
+public enum TranscriptAgentDelivery: Equatable, Sendable {
+    /// The person pressed Send and is watching: Latch is brought forward.
+    case manual
+    /// A queued send firing on its own: Latch stays where it is, and the
+    /// send is refused unless Latch can guarantee one session per operation
+    /// ID, because nobody is there to notice a duplicate.
+    case background
+}
+
 /// One transcript, on its way to one agent.
 public struct TranscriptAgentRequest: Equatable, Sendable {
-    /// What the instruction field starts as, and what stands in for an empty one.
+    /// What the prompt starts as, and what stands in for an empty one.
     public static let defaultInstruction = "Review this transcript and create meeting notes in the Tough Leaf workspace in the Knowledgebase."
 
+    /// Names this one send: the handoff files are named after it, and Latch
+    /// will be given it as the request's identity. A retry of the same send
+    /// keeps it; pressing Send again makes a new one.
+    public let operationID: UUID
     public let transcript: CanonicalTranscript
     public let agent: TranscriptAgent
     /// The model to run, or nil for whatever the agent uses on its own.
@@ -89,16 +103,26 @@ public struct TranscriptAgentRequest: Equatable, Sendable {
     public let mcpURL: String?
     /// The person's own words, never empty: the default stands in for silence.
     public let instruction: String
+    /// Notes the person wrote during the meeting, in order. Empty for imports,
+    /// pasted transcripts and meetings with no notes. Notes with no text are
+    /// dropped: they carry nothing for the agent.
+    public let notes: [MeetingNote]
+    public let delivery: TranscriptAgentDelivery
 
     public init(
+        operationID: UUID = UUID(),
         transcript: CanonicalTranscript,
         agent: TranscriptAgent,
         model: String? = nil,
         effort: TranscriptAgentEffort? = nil,
         folder: TranscriptAgentFolder? = nil,
         mcpURL: String? = nil,
-        instruction: String
+        instruction: String,
+        notes: [MeetingNote] = [],
+        delivery: TranscriptAgentDelivery = .manual
     ) {
+        self.operationID = operationID
+        self.delivery = delivery
         self.transcript = transcript
         self.agent = agent
         self.model = Self.nonEmpty(model)
@@ -106,6 +130,7 @@ public struct TranscriptAgentRequest: Equatable, Sendable {
         self.folder = folder
         self.mcpURL = Self.nonEmpty(mcpURL)
         self.instruction = Self.nonEmpty(instruction) ?? Self.defaultInstruction
+        self.notes = notes.filter { Self.nonEmpty($0.text) != nil }
     }
 
     private static func nonEmpty(_ text: String?) -> String? {
@@ -118,16 +143,32 @@ public struct TranscriptAgentRequest: Equatable, Sendable {
 public struct TranscriptAgentOutcome: Equatable, Sendable {
     /// The session Latch created, as it names it.
     public let sessionName: String?
+    /// Latch's identifier for the session, used to open it again.
+    public let sessionID: String?
     public let agentName: String
     /// Nil when the agent was sent without a folder.
     public let folderName: String?
     public let errorMessage: String?
+    /// For a failure: true when nothing was started, false when Scribe could
+    /// not tell whether Latch started the session (the report was unreadable,
+    /// or `latch` was killed). Only the latter may be retried under the same
+    /// operation ID without the person deciding again.
+    public let failureIsDefinite: Bool
 
-    public init(sessionName: String?, agentName: String, folderName: String?, errorMessage: String? = nil) {
+    public init(
+        sessionName: String?,
+        sessionID: String? = nil,
+        agentName: String,
+        folderName: String?,
+        errorMessage: String? = nil,
+        failureIsDefinite: Bool = true
+    ) {
         self.sessionName = sessionName
+        self.sessionID = sessionID
         self.agentName = agentName
         self.folderName = folderName
         self.errorMessage = errorMessage
+        self.failureIsDefinite = failureIsDefinite
     }
 
     public var succeeded: Bool { errorMessage == nil }
@@ -138,6 +179,11 @@ public struct TranscriptAgentOutcome: Equatable, Sendable {
         let session = sessionName.map { " as \u{201C}\($0)\u{201D}" } ?? ""
         let folder = folderName.map { " in \($0)" } ?? ""
         return "Sent to \(agentName)\(folder)\(session). Open Latch to watch it work."
+    }
+
+    /// The tray's short form: "Sent to Claude Code in tough-leaf".
+    public var sentDescription: String {
+        "Sent to \(agentName)" + (folderName.map { " in \($0)" } ?? "")
     }
 }
 
@@ -160,4 +206,58 @@ public protocol TranscriptAgentDispatching: Sendable {
     func disconnectFolder(id: TranscriptAgentFolder.ID) async -> TranscriptAgentEnvironment
     /// Starts the agent on this transcript.
     func send(_ request: TranscriptAgentRequest) async -> TranscriptAgentOutcome
+    /// Shows a session that was already created. Returns why it could not be
+    /// shown, or nil once it is in front of the person.
+    func openSession(id: String) async -> String?
+}
+
+public extension TranscriptAgentDispatching {
+    func openSession(id _: String) async -> String? {
+        "Opening Latch is not available here."
+    }
+}
+
+/// What one handoff tray is bound to. A recorded meeting's tray edits that
+/// meeting's draft, so every meeting keeps its own agent, model, folder and
+/// prompt; a row with no draft (an import, a pasted transcript, a transcript
+/// from before drafts existed) has settings of its own for as long as the
+/// window is open. Nothing about a handoff belongs to the window as a whole.
+public enum AgentHandoffTarget: Hashable, Sendable, Identifiable {
+    case draft(UUID)
+    case transcript(TranscriptReviewFile.ID)
+
+    public var id: String {
+        switch self {
+        case .draft(let id): "draft:\(id.uuidString)"
+        case .transcript(let id): "transcript:\(id)"
+        }
+    }
+
+    public var draftID: UUID? {
+        if case .draft(let id) = self { return id }
+        return nil
+    }
+}
+
+/// Where a manual send stands, as its tray shows it.
+public enum AgentHandoffSendStatus: Equatable, Sendable {
+    case sending
+    case sent(TranscriptAgentOutcome)
+    case failed(String)
+}
+
+/// Everything a tray's send controls can show.
+public enum AgentHandoffTrayState: Equatable, Sendable {
+    /// A send made by hand (or a queued send's outcome, shown the same way),
+    /// or nil when nothing has been sent.
+    case manual(AgentHandoffSendStatus?)
+    /// The transcript is not ready; the send can be queued.
+    case canQueue
+    /// "Will send when ready", with Cancel send.
+    case waiting
+    /// "Ready to send \u{2014} confirm", with Send and Cancel.
+    case held(MeetingSendHoldReason)
+    /// Scribe could not tell whether the agent started; Try again re-issues
+    /// the same send.
+    case unconfirmed(String)
 }

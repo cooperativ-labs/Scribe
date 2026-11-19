@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "profileID": "parakeet-v3-offline-diarization-v2",
+  "obsoleteTranscriptionPaths": ["parakeet-tdt-0.6b-v3-coreml/Encoder.mlmodelc"],
   "fluidAudio": {
     "repository": "https://github.com/FluidInference/FluidAudio.git",
     "revision": "v0.18.3 (c8b41f98eae668794dd0083bbe028fe7e6585051)"

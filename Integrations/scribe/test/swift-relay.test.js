@@ -35,12 +35,17 @@ function lines(child) {
   };
 }
 
+// Words that live only in a draft's private handoff settings and handoff files.
+// They must never come back through the relay.
+const PROMPT = 'PRIVATE-PROMPT summarise for the board', MCP_URL = 'https://private-mcp.example.test/sse';
+
 async function synthetic(root) {
-  const meeting = randomUUID(), id = randomUUID(), date = '2026-09-20T10:00:00Z';
+  const meeting = randomUUID(), id = randomUUID(), date = '2026-09-20T10:00:00Z', draftID = randomUUID();
   const dir = path.join(root, `meeting--${meeting}`, 'runs', id.toUpperCase());
   await mkdir(dir, { recursive: true });
   await writeFile(path.join(dir, 'job.json'), JSON.stringify({ schemaVersion: 1, id: randomUUID().toUpperCase(), runID: id.toUpperCase(),
-    request: { requestID: randomUUID().toUpperCase(), sourceURL: 'file:///synthetic.m4a', languageMode: 'automatic', speakerCount: 'automatic', speakerMatching: 'enabled', modelProfileID: 'parakeet-v3' },
+    request: { requestID: randomUUID().toUpperCase(), sourceURL: 'file:///synthetic.m4a', languageMode: 'automatic', speakerCount: 'automatic', speakerMatching: 'enabled', modelProfileID: 'parakeet-v3',
+      draftID: draftID.toUpperCase() },
     sourceSnapshotURL: `file://${root}/meeting--${meeting}/source.m4a`, runDirectoryURL: '/synthetic/', sourceFingerprint: meeting,
     modelFingerprint: 'model', configurationFingerprint: 'config', state: 'complete', checkpoints: [], createdAt: date, updatedAt: date }));
   await writeFile(path.join(dir, 'canonical-transcript.json'), JSON.stringify({ schema_version: 1, transcript_id: randomUUID(), revision: 1,
@@ -51,6 +56,18 @@ async function synthetic(root) {
     segments: [{ id: 'segment_1', speaker_id: 'speaker_1', speaker_label: 'Dana', start_ms: 1000, end_ms: 2000,
       text: 'Swift ships on Friday.', overlap: false, timing_quality: 'asr_word' }],
     processing_options: {}, engine_revisions: {}, warnings: [] }));
+  await writeFile(path.join(root, `meeting--${meeting}`, 'meeting-notes.json'), JSON.stringify({ schemaVersion: 1, entries: [
+    { draftID: draftID.toUpperCase(), recorderSessionID: randomUUID().toUpperCase(), attachedRevision: 4, notes: [
+      { id: randomUUID().toUpperCase(), text: 'Check the walrus budget', recordingOffsetMilliseconds: 5_000 },
+      { id: randomUUID().toUpperCase(), text: 'Untimed thought', recordingOffsetMilliseconds: null }] }] }), { mode: 0o600 });
+  // A draft record and handoff files as Scribe keeps them, here planted inside
+  // the transcript folder itself: the relay must not walk into either.
+  await mkdir(path.join(root, 'drafts'), { recursive: true });
+  await writeFile(path.join(root, 'drafts', `${draftID.toUpperCase()}.json`), JSON.stringify({ id: draftID.toUpperCase(),
+    handoff: { prompt: PROMPT, mcpURL: MCP_URL }, send: { sent: { operationID: randomUUID() } } }));
+  await mkdir(path.join(root, 'Agent Handoffs'), { recursive: true });
+  await writeFile(path.join(root, 'Agent Handoffs', `${randomUUID()}.notes.txt`), `${PROMPT}\n${MCP_URL}\n`);
+  await writeFile(path.join(root, `meeting--${meeting}`, 'handoff.json'), JSON.stringify({ prompt: PROMPT, mcpURL: MCP_URL }));
 }
 
 test('Swift client links, answers the Node relay, revokes and unlinks', { skip: !built && 'build Workers/ScribeMCP first (swift build)' }, async t => {
@@ -90,6 +107,25 @@ test('Swift client links, answers the Node relay, revokes and unlinks', { skip: 
   assert.deepEqual(recent.structuredContent.transcripts.map(item => item.title), ['Swift relay planning']);
   const fetched = await client.callTool({ name: 'scribe_get_transcript', arguments: { id: recent.structuredContent.transcripts[0].id } });
   assert.match(fetched.structuredContent.text, /Swift ships on Friday/);
+  assert.deepEqual(fetched.structuredContent.notes.map(({ text, offset_ms }) => [text, offset_ms]),
+    [['Check the walrus budget', 5_000], ['Untimed thought', null]]);
+  assert.doesNotMatch(fetched.structuredContent.text, /walrus/, 'notes stay out of the paged transcript text');
+  const viaFetch = await client.callTool({ name: 'fetch', arguments: { id: recent.structuredContent.transcripts[0].id } });
+  assert.deepEqual(viaFetch.structuredContent.notes, fetched.structuredContent.notes);
+  const searched = await client.callTool({ name: 'scribe_search_transcripts', arguments: { query: 'walrus' } });
+  assert.equal(searched.structuredContent.transcripts.length, 1);
+  assert.equal(searched.structuredContent.transcripts[0].excerpt, undefined);
+  assert.deepEqual(searched.structuredContent.transcripts[0].matched_note,
+    { id: fetched.structuredContent.notes[0].id, offset_ms: 5_000, excerpt: 'Check the walrus budget' });
+  const research = await client.callTool({ name: 'search', arguments: { query: 'walrus' } });
+  assert.equal(research.structuredContent.results[0].matched_note.id, fetched.structuredContent.notes[0].id);
+  for (const query of ['PRIVATE-PROMPT', 'private-mcp', 'board']) {
+    const leaked = await client.callTool({ name: 'scribe_search_transcripts', arguments: { query } });
+    assert.equal(leaked.structuredContent.total, 0, `search for ${query} matched private handoff data`);
+  }
+  for (const answer of [recent, fetched, viaFetch, searched, research])
+    for (const secret of [PROMPT, MCP_URL, 'private-mcp', 'Agent Handoffs', 'drafts/'])
+      assert.ok(!JSON.stringify(answer).includes(secret), `relay answer exposed ${secret}`);
   child.stdin.write('revoke\n'); await next('revoked');
   assert.equal((await fetch(relay.origin + '/mcp', { headers: { Authorization: `Bearer ${token}` } })).status, 401);
   child.stdin.write('unlink\n'); await next('unlinked');

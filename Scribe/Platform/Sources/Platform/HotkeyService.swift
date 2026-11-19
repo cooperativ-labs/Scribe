@@ -16,6 +16,9 @@ public struct GlobalShortcut: Codable, Hashable, Sendable, Identifiable {
     public static let defaultStart = GlobalShortcut(keyCode: UInt32(kVK_ANSI_R), modifiers: UInt32(cmdKey | shiftKey))
     public static let defaultStop = GlobalShortcut(keyCode: UInt32(kVK_ANSI_S), modifiers: UInt32(cmdKey | shiftKey))
     public static let defaultPasteTimestamp = GlobalShortcut(keyCode: UInt32(kVK_ANSI_T), modifiers: UInt32(cmdKey | shiftKey))
+    /// ⌥⇧⌘N: Meeting Notes. Three modifiers, since ⇧⌘N (a new folder in
+    /// Finder, a new window in many apps) is too common to take globally.
+    public static let defaultMeetingNotes = GlobalShortcut(keyCode: UInt32(kVK_ANSI_N), modifiers: UInt32(cmdKey | shiftKey | optionKey))
 
     public var displayName: String {
         let modifierText = [
@@ -138,12 +141,15 @@ public enum HotkeyAction: String, CaseIterable, Sendable {
     case start
     case stop
     case pasteTimestamp
+    /// Opens the live recording's notes in the floating panel.
+    case meetingNotes
 
     public var displayName: String {
         switch self {
         case .start: "Start"
         case .stop: "Stop"
         case .pasteTimestamp: "Paste timestamp"
+        case .meetingNotes: "Meeting notes"
         }
     }
 
@@ -154,6 +160,7 @@ public enum HotkeyAction: String, CaseIterable, Sendable {
         case .start: 1
         case .stop: 2
         case .pasteTimestamp: 3
+        case .meetingNotes: 4
         }
     }
 }
@@ -202,10 +209,15 @@ public protocol HotKeyRegistering: AnyObject {
 }
 
 /// Registers independent start, stop, and paste-timestamp shortcuts and routes them to one coordinator.
+/// The Meeting Notes shortcut, which is not a recorder command, goes to
+/// `openMeetingNotes` instead.
 /// Repeated hardware events for the same action are suppressed for a short window.
 @MainActor
 public final class HotkeyService {
     public private(set) var lastRegistrationReport = HotkeyRegistrationReport(activeActions: [], failures: [:])
+    /// What the Meeting Notes shortcut does. Set by the app, which owns the
+    /// notes panel.
+    public var openMeetingNotes: (@MainActor () -> Void)?
 
     private weak var coordinator: (any RecordingShortcutCoordinating)?
     private let registrar: any HotKeyRegistering
@@ -228,16 +240,18 @@ public final class HotkeyService {
     public func register(
         start: GlobalShortcut,
         stop: GlobalShortcut,
-        pasteTimestamp: GlobalShortcut = .defaultPasteTimestamp
+        pasteTimestamp: GlobalShortcut = .defaultPasteTimestamp,
+        meetingNotes: GlobalShortcut? = nil
     ) -> HotkeyRegistrationReport {
         registrar.unregisterAll()
         lastEventDate.removeAll()
 
-        let assignments: [(HotkeyAction, GlobalShortcut)] = [
+        var assignments: [(HotkeyAction, GlobalShortcut)] = [
             (.start, start),
             (.stop, stop),
             (.pasteTimestamp, pasteTimestamp)
         ]
+        if let meetingNotes { assignments.append((.meetingNotes, meetingNotes)) }
 
         var failures: [HotkeyAction: HotkeyRegistrationFailure] = [:]
         for i in assignments.indices {
@@ -281,6 +295,7 @@ public final class HotkeyService {
         case .start: coordinator?.startRecordingFromShortcut()
         case .stop: coordinator?.stopRecordingFromShortcut()
         case .pasteTimestamp: coordinator?.pasteTimestampFromShortcut()
+        case .meetingNotes: openMeetingNotes?()
         }
     }
 

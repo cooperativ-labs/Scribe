@@ -132,6 +132,52 @@ final class ScribeMenuBarControllerTests: XCTestCase {
         XCTAssertTrue(recording.isEnabled)
     }
 
+    func testMeetingNotesOpensTheLiveRecordingsNotesAndShowsItsShortcut() async throws {
+        let coordinator = MockRecordingCoordinator(snapshot: readySnapshot())
+        var opened: [UUID] = []
+        let shortcut = GlobalShortcut(keyCode: 45, modifiers: 256 | 4096)
+        let model = RecorderMenuModel(coordinator: coordinator, meetingNotesShortcut: { shortcut })
+        let controller = makeController(
+            coordinator,
+            model: model,
+            transcription: TranscriptionMenuCommands(
+                openTranscripts: {},
+                transcribeFolder: {},
+                openTranscriptionsFolder: {},
+                openMeetingNotes: { opened.append($0) }
+            )
+        )
+
+        let idle = try XCTUnwrap(controller.makeContent().command(titled: "Meeting Notes"))
+        XCTAssertFalse(idle.isEnabled, "nothing is being recorded")
+        XCTAssertEqual(idle.shortcut, shortcut.displayName)
+        let titles = controller.makeContent().titles
+        XCTAssertEqual(titles.firstIndex(of: "Meeting Notes"), titles.firstIndex(of: "Paste Timestamp").map { $0 + 1 })
+
+        coordinator.submit(.start)
+        await coordinator.waitUntilIdle()
+        let sessionID = try XCTUnwrap(coordinator.snapshot.state.activity?.sessionID)
+        let recording = try XCTUnwrap(controller.makeContent(model.presentation).command(titled: "Meeting Notes"))
+        XCTAssertTrue(recording.isEnabled)
+
+        // Held, it is still the same live recording.
+        coordinator.submit(.pause)
+        await coordinator.waitUntilIdle()
+        model.refreshPresentation()
+        let held = try XCTUnwrap(controller.makeContent(model.presentation).command(titled: "Meeting Notes"))
+        XCTAssertTrue(held.isEnabled)
+        held.perform()
+        XCTAssertEqual(opened, [sessionID])
+    }
+
+    func testMeetingNotesIsAbsentWhenTheHostKeepsNoNotes() {
+        let controller = makeController(
+            MockRecordingCoordinator(snapshot: readySnapshot()),
+            transcription: TranscriptionMenuCommands(openTranscripts: {}, transcribeFolder: {}, openTranscriptionsFolder: {})
+        )
+        XCTAssertNil(controller.makeContent().command(titled: "Meeting Notes"))
+    }
+
     func testPasteTimestampWritesTheElapsedFigure() async {
         let start = Date(timeIntervalSince1970: 1_000)
         var now = start

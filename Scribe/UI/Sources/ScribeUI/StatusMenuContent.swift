@@ -135,6 +135,19 @@ extension StatusMenuContent {
             isEnabled: presentation.isPasteTimestampEnabled,
             shortcut: presentation.pasteTimestampShortcut.displayName
         ) { model.pasteTimestamp() }))
+        // The live recording's notes, in the floating panel. Bound to the
+        // session the menu was drawn for, so a recording that ends while the
+        // menu is open is not swapped for the next one.
+        if let openMeetingNotes = transcription?.openMeetingNotes {
+            let sessionID = presentation.liveSessionID
+            recorder.append(.command(StatusMenuCommand(
+                title: "Meeting Notes",
+                isEnabled: sessionID != nil,
+                shortcut: presentation.meetingNotesShortcut.displayName
+            ) {
+                if let sessionID { openMeetingNotes(sessionID) }
+            }))
+        }
         sections.append(StatusMenuSection(id: "recorder", rows: recorder))
 
         if let prompt = presentation.permissionPrompt {

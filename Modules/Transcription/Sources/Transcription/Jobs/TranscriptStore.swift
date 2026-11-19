@@ -144,7 +144,15 @@ public struct TranscriptStore: Sendable {
     /// The new meeting is fully written before either original is touched, so
     /// a failure part way leaves both recordings as they were.
     ///
-    /// - Returns: The combined run's ID, which is also its review file ID.
+    /// Meeting notes come along: both meetings' `meeting-notes.json` entries
+    /// are staged into the new meeting, the second's stamps moved later by
+    /// the exact point its audio was joined (untimed notes stay untimed).
+    /// Each entry keeps the draft it was written in; the combined meeting
+    /// belongs to the first recording's draft (else the second's), which the
+    /// other entries name as their owner so its row shows them all. Notes
+    /// that cannot be read stop the combine rather than being left behind.
+    ///
+    /// - Returns: The combined run's ID.
     @discardableResult
     public func combineRecordings(
         firstRunID: UUID,
@@ -157,6 +165,15 @@ public struct TranscriptStore: Sendable {
         guard first.meeting.standardizedFileURL != second.meeting.standardizedFileURL else {
             throw TranscriptStoreError.sameRecording
         }
+        let firstNotes: MeetingNotesSidecar
+        let secondNotes: MeetingNotesSidecar
+        do {
+            firstNotes = try MeetingNotesSidecarFile.read(meetingDirectory: first.meeting)
+            secondNotes = try MeetingNotesSidecarFile.read(meetingDirectory: second.meeting)
+        } catch {
+            throw TranscriptStoreError.notesUnreadable
+        }
+        let ownerDraftID = first.run.job.draftID ?? second.run.job.draftID
 
         let staging = storeDirectoryURL.appending(path: ".combine-\(UUID().uuidString)", directoryHint: .isDirectory)
         try fileManager.createDirectory(at: staging, withIntermediateDirectories: true)
@@ -210,7 +227,8 @@ public struct TranscriptStore: Sendable {
             vocabularyRevision: previous.request.vocabularyRevision,
             modelProfileID: previous.request.modelProfileID,
             exportDirectory: previous.request.exportDirectory,
-            title: previous.request.title
+            title: previous.request.title,
+            draftID: ownerDraftID
         )
         let job = TranscriptionJob(
             runID: runID,
@@ -249,6 +267,22 @@ public struct TranscriptStore: Sendable {
             updatedAt: now
         )
         try writer.write(try encoder.encode(record), to: staging.appending(path: SourceSnapshotRecord.fileName))
+
+        let secondOffsetMs = joined.offsetsMs.count > 1 ? joined.offsetsMs[1] : firstTranscript.source.durationMs
+        var notes = MeetingNotesSidecar(
+            entries: firstNotes.entries + secondNotes.shifted(byMilliseconds: secondOffsetMs).entries
+        )
+        if let ownerDraftID {
+            for index in notes.entries.indices where notes.entries[index].draftID != ownerDraftID {
+                notes.entries[index].ownerDraftID = ownerDraftID
+            }
+        }
+        if !notes.entries.isEmpty {
+            try MeetingDraftStore.writePrivateFile(
+                try MeetingNotesSidecarFile.encode(notes),
+                MeetingNotesSidecarFile.url(inMeeting: staging)
+            )
+        }
 
         try fileManager.moveItem(at: staging, to: meeting)
         try fileManager.removeItem(at: first.meeting)
@@ -336,6 +370,8 @@ public enum TranscriptStoreError: LocalizedError, Equatable, Sendable {
     case sameRecording
     /// The joined audio is identical to a recording already in the store.
     case combinedRecordingExists
+    /// A meeting's notes file cannot be read, so combining would lose it.
+    case notesUnreadable
 
     public var errorDescription: String? {
         switch self {
@@ -344,6 +380,7 @@ public enum TranscriptStoreError: LocalizedError, Equatable, Sendable {
         case .audioDeleted: "The audio for one of these recordings has been deleted, so they can no longer be combined."
         case .sameRecording: "These are the same recording."
         case .combinedRecordingExists: "These recordings have already been combined."
+        case .notesUnreadable: "The notes for one of these meetings could not be read, so combining would lose them."
         }
     }
 }
@@ -358,6 +395,18 @@ public struct ConfinedTranscriptRun: Sendable {
     public let meeting: String
     public let job: TranscriptionJob
     public let transcript: CanonicalTranscript
+    /// The meeting's notes as this run shows them, from the meeting's
+    /// `meeting-notes.json`. Empty when the meeting has none, or when that
+    /// file is missing, unreadable or outside the confinement rules: notes
+    /// never cost a reader the transcript.
+    public let notes: [TranscriptExportNote]
+
+    public init(meeting: String, job: TranscriptionJob, transcript: CanonicalTranscript, notes: [TranscriptExportNote] = []) {
+        self.meeting = meeting
+        self.job = job
+        self.transcript = transcript
+        self.notes = notes
+    }
 }
 
 public enum ConfinedTranscriptStoreError: Error, Equatable, Sendable {
@@ -384,6 +433,9 @@ public extension TranscriptStore {
         var skipped = 0, count = 0
         for meeting in meetings.sorted()
         where meeting.hasPrefix(SourceSnapshotService.meetingDirectoryPrefix) && Self.isDirectory("\(root)/\(meeting)") {
+            let sidecar = Self.readConfined("\(root)/\(meeting)/\(MeetingNotesSidecar.fileName)", root: root, limit: maximumFileBytes)
+                .flatMap { try? JSONDecoder().decode(MeetingNotesSidecar.self, from: $0) }
+                .flatMap { $0.schemaVersion <= MeetingNotesSidecar.currentSchemaVersion ? $0 : nil }
             let folder = "\(root)/\(meeting)/runs"
             guard let resolved = Self.realPath(folder), resolved.hasPrefix(root + "/"),
                   let entries = try? FileManager.default.contentsOfDirectory(atPath: folder) else {
@@ -403,7 +455,8 @@ public extension TranscriptStore {
                     skipped += 1
                     continue
                 }
-                runs.append(ConfinedTranscriptRun(meeting: meeting, job: job, transcript: transcript))
+                let notes = sidecar.map { TranscriptExportNote.exportable($0.exportNotes(forRunDraft: job.draftID)) } ?? []
+                runs.append(ConfinedTranscriptRun(meeting: meeting, job: job, transcript: transcript, notes: notes))
             }
         }
         runs.sort {

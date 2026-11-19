@@ -74,6 +74,30 @@
        },
        "excerpt": {
         "type": "string"
+       },
+       "matched_note": {
+        "description": "Set when the query matched one of the meeting's notes: the first such note, its recording time and an excerpt.",
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "offset_ms": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "excerpt": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "id",
+         "offset_ms",
+         "excerpt"
+        ],
+        "additionalProperties": false
        }
       },
       "required": [
@@ -136,7 +160,7 @@
  {
   "name": "scribe_search_transcripts",
   "title": "Search Scribe transcripts",
-  "description": "Search titles, speaker names, and transcript text using a literal case-insensitive query. Returns matching meetings and short excerpts, newest first. Fetch matches before drawing conclusions.",
+  "description": "Search titles, speaker names, transcript text and the meeting's notes using a literal case-insensitive query. Returns matching meetings and short excerpts, newest first; matched_note names a matching note. Fetch matches before drawing conclusions.",
   "inputSchema": {
    "type": "object",
    "properties": {
@@ -216,6 +240,30 @@
        },
        "excerpt": {
         "type": "string"
+       },
+       "matched_note": {
+        "description": "Set when the query matched one of the meeting's notes: the first such note, its recording time and an excerpt.",
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "offset_ms": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "excerpt": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "id",
+         "offset_ms",
+         "excerpt"
+        ],
+        "additionalProperties": false
        }
       },
       "required": [
@@ -278,7 +326,7 @@
  {
   "name": "scribe_get_transcript",
   "title": "Read a Scribe transcript",
-  "description": "Read saved transcript text with speaker labels and source timestamps, warnings, and revision. Follow next_offset until null for the complete meeting. No audio, private file paths, or write operations.",
+  "description": "Read saved transcript text with speaker labels and source timestamps, warnings, revision, and the notes the person wrote during the meeting (in notes, apart from the transcript text). Follow next_offset until null for the complete meeting. No audio, private file paths, or write operations.",
   "inputSchema": {
    "type": "object",
    "properties": {
@@ -351,6 +399,30 @@
     "excerpt": {
      "type": "string"
     },
+    "matched_note": {
+     "description": "Set when the query matched one of the meeting's notes: the first such note, its recording time and an excerpt.",
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string"
+      },
+      "offset_ms": {
+       "type": [
+        "number",
+        "null"
+       ]
+      },
+      "excerpt": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "id",
+      "offset_ms",
+      "excerpt"
+     ],
+     "additionalProperties": false
+    },
     "text": {
      "type": "string"
     },
@@ -381,6 +453,34 @@
       "required": [
        "code",
        "message"
+      ],
+      "additionalProperties": false
+     }
+    },
+    "notes": {
+     "description": "Notes the person wrote during the meeting, not part of the transcript text. Returned whole on every page.",
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "string"
+       },
+       "text": {
+        "type": "string"
+       },
+       "offset_ms": {
+        "description": "Recording time in milliseconds; null when untimed.",
+        "type": [
+         "number",
+         "null"
+        ]
+       }
+      },
+      "required": [
+       "id",
+       "text",
+       "offset_ms"
       ],
       "additionalProperties": false
      }
@@ -460,6 +560,30 @@
        },
        "url": {
         "type": "string"
+       },
+       "matched_note": {
+        "description": "Set when the query matched one of the meeting's notes: the first such note, its recording time and an excerpt.",
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "offset_ms": {
+          "type": [
+           "number",
+           "null"
+          ]
+         },
+         "excerpt": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "id",
+         "offset_ms",
+         "excerpt"
+        ],
+        "additionalProperties": false
        }
       },
       "required": [
@@ -562,6 +686,30 @@
     "excerpt": {
      "type": "string"
     },
+    "matched_note": {
+     "description": "Set when the query matched one of the meeting's notes: the first such note, its recording time and an excerpt.",
+     "type": "object",
+     "properties": {
+      "id": {
+       "type": "string"
+      },
+      "offset_ms": {
+       "type": [
+        "number",
+        "null"
+       ]
+      },
+      "excerpt": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "id",
+      "offset_ms",
+      "excerpt"
+     ],
+     "additionalProperties": false
+    },
     "text": {
      "type": "string"
     },
@@ -592,6 +740,34 @@
       "required": [
        "code",
        "message"
+      ],
+      "additionalProperties": false
+     }
+    },
+    "notes": {
+     "description": "Notes the person wrote during the meeting, not part of the transcript text. Returned whole on every page.",
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "string"
+       },
+       "text": {
+        "type": "string"
+       },
+       "offset_ms": {
+        "description": "Recording time in milliseconds; null when untimed.",
+        "type": [
+         "number",
+         "null"
+        ]
+       }
+      },
+      "required": [
+       "id",
+       "text",
+       "offset_ms"
       ],
       "additionalProperties": false
      }

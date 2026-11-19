@@ -22,8 +22,12 @@ public struct TranscriptionModelManifest: Decodable, Sendable {
     }
     public enum Group: Sendable { case transcription, vocabulary }
     public let assets: [Asset]
+    public let obsoleteTranscriptionPaths: [String]?
+    public let obsoleteVocabularyPaths: [String]?
     public func selecting(_ group: Group) -> Self {
-        Self(assets: assets.filter { group == .vocabulary ? $0.optional == true : $0.optional != true })
+        Self(assets: assets.filter { group == .vocabulary ? $0.optional == true : $0.optional != true },
+             obsoleteTranscriptionPaths: group == .transcription ? obsoleteTranscriptionPaths : nil,
+             obsoleteVocabularyPaths: group == .vocabulary ? obsoleteVocabularyPaths : nil)
     }
     public var totalBytes: Int64 { assets.reduce(0) { $0 + $1.requiredFiles.reduce(0) { $0 + Int64($1.bytes) } } }
 
@@ -43,6 +47,14 @@ public struct TranscriptionModelManifest: Decodable, Sendable {
                 guard safePath(file.relativePath), file.bytes > 0 else {
                     throw ModelInstallationError("The model manifest contains an invalid file.")
                 }
+            }
+        }
+        let required = manifest.assets.flatMap { asset in
+            asset.requiredFiles.map { asset.relativePath + "/" + $0.relativePath }
+        }
+        for path in (manifest.obsoleteTranscriptionPaths ?? []) + (manifest.obsoleteVocabularyPaths ?? []) {
+            guard safePath(path), !required.contains(where: { $0 == path || $0.hasPrefix(path + "/") || path.hasPrefix($0 + "/") }) else {
+                throw ModelInstallationError("The model manifest contains an invalid obsolete path.")
             }
         }
         return manifest
@@ -139,6 +151,26 @@ public actor TranscriptionModelDownloader {
             }
         }
         try Task.checkCancellation()
+        guard try isInstalled(manifest: manifest, directory: directory) else {
+            throw ModelInstallationError("Model verification failed. Retry the installation.")
+        }
+        // Only remove explicitly retired assets after the complete replacement is verified.
+        // Never follow a symlink in a parent directory inside a user-selected folder.
+        for path in (manifest.obsoleteTranscriptionPaths ?? []) + (manifest.obsoleteVocabularyPaths ?? []) {
+            try Task.checkCancellation()
+            var target = directory
+            let components = path.split(separator: "/")
+            for component in components.dropLast() {
+                target.appendPathComponent(String(component))
+                if let values = try? target.resourceValues(forKeys: [.isSymbolicLinkKey]), values.isSymbolicLink == true {
+                    throw ModelInstallationError("Cannot clean up old models through a symbolic link.")
+                }
+            }
+            target.appendPathComponent(String(components.last!))
+            if fm.fileExists(atPath: target.path) || (try? target.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == true {
+                try fm.removeItem(at: target)
+            }
+        }
     }
 
     private func valid(_ file: TranscriptionModelManifest.Asset.File, at url: URL) -> Bool {

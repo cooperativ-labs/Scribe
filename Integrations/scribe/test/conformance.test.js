@@ -30,7 +30,7 @@ async function library(t) {
   t.after(() => rm(root, { recursive: true, force: true }));
   const ids = {};
   async function run(key, { meeting, date, title = null, filename = 'Planning call.m4a', speakers = [['speaker_1', 'Dana']], segments, revision = 1,
-    warnings = [], directory, complete = true, corrupt = false }) {
+    warnings = [], directory, complete = true, corrupt = false, draftID }) {
     const id = randomUUID(); ids[key] = id;
     const dir = path.join(root, `meeting--${meeting}`, 'runs', directory || id.toUpperCase());
     await mkdir(dir, { recursive: true });
@@ -38,7 +38,7 @@ async function library(t) {
     const jobDate = new Date(date).toISOString().replace('.000Z', 'Z');
     await writeFile(path.join(dir, 'job.json'), JSON.stringify({ schemaVersion: 1, id: randomUUID().toUpperCase(), runID: id.toUpperCase(),
       request: { requestID: randomUUID().toUpperCase(), sourceURL: 'file:///must/not/be/read.m4a', languageMode: 'automatic', speakerCount: 'automatic',
-        speakerMatching: 'enabled', modelProfileID: 'parakeet-v3' },
+        speakerMatching: 'enabled', modelProfileID: 'parakeet-v3', ...(draftID ? { draftID: draftID.toUpperCase() } : {}) },
       sourceSnapshotURL: `file://${root}/meeting--${meeting}/source.m4a`, runDirectoryURL: '/must/not/be/read/', sourceFingerprint: meeting,
       modelFingerprint: 'model', configurationFingerprint: 'configuration', state: complete ? 'complete' : 'transcribing', checkpoints: [],
       createdAt: jobDate, updatedAt: jobDate }));
@@ -55,7 +55,8 @@ async function library(t) {
   const long = Array.from({ length: 900 }, (_, i) => [i % 2 ? 'speaker_2' : 'speaker_1', i * 5000,
     `Point ${i}: 😀 we café-tested the rollout plan, ÉTÉ notes and next steps for the quarterly review.`]);
   await run('older', { meeting: 'a', date: '2026-09-18T09:00:00Z', segments: [['speaker_1', 0, 'Superseded draft about Friday.']] });
-  await run('planning', { meeting: 'a', date: '2026-09-20T10:00:00Z', title: '  Planning  ', directory: randomUUID().toUpperCase(),
+  const draftA = randomUUID(), draftB = randomUUID();
+  await run('planning', { meeting: 'a', date: '2026-09-20T10:00:00Z', title: '  Planning  ', directory: randomUUID().toUpperCase(), draftID: draftA,
     speakers: [['speaker_1', 'Dana'], ['speaker_2', 'Updated Name']],
     segments: [['speaker_1', 1000, 'Ship the project on Friday.'], ['speaker_2', 65_000, 'Literal [query] matters.'], [null, 3_725_000, 'Unknown voice.']],
     warnings: [{ code: 'low_confidence', message: 'Some words were unclear.', segment_id: 'segment_1' }] });
@@ -66,6 +67,23 @@ async function library(t) {
     segments: [['speaker_1', 0, `${'lorem ipsum dolor '.repeat(12)}the needle sits here ${'and the text keeps going on '.repeat(12)}`]] });
   await run('broken', { meeting: 'd', date: '2026-09-16T12:00:00Z', corrupt: true, segments: [] });
   await mkdir(path.join(root, 'meeting--empty'));
+  // Notes as Scribe.app writes them beside a meeting's runs. Meeting a's latest
+  // run names draft A, whose row also shows the notes combined in from draft B;
+  // meeting c's run names no draft, so every entry is its meeting's notes.
+  // Meeting b has an unreadable notes file, which must not cost its transcript.
+  const session = () => randomUUID().toUpperCase();
+  const notesFile = (meeting, entries) => writeFile(path.join(root, `meeting--${meeting}`, 'meeting-notes.json'),
+    JSON.stringify({ schemaVersion: 1, entries }, null, 2), { mode: 0o600 });
+  await notesFile('a', [
+    { draftID: draftB.toUpperCase(), recorderSessionID: session(), attachedRevision: 2, ownerDraftID: draftA.toUpperCase(), notes: [
+      { id: randomUUID().toUpperCase(), text: 'From the second call: budget is approved', recordingOffsetMilliseconds: 3_725_500 }] },
+    { draftID: draftA.toUpperCase(), recorderSessionID: session(), attachedRevision: 7, notes: [
+      { id: (ids.noteFriday = randomUUID()).toUpperCase(), text: '  Ask Dana about Friday\n\n   and the café 😀 rollout  ', recordingOffsetMilliseconds: 350_000 },
+      { id: randomUUID().toUpperCase(), text: 'Untimed follow-up: send the zebra memo', recordingOffsetMilliseconds: null },
+      { id: randomUUID().toUpperCase(), text: '\u3000 \n ', recordingOffsetMilliseconds: 1_000 }] }]);
+  await notesFile('c', [{ draftID: randomUUID().toUpperCase(), recorderSessionID: session(), attachedRevision: 1, notes: [
+    { id: randomUUID().toUpperCase(), text: `${'context words '.repeat(10)}the quokka decision ${'more trailing words '.repeat(15)}`, recordingOffsetMilliseconds: 0 }] }]);
+  await writeFile(path.join(root, 'meeting--b', 'meeting-notes.json'), '{"schemaVersion": 1, "entries": [');
   return { root, ids };
 }
 
@@ -119,6 +137,33 @@ test('Swift helper and Node stdio server answer identically', { skip: !built && 
     await same(`search ${query}`, call('scribe_search_transcripts', { query, limit: 50 }));
   await same('search paged', call('scribe_search_transcripts', { query: 'e', limit: 1, offset: 1 }));
   await same('research search', call('search', { query: 'the' }));
+  // Notes: matched apart from the transcript, named by note, never from an
+  // unreadable notes file, and whole on every page of get and fetch.
+  for (const query of ['zebra', 'QUOKKA', 'budget is approved', 'café 😀', 'friday', 'and the café'])
+    await same(`search notes ${query}`, call('scribe_search_transcripts', { query, limit: 50 }));
+  await same('research search notes', call('search', { query: 'zebra' }));
+  const zebra = await same('notes-only match', call('scribe_search_transcripts', { query: 'zebra' }));
+  assert.equal(zebra.structuredContent.transcripts.length, 1);
+  assert.equal(zebra.structuredContent.transcripts[0].excerpt, undefined);
+  const { id: zebraNote, ...zebraMatch } = zebra.structuredContent.transcripts[0].matched_note;
+  assert.match(zebraNote, /^[0-9a-f-]{36}$/);
+  assert.deepEqual(zebraMatch, { offset_ms: null, excerpt: 'Untimed follow-up: send the zebra memo' });
+  const friday = await same('note and transcript match', call('scribe_search_transcripts', { query: 'friday' }));
+  const planning = friday.structuredContent.transcripts.find(item => item.id === ids.planning);
+  assert.equal(planning.excerpt, 'Ship the project on Friday.');
+  assert.deepEqual(planning.matched_note, { id: ids.noteFriday, offset_ms: 350_000, excerpt: 'Ask Dana about Friday\nand the café 😀 rollout' });
+  const research = await same('research search note match', call('search', { query: 'quokka' }));
+  assert.ok(research.structuredContent.results[0].matched_note.excerpt.includes('quokka'));
+  const withNotes = await same('get with notes', call('scribe_get_transcript', { id: ids.planning }));
+  assert.deepEqual(withNotes.structuredContent.notes.map(note => [note.text, note.offset_ms]), [
+    ['Ask Dana about Friday\nand the café 😀 rollout', 350_000], ['Untimed follow-up: send the zebra memo', null],
+    ['From the second call: budget is approved', 3_725_500]]);
+  assert.equal(withNotes.structuredContent.notes[0].id, ids.noteFriday);
+  const unreadable = await same('get with unreadable notes', call('scribe_get_transcript', { id: ids.long, max_chars: 1000 }));
+  assert.deepEqual(unreadable.structuredContent.notes, []);
+  assert.ok(unreadable.structuredContent.text.length > 0);
+  await same('fetch with notes', call('fetch', { id: ids.planning }));
+  await same('superseded run shows its meeting notes', call('scribe_get_transcript', { id: ids.older, max_chars: 1000 }));
 
   for (const key of ['planning', 'excerpt']) await same(`get ${key}`, call('scribe_get_transcript', { id: ids[key] }));
   await same('get by uppercase id', call('scribe_get_transcript', { id: ids.planning.toUpperCase() }));
