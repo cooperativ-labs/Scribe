@@ -1261,6 +1261,79 @@ private extension View {
 
 // MARK: - Transport
 
+/// The speaker-coloured track under the transport: one drawing, rebuilt only
+/// when its inputs change. It used to be a view per turn, rebuilt and diffed
+/// on every playback tick because it shared a body with the play head.
+private struct TranscriptSpeakerTrack: View, Equatable {
+    let durationMs: Int
+    let segments: [TranscriptSegment]
+    let colors: [String: Color]
+
+    var body: some View {
+        let spans = TranscriptSpeakerTimeline.spans(durationMs: durationMs, segments: segments)
+        let duration = CGFloat(max(1, durationMs))
+        ZStack {
+            Capsule()
+                .fill(Color.secondary.opacity(0.16))
+            Canvas { context, size in
+                var x: CGFloat = 0
+                for span in spans {
+                    let width = size.width * CGFloat(span.durationMs) / duration
+                    let color = span.speakerID.flatMap { colors[$0] } ?? Color.secondary.opacity(0.27)
+                    context.fill(Path(CGRect(x: x, y: 0, width: width, height: size.height)), with: .color(color))
+                    x += width
+                }
+            }
+            .clipShape(Capsule())
+        }
+        .frame(height: 7)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// The knob and the invisible slider that moves the play head.
+private struct TranscriptPlayheadScrubber: View {
+    @Bindable var viewModel: TranscriptViewModel
+
+    var body: some View {
+        let duration = max(1, viewModel.sourceDurationMilliseconds)
+        GeometryReader { geometry in
+            Circle()
+                .fill(Color.primary)
+                .frame(width: 12, height: 12)
+                .overlay(Circle().stroke(Color(nsColor: .windowBackgroundColor), lineWidth: 2))
+                .position(
+                    x: 6 + (geometry.size.width - 12) * CGFloat(max(0, min(viewModel.playheadMilliseconds, duration))) / CGFloat(duration),
+                    y: geometry.size.height / 2
+                )
+                .allowsHitTesting(false)
+            Slider(
+                value: Binding(
+                    get: { Double(viewModel.playheadMilliseconds) },
+                    set: { viewModel.seek(toMilliseconds: Int($0.rounded())) }
+                ),
+                in: 0...Double(duration)
+            )
+            .controlSize(.small)
+            .opacity(0.015)
+            .accessibilityLabel("Play head")
+        }
+    }
+}
+
+/// "12:04 / 58:30", the only text that changes on every playback tick.
+private struct TranscriptPlayheadReadout: View {
+    let viewModel: TranscriptViewModel
+
+    var body: some View {
+        let duration = viewModel.sourceDurationMilliseconds
+        Text("\(TranscriptSpeakerTimeline.timeLabel(viewModel.playheadMilliseconds, includeHours: duration >= 3_600_000)) / \(TranscriptSpeakerTimeline.timeLabel(duration, includeHours: duration >= 3_600_000))")
+            .font(TranscriptDesign.TypeRole.timecode)
+            .foregroundStyle(.secondary)
+    }
+}
+
 /// Playback controls and a speaker timeline over the whole source.
 ///
 /// Always present once a transcript has speech, so a person can scrub to any
@@ -1312,10 +1385,7 @@ private struct TranscriptTransportBar: View {
                             .lineLimit(1)
                     }
                     Spacer()
-                    let duration = viewModel.sourceDurationMilliseconds
-                    Text("\(TranscriptSpeakerTimeline.timeLabel(viewModel.playheadMilliseconds, includeHours: duration >= 3_600_000)) / \(TranscriptSpeakerTimeline.timeLabel(duration, includeHours: duration >= 3_600_000))")
-                        .font(TranscriptDesign.TypeRole.timecode)
-                        .foregroundStyle(.secondary)
+                    TranscriptPlayheadReadout(viewModel: viewModel)
                 }
             }
             .frame(maxWidth: .infinity)
@@ -1358,47 +1428,19 @@ private struct TranscriptTransportBar: View {
         .animation(.snappy, value: viewModel.isPlaying)
     }
 
+    /// The coloured track redraws only when the transcript changes; the
+    /// knob and the readout are the only parts that follow each playback tick.
     private var speakerTimeline: some View {
-        let duration = max(1, viewModel.sourceDurationMilliseconds)
-        let spans = TranscriptSpeakerTimeline.spans(
-            durationMs: viewModel.sourceDurationMilliseconds,
-            segments: viewModel.chronologicalSegments
+        let segments = viewModel.chronologicalSegments
+        let palette = viewModel.speakerPalette
+        let colors = Dictionary(
+            Set(segments.compactMap(\.speakerID)).compactMap { id in palette.color(forSpeakerID: id).map { (id, $0) } },
+            uniquingKeysWith: { first, _ in first }
         )
-        return GeometryReader { geometry in
-            ZStack {
-                Capsule()
-                    .fill(Color.secondary.opacity(0.16))
-                    .frame(height: 7)
-                HStack(spacing: 0) {
-                    ForEach(Array(spans.enumerated()), id: \.offset) { _, span in
-                        Rectangle()
-                            .fill(viewModel.color(forSpeakerID: span.speakerID) ?? .secondary.opacity(0.27))
-                            .frame(width: geometry.size.width * CGFloat(span.durationMs) / CGFloat(duration))
-                    }
-                }
-                .clipShape(Capsule())
-                .frame(height: 7)
-                Circle()
-                    .fill(Color.primary)
-                    .frame(width: 12, height: 12)
-                    .overlay(Circle().stroke(Color(nsColor: .windowBackgroundColor), lineWidth: 2))
-                    .position(
-                        x: 6 + (geometry.size.width - 12) * CGFloat(max(0, min(viewModel.playheadMilliseconds, duration))) / CGFloat(duration),
-                        y: geometry.size.height / 2
-                    )
-            }
-            .frame(width: geometry.size.width, height: geometry.size.height)
-            .allowsHitTesting(false)
-            Slider(
-                value: Binding(
-                    get: { Double(viewModel.playheadMilliseconds) },
-                    set: { viewModel.seek(toMilliseconds: Int($0.rounded())) }
-                ),
-                in: 0...Double(duration)
-            )
-            .controlSize(.small)
-            .opacity(0.015)
-            .accessibilityLabel("Play head")
+        return ZStack {
+            TranscriptSpeakerTrack(durationMs: viewModel.sourceDurationMilliseconds, segments: segments, colors: colors)
+                .equatable()
+            TranscriptPlayheadScrubber(viewModel: viewModel)
         }
         .frame(height: 20)
     }

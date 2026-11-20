@@ -246,16 +246,26 @@ public final class TranscriptViewModel {
 
     public var selectedTranscript: CanonicalTranscript? { selectedFile?.transcript }
 
-    public var chronologicalSegments: [TranscriptSegment] {
-        (selectedTranscript?.segments ?? []).sorted {
-            ($0.startMs, $0.endMs, $0.id) < ($1.startMs, $1.endMs, $1.id)
-        }
-    }
+    public var chronologicalSegments: [TranscriptSegment] { order.segments }
 
     /// Reading paragraphs derived from the current canonical segments.
-    public var chronologicalParagraphs: [TranscriptParagraph] {
-        TranscriptParagraphGrouper().paragraphs(from: chronologicalSegments)
+    public var chronologicalParagraphs: [TranscriptParagraph] { order.paragraphs }
+
+    /// The selected transcript in time order, worked out once per version of
+    /// its turns. Every list row asks for it (its neighbours, its paragraph,
+    /// which source is playing) and paragraph rows redraw on each playback
+    /// tick, so sorting and grouping two thousand turns per question kept the
+    /// main thread busy. Reading `selectedTranscript` here keeps observation
+    /// exactly as before; only the derived arrays are remembered.
+    private var order: TranscriptOrder {
+        let source = selectedTranscript?.segments ?? []
+        if let cached = orderCache, cached.source == source { return cached }
+        let order = TranscriptOrder(source: source)
+        orderCache = order
+        return order
     }
+
+    @ObservationIgnored private var orderCache: TranscriptOrder?
 
     /// The speakers this recording has, in table order.
     public var recordingSpeakers: [TranscriptSpeaker] { selectedTranscript?.speakers ?? [] }
@@ -420,14 +430,16 @@ public final class TranscriptViewModel {
 
     public func paragraph(containingSegmentID segmentID: TranscriptSegment.ID?) -> TranscriptParagraph? {
         guard let segmentID else { return nil }
-        return chronologicalParagraphs.first { $0.allSourceSegmentIDs.contains(segmentID) }
+        let order = order
+        return order.paragraphIndexBySegmentID[segmentID].map { order.paragraphs[$0] }
     }
 
     /// The canonical segment a paragraph row should act on: the selected source
     /// when it belongs to the paragraph, otherwise the source covering the play
     /// head, otherwise the first source.
     public func primarySegment(for paragraph: TranscriptParagraph) -> TranscriptSegment? {
-        let sources = chronologicalSegments.filter { paragraph.sourceSegmentIDs.contains($0.id) }
+        let order = order
+        let sources = paragraph.sourceSegmentIDs.compactMap { order.segmentIndexByID[$0] }.sorted().map { order.segments[$0] }
         guard !sources.isEmpty else { return nil }
         if let selectedSegmentID, let selected = sources.first(where: { $0.id == selectedSegmentID }) {
             return selected
@@ -1220,16 +1232,16 @@ public final class TranscriptViewModel {
 
     /// The turn after this one in time, if any.
     public func segment(after segmentID: String) -> TranscriptSegment? {
-        let segments = chronologicalSegments
-        guard let index = segments.firstIndex(where: { $0.id == segmentID }), index + 1 < segments.count else { return nil }
-        return segments[index + 1]
+        let order = order
+        guard let index = order.segmentIndexByID[segmentID], index + 1 < order.segments.count else { return nil }
+        return order.segments[index + 1]
     }
 
     /// The turn before this one in time, if any.
     public func segment(before segmentID: String) -> TranscriptSegment? {
-        let segments = chronologicalSegments
-        guard let index = segments.firstIndex(where: { $0.id == segmentID }), index > 0 else { return nil }
-        return segments[index - 1]
+        let order = order
+        guard let index = order.segmentIndexByID[segmentID], index > 0 else { return nil }
+        return order.segments[index - 1]
     }
 
     /// Combines a turn with its neighbour into one. The earlier turn's speaker
@@ -1595,5 +1607,39 @@ public final class TranscriptViewModel {
     private static func describe(_ error: Error) -> String {
         if let error = error as? LocalizedError, let description = error.errorDescription { return description }
         return error.localizedDescription
+    }
+}
+
+/// One version of a transcript's turns, in time order, with its reading
+/// paragraphs and the lookups list rows need. Paragraphs are grouped on first
+/// use: the segment layout never asks for them.
+private final class TranscriptOrder {
+    let source: [TranscriptSegment]
+    let segments: [TranscriptSegment]
+    let segmentIndexByID: [TranscriptSegment.ID: Int]
+    private var grouped: (paragraphs: [TranscriptParagraph], indexBySegmentID: [TranscriptSegment.ID: Int])?
+
+    init(source: [TranscriptSegment]) {
+        self.source = source
+        segments = source.sorted { ($0.startMs, $0.endMs, $0.id) < ($1.startMs, $1.endMs, $1.id) }
+        segmentIndexByID = Dictionary(segments.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { first, _ in first })
+    }
+
+    var paragraphs: [TranscriptParagraph] { group().paragraphs }
+
+    /// The paragraph holding each turn, asides included; the first wins, as
+    /// a search from the top did.
+    var paragraphIndexBySegmentID: [TranscriptSegment.ID: Int] { group().indexBySegmentID }
+
+    private func group() -> (paragraphs: [TranscriptParagraph], indexBySegmentID: [TranscriptSegment.ID: Int]) {
+        if let grouped { return grouped }
+        let paragraphs = TranscriptParagraphGrouper().paragraphs(from: segments)
+        var index: [TranscriptSegment.ID: Int] = [:]
+        for (offset, paragraph) in paragraphs.enumerated() {
+            for id in paragraph.allSourceSegmentIDs where index[id] == nil { index[id] = offset }
+        }
+        let result = (paragraphs, index)
+        grouped = result
+        return result
     }
 }

@@ -122,6 +122,42 @@ final class SourceEnergyPriorTests: XCTestCase {
         }
     }
 
+    /// Review applies the pass to every run on every reload, so the answer is
+    /// cached; it must follow the energy timeline and diarization on disk.
+    func testReviewsReconciliationFollowsItsInputFilesAndIsReusedWhileTheyStand() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try JSONEncoder().encode(DiarizationRecord(intervals: [
+            .init(speakerID: "local", startSeconds: 0, endSeconds: 9, qualityScore: 1, overlapsAnotherSpeaker: false),
+            .init(speakerID: "remote", startSeconds: 10, endSeconds: 20, qualityScore: 1, overlapsAnotherSpeaker: false),
+        ], sourceDurationSeconds: 20, engine: nil, configuration: nil, clusteringDiagnostics: nil))
+            .write(to: root.appendingPathComponent(TranscriptRunArtifact.diarization), options: .atomic)
+        let transcript = CanonicalTranscript(
+            transcriptID: "t", revision: 1, status: .complete, createdAt: "2026-11-20T10:00:00Z",
+            source: TranscriptSource(filename: "final.m4a", durationMs: 20_000, checksum: "sha256:x"),
+            language: "en", languageSource: .detected,
+            speakers: [TranscriptSpeaker(id: "speaker_1", identityAssignment: .unmatched, labelSnapshot: "Local")],
+            segments: [segment("a", "speaker_1", 8_500, 9_000), segment("b", nil, 9_100, 9_400)],
+            processingOptions: ["microphone_speaker_prior_enabled": .boolean(true)]
+        )
+        func speakerOfB() -> String? {
+            UnknownFragmentReconciler.applied(to: transcript, in: root)?.segments.first { $0.id == "b" }?.effectiveSpeakerID
+        }
+
+        XCTAssertNil(speakerOfB(), "no energy timeline yet")
+        XCTAssertNil(speakerOfB())
+        try SourceEnergyCheckpoint.write(timeline(), in: root)
+        XCTAssertEqual(speakerOfB(), "speaker_1", "the new timeline is read, not the cached answer")
+        XCTAssertEqual(speakerOfB(), "speaker_1")
+        try FileManager.default.removeItem(at: root.appendingPathComponent(TranscriptRunArtifact.diarization))
+        XCTAssertNil(speakerOfB(), "without diarization the transcript is shown as stored")
+
+        var decided = transcript
+        decided = decided.replacing(segments: [segment("a", "speaker_1", 8_500, 9_000), segment("b", "speaker_1", 9_100, 9_400)])
+        XCTAssertEqual(UnknownFragmentReconciler.applied(to: decided, in: root), decided, "nothing undecided: nothing read")
+    }
+
     private func segment(_ id: String, _ speaker: String?, _ start: Int, _ end: Int, manual: Bool = false, overlap: Bool = false) -> TranscriptSegment {
         .init(id: id, speakerID: speaker, speakerLabel: speaker ?? "Unknown", startMs: start, endMs: end,
               text: "word", overlap: overlap, timingQuality: .asrWord, speakerConfidence: 0.5,

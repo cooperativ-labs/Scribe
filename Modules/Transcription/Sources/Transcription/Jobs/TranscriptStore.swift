@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import ScribeAppCore
 
@@ -29,6 +30,8 @@ public struct TranscriptStore: Sendable {
     public let storeDirectoryURL: URL
     private let writer: AtomicReplaceFileWriter
     nonisolated(unsafe) private let fileManager: FileManager
+    /// Shared by every copy of this store, so the host's reloads reuse it.
+    private let transcriptCache = CanonicalTranscriptDecodeCache()
 
     public init(
         storeDirectoryURL: URL,
@@ -49,7 +52,8 @@ public struct TranscriptStore: Sendable {
 
     /// Every run in the store, newest first.
     public func runs() -> [StoredTranscriptRun] {
-        meetingDirectories().flatMap(runs(inMeetingAt:)).sorted { $0.job.createdAt > $1.job.createdAt }
+        transcriptCache.removeMissing(fileManager: fileManager)
+        return meetingDirectories().flatMap(runs(inMeetingAt:)).sorted { $0.job.createdAt > $1.job.createdAt }
     }
 
     /// The runs review should show: the newest completed transcript per source.
@@ -66,14 +70,19 @@ public struct TranscriptStore: Sendable {
         .sorted { $0.job.createdAt > $1.job.createdAt }
     }
 
+    /// Reads and prepares every run the way the Transcripts window shows it,
+    /// so the decoded transcripts and their speaker reconciliation are cached
+    /// before the window first asks. Safe off the main thread.
+    public func prepareReviewCaches() {
+        for run in runs() { _ = TranscriptReviewFile(run) }
+    }
+
     public func run(withRunID runID: UUID) -> StoredTranscriptRun? {
         runs().first { $0.job.runID == runID }
     }
 
     public func transcript(forRunAt runDirectoryURL: URL) -> CanonicalTranscript? {
-        let url = runDirectoryURL.appending(path: TranscriptRunArtifact.canonicalTranscript)
-        guard let data = try? Data(contentsOf: url) else { return nil }
-        return try? CanonicalTranscriptCodec.decode(data)
+        transcriptCache.transcript(at: runDirectoryURL.appending(path: TranscriptRunArtifact.canonicalTranscript), fileManager: fileManager)
     }
 
     public func recognition(forRunAt runDirectoryURL: URL) -> SpeakerRecognitionRecord? {
@@ -429,6 +438,7 @@ public extension TranscriptStore {
               let meetings = try? FileManager.default.contentsOfDirectory(atPath: root) else {
             throw ConfinedTranscriptStoreError.unavailable
         }
+        transcriptCache.removeMissing(fileManager: fileManager)
         var runs: [ConfinedTranscriptRun] = []
         var skipped = 0, count = 0
         for meeting in meetings.sorted()
@@ -451,7 +461,7 @@ public extension TranscriptStore {
                       let jobData = Self.readConfined("\(folder)/\(entry)/job.json", root: root, limit: maximumFileBytes),
                       let job = try? Self.decodeJob(jobData),
                       let data = Self.readConfined("\(folder)/\(entry)/\(TranscriptRunArtifact.canonicalTranscript)", root: root, limit: maximumFileBytes),
-                      let transcript = try? CanonicalTranscriptCodec.decode(data) else {
+                      let transcript = transcriptCache.transcript(decoding: data, from: "\(folder)/\(entry)") else {
                     skipped += 1
                     continue
                 }
@@ -599,5 +609,82 @@ public struct TranscriptStoreRecordingCombiner: TranscriptRecordingCombining {
             throw TranscriptAssemblyError.missingArtifact("the run directory for \(runID.uuidString)")
         }
         return TranscriptReviewFile(run)
+    }
+}
+
+/// Decoded canonical transcripts, reused while their file is unchanged.
+///
+/// Review rebuilds its list from the store after a change, on the main
+/// thread; decoding every transcript again each time took about a third of a
+/// second for twenty hour-long meetings. A file is reused only while its
+/// size, modification date and file number are the ones it was decoded at:
+/// every write is an atomic replace, which gives the file a new number. The
+/// file is examined before it is read, so a write in between costs one more
+/// decode the next time, never a stale transcript.
+final class CanonicalTranscriptDecodeCache: @unchecked Sendable {
+    private let lock = NSLock()
+    private var entries: [String: (stamp: FileStamp, transcript: CanonicalTranscript)] = [:]
+    private var digestEntries: [String: (digest: Data, transcript: CanonicalTranscript)] = [:]
+
+    func transcript(at url: URL, fileManager: FileManager) -> CanonicalTranscript? {
+        let path = url.standardizedFileURL.path
+        guard let stamp = FileStamp(path: path, fileManager: fileManager) else {
+            lock.withLock { entries[path] = nil }
+            return nil
+        }
+        if let entry = lock.withLock({ entries[path] }), entry.stamp == stamp { return entry.transcript }
+        guard let data = try? Data(contentsOf: url), let transcript = try? CanonicalTranscriptCodec.decode(data) else {
+            lock.withLock { entries[path] = nil }
+            return nil
+        }
+        lock.withLock { entries[path] = (stamp, transcript) }
+        return transcript
+    }
+
+    /// The transcript in bytes read elsewhere (the confined reader, which does
+    /// its own checks), decoded again only when the bytes differ from the
+    /// last read of that run.
+    func transcript(decoding data: Data, from runPath: String) -> CanonicalTranscript? {
+        let digest = Data(SHA256.hash(data: data))
+        if let entry = lock.withLock({ digestEntries[runPath] }), entry.digest == digest { return entry.transcript }
+        guard let transcript = try? CanonicalTranscriptCodec.decode(data) else {
+            lock.withLock { digestEntries[runPath] = nil }
+            return nil
+        }
+        lock.withLock { digestEntries[runPath] = (digest, transcript) }
+        return transcript
+    }
+
+    /// Forgets transcripts whose file is gone (a deleted meeting).
+    func removeMissing(fileManager: FileManager) {
+        let (paths, runPaths) = lock.withLock { (Array(entries.keys), Array(digestEntries.keys)) }
+        let missing = paths.filter { !fileManager.fileExists(atPath: $0) }
+        let missingRuns = runPaths.filter { !fileManager.fileExists(atPath: $0) }
+        guard !missing.isEmpty || !missingRuns.isEmpty else { return }
+        lock.withLock {
+            for path in missing { entries[path] = nil }
+            for path in missingRuns { digestEntries[path] = nil }
+        }
+    }
+
+    var count: Int { lock.withLock { entries.count } }
+}
+
+/// What identifies one version of a file: an atomic replace always changes
+/// the file number, and an edit in place the size or modification date.
+struct FileStamp: Equatable {
+    let size: Int
+    let modified: Date
+    let fileNumber: Int
+
+    init?(path: String, fileManager: FileManager) {
+        guard let attributes = try? fileManager.attributesOfItem(atPath: path),
+              let size = (attributes[.size] as? NSNumber)?.intValue,
+              let modified = attributes[.modificationDate] as? Date,
+              let fileNumber = (attributes[.systemFileNumber] as? NSNumber)?.intValue
+        else { return nil }
+        self.size = size
+        self.modified = modified
+        self.fileNumber = fileNumber
     }
 }

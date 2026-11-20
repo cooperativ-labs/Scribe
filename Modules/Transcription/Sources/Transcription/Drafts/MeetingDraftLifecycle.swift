@@ -411,7 +411,7 @@ public final class MeetingDraftLifecycle: MeetingDraftEditing {
         await notesChain?.value
         if dirtySidecars.contains(draftID) { writeSidecar(draftID: draftID) }
         await store.flush(id: draftID)
-        await refresh(draftID)
+        await refresh(draftID, onlyIfRowChanged: true)
     }
 
     /// Whether an edit to this draft's notes or handoff settings made here
@@ -450,7 +450,11 @@ public final class MeetingDraftLifecycle: MeetingDraftEditing {
         let remaining = (pendingDraftNotes[id] ?? 1) - 1
         pendingDraftNotes[id] = remaining > 0 ? remaining : nil
         guard remaining <= 0, let stored = await store.draft(id: id) else { return }
-        await refresh(id)
+        // Typing lands here after every keystroke. A reload of the list
+        // rereads every transcript in the store, so it is asked for only
+        // when a row shows something new; a new note's count was already
+        // announced by `setNotes`.
+        await refresh(id, onlyIfRowChanged: true)
         // The draft attached while this edit was on its way: move the notes
         // into the meeting now rather than at the next reconciliation.
         if case .attached(let meetingKey, let runID) = stored.phase, !stored.notes.isEmpty {
@@ -561,7 +565,11 @@ public final class MeetingDraftLifecycle: MeetingDraftEditing {
     /// draft changes: every tray is bound to one draft ID.
     public func setHandoffSettings(draftID: UUID, _ settings: MeetingHandoffSettings) {
         guard let current = drafts[draftID], current.handoff != settings else { return }
+        let agentChanged = current.handoff.agentID != settings.agentID
         drafts[draftID]?.handoff = settings
+        // The row names the agent of a queued send; the rest of the settings
+        // (a prompt typed a key at a time) is not news to the list.
+        if agentChanged { didChange?() }
         pendingHandoffs[draftID, default: 0] += 1
         let previous = notesChain
         let store = store
@@ -576,7 +584,9 @@ public final class MeetingDraftLifecycle: MeetingDraftEditing {
         let remaining = (pendingHandoffs[id] ?? 1) - 1
         pendingHandoffs[id] = remaining > 0 ? remaining : nil
         guard remaining <= 0 else { return }
-        await refresh(id)
+        // Typing a prompt lands here after every keystroke; only the agent
+        // shows in the row.
+        await refresh(id, onlyIfRowChanged: true)
     }
 
     // MARK: - Queued send
@@ -651,11 +661,19 @@ public final class MeetingDraftLifecycle: MeetingDraftEditing {
         await refresh(id)
     }
 
-    private func refresh(_ id: UUID) async {
+    /// Takes the store's copy of a draft into the mirror and tells review.
+    /// `onlyIfRowChanged` skips the telling when nothing a row shows (the
+    /// facts `rowFacts` keeps, and the save state) is different.
+    private func refresh(_ id: UUID, onlyIfRowChanged: Bool = false) async {
         guard !deletedIDs.contains(id) else { return }
+        let before = drafts[id].map(Self.rowFacts)
+        let saveStateBefore = saveStates[id]
         if let draft = await store.draft(id: id) {
             adopt(draft)
             storeSaveStates[id] = await store.saveState(id: id)
+        }
+        if onlyIfRowChanged, before != nil, before == drafts[id].map(Self.rowFacts), saveStateBefore == saveStates[id] {
+            return
         }
         didChange?()
     }
@@ -703,7 +721,9 @@ public final class MeetingDraftLifecycle: MeetingDraftEditing {
     private static func rowFacts(_ draft: MeetingDraft) -> MeetingDraft {
         var facts = draft
         facts.revision = 0
+        // A queued send's row names the agent; nothing else of the handoff shows.
         facts.handoff = MeetingHandoffSettings()
+        facts.handoff.agentID = draft.handoff.agentID
         facts.notes = draft.notes.map { MeetingNote(id: $0.id, text: "", recordingOffsetMilliseconds: nil) }
         return facts
     }

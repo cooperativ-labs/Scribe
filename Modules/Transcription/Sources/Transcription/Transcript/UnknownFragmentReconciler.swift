@@ -109,15 +109,39 @@ public struct UnknownFragmentReconciler: Sendable {
         fileManager: FileManager = .default
     ) -> CanonicalTranscript? {
         guard let transcript else { return nil }
+        // Only a turn with no speaker, inference or manual choice can change.
+        // Without one there is nothing to decide, and the diarization and the
+        // energy timeline (several megabytes per meeting) are not read.
+        guard transcript.segments.contains(where: isUndecided) else { return transcript }
         let url = runDirectoryURL.appending(path: TranscriptRunArtifact.diarization)
+        let energyURL = runDirectoryURL.appendingPathComponent(TranscriptRunArtifact.sourceEnergy)
+        let usesEnergy = transcript.processingOptions["microphone_speaker_prior_enabled"] == .boolean(true)
+        // Review applies this to every run on every reload of its list; the
+        // answer is kept until the transcript or either input file changes.
+        let key = AppliedReconciliationCache.Key(
+            transcript: transcript,
+            diarization: FileStamp(path: url.path, fileManager: fileManager),
+            energy: usesEnergy ? FileStamp(path: energyURL.path, fileManager: fileManager) : nil
+        )
+        let directory = runDirectoryURL.standardizedFileURL.path
+        if let cached = AppliedReconciliationCache.shared.result(for: key, in: directory) { return cached }
+        let result = computeApplied(to: transcript, diarizationURL: url, energyURL: usesEnergy ? energyURL : nil, fileManager: fileManager)
+        AppliedReconciliationCache.shared.store(result, for: key, in: directory)
+        return result
+    }
+
+    private static func computeApplied(
+        to transcript: CanonicalTranscript,
+        diarizationURL url: URL,
+        energyURL: URL?,
+        fileManager: FileManager
+    ) -> CanonicalTranscript {
         guard fileManager.fileExists(atPath: url.path),
               let data = try? Data(contentsOf: url),
               let record = try? JSONDecoder().decode(DiarizationRecord.self, from: data)
         else { return transcript }
         let intervals = record.acousticIntervals(sourceDurationMs: transcript.source.durationMs)
-        let energyURL = runDirectoryURL.appendingPathComponent(TranscriptRunArtifact.sourceEnergy)
-        let energy = transcript.processingOptions["microphone_speaker_prior_enabled"] == .boolean(true)
-            ? (try? JSONDecoder().decode(SourceEnergyTimeline.self, from: Data(contentsOf: energyURL))) : nil
+        let energy = energyURL.flatMap { try? JSONDecoder().decode(SourceEnergyTimeline.self, from: Data(contentsOf: $0)) }
         let prior = energy.flatMap { SourceEnergyPrior(timeline: $0, intervals: intervals) }
         let segments = UnknownFragmentReconciler().reconcile(
             segments: transcript.segments,
@@ -127,6 +151,11 @@ public struct UnknownFragmentReconciler: Sendable {
         )
         guard segments != transcript.segments else { return transcript }
         return transcript.replacing(segments: segments)
+    }
+
+    /// A turn this pass may attribute: no speaker, no inference, not chosen by hand.
+    static func isUndecided(_ segment: TranscriptSegment) -> Bool {
+        segment.speakerID == nil && segment.speakerInference == nil && segment.attributionSource != .manual
     }
 
     // MARK: - Decisions
@@ -139,7 +168,7 @@ public struct UnknownFragmentReconciler: Sendable {
         sourceEnergyPrior: SourceEnergyPrior?
     ) -> TranscriptSegment {
         let segment = segments[index]
-        guard segment.speakerID == nil, segment.speakerInference == nil, segment.attributionSource != .manual else { return segment }
+        guard Self.isUndecided(segment) else { return segment }
 
         let acoustic = classify(segment, using: intervals)
         let unresolved = unresolvedEvidence(acoustic)
@@ -457,3 +486,27 @@ private extension Array {
         indices.contains(index) ? self[index] : nil
     }
 }
+
+/// The last reconciled transcript of each run directory, with the inputs it
+/// came from. One entry per run, replaced when any input differs.
+final class AppliedReconciliationCache: @unchecked Sendable {
+    struct Key: Equatable {
+        let transcript: CanonicalTranscript
+        let diarization: FileStamp?
+        let energy: FileStamp?
+    }
+
+    static let shared = AppliedReconciliationCache()
+
+    private let lock = NSLock()
+    private var entries: [String: (key: Key, result: CanonicalTranscript)] = [:]
+
+    func result(for key: Key, in directory: String) -> CanonicalTranscript? {
+        lock.withLock { entries[directory].flatMap { $0.key == key ? $0.result : nil } }
+    }
+
+    func store(_ result: CanonicalTranscript, for key: Key, in directory: String) {
+        lock.withLock { entries[directory] = (key, result) }
+    }
+}
+

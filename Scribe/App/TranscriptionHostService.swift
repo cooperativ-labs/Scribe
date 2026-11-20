@@ -207,6 +207,11 @@ final class TranscriptionHostService {
             }
         }
         observeJobEvents()
+        // Decoding every transcript and its speaker reconciliation takes over
+        // a second for a few dozen meetings; done here, off the main thread,
+        // the Transcripts window's first open and later reloads reuse it.
+        let store = store
+        Task.detached(priority: .utility) { store.prepareReviewCaches() }
         Task { [weak self] in
             guard let self else { return }
             await self.openDrafts()

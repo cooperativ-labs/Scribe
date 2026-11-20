@@ -645,6 +645,7 @@ private struct HandoffStatusLine: View {
         }
         .font(.caption)
         .foregroundStyle(color)
+        .lineLimit(3)
         .fixedSize(horizontal: false, vertical: true)
         .padding(.top, 8)
     }
