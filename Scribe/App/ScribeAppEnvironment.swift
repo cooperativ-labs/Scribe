@@ -159,7 +159,7 @@ final class ScribeAppEnvironment: ObservableObject {
             transcription?.openVocabularySettings = { [weak self] in self?.openVocabularySettings() }
         }
 
-        coordinator.terminationHandler = { NSApplication.shared.terminate(nil) }
+        coordinator.terminationHandler = { Self.requestTermination() }
         // Each recording gets a meeting draft from the moment capture is
         // active: the placeholder row, its title and, later, its notes.
         coordinator.lifecycleHandler = { [weak self] event in
@@ -424,11 +424,22 @@ final class ScribeAppEnvironment: ObservableObject {
             do {
                 try await updater.launchInstaller(preparedUpdate, processID: ProcessInfo.processInfo.processIdentifier)
                 // AppDelegate drains and saves any active recording before exit.
-                NSApplication.shared.terminate(nil)
+                Self.requestTermination()
             } catch {
                 updater.discard(preparedUpdate)
                 self?.preparedUpdate = nil
                 self?.updateState = .failed(message: error.localizedDescription)
+            }
+        }
+    }
+
+    private static func requestTermination() {
+        // AppKit runs a modal event loop while it waits for the delegate's reply.
+        // Enter it from the run loop so it can service the main queue, which
+        // runs the capture drain and draft flush.
+        RunLoop.main.perform(inModes: [.default]) {
+            MainActor.assumeIsolated {
+                NSApplication.shared.terminate(nil)
             }
         }
     }

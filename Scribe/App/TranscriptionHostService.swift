@@ -346,17 +346,26 @@ final class TranscriptionHostService {
     func flushDraftsForTermination(then completion: @escaping @MainActor () -> Void) {
         let chain = draftChain
         let store = draftStore
-        Task { @MainActor in
-            await withTaskGroup(of: Void.self) { group in
-                group.addTask {
-                    await chain?.value
-                    await store.flushAll()
-                }
-                group.addTask { try? await Task.sleep(for: .seconds(3)) }
-                await group.next()
-                group.cancelAll()
-            }
+        // A task group would wait for the flush even after the timeout wins.
+        var didFinish = false
+        let finish: @MainActor () -> Void = {
+            guard !didFinish else { return }
+            didFinish = true
             completion()
+        }
+        let timeout = Task { @MainActor in
+            do {
+                try await Task.sleep(for: .seconds(3))
+            } catch {
+                return
+            }
+            finish()
+        }
+        Task { @MainActor in
+            await chain?.value
+            await store.flushAll()
+            timeout.cancel()
+            finish()
         }
     }
 
