@@ -21,6 +21,8 @@ public final class ScribeSettings: ObservableObject {
 
     @Published public private(set) var recordingsFolderURL: URL
     @Published public private(set) var recordingsFolderError: ScribeSettingsError?
+    @Published public private(set) var autoTranscribeFolderURL: URL?
+    @Published public private(set) var autoTranscribeFolderError: String?
     @Published public var rememberedApplicationBundleIdentifier: String? {
         didSet { storeOptionalString(rememberedApplicationBundleIdentifier, forKey: Key.applicationBundleIdentifier) }
     }
@@ -411,6 +413,7 @@ public final class ScribeSettings: ObservableObject {
         assistantKeyWasMoved = movedStoredAssistantKey
 
         recordingsFolderURL = defaultRecordingsFolderURL
+        autoTranscribeFolderURL = nil
         modelInstaller.refresh(directory: modelsFolderURL)
         vocabularyInstaller.refresh(directory: modelsFolderURL)
 
@@ -423,6 +426,18 @@ public final class ScribeSettings: ObservableObject {
             return
         }
         recordingsFolderError = nil
+
+        do {
+            autoTranscribeFolderURL = try Self.resolveBookmark(
+                from: defaults,
+                fileManager: fileManager,
+                key: Key.autoTranscribeFolderBookmark
+            )
+            autoTranscribeFolderError = nil
+        } catch {
+            autoTranscribeFolderURL = nil
+            autoTranscribeFolderError = "The saved auto transcribe folder could not be opened. Choose it again: \(error.localizedDescription)"
+        }
 
         // Store the default as a bookmark immediately, not only after the user
         // changes it. This makes a relaunch behave the same as a selected folder.
@@ -497,6 +512,32 @@ public final class ScribeSettings: ObservableObject {
             let settingsError = ScribeSettingsError.cannotCreateBookmark(error.localizedDescription)
             recordingsFolderError = settingsError
             throw settingsError
+        }
+    }
+
+    /// Saves the folder selected for automatic transcription as a
+    /// security-scoped bookmark. `nil` clears the selection.
+    public func setAutoTranscribeFolder(_ url: URL?) throws {
+        guard let url else {
+            defaults.removeObject(forKey: Key.autoTranscribeFolderBookmark)
+            autoTranscribeFolderURL = nil
+            autoTranscribeFolderError = nil
+            return
+        }
+
+        let standardizedURL = url.standardizedFileURL
+        do {
+            let bookmark = try standardizedURL.bookmarkData(
+                options: [.withSecurityScope],
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            )
+            defaults.set(bookmark, forKey: Key.autoTranscribeFolderBookmark)
+            autoTranscribeFolderURL = standardizedURL
+            autoTranscribeFolderError = nil
+        } catch {
+            autoTranscribeFolderError = "The folder could not be saved: \(error.localizedDescription)"
+            throw error
         }
     }
 
@@ -605,6 +646,7 @@ public final class ScribeSettings: ObservableObject {
     private enum Key {
         static let modelsFolderBookmark = "scribe.settings.modelsFolderBookmark"
         static let recordingsFolderBookmark = "scribe.settings.recordingsFolderBookmark"
+        static let autoTranscribeFolderBookmark = "scribe.settings.autoTranscribeFolderBookmark"
         static let applicationBundleIdentifier = "scribe.settings.rememberedApplicationBundleIdentifier"
         static let microphoneID = "scribe.settings.rememberedMicrophoneID"
         static let recordingMode = "scribe.settings.rememberedRecordingMode"

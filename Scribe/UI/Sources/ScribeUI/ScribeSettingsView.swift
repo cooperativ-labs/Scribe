@@ -1,3 +1,4 @@
+import AppKit
 import Platform
 import SwiftUI
 import Vocabulary
@@ -259,6 +260,32 @@ public struct ScribeSettingsView: View {
 
     private var transcriptionTab: some View {
         Form {
+            Section("Auto Transcribe Folder") {
+                HStack {
+                    Label(
+                        settings.autoTranscribeFolderURL?.path ?? "No folder selected",
+                        systemImage: "folder"
+                    )
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    Spacer(minLength: 8)
+                    Button("Choose Folder…", systemImage: "folder.badge.plus") {
+                        chooseAutoTranscribeFolder()
+                    }
+                }
+                if let error = settings.autoTranscribeFolderError {
+                    Text(error).font(.footnote).foregroundStyle(.red)
+                }
+                Text("Choose the folder Scribe should use as the source for automatic transcription.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                if settings.autoTranscribeFolderURL != nil {
+                    Button("Clear Folder", role: .destructive) {
+                        try? settings.setAutoTranscribeFolder(nil)
+                    }
+                }
+            }
+
             Section("Processing") {
                 Toggle("Transcribe when the final recording is ready", isOn: $settings.transcribeWhenFinalRecordingIsReady)
                 Toggle("Identify me from my microphone", isOn: $settings.microphoneSpeakerPrior)
@@ -287,6 +314,21 @@ public struct ScribeSettingsView: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    private func chooseAutoTranscribeFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Choose Folder"
+        panel.message = "Choose the folder to use for automatic transcription."
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try settings.setAutoTranscribeFolder(url)
+        } catch {
+            // The setting publishes a human-readable error for the form.
+        }
     }
 
     // MARK: - Dictation

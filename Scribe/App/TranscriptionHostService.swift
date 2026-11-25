@@ -667,24 +667,6 @@ final class TranscriptionHostService {
         return outcome
     }
 
-    /// The folder chooser the menu opens. Security-scoped access is held for the
-    /// scan and the snapshot copies, which is all the module needs the original
-    /// folder for.
-    func chooseFolderToTranscribe() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.prompt = "Transcribe"
-        panel.message = "Choose a folder of recordings to transcribe."
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        Task { [weak self] in
-            let granted = url.startAccessingSecurityScopedResource()
-            defer { if granted { url.stopAccessingSecurityScopedResource() } }
-            await self?.importFolder(at: url)
-        }
-    }
-
     // MARK: - Review
 
     /// Builds the window's view model on first open and refreshes it afterwards.

@@ -214,11 +214,7 @@ extension StatusMenuContent {
         if let transcription {
             // Transcription is reported apart from capture and from audio
             // cleanup: all three run independently. Failure detail stays out.
-            var rows = transcription.statusLines.map(StatusMenuRow.note)
-            rows.append(.command(StatusMenuCommand(title: "Transcribe Folder…", perform: transcription.transcribeFolder)))
-            if let openSpeakers = transcription.openSpeakers {
-                rows.append(.command(StatusMenuCommand(title: "Speakers…", perform: openSpeakers)))
-            }
+            let rows = transcription.statusLines.map(StatusMenuRow.note)
             sections.append(StatusMenuSection(id: "transcription", rows: rows))
         }
 
@@ -230,6 +226,9 @@ extension StatusMenuContent {
             )))
         }
         folders.append(.command(StatusMenuCommand(title: "Settings…", perform: openSettings)))
+        if let openSpeakers = transcription?.openSpeakers {
+            folders.append(.command(StatusMenuCommand(title: "Speakers…", perform: openSpeakers)))
+        }
         sections.append(StatusMenuSection(id: "folders", rows: folders))
 
         if let updates {

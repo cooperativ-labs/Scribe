@@ -709,7 +709,6 @@ extension ScribeAppEnvironment {
             failure: transcriptionStatus.failure,
             openTranscripts: { [weak self] in self?.openTranscriptWindow() },
             openSpeakers: transcription.speakersAreAvailable ? { [weak self] in self?.openSpeakersWindow() } : nil,
-            transcribeFolder: { transcription.chooseFolderToTranscribe() },
             openTranscriptionsFolder: { NSWorkspace.shared.open(transcription.storeDirectoryURL) },
             openMeetingNotes: { [weak self] sessionID in self?.openMeetingNotes(sessionID: sessionID) }
         )

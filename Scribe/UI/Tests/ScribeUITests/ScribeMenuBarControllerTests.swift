@@ -142,7 +142,6 @@ final class ScribeMenuBarControllerTests: XCTestCase {
             model: model,
             transcription: TranscriptionMenuCommands(
                 openTranscripts: {},
-                transcribeFolder: {},
                 openTranscriptionsFolder: {},
                 openMeetingNotes: { opened.append($0) }
             )
@@ -173,7 +172,7 @@ final class ScribeMenuBarControllerTests: XCTestCase {
     func testMeetingNotesIsAbsentWhenTheHostKeepsNoNotes() {
         let controller = makeController(
             MockRecordingCoordinator(snapshot: readySnapshot()),
-            transcription: TranscriptionMenuCommands(openTranscripts: {}, transcribeFolder: {}, openTranscriptionsFolder: {})
+            transcription: TranscriptionMenuCommands(openTranscripts: {}, openTranscriptionsFolder: {})
         )
         XCTAssertNil(controller.makeContent().command(titled: "Meeting Notes"))
     }
@@ -222,7 +221,6 @@ final class ScribeMenuBarControllerTests: XCTestCase {
             MockRecordingCoordinator(snapshot: readySnapshot()),
             transcription: TranscriptionMenuCommands(
                 openTranscripts: {},
-                transcribeFolder: {},
                 openTranscriptionsFolder: { openedTranscriptions = true }
             )
         )
@@ -285,7 +283,6 @@ final class ScribeMenuBarControllerTests: XCTestCase {
             transcription: TranscriptionMenuCommands(
                 failure: "Transcription of weekly-sync.flac failed: model missing",
                 openTranscripts: {},
-                transcribeFolder: {},
                 openTranscriptionsFolder: {}
             )
         )
