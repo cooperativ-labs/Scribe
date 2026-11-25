@@ -78,6 +78,8 @@ struct StatusMenuCommand {
     var shortcut: String?
     /// `nil` for an ordinary command; on or off for a setting the row toggles.
     var isOn: Bool?
+    /// An SF Symbol drawn in place of the checkmark column.
+    var symbol: String?
     let perform: () -> Void
 }
 
@@ -120,6 +122,14 @@ extension StatusMenuContent {
         openSettings: @escaping () -> Void
     ) {
         var sections: [StatusMenuSection] = []
+
+        // The transcripts window is the app's home screen, so it opens from a
+        // section of its own under the transport controls.
+        if let transcription {
+            sections.append(StatusMenuSection(id: "open", rows: [
+                .command(StatusMenuCommand(title: "Open Scribe", symbol: "macwindow", perform: transcription.openTranscripts)),
+            ]))
+        }
 
         var recorder: [StatusMenuRow] = []
         // The Record button already says the recorder is ready; an "Idle" row
@@ -205,7 +215,6 @@ extension StatusMenuContent {
             // Transcription is reported apart from capture and from audio
             // cleanup: all three run independently. Failure detail stays out.
             var rows = transcription.statusLines.map(StatusMenuRow.note)
-            rows.append(.command(StatusMenuCommand(title: "Transcripts…", perform: transcription.openTranscripts)))
             rows.append(.command(StatusMenuCommand(title: "Transcribe Folder…", perform: transcription.transcribeFolder)))
             if let openSpeakers = transcription.openSpeakers {
                 rows.append(.command(StatusMenuCommand(title: "Speakers…", perform: openSpeakers)))

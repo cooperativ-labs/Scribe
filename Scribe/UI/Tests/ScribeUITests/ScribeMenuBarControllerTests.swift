@@ -295,7 +295,8 @@ final class ScribeMenuBarControllerTests: XCTestCase {
         let titles = controller.makeContent().titles
 
         XCTAssertFalse(titles.contains { $0.contains("model missing") })
-        XCTAssertTrue(titles.contains("Transcripts…"))
+        XCTAssertTrue(titles.contains("Open Scribe"))
+        XCTAssertFalse(titles.contains("Transcripts…"))
     }
 
     func testUpdateFailuresShowAShortStatusInsteadOfTheDiagnostic() {

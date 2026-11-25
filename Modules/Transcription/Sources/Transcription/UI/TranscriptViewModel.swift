@@ -97,6 +97,9 @@ public final class TranscriptViewModel {
     /// build with no settings surface — the toolbar then hides the button
     /// rather than offering a route that goes nowhere.
     @ObservationIgnored private let openVocabularySettings: (@MainActor () -> Void)?
+    /// Pauses, resumes or stops the recording in progress. Set by the host,
+    /// which owns the recorder; nil hides the header's recording controls.
+    @ObservationIgnored public var recordingControl: (@MainActor (RecordingControlAction) -> Void)?
     /// Edits meeting drafts by ID. Absent when the host keeps no drafts.
     @ObservationIgnored let draftEditor: (any MeetingDraftEditing)?
     /// Queues, cancels and confirms a meeting's "Send after processing".
@@ -225,7 +228,15 @@ public final class TranscriptViewModel {
             else { return file }
             return file.replacingTranscript(existingTranscript)
         }
-        if let selectedFileID, self.files.contains(where: { $0.id == selectedFileID }) { return }
+        if let currentSelection = selectedFile {
+            // Draft rows keep their selection key when processing attaches a run.
+            if currentSelection.runID != previousSelection?.runID
+                || currentSelection.playbackSourceURL != previousSelection?.playbackSourceURL
+            {
+                selectFileIfNeeded()
+            }
+            return
+        }
         // A finished reprocess replaces the run ID; keep the same source selected
         // so the confirmation sheet and review stay on the meeting that just finished.
         if let previousSelection,
@@ -672,8 +683,7 @@ public final class TranscriptViewModel {
     }
 
     /// Removes the recording and keeps the transcript in the list. Playback
-    /// stops first when this is the file on screen, so the player lets go of
-    /// the source before it disappears.
+    /// stops before deletion when this is the file on screen.
     public func deleteAudio(fileID: TranscriptReviewFile.ID) {
         guard let index = files.firstIndex(where: { $0.id == fileID }), canDeleteAudio(files[index]) else { return }
         let file = files[index]
@@ -692,6 +702,7 @@ public final class TranscriptViewModel {
             return
         }
         files[index] = file.removingAudio()
+        if selectedFileID == fileID { playback.unload() }
     }
 
     // MARK: - Combining
@@ -775,7 +786,7 @@ public final class TranscriptViewModel {
     }
 
     /// Whether the selected file still has a recording to play.
-    public var canPlayAudio: Bool { selectedFile?.hasAudio ?? false }
+    public var canPlayAudio: Bool { selectedFile?.playbackSourceURL != nil }
 
     // MARK: - Importing
 
@@ -1594,12 +1605,11 @@ public final class TranscriptViewModel {
         stopPlayback()
         speakerFilterID = nil
         playheadMilliseconds = 0
-        guard let file = selectedFile else {
-            selectedSegmentID = nil
-            exportMessage = nil
-            return
+        if let url = selectedFile?.playbackSourceURL {
+            playback.load(sourceSnapshotURL: url)
+        } else {
+            playback.unload()
         }
-        if !file.isPlaceholder { playback.load(sourceSnapshotURL: file.sourceSnapshotURL) }
         selectedSegmentID = nil
         exportMessage = nil
     }
@@ -1642,4 +1652,9 @@ private final class TranscriptOrder {
         grouped = result
         return result
     }
+}
+
+/// What the transcript header's recording controls ask of the recorder.
+public enum RecordingControlAction: Sendable {
+    case pause, resume, stop
 }

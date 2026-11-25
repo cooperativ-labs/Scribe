@@ -90,6 +90,11 @@ final class TranscriptionHostService {
     /// session: the capture clock less the Paste Timestamp offset, nil unless
     /// that session is capturing audio. Set by the environment, which owns
     /// the recorder.
+    /// Drives the recorder from the transcript header's controls.
+    var recordingControl: (@MainActor (RecordingControlAction) -> Void)? {
+        didSet { reviewModel?.recordingControl = recordingControl }
+    }
+
     var noteClock: (@MainActor (_ sessionID: UUID) -> Int?)? {
         didSet { drafts?.captureClock = noteClock }
     }
@@ -683,6 +688,7 @@ final class TranscriptionHostService {
             draftEditor: self,
             sendController: self
         )
+        model.recordingControl = recordingControl
         reviewModel = model
         return model
     }

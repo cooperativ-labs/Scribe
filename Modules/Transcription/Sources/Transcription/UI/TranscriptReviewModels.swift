@@ -97,6 +97,8 @@ public struct TranscriptReviewFile: Identifiable, Equatable, Sendable {
     /// one waiting for transcription, or notes whose recording is gone.
     public var isPlaceholder: Bool { runID == nil }
 
+    var playbackSourceURL: URL? { hasAudio && !isPlaceholder ? sourceSnapshotURL : nil }
+
     public var filename: String {
         if let transcript { return transcript.source.filename }
         if let draft, runID == nil { return draft.defaultTitle }
@@ -248,6 +250,7 @@ public enum TranscriptPlaybackEvent: Equatable, Sendable {
 @MainActor
 public protocol TranscriptPlaybackSeeking: AnyObject {
     func load(sourceSnapshotURL: URL)
+    func unload()
     func seek(toMilliseconds milliseconds: Int)
     func play()
     func pause()
@@ -258,6 +261,7 @@ public protocol TranscriptPlaybackSeeking: AnyObject {
 }
 
 public extension TranscriptPlaybackSeeking {
+    func unload() {}
     func play() {}
     func pause() {}
     func setRate(_: Float) {}
@@ -292,6 +296,13 @@ public final class AVFoundationTranscriptPlayback: TranscriptPlaybackSeeking {
             options: [AVURLAssetPreferPreciseDurationAndTimingKey: true]
         )
         player.replaceCurrentItem(with: AVPlayerItem(asset: asset))
+        observeEndOfCurrentItem()
+    }
+
+    public func unload() {
+        player.pause()
+        player.replaceCurrentItem(with: nil)
+        loadedURL = nil
         observeEndOfCurrentItem()
     }
 
@@ -336,10 +347,12 @@ public final class AVFoundationTranscriptPlayback: TranscriptPlaybackSeeking {
     private func observeEndOfCurrentItem() {
         if let endObserverToken {
             NotificationCenter.default.removeObserver(endObserverToken)
+            self.endObserverToken = nil
         }
+        guard let item = player.currentItem else { return }
         endObserverToken = NotificationCenter.default.addObserver(
             forName: AVPlayerItem.didPlayToEndTimeNotification,
-            object: player.currentItem,
+            object: item,
             queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {

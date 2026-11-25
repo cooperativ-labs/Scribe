@@ -175,6 +175,13 @@ final class ScribeAppEnvironment: ObservableObject {
                 offset: TimeInterval(settings.pasteTimestampOffsetSeconds)
             )
         }
+        transcription?.recordingControl = { [weak coordinator] action in
+            switch action {
+            case .pause: coordinator?.submit(.pause)
+            case .resume: coordinator?.submit(.resume)
+            case .stop: coordinator?.submit(.stop)
+            }
+        }
         transcription?.publishFinishedRecording = { [weak self] directory, draftID in
             await self?.publishFinishedRecording(sessionDirectory: directory, draftID: draftID)
                 ?? "Transcription is not available right now."

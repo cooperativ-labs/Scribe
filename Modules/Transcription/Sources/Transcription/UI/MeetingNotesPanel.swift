@@ -214,6 +214,8 @@ struct MeetingNotesPanelView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Spacer(minLength: 8)
+                RecordingControlButtons(viewModel: viewModel, file: file)
+                    .controlSize(.small)
                 Button {
                     openInTranscripts(draftID)
                 } label: {
@@ -464,5 +466,33 @@ public final class MeetingNotesPanelController: NSObject, NSWindowDelegate {
         state.draftID = nil
         state.isEditingNotes = false
         wasOpenBeforeTranscript = false
+    }
+}
+
+/// Pause/resume and stop for the recording in progress. Shown in the
+/// transcript header and the floating notes panel; empty unless the file is
+/// recording (or held) and the host supplied a recorder hook.
+struct RecordingControlButtons: View {
+    let viewModel: TranscriptViewModel
+    let file: TranscriptReviewFile
+
+    var body: some View {
+        if case .recording(_, let isPaused) = file.jobState, let control = viewModel.recordingControl {
+            HStack(spacing: 6) {
+                Button {
+                    control(isPaused ? .resume : .pause)
+                } label: {
+                    Label(isPaused ? "Resume" : "Pause", systemImage: isPaused ? "record.circle" : "pause.fill")
+                }
+                .help(isPaused ? "Resume recording" : "Pause recording")
+                Button {
+                    control(.stop)
+                } label: {
+                    Label("Stop", systemImage: "stop.fill")
+                }
+                .help("Stop recording and finish this meeting")
+            }
+            .buttonStyle(.bordered)
+        }
     }
 }

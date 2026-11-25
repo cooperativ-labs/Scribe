@@ -371,6 +371,7 @@ public struct TranscriptWindow: View {
                     .font(.callout)
                     .foregroundStyle(file.isRecording ? AnyShapeStyle(Color.red) : AnyShapeStyle(.secondary))
                     Spacer(minLength: 8)
+                    RecordingControlButtons(viewModel: viewModel, file: file)
                     placeholderActions(file: file)
                         .controlSize(.small)
                 }

@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import ScribeAppCore
 import XCTest
@@ -450,12 +451,21 @@ final class MeetingDraftLifecycleTests: XCTestCase {
         let rowKey = draft.id.uuidString
 
         // Recording: a pinned placeholder row that can be renamed.
-        var files = rows(lifecycle, transcripts)
+        let files = rows(lifecycle, transcripts)
         XCTAssertEqual(files.map(\.id), [rowKey])
         XCTAssertEqual(files[0].jobState, .recording(startedAt: startedAt, isPaused: false))
         XCTAssertTrue(files[0].isPlaceholder)
-        let viewModel = TranscriptViewModel(files: files, playback: LifecyclePlayback(), draftEditor: lifecycle)
+        let previous = TranscriptReviewFile(
+            sourceSnapshotURL: root.appendingPathComponent("previous.m4a"),
+            transcript: sampleTranscript(id: "previous", title: nil),
+            jobState: .complete
+        )
+        let playback = AVFoundationTranscriptPlayback()
+        let viewModel = TranscriptViewModel(files: [previous] + files, playback: playback, draftEditor: lifecycle)
+        XCTAssertEqual((playback.player.currentItem?.asset as? AVURLAsset)?.url, previous.sourceSnapshotURL)
+        viewModel.selectedFileID = rowKey
         XCTAssertEqual(viewModel.selectedFileID, rowKey)
+        XCTAssertNil(playback.player.currentItem)
         _ = try await lifecycle.setTitle(draftID: draft.id, title: "Board sync", basedOnRevision: draft.revision, previousTitle: nil)
         viewModel.reload(files: rows(lifecycle, transcripts))
         XCTAssertEqual(viewModel.selectedFile?.displayName, "Board sync")
@@ -486,6 +496,14 @@ final class MeetingDraftLifecycleTests: XCTestCase {
         XCTAssertEqual(viewModel.files.map(\.id), [rowKey])
         XCTAssertEqual(viewModel.selectedFileID, rowKey)
         XCTAssertEqual(viewModel.selectedFile?.displayName, "Board sync")
+        XCTAssertEqual((playback.player.currentItem?.asset as? AVURLAsset)?.url, job.sourceSnapshotURL)
+
+        let item = try XCTUnwrap(playback.player.currentItem)
+        let segment = try XCTUnwrap(viewModel.chronologicalSegments.first)
+        viewModel.select(segment: segment)
+        viewModel.reload(files: rows(lifecycle, transcripts))
+        XCTAssertTrue(playback.player.currentItem === item)
+        XCTAssertEqual(viewModel.selectedSegmentID, segment.id)
 
         // A rerun opens under the same title and keeps the row.
         let completed = try XCTUnwrap(transcripts.run(withRunID: job.runID)?.job)
@@ -496,7 +514,15 @@ final class MeetingDraftLifecycleTests: XCTestCase {
         viewModel.reload(files: rows(lifecycle, transcripts))
         XCTAssertEqual(viewModel.files.map(\.id), [rowKey])
         XCTAssertEqual(viewModel.selectedFile?.runID, rerun.runID.uuidString)
+        XCTAssertEqual((playback.player.currentItem?.asset as? AVURLAsset)?.url, rerun.sourceSnapshotURL)
         XCTAssertEqual(lifecycle.drafts[draft.id]?.phase.runID, job.runID, "a rerun never re-opens the draft lifecycle")
+
+        let selected = try XCTUnwrap(viewModel.selectedFile)
+        viewModel.reload(files: [selected.removingAudio()])
+        XCTAssertNil(playback.player.currentItem)
+        XCTAssertFalse(viewModel.canPlayAudio)
+        viewModel.reload(files: [selected])
+        XCTAssertEqual((playback.player.currentItem?.asset as? AVURLAsset)?.url, rerun.sourceSnapshotURL)
 
         // Relaunch: a new store and lifecycle produce the same row key.
         await lifecycle.flushAll()

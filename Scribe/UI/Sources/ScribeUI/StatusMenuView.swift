@@ -123,11 +123,18 @@ private struct StatusMenuRowView: View {
         case .command(let command):
             MenuRowButton(isEnabled: command.isEnabled, action: { perform(command.perform) }) { highlighted in
                 HStack(spacing: MenuRowMetrics.glyphSpacing) {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 11, weight: .semibold))
-                        .opacity(command.isOn == true ? 1 : 0)
-                        .frame(width: MenuRowMetrics.glyphWidth)
-                        .accessibilityHidden(true)
+                    if let symbol = command.symbol {
+                        Image(systemName: symbol)
+                            .font(.system(size: 12, weight: .medium))
+                            .frame(width: MenuRowMetrics.glyphWidth)
+                            .accessibilityHidden(true)
+                    } else {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 11, weight: .semibold))
+                            .opacity(command.isOn == true ? 1 : 0)
+                            .frame(width: MenuRowMetrics.glyphWidth)
+                            .accessibilityHidden(true)
+                    }
                     Text(command.title)
                     Spacer(minLength: 8)
                     if let shortcut = command.shortcut {
