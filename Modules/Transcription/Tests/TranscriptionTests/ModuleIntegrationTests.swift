@@ -230,13 +230,18 @@ final class ModuleIntegrationTests: XCTestCase {
     func testSelectingASegmentSeeksTheStoredSnapshot() async throws {
         let source = try writeAudio(named: "call.wav", in: root, seconds: 4)
         let coordinator = try TranscriptionCoordinator(
-            configuration: .init(transcriptStoreURL: storeURL),
+            configuration: .init(transcriptStoreURL: storeURL, removePreparedAudioOnCompletion: true),
             stageRunner: ScriptedWorkerStageRunner(hostStageRunner: TranscriptAssemblyStageRunner())
         )
-        _ = try await coordinator.enqueue(TranscriptionRequest(sourceURL: source, modelProfileID: "parakeet-v3"))
+        let job = try await coordinator.enqueue(TranscriptionRequest(sourceURL: source, modelProfileID: "parakeet-v3"))
         await coordinator.runPending()
 
         let store = TranscriptStore(storeDirectoryURL: storeURL)
+        let run = try XCTUnwrap(store.run(withRunID: job.runID))
+        XCTAssertEqual(run.job.state, .complete)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: run.runDirectoryURL.appending(path: "prepared.wav").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: run.runDirectoryURL.appending(path: TranscriptRunArtifact.prepare).path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: run.job.sourceSnapshotURL.path))
         let playback = RecordingPlayback()
         let model = await TranscriptViewModel(
             files: store.latestRunPerSource().map(TranscriptReviewFile.init),
@@ -249,6 +254,51 @@ final class ModuleIntegrationTests: XCTestCase {
         let seeks = await playback.seeks
         XCTAssertEqual(loaded?.standardizedFileURL, store.latestRunPerSource().first?.job.sourceSnapshotURL.standardizedFileURL)
         XCTAssertEqual(seeks, [segment.startMs])
+    }
+
+    func testFailedCompletionWriteKeepsPreparedAudio() async throws {
+        let source = try writeAudio(named: "call.wav", in: root, seconds: 4)
+        let writer = AtomicReplaceFileWriter { temporary, destination in
+            let data = try Data(contentsOf: temporary)
+            if destination.lastPathComponent == "job.json",
+               (try JSONSerialization.jsonObject(with: data) as? [String: Any])?["state"] as? String == "complete" {
+                throw CocoaError(.fileWriteNoPermission)
+            }
+            try data.write(to: destination, options: .atomic)
+            try FileManager.default.removeItem(at: temporary)
+        }
+        let coordinator = try TranscriptionCoordinator(
+            configuration: .init(transcriptStoreURL: storeURL, removePreparedAudioOnCompletion: true),
+            stageRunner: ScriptedWorkerStageRunner(hostStageRunner: TranscriptAssemblyStageRunner()),
+            writer: writer
+        )
+        let job = try await coordinator.enqueue(.init(sourceURL: source, modelProfileID: "parakeet-v3"))
+
+        await coordinator.runPending()
+
+        let store = TranscriptStore(storeDirectoryURL: storeURL)
+        let run = try XCTUnwrap(store.run(withRunID: job.runID))
+        XCTAssertNotEqual(run.job.state, .complete)
+        XCTAssertNotNil(run.transcript)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: run.runDirectoryURL.appending(path: "prepared.wav").path))
+    }
+
+    func testMismatchedSourceSnapshotKeepsPreparedAudio() async throws {
+        let source = try writeAudio(named: "call.wav", in: root, seconds: 4)
+        let coordinator = try TranscriptionCoordinator(
+            configuration: .init(transcriptStoreURL: storeURL, removePreparedAudioOnCompletion: true),
+            stageRunner: ScriptedWorkerStageRunner(hostStageRunner: TranscriptAssemblyStageRunner())
+        )
+        let job = try await coordinator.enqueue(.init(sourceURL: source, modelProfileID: "parakeet-v3"))
+        try Data("changed source".utf8).write(to: job.sourceSnapshotURL, options: .atomic)
+
+        await coordinator.runPending()
+
+        let store = TranscriptStore(storeDirectoryURL: storeURL)
+        let run = try XCTUnwrap(store.run(withRunID: job.runID))
+        XCTAssertEqual(run.job.state, .complete)
+        XCTAssertNotNil(run.transcript)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: run.runDirectoryURL.appending(path: "prepared.wav").path))
     }
 
     /// Deleting from review removes the whole meeting from the store: the
@@ -295,7 +345,7 @@ final class ModuleIntegrationTests: XCTestCase {
         let store = TranscriptStore(storeDirectoryURL: storeURL)
         let run = try XCTUnwrap(store.latestRunPerSource().first)
         let prepared = run.runDirectoryURL.appending(path: "prepared.wav")
-        try Data("RIFF".utf8).write(to: prepared)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: prepared.path))
         XCTAssertTrue(TranscriptReviewFile(run).hasAudio)
 
         try TranscriptStoreFileDeleter(store: store).deleteAudio(fileID: run.job.runID.uuidString)
@@ -492,8 +542,10 @@ struct ScriptedWorkerStageRunner: TranscriptionStageRunning {
     func run(stage: TranscriptionJobState, job: TranscriptionJob) async throws -> TranscriptionStageOutput {
         switch stage {
         case .preparing:
+            let prepared = job.runDirectoryURL.appending(path: "prepared.wav")
+            try AtomicReplaceFileWriter().write(Data("RIFF".utf8), to: prepared)
             return TranscriptionStageOutput(artifactURL: try write([
-                "preparedAudioPath": .string(job.runDirectoryURL.appending(path: "prepared.wav").path),
+                "preparedAudioPath": .string(prepared.path),
                 "sourceDurationSeconds": .number(6),
                 "sampleRate": .number(16_000),
                 "channels": .number(1),

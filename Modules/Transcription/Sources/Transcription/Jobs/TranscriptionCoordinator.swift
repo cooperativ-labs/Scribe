@@ -11,10 +11,17 @@ public actor TranscriptionCoordinator {
     public struct Configuration: Sendable {
         public let transcriptStoreURL: URL
         public let queueFileURL: URL
+        /// Enable for the app's transcript store. Diagnostic callers can retain the worker input.
+        public let removePreparedAudioOnCompletion: Bool
 
-        public init(transcriptStoreURL: URL, queueFileURL: URL? = nil) {
+        public init(
+            transcriptStoreURL: URL,
+            queueFileURL: URL? = nil,
+            removePreparedAudioOnCompletion: Bool = false
+        ) {
             self.transcriptStoreURL = transcriptStoreURL
             self.queueFileURL = queueFileURL ?? transcriptStoreURL.appendingPathComponent(".transcription-queue.json")
+            self.removePreparedAudioOnCompletion = removePreparedAudioOnCompletion
         }
     }
 
@@ -416,14 +423,41 @@ public actor TranscriptionCoordinator {
                 return
             }
         }
-        transition(&job, to: .complete)
+        if transition(&job, to: .complete), configuration.removePreparedAudioOnCompletion {
+            removePreparedAudio(for: job)
+        }
         emit(.completed(job))
     }
 
-    private func transition(_ job: inout TranscriptionJob, to state: TranscriptionJobState) {
+    private func removePreparedAudio(for job: TranscriptionJob) {
+        let run = job.runDirectoryURL.resolvingSymlinksInPath()
+        let runs = run.deletingLastPathComponent()
+        let meeting = runs.deletingLastPathComponent()
+        let source = job.sourceSnapshotURL.resolvingSymlinksInPath()
+        let prepared = run.appending(path: TranscriptStore.preparedAudioFileName)
+        guard UUID(uuidString: run.lastPathComponent) != nil,
+              runs.lastPathComponent == "runs",
+              meeting.lastPathComponent.hasPrefix(SourceSnapshotService.meetingDirectoryPrefix),
+              meeting.deletingLastPathComponent().path == configuration.transcriptStoreURL.resolvingSymlinksInPath().path,
+              source.deletingLastPathComponent().path == meeting.path,
+              (try? prepared.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true,
+              (try? source.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true,
+              let data = try? Data(contentsOf: run.appending(path: TranscriptRunArtifact.canonicalTranscript)),
+              let transcript = try? CanonicalTranscriptCodec.decode(data),
+              transcript.source.checksum == job.sourceFingerprint,
+              let snapshot = try? FileContentHash.sha256(ofFileAt: source),
+              snapshot.digest == job.sourceFingerprint else { return }
+
+        // Cleanup is optional once the transcript is saved. A filesystem
+        // error leaves the WAV available without affecting the completed run.
+        try? fileManager.removeItem(at: prepared)
+    }
+
+    @discardableResult
+    private func transition(_ job: inout TranscriptionJob, to state: TranscriptionJobState) -> Bool {
         job.state = state
         job.updatedAt = now()
-        persist(job)
+        return persist(job)
     }
 
     private func beginMonitoringControlSignals(for job: TranscriptionJob) async -> Task<Void, Never>? {
@@ -491,9 +525,10 @@ public actor TranscriptionCoordinator {
         }
     }
 
-    private func persist(_ job: TranscriptionJob) {
+    @discardableResult
+    private func persist(_ job: TranscriptionJob) -> Bool {
         jobs[job.id] = job
-        try? write(job)
+        return (try? write(job)) != nil
     }
 
     private func persistQueueIndex() throws {

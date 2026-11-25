@@ -169,7 +169,7 @@ final class TranscriptionHostService {
         }
 
         coordinator = try TranscriptionCoordinator(
-            configuration: .init(transcriptStoreURL: storeDirectoryURL),
+            configuration: .init(transcriptStoreURL: storeDirectoryURL, removePreparedAudioOnCompletion: true),
             scheduler: scheduler,
             stageRunner: stageRunner,
             canStartJob: { @MainActor [settings] in settings.modelInstaller.state == .installed },

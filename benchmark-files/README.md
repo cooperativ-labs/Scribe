@@ -61,9 +61,15 @@ benchmark-files/scripts/score.sh cab benchmark-files/CAB/results/nemotron3-offli
 
 ## Restoring or adding a snapshot
 
+The app removes the prepared WAV from completed runs once it verifies the
+retained source. Keep frozen benchmark snapshots in this directory. For new
+diagnostic captures that need the exact prepared WAV, run the worker directly
+with a private output directory as described in the
+[worker protocol](../Workers/TranscriptionWorker/PROTOCOL.md).
+
 `CAB/snapshot-manifest.json` lists the SHA-256 of every snapshot file. To restore
-from the app's meeting folder, copy with APFS clones (`cp -c`, no extra disk
-space) and verify the hashes:
+from an older app run that still has the WAV, use APFS clones (`cp -c`) and verify
+the hashes:
 
 ```sh
 M="$HOME/Meeting Transcripts/meeting--cecb678e89d2e0bc89c9687e1c980d5b"
