@@ -118,10 +118,8 @@ public struct TranscriptStore: Sendable {
         try fileManager.removeItem(at: meeting)
     }
 
-    /// Removes the recording behind this run and keeps everything else: the
-    /// source snapshot and the prepared audio each run decoded from it. The
-    /// transcripts, their revisions, and the speaker records stay, so review
-    /// still opens the meeting; it just has nothing left to play.
+    /// Removes the meeting's managed audio, including retained capture tracks.
+    /// Review can still open the transcript, its revisions, and speaker records.
     ///
     /// Every run of the meeting shares the one snapshot, so a run still in
     /// flight would lose its input mid-stage; that is refused rather than raced.
@@ -135,6 +133,11 @@ public struct TranscriptStore: Sendable {
         }
         let meetingRuns = runs(inMeetingAt: meeting)
         guard meetingRuns.allSatisfy(\.job.state.isTerminal) else { throw TranscriptStoreError.meetingInUse }
+        if let provenance = run.job.request.provenance,
+           provenance.producerID == TranscriptionProvenance.recorderProducerID,
+           RecorderMeetingDirectory.contains(meeting, sessionID: provenance.sessionID, in: storeDirectoryURL) {
+            try RecorderMeetingDirectory.removeCaptureAudio(in: meeting, fileManager: fileManager)
+        }
         for url in audioFiles(inMeetingAt: meeting, runs: meetingRuns) {
             try fileManager.removeItem(at: url)
         }
@@ -355,7 +358,7 @@ public struct TranscriptStore: Sendable {
         let prepared = runs
             .map { $0.runDirectoryURL.appending(path: Self.preparedAudioFileName) }
             .filter { fileManager.fileExists(atPath: $0.path) }
-        return sources + prepared
+        return prepared + sources
     }
 
     /// The worker's decoded copy of the source, written into each run directory.

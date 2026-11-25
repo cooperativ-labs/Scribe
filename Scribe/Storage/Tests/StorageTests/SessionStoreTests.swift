@@ -22,6 +22,19 @@ import ScribeAppCore
     #expect(FileManager.default.fileExists(atPath: first.timelineURL.path))
 }
 
+@Test func captureCanStartInItsPermanentMeetingDirectory() throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let id = UUID()
+    let store = try SessionStore.create(configuration: makeConfiguration(root: root, usesMeetingLibrary: true), sessionID: id)
+    defer { try? store.finish() }
+
+    #expect(RecorderMeetingDirectory.contains(store.sessionDirectory, sessionID: id, in: root))
+    #expect(FileManager.default.fileExists(atPath: store.timelineURL.path))
+    let manifest = try RecorderSessionManifestCodec.decode(Data(contentsOf: store.manifestURL))
+    #expect(manifest.sessionID == id)
+}
+
 @Test func aTitledSessionIsNamedAfterItsMeetingAndKeepsTheTitleInTheManifest() throws {
     let root = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: root) }
@@ -159,7 +172,8 @@ private func makeConfiguration(
     minimumFreeBytes: Int64 = 0,
     freeSpace: @escaping @Sendable (URL) throws -> Int64 = { _ in .max },
     cleanStop: @escaping @Sendable () -> Void = {},
-    title: String? = nil
+    title: String? = nil,
+    usesMeetingLibrary: Bool = false
 ) -> SessionStoreConfiguration {
     SessionStoreConfiguration(
         recordingsDirectory: root,
@@ -172,7 +186,8 @@ private func makeConfiguration(
         minimumFreeBytes: minimumFreeBytes,
         freeSpaceProvider: freeSpace,
         cleanStopRequester: cleanStop,
-        title: title
+        title: title,
+        usesMeetingLibrary: usesMeetingLibrary
     )
 }
 

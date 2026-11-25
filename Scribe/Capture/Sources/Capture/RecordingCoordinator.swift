@@ -115,6 +115,7 @@ public struct FinalRecordingReadyEvent: Sendable, Equatable {
 
 public struct RecordingCoordinatorConfiguration: Sendable {
     public let recordingsDirectory: URL
+    public let usesMeetingLibrary: Bool
     public let appBuild: String
     public let macOSVersion: String
     public let selectedApplicationBundleIdentifier: String?
@@ -129,9 +130,11 @@ public struct RecordingCoordinatorConfiguration: Sendable {
         selectedApplicationBundleIdentifier: String?,
         selectedMicrophoneID: String?,
         recordingMode: RecordingMode = .systemAudioAndMicrophone,
-        minimumFreeBytes: Int64 = 512 * 1_024 * 1_024
+        minimumFreeBytes: Int64 = 512 * 1_024 * 1_024,
+        usesMeetingLibrary: Bool = false
     ) {
         self.recordingsDirectory = recordingsDirectory
+        self.usesMeetingLibrary = usesMeetingLibrary
         self.appBuild = appBuild
         self.macOSVersion = macOSVersion
         self.selectedApplicationBundleIdentifier = selectedApplicationBundleIdentifier
@@ -234,7 +237,8 @@ public actor RecordingCoordinator {
                 cleanStopRequester: { [weak self] in
                     Task { await self?.stop(reason: .lowFreeSpace) }
                 },
-                title: title
+                title: title,
+                usesMeetingLibrary: configuration.usesMeetingLibrary
             ))
             activeStore = store
             let capture = captureFactory(configuration, store) { [weak self] event in

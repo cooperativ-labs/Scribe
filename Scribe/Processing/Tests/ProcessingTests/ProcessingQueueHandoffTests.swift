@@ -4,15 +4,15 @@ import Testing
 @testable import Processing
 
 /// The whole tail of the recorder flow: a finished capture goes into the queue,
-/// comes out as a published `final.m4a`, and only then becomes a transcription
+/// comes out as a published final mix, and only then becomes a transcription
 /// request. These run the real processor and the real checksum, because the
 /// point of the handoff is that nothing along here is taken on trust.
 @Suite("Processing queue handoff") struct ProcessingQueueHandoffTests {
-    @Test func aProcessedSessionReportsCompletionAndBecomesAVerifiedTranscriptionRequest() async throws {
+    @Test func aManagedSessionPublishesSourceAndBecomesAVerifiedTranscriptionRequest() async throws {
         let root = try temporaryRoot()
         defer { try? FileManager.default.removeItem(at: root) }
         let sessionID = UUID()
-        let session = try handoffCaptureSession(root: root, sessionID: sessionID, seconds: 0.75)
+        let session = try handoffCaptureSession(root: root, sessionID: sessionID, seconds: 0.75, usesMeetingLibrary: true)
 
         let queue = try ProcessingQueue(configuration: .inRecordingsDirectory(root))
         let events = QueueEventRecorder(await queue.events())
@@ -24,7 +24,8 @@ import Testing
 
         // The real gate, with the real hash, over the file the pipeline published.
         let request = try FinalRecordingHandoff().request(forSessionAt: session)
-        #expect(request.sourceURL == session.appendingPathComponent("final.m4a"))
+        #expect(request.sourceURL == session.appendingPathComponent("source.m4a"))
+        #expect(!FileManager.default.fileExists(atPath: session.appendingPathComponent("final.m4a").path))
         #expect(request.provenance?.sessionID == sessionID)
         #expect(request.provenance?.producerID == FinalRecordingHandoff.producerID)
         #expect(!FileManager.default.fileExists(atPath: session.appendingPathComponent("system.flac").path))
@@ -40,6 +41,12 @@ import Testing
         let outbox = TranscriptionRequestOutbox.inRecordingsDirectory(root)
         try await outbox.submit(request)
         #expect(try await outbox.pendingRequests() == [request])
+
+        try FileManager.default.createDirectory(at: session.appendingPathComponent("runs"), withIntermediateDirectories: false)
+        #expect(throws: MixdownError.sharedSourceInUse) {
+            try SessionProcessor().run(sessionDirectory: session)
+        }
+        #expect(try FinalRecordingHandoff().request(forSessionAt: session) == request)
     }
 
     @Test func aFailedJobReportsFailureAndTheSessionNeverReachesTranscription() async throws {
@@ -135,11 +142,12 @@ private actor QueueEventRecorder {
 }
 
 /// A minimal but genuine capture archive: two mono 48 kHz tracks on one timeline,
-/// enough for the exporter and the mixdown to produce a real `final.m4a`.
-private func handoffCaptureSession(root: URL, sessionID: UUID, seconds: Double) throws -> URL {
+/// enough for the exporter and the mixdown to produce a real final mix.
+private func handoffCaptureSession(root: URL, sessionID: UUID, seconds: Double, usesMeetingLibrary: Bool = false) throws -> URL {
     let sampleRate = 48_000
     let frames = Int(seconds * Double(sampleRate))
-    let archive = try CaptureArchiveFixture(root: root, name: "2026-09-04 09-00-00")
+    let name = usesMeetingLibrary ? RecorderMeetingDirectory.name(for: sessionID) : "2026-09-04 09-00-00"
+    let archive = try CaptureArchiveFixture(root: root, name: name)
     let format = CaptureArchiveFixture.Format(sampleRate: sampleRate, channelCount: 1)
     let system = testSignal(frames: frames)
     let microphone = testSignal(frames: frames, startingAt: 1_000_003)

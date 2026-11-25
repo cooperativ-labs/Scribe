@@ -146,8 +146,10 @@ final class WorkerIntegrationTests: XCTestCase {
         let transcript = try XCTUnwrap(run.transcript)
         XCTAssertTrue(transcript.segments.map(\.text).joined(separator: " ").contains("Livmarli"))
         let raw = try WorkerASRTranscriptCodec.decode(Data(contentsOf: run.job.runDirectoryURL.appendingPathComponent("transcript.json")))
-        XCTAssertTrue(raw.rawText?.contains("live marly") == true)
-        XCTAssertTrue(raw.vocabularyReplacements?.contains { $0.replacement == "Livmarli" } == true)
+        let replacement = try XCTUnwrap(raw.vocabularyReplacements?.first { $0.replacement == "Livmarli" })
+        let rawText = try XCTUnwrap(raw.rawText)
+        XCTAssertTrue(rawText.localizedCaseInsensitiveContains(replacement.original))
+        XCTAssertNotEqual(rawText, raw.text)
         XCTAssertNil(raw.vocabularyWarning)
 
         let directory = root.appendingPathComponent("short-dictation")

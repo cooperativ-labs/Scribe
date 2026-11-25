@@ -335,12 +335,12 @@ public struct TranscriptWindow: View {
     static func meetingDeletionMessage(for file: TranscriptReviewFile) -> String {
         let count = file.draft?.noteCount ?? 0
         let notes = count == 0 ? "" : " Its \(count == 1 ? "note is" : "\(count) notes are") deleted too."
-        return "The transcript and the copy of the recording kept beside it are removed.\(notes) Exported files are left alone."
+        return "The transcript and the audio stored with it are removed.\(notes) Exported files are left alone."
     }
 
     static func audioDeletionMessage(for file: TranscriptReviewFile) -> String {
         let notes = (file.draft?.noteCount ?? 0) > 0 ? " Notes are kept, but their times no longer play the recording." : ""
-        return "The transcript and its edits are kept. Scribe's copy of the recording is removed, so it can no longer be played, retranscribed, or used to remember a voice.\(notes) The original file you imported is left alone."
+        return "Scribe removes the audio it stores for this meeting, including any retained capture tracks in the meeting folder. You can still read the transcript and its edits.\(notes) Files imported from outside Scribe stay in their original locations."
     }
 
     static func draftDeletionMessage(for file: TranscriptReviewFile) -> String {

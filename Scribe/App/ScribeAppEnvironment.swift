@@ -35,6 +35,7 @@ final class ScribeAppEnvironment: ObservableObject {
     @Published private(set) var detectedMeeting: DetectedMeeting?
     private let processingQueue: ProcessingQueue?
     private let outbox: TranscriptionRequestOutbox
+    private let meetingLibraryURL: URL
     /// Absent only when the transcript store cannot be opened at all; the
     /// recorder is unaffected either way.
     let transcription: TranscriptionHostService?
@@ -88,12 +89,14 @@ final class ScribeAppEnvironment: ObservableObject {
     init() {
         // Load the opt-in flag before any startup messages can be emitted.
         _ = MessageDebugLog.shared
-        let settings = ScribeSettings()
+        let settings = ScribeSettings(createDefaultRecordingsFolder: false)
         let permissions = PermissionService()
         self.settings = settings
         self.permissions = permissions
-        processingQueue = try? ProcessingQueue(configuration: .inRecordingsDirectory(settings.recordingsFolderURL))
-        outbox = .inRecordingsDirectory(settings.recordingsFolderURL)
+        let meetingLibraryURL = TranscriptStore.defaultStoreDirectoryURL()
+        self.meetingLibraryURL = meetingLibraryURL
+        processingQueue = try? ProcessingQueue(configuration: .inRecordingsDirectory(meetingLibraryURL))
+        outbox = .inRecordingsDirectory(meetingLibraryURL)
         let calendar = CalendarMeetingService(settings: settings)
         self.calendar = calendar
 
@@ -103,7 +106,7 @@ final class ScribeAppEnvironment: ObservableObject {
                 selectedApplicationID: settings.rememberedApplicationBundleIdentifier,
                 recordingMode: settings.rememberedRecordingMode,
                 selectedMicrophoneID: settings.rememberedMicrophoneID,
-                recordingsFolderURL: settings.recordingsFolderURL
+                recordingsFolderURL: meetingLibraryURL
             ),
             permissions: permissions,
             sourceProvider: SystemCaptureSourceProvider(),
@@ -118,7 +121,8 @@ final class ScribeAppEnvironment: ObservableObject {
                 await processingQueue?.setCaptureActive(active)
             },
             recordingTitleProvider: calendar,
-            timestampOffset: { TimeInterval(settings.pasteTimestampOffsetSeconds) }
+            timestampOffset: { TimeInterval(settings.pasteTimestampOffsetSeconds) },
+            usesMeetingLibrary: true
         )
         self.coordinator = coordinator
         menuModel = RecorderMenuModel(
@@ -135,7 +139,7 @@ final class ScribeAppEnvironment: ObservableObject {
         hotkeys = HotkeyService(coordinator: coordinator)
         meetingDetector = MeetingDetector(settings: settings, titleProvider: calendar)
 
-        transcription = try? TranscriptionHostService(settings: settings, scheduler: processingQueue)
+        transcription = try? TranscriptionHostService(settings: settings, scheduler: processingQueue, storeDirectoryURL: meetingLibraryURL)
         if let installation = try? WorkerLocator.locate() {
             dictationCoordinator = DictationCoordinator(engine: DictationEngine(
                 installation: installation,
@@ -185,9 +189,6 @@ final class ScribeAppEnvironment: ObservableObject {
         transcription?.publishFinishedRecording = { [weak self] directory, draftID in
             await self?.publishFinishedRecording(sessionDirectory: directory, draftID: draftID)
                 ?? "Transcription is not available right now."
-        }
-        coordinator.recoveryReporter = { [weak self] recovered in
-            self?.reportRepairedCaptures(recovered)
         }
         hotkeys.openMeetingNotes = { [weak self] in self?.openLiveMeetingNotes() }
         registerShortcuts()
@@ -455,7 +456,6 @@ final class ScribeAppEnvironment: ObservableObject {
     /// conflicts are shown in the menu; the menu commands are never affected.
     func settingsWindowDidClose() {
         syncTriggerMonitors()
-        coordinator.setRecordingsFolder(settings.recordingsFolderURL)
         registerShortcuts()
     }
 
@@ -553,14 +553,14 @@ final class ScribeAppEnvironment: ObservableObject {
             coordinator.reportBackgroundFailure(RecorderFailure(
                 code: "processing.failed",
                 message: "Audio cleanup failed for one recording: \(message)",
-                recoveryHint: "The original tracks were kept. Open the recordings folder to reprocess."
+                recoveryHint: "The original tracks were kept in the meeting folder."
             ))
             transcription?.recordingProcessingDidChange()
             retireRecoveryNotice(for: job.id)
         }
     }
 
-    /// Submits a `TranscriptionRequest` for verified `final.m4a` recorder output.
+    /// Submits a transcription request for the verified recorder mix.
     ///
     /// A refusal is surfaced instead of being worked around: handing over a raw
     /// track when cleanup failed would look like a successful transcription of
@@ -603,7 +603,7 @@ final class ScribeAppEnvironment: ObservableObject {
             coordinator.reportBackgroundFailure(RecorderFailure(
                 code: "handoff.notSubmitted",
                 message: message,
-                recoveryHint: "Open the recordings folder; the recording itself is complete."
+                recoveryHint: "The recording is complete and available in its meeting folder."
             ))
             return message
         }
@@ -614,12 +614,12 @@ final class ScribeAppEnvironment: ObservableObject {
     private func recordingLifecycleDidChange(_ event: RecordingLifecycleEvent) {
         guard let transcription else { return }
         switch event {
-        case let .captureStarted(sessionID, startedAt, title, sessionDirectory):
+        case let .captureStarted(sessionID, startedAt, title, _):
             transcription.draftCaptureStarted(
                 sessionID: sessionID,
                 startedAt: startedAt,
                 title: title,
-                sessionName: sessionDirectory.lastPathComponent
+                sessionName: SessionDirectoryName.make(for: startedAt, timeZone: .current)
             )
         case let .pauseChanged(sessionID, isPaused):
             transcription.draftPauseChanged(sessionID: sessionID, isPaused: isPaused)
@@ -657,16 +657,20 @@ final class ScribeAppEnvironment: ObservableObject {
         guard let processingQueue else { return }
         Task { [weak self] in
             guard let self else { return }
-            let requeued = (try? await processingQueue.recoverSessions(in: self.settings.recordingsFolderURL)) ?? []
-            self.adoptedSessionIDs.formUnion(requeued.map(\.id))
+            let legacyRoot = self.settings.recordingsFolderURL
+            let roots = legacyRoot.standardizedFileURL.path == self.meetingLibraryURL.standardizedFileURL.path
+                ? [self.meetingLibraryURL] : [self.meetingLibraryURL, legacyRoot]
+            for root in roots {
+                self.reportRepairedCaptures((try? SessionStore.recoverIncompleteSessions(in: root)) ?? [])
+                let requeued = (try? await processingQueue.recoverSessions(in: root)) ?? []
+                self.adoptedSessionIDs.formUnion(requeued.map(\.id))
+            }
             self.refreshRecoveryNotice()
             await processingQueue.runPending()
         }
     }
 
-    /// Called by `LiveRecordingCoordinator` once its own capture-repair scan has
-    /// run, before any new stream can be created.
-    func reportRepairedCaptures(_ recovered: [SessionStore.RecoveredSession]) {
+    private func reportRepairedCaptures(_ recovered: [SessionStore.RecoveredSession]) {
         let ids = recovered.map(\.sessionID)
         repairedSessionIDs.formUnion(ids)
         adoptedSessionIDs.formUnion(ids)

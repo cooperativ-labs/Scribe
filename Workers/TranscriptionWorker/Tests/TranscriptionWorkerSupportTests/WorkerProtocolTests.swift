@@ -1,4 +1,5 @@
 @testable import ScribeInference
+import AVFoundation
 @preconcurrency import CoreML
 import Foundation
 import FluidAudio
@@ -206,12 +207,12 @@ func offlineDiarizationCollapseDiagnostics() throws {
     #expect(result.clusteringDiagnostics.separationAppearsCollapsed)
 }
 
-@Test("worker binary streams each sequential stage to the host run directory")
-func workerBinarySequentialIntegration() throws {
+@Test("worker binary writes 16-bit PCM and streams stages to the host run directory", arguments: ["microphone-16k", "microphone-44k1"])
+func workerBinarySequentialIntegration(fixtureName: String) throws {
     let packageRoot = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     let fixture = packageRoot.deletingLastPathComponent().deletingLastPathComponent()
-        .appending(path: "Tests/Fixtures/Generated/microphone-16k/microphone.wav")
+        .appending(path: "Tests/Fixtures/Generated/\(fixtureName)/microphone.wav")
     let runDirectory = FileManager.default.temporaryDirectory.appending(path: "transcription-worker-sequential-\(UUID().uuidString)", directoryHint: .isDirectory)
     defer { try? FileManager.default.removeItem(at: runDirectory) }
 
@@ -236,6 +237,16 @@ func workerBinarySequentialIntegration() throws {
         #expect(FileManager.default.fileExists(atPath: runDirectory.appending(path: file).path))
     }
     #expect(messages.contains("\"stage\":\"complete\""))
+    let prepared = try AVAudioFile(forReading: runDirectory.appending(path: "prepared.wav"))
+    let format = prepared.fileFormat.streamDescription.pointee
+    #expect(format.mFormatID == kAudioFormatLinearPCM)
+    #expect(format.mFormatFlags & kAudioFormatFlagIsSignedInteger != 0)
+    #expect(format.mBitsPerChannel == 16)
+    #expect(format.mSampleRate == 16_000)
+    #expect(format.mChannelsPerFrame == 1)
+    let original = try AVAudioFile(forReading: fixture)
+    let expectedFrames = Double(original.length) * 16_000 / original.fileFormat.sampleRate
+    #expect(abs(Double(prepared.length) - expectedFrames) <= 1)
 }
 
 @Test("worker binary checkpoints a cancelled request and preserves prior output offline")

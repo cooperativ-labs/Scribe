@@ -22,8 +22,6 @@ public struct ScribeSettingsView: View {
     private let permissions: PermissionService?
     /// Requests from elsewhere in the app to open Settings at one section.
     @ObservedObject private var focus: SettingsFocusModel
-    @State private var isChoosingRecordingsFolder = false
-    @State private var folderSelectionError: String?
     @State private var highlightedSection: SettingsSection?
     @State private var selectedTab: SettingsTab = .general
     @State private var dictationAccess = DictationAccess.current()
@@ -79,29 +77,9 @@ public struct ScribeSettingsView: View {
         .onAppear { sources.refreshSources() }
         .onAppear { settings.refreshLaunchAtLoginStatus() }
         .onChange(of: selectedTab) { shortcutCapture.stop() }
-        .captureDebugMessage(folderSelectionError, source: "Recording folder")
         .captureDebugMessage(settings.launchAtLoginError, source: "Launch at login")
         .captureDebugMessage(settings.modelsFolderError, source: "Models folder")
-        .captureDebugMessage(settings.recordingsFolderError?.localizedDescription, source: "Recording folder")
         .onDisappear { shortcutCapture.stop() }
-        .fileImporter(
-            isPresented: $isChoosingRecordingsFolder,
-            allowedContentTypes: [.folder],
-            allowsMultipleSelection: false
-        ) { result in
-            switch result {
-            case .success(let urls):
-                guard let url = urls.first else { return }
-                do {
-                    try settings.setRecordingsFolder(url)
-                    folderSelectionError = nil
-                } catch {
-                    folderSelectionError = error.localizedDescription
-                }
-            case .failure(let error):
-                folderSelectionError = error.localizedDescription
-            }
-        }
     }
 
     private var selectedTabContent: some View {
@@ -260,22 +238,8 @@ public struct ScribeSettingsView: View {
             }
 
             Section("Recordings") {
-                LabeledContent("Folder") {
-                    Text(settings.recordingsFolderURL.path)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .foregroundStyle(.secondary)
-                }
-                Button("Choose Folder…") {
-                    isChoosingRecordingsFolder = true
-                }
-                if let folderSelectionError {
-                    Text(folderSelectionError)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                }
                 Toggle("Keep recording files for debugging", isOn: $settings.keepRecordingFilesForDebugging)
-                Text("By default, Scribe deletes the meeting folder and its component audio after the final recording has been safely copied into Transcriptions. Turn this on to retain those files for debugging and reprocessing.")
+                Text("Scribe saves recordings and transcripts in the Meeting Transcripts folder. Turn this on to keep the original mic and system audio after the recording has been queued for transcription.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

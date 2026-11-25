@@ -88,7 +88,7 @@ public enum FinalRecordingHandoffRefusal: Error, Equatable, Sendable {
 public struct FinalRecordingHandoff: Sendable {
     /// Identifies the recorder in `TranscriptionProvenance`. The session ID
     /// travels beside it so a transcript can always be traced to its meeting.
-    public static let producerID = "com.scribe.recorder"
+    public static let producerID = TranscriptionProvenance.recorderProducerID
     /// The transcription module owns the real profile registry; until it lands,
     /// the handoff asks for that module's default.
     public static let defaultModelProfileID = "default"

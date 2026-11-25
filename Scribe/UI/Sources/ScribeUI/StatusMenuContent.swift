@@ -229,7 +229,6 @@ extension StatusMenuContent {
                 perform: transcription.openTranscriptionsFolder
             )))
         }
-        folders.append(.command(StatusMenuCommand(title: "Open Recordings Folder") { model.openRecordingsFolder() }))
         folders.append(.command(StatusMenuCommand(title: "Settings…", perform: openSettings)))
         sections.append(StatusMenuSection(id: "folders", rows: folders))
 

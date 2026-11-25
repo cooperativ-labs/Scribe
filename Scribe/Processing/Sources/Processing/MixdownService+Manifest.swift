@@ -31,7 +31,7 @@ extension MixdownService {
             ),
             firstMediaTimestampSeconds: timeline.origin.seconds,
             frameCount: encoded.frameCount,
-            fileName: Self.outputFileName,
+            fileName: encoded.url.lastPathComponent,
             checksum: encoded.sha256,
             journalReference: Self.journalReference
         )

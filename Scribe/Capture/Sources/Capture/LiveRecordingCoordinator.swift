@@ -37,6 +37,7 @@ public final class LiveRecordingCoordinator: RecordingCoordinating {
     private let permissions: any RecordingPermissionProviding
     private let sourceProvider: any CaptureSourceProviding
     private let engine: RecordingCoordinator
+    private let usesMeetingLibrary: Bool
     private let queue = RecordingCommandQueue()
     private let broadcaster = RecorderSnapshotBroadcaster()
     private let openFolder: @MainActor (URL) -> Void
@@ -65,9 +66,11 @@ public final class LiveRecordingCoordinator: RecordingCoordinating {
         textInserter: any TextInserting = KeystrokeTextInserter(),
         timestampOffset: @escaping @MainActor () -> TimeInterval = { 0 },
         appBuild: String = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "development",
-        macOSVersion: String = ProcessInfo.processInfo.operatingSystemVersionString
+        macOSVersion: String = ProcessInfo.processInfo.operatingSystemVersionString,
+        usesMeetingLibrary: Bool = false
     ) {
         self.snapshot = snapshot
+        self.usesMeetingLibrary = usesMeetingLibrary
         self.permissions = permissions
         self.sourceProvider = sourceProvider
         self.openFolder = openFolder
@@ -77,7 +80,7 @@ public final class LiveRecordingCoordinator: RecordingCoordinating {
         self.textInserter = textInserter
         self.timestampOffset = timestampOffset
         permissionMonitor = permissions as? PermissionService
-        let initialConfiguration = Self.configuration(from: snapshot, appBuild: appBuild, macOSVersion: macOSVersion)
+        let initialConfiguration = Self.configuration(from: snapshot, appBuild: appBuild, macOSVersion: macOSVersion, usesMeetingLibrary: usesMeetingLibrary)
         let engine = RecordingCoordinator(
             configuration: initialConfiguration,
             permissions: permissions,
@@ -127,10 +130,14 @@ public final class LiveRecordingCoordinator: RecordingCoordinating {
         // Recovery runs before any new stream can be created, and its result is
         // reported rather than discarded: a repaired meeting the person never
         // hears about is indistinguishable from a lost one.
-        Task { [weak self, engine] in
-            let recovered = (try? await engine.recoverIncompleteSessions()) ?? []
-            guard !recovered.isEmpty else { return }
-            self?.recoveryReporter?(recovered)
+        // The meeting library host repairs capture and scans its durable queue
+        // in order, including any unfinished sessions at the former location.
+        if !usesMeetingLibrary {
+            Task { [weak self, engine] in
+                let recovered = (try? await engine.recoverIncompleteSessions()) ?? []
+                guard !recovered.isEmpty else { return }
+                self?.recoveryReporter?(recovered)
+            }
         }
         installInterruptionObservers()
         outputDeviceMonitor.start()
@@ -209,7 +216,7 @@ public final class LiveRecordingCoordinator: RecordingCoordinating {
     private func perform(_ command: RecordingCommand) async {
         switch command {
         case .start:
-            await engine.updateConfiguration(Self.configuration(from: snapshot))
+            await engine.updateConfiguration(Self.configuration(from: snapshot, usesMeetingLibrary: usesMeetingLibrary))
             // The name is looked up at the moment of starting, so a recording
             // begun from the menu, a shortcut, or the chip is named the same way.
             let title = await recordingTitleProvider?.suggestedRecordingTitle(at: Date())
@@ -292,7 +299,8 @@ public final class LiveRecordingCoordinator: RecordingCoordinating {
     private static func configuration(
         from snapshot: RecorderSnapshot,
         appBuild: String = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "development",
-        macOSVersion: String = ProcessInfo.processInfo.operatingSystemVersionString
+        macOSVersion: String = ProcessInfo.processInfo.operatingSystemVersionString,
+        usesMeetingLibrary: Bool
     ) -> RecordingCoordinatorConfiguration {
         RecordingCoordinatorConfiguration(
             recordingsDirectory: snapshot.recordingsFolderURL,
@@ -300,7 +308,8 @@ public final class LiveRecordingCoordinator: RecordingCoordinating {
             macOSVersion: macOSVersion,
             selectedApplicationBundleIdentifier: snapshot.selectedApplicationID,
             selectedMicrophoneID: snapshot.selectedMicrophoneID,
-            recordingMode: snapshot.recordingMode
+            recordingMode: snapshot.recordingMode,
+            usesMeetingLibrary: usesMeetingLibrary
         )
     }
 

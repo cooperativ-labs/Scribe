@@ -130,7 +130,7 @@ public struct SourceSnapshotService: Sendable {
         return try? decoder.decode(SourceSnapshotRecord.self, from: data)
     }
 
-    /// Copies `originalURL` into the store and verifies it did not change.
+    /// Copies the original into the store and verifies it did not change.
     ///
     /// The copy is hashed as it is written, in one pass, and compared against
     /// the fingerprint taken during the scan; the original's size and
@@ -213,6 +213,33 @@ public struct SourceSnapshotService: Sendable {
             sourceID: fingerprint.sourceID,
             fingerprint: fingerprint,
             reusedExistingSnapshot: false
+        )
+    }
+
+    /// Registers a verified recorder mix already owned by this meeting.
+    func registerRecorderSource(
+        at source: URL,
+        sessionID: UUID,
+        fingerprint: ImportFingerprint,
+        now: Date
+    ) throws -> SourceSnapshot {
+        let meeting = source.deletingLastPathComponent()
+        guard RecorderMeetingDirectory.contains(meeting, sessionID: sessionID, in: storeDirectory),
+              source.lastPathComponent == RecorderMeetingDirectory.sourceFileName else {
+            throw SourceSnapshotError.sourceUnreadable("The recording is outside its meeting directory.")
+        }
+        let existing = readRecord(in: meeting)
+        if let existing, existing.contentHash != fingerprint.contentHash {
+            throw SourceSnapshotError.sourceChangedDuringCopy(detail: "The recording differs from the audio registered for this meeting.")
+        }
+        try recordImport(of: source, fingerprint: fingerprint, snapshotFileName: source.lastPathComponent, in: meeting, now: now)
+        return SourceSnapshot(
+            originalURL: source,
+            snapshotURL: source,
+            meetingDirectoryURL: meeting,
+            sourceID: fingerprint.sourceID,
+            fingerprint: fingerprint,
+            reusedExistingSnapshot: existing != nil
         )
     }
 

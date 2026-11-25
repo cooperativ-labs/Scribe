@@ -308,7 +308,8 @@ public final class ScribeSettings: ObservableObject {
         defaultRecordingsFolderURL: URL = ScribeSettings.defaultRecordingsFolderURL,
         fileManager: FileManager = .default,
         modelManifestURL: URL? = Bundle.main.url(forResource: "model_manifest", withExtension: "json"),
-        loginItemManager: LoginItemManaging = SystemLoginItemManager()
+        loginItemManager: LoginItemManaging = SystemLoginItemManager(),
+        createDefaultRecordingsFolder: Bool = true
     ) {
         self.defaults = defaults
         self.defaultRecordingsFolderURL = defaultRecordingsFolderURL
@@ -425,7 +426,7 @@ public final class ScribeSettings: ObservableObject {
 
         // Store the default as a bookmark immediately, not only after the user
         // changes it. This makes a relaunch behave the same as a selected folder.
-        if defaults.data(forKey: Key.recordingsFolderBookmark) == nil {
+        if createDefaultRecordingsFolder, defaults.data(forKey: Key.recordingsFolderBookmark) == nil {
             do {
                 try setRecordingsFolder(defaultRecordingsFolderURL)
             } catch {

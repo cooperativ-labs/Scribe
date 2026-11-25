@@ -216,7 +216,7 @@ final class ScribeMenuBarControllerTests: XCTestCase {
         XCTAssertFalse(controller.showsRecordingIndicator)
     }
 
-    func testOpenTranscriptionsFolderAppearsBesideOpenRecordingsFolder() throws {
+    func testOpenTranscriptionsFolderAppearsWithoutRecordingsFolderShortcut() throws {
         var openedTranscriptions = false
         let controller = makeController(
             MockRecordingCoordinator(snapshot: readySnapshot()),
@@ -230,9 +230,7 @@ final class ScribeMenuBarControllerTests: XCTestCase {
         let content = controller.makeContent()
 
         let titles = content.titles
-        let transcriptionsIndex = try XCTUnwrap(titles.firstIndex(of: "Open Transcriptions Folder"))
-        let recordingsIndex = try XCTUnwrap(titles.firstIndex(of: "Open Recordings Folder"))
-        XCTAssertEqual(transcriptionsIndex + 1, recordingsIndex)
+        XCTAssertFalse(titles.contains("Open Recordings Folder"))
 
         try XCTUnwrap(content.command(titled: "Open Transcriptions Folder")).perform()
         XCTAssertTrue(openedTranscriptions)
@@ -244,7 +242,7 @@ final class ScribeMenuBarControllerTests: XCTestCase {
         let titles = controller.makeContent().titles
 
         XCTAssertFalse(titles.contains("Open Transcriptions Folder"))
-        XCTAssertTrue(titles.contains("Open Recordings Folder"))
+        XCTAssertFalse(titles.contains("Open Recordings Folder"))
     }
 
     func testDictationRowsReflectTheSetting() throws {

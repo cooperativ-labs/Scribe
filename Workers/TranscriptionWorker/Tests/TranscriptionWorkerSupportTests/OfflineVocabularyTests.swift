@@ -1,9 +1,34 @@
+import AVFoundation
 import FluidAudio
 import Foundation
 import Testing
 @testable import ScribeInference
 
 struct OfflineVocabularyTests {
+    @Test func capturedBufferProvidesTheSameWindowsAsTheWAV() throws {
+        let format = try #require(AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1))
+        let buffer = try #require(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 8))
+        let channel = try #require(buffer.floatChannelData?[0])
+        buffer.frameLength = 5
+        for index in 0..<Int(buffer.frameLength) { channel[index] = Float(index) / 8 }
+
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).wav")
+        defer { try? FileManager.default.removeItem(at: url) }
+        do {
+            let file = try AVAudioFile(forWriting: url, settings: format.settings)
+            try file.write(from: buffer)
+        }
+
+        let memory = OfflineVocabularyRescorer.AudioSamples(buffer: buffer)
+        let disk = try OfflineVocabularyRescorer.AudioSamples(fileURL: url)
+        #expect(memory.frameCount == 5)
+        #expect(memory.frameCount == disk.frameCount)
+        for range in [0..<2, 1..<5, 4..<5] {
+            #expect(try memory.read(range) == disk.read(range))
+        }
+        #expect(throws: CocoaError.self) { try memory.read(4..<6) }
+    }
+
     private func token(_ text: String, _ start: Double, _ end: Double) -> TokenTiming {
         .init(token: text, tokenId: 1, startTime: start, endTime: end, confidence: 1)
     }

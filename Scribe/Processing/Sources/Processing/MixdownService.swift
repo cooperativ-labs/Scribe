@@ -4,7 +4,7 @@ import Foundation
 import ScribeAppCore
 import WebRTCBridge
 
-/// Produces `final.m4a`: the original system signal mixed with the echo-cancelled
+/// Produces the final AAC mix: the original system signal mixed with the echo-cancelled
 /// microphone, 48 kHz mono AAC-LC for transcription and interchange.
 ///
 /// Both tracks are already on one 48 kHz grid from ``TimelineBuilder``, so block
@@ -17,7 +17,7 @@ import WebRTCBridge
 ///
 /// Failure is a first-class outcome. A job that cannot establish a delay while
 /// evidently having an echo to cancel does not publish anything: the originals
-/// stay exactly as they were, any previously valid `final.m4a` is left alone, and
+/// stay exactly as they were, any previously valid mix is left alone, and
 /// the manifest records `failed` with the reason.
 public struct MixdownService: Sendable {
     public static let journalReference = "capture/timeline.jsonl"
@@ -63,9 +63,10 @@ public struct MixdownService: Sendable {
         options: Options = Options(),
         cleanedMicrophone: (([Float]) -> Void)? = nil
     ) throws -> MixdownResult {
-        let builder = try TimelineBuilder.plan(sessionDirectory: sessionDirectory)
         let manifestURL = sessionDirectory.appendingPathComponent("metadata.json")
         let manifest = try RecorderSessionManifestCodec.decode(Data(contentsOf: manifestURL))
+        try Self.validateSourceCanBeReplaced(in: sessionDirectory, manifest: manifest)
+        let builder = try TimelineBuilder.plan(sessionDirectory: sessionDirectory)
         do {
             let result = try mix(builder: builder, sessionDirectory: sessionDirectory, manifest: manifest, options: options, cleanedMicrophone: cleanedMicrophone)
             try AtomicReplaceFileWriter().write(result.manifest, to: manifestURL)
@@ -77,6 +78,13 @@ public struct MixdownService: Sendable {
             let failed = failureManifest(manifest, timeline: builder.timeline, options: options, error: error)
             try? AtomicReplaceFileWriter().write(failed, to: manifestURL)
             throw error
+        }
+    }
+
+    static func validateSourceCanBeReplaced(in directory: URL, manifest: RecorderSessionManifest) throws {
+        if directory.lastPathComponent == RecorderMeetingDirectory.name(for: manifest.sessionID),
+           FileManager.default.fileExists(atPath: directory.appendingPathComponent("runs", isDirectory: true).path) {
+            throw MixdownError.sharedSourceInUse
         }
     }
 
@@ -146,7 +154,10 @@ public struct MixdownService: Sendable {
             interleaved: false
         ) else { throw MixdownError.invalidOutputFormat }
         let encoder = try AACM4AEncoder(
-            outputURL: sessionDirectory.appendingPathComponent(Self.outputFileName),
+            outputURL: sessionDirectory.appendingPathComponent(
+                sessionDirectory.lastPathComponent == RecorderMeetingDirectory.name(for: manifest.sessionID)
+                    ? RecorderMeetingDirectory.sourceFileName : Self.outputFileName
+            ),
             sampleRate: timelineSampleRate,
             channelCount: 1
         )
@@ -372,6 +383,7 @@ public struct MixdownResult: Sendable, Equatable {
 }
 
 public enum MixdownError: Error, Equatable, CustomStringConvertible {
+    case sharedSourceInUse
     case missingTrack(RecorderTrackKind)
     case emptyTimeline
     case uncertainDelay(reason: String)
@@ -381,6 +393,7 @@ public enum MixdownError: Error, Equatable, CustomStringConvertible {
 
     public var code: String {
         switch self {
+        case .sharedSourceInUse: return "mixdown.shared-source-in-use"
         case .missingTrack: return "mixdown.missing-track"
         case .emptyTimeline: return "mixdown.empty-timeline"
         case .uncertainDelay: return "mixdown.uncertain-delay"
@@ -392,6 +405,7 @@ public enum MixdownError: Error, Equatable, CustomStringConvertible {
 
     public var description: String {
         switch self {
+        case .sharedSourceInUse: return "the shared recording is already used by transcription runs"
         case .missingTrack(let track): return "the session has no \(track.rawValue) track to mix"
         case .emptyTimeline: return "the reconstructed timeline is empty"
         case .uncertainDelay(let reason): return "echo cancellation was not attempted: \(reason)"

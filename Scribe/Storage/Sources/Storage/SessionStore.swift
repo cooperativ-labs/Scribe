@@ -66,6 +66,7 @@ public struct SessionStoreConfiguration: Sendable {
     /// Provided by the coordinator so UI activity, processing work, and the
     /// durable manifest all address the same recording.
     public let sessionID: UUID?
+    public let usesMeetingLibrary: Bool
     public let appBuild: String
     public let macOSVersion: String
     public let captureScope: CaptureScope
@@ -93,10 +94,12 @@ public struct SessionStoreConfiguration: Sendable {
         journalCheckpointEveryBuffers: Int = 1,
         freeSpaceProvider: @escaping @Sendable (URL) throws -> Int64 = SessionStore.availableCapacity,
         cleanStopRequester: @escaping @Sendable () -> Void = {},
-        title: String? = nil
+        title: String? = nil,
+        usesMeetingLibrary: Bool = false
     ) {
         self.recordingsDirectory = recordingsDirectory
         self.sessionID = sessionID
+        self.usesMeetingLibrary = usesMeetingLibrary
         self.appBuild = appBuild
         self.macOSVersion = macOSVersion
         self.captureScope = captureScope
@@ -155,17 +158,25 @@ public final class SessionStore: @unchecked Sendable {
         self.journal = journal
     }
 
-    /// Atomically reserves a timestamp-and-time-zone session directory, writes
+    /// Atomically reserves a session directory, writes
     /// its manifest, then creates the capture journal before capture begins.
     public static func create(configuration: SessionStoreConfiguration, now: Date = Date(), sessionID: UUID = UUID()) throws -> SessionStore {
         let manager = FileManager.default
         try manager.createDirectory(at: configuration.recordingsDirectory, withIntermediateDirectories: true)
-        let baseName = SessionDirectoryName.make(for: now, timeZone: configuration.timeZone, title: configuration.title)
-        let directory = try reserveSessionDirectory(in: configuration.recordingsDirectory, baseName: baseName)
-        let capture = directory.appendingPathComponent("capture", isDirectory: true)
+        let resolvedSessionID = configuration.sessionID ?? sessionID
+        let directory: URL
+        if configuration.usesMeetingLibrary {
+            directory = configuration.recordingsDirectory.appendingPathComponent(
+                RecorderMeetingDirectory.name(for: resolvedSessionID), isDirectory: true
+            )
+            try manager.createDirectory(at: directory, withIntermediateDirectories: false)
+        } else {
+            let baseName = SessionDirectoryName.make(for: now, timeZone: configuration.timeZone, title: configuration.title)
+            directory = try reserveSessionDirectory(in: configuration.recordingsDirectory, baseName: baseName)
+        }
+        let capture = directory.appendingPathComponent(RecorderMeetingDirectory.captureDirectoryName, isDirectory: true)
         try manager.createDirectory(at: capture, withIntermediateDirectories: false)
 
-        let resolvedSessionID = configuration.sessionID ?? sessionID
         let manifest = RecorderSessionManifest(
             sessionID: resolvedSessionID,
             appBuild: configuration.appBuild,

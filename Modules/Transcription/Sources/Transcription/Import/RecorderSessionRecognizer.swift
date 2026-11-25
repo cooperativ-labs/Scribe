@@ -94,6 +94,7 @@ public struct RecorderSessionRecognizer: Sendable {
     /// preselection from the tracks it conventionally contains is the safe
     /// reading; the user can still select any of them explicitly.
     static let conventionalTrackRoles: [String: RecorderSessionTrackRole] = [
+        RecorderMeetingDirectory.sourceFileName: .finalMix,
         "final.m4a": .finalMix,
         "final.flac": .finalMix,
         "system.flac": .system,

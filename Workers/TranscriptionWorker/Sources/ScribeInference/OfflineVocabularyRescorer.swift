@@ -53,23 +53,47 @@ public enum OfflineVocabularyRescorer {
         let (prepared, report) = await VocabularyBooster().prepare(
             snapshot: snapshot, manifest: manifest, manifestData: (try? JSONEncoder().encode(manifest)) ?? Data(),
             modelsDirectory: modelsDirectory, warmInference: false)
-        return await rescore(prepared: prepared, report: report, fileURL: fileURL, text: text, tokens: tokens, snapshot: snapshot)
+        return await rescore(prepared: prepared, report: report, text: text, tokens: tokens, snapshot: snapshot) {
+            try AudioSamples(fileURL: fileURL)
+        }
     }
 
-    /// Dictation rescoring with the worker's retained booster.
     public static func rescore(
         booster: VocabularyBooster, fileURL: URL, text: String, tokens: [TokenTiming],
         snapshot: WorkerVocabularySnapshot, manifestURL: URL, modelsDirectory: URL
     ) async -> Output {
+        await rescore(booster: booster, text: text, tokens: tokens, snapshot: snapshot,
+                      manifestURL: manifestURL, modelsDirectory: modelsDirectory) {
+            try AudioSamples(fileURL: fileURL)
+        }
+    }
+
+    /// Dictation reuses the worker's decoded buffer and retained booster.
+    public static func rescore(
+        booster: VocabularyBooster, buffer: AVAudioPCMBuffer, text: String, tokens: [TokenTiming],
+        snapshot: WorkerVocabularySnapshot, manifestURL: URL, modelsDirectory: URL
+    ) async -> Output {
+        await rescore(booster: booster, text: text, tokens: tokens, snapshot: snapshot,
+                      manifestURL: manifestURL, modelsDirectory: modelsDirectory) {
+            AudioSamples(buffer: buffer)
+        }
+    }
+
+    private static func rescore(
+        booster: VocabularyBooster, text: String, tokens: [TokenTiming],
+        snapshot: WorkerVocabularySnapshot, manifestURL: URL, modelsDirectory: URL,
+        openAudio: () throws -> AudioSamples
+    ) async -> Output {
         guard !snapshot.usableTerms.isEmpty else { return .init(text: text, replacements: [], warning: nil) }
         let (prepared, report) = await booster.prepare(snapshot: snapshot, manifestURL: manifestURL,
                                                        modelsDirectory: modelsDirectory, warmInference: false)
-        return await rescore(prepared: prepared, report: report, fileURL: fileURL, text: text, tokens: tokens, snapshot: snapshot)
+        return await rescore(prepared: prepared, report: report, text: text, tokens: tokens,
+                             snapshot: snapshot, openAudio: openAudio)
     }
 
-    static func rescore(
-        prepared: VocabularyBooster.Prepared?, report: VocabularyBooster.Report, fileURL: URL, text: String,
-        tokens: [TokenTiming], snapshot: WorkerVocabularySnapshot
+    private static func rescore(
+        prepared: VocabularyBooster.Prepared?, report: VocabularyBooster.Report, text: String,
+        tokens: [TokenTiming], snapshot: WorkerVocabularySnapshot, openAudio: () throws -> AudioSamples
     ) async -> Output {
         switch report.readiness {
         case .notNeeded:
@@ -85,8 +109,8 @@ public enum OfflineVocabularyRescorer {
         let context = prepared.context, spotter = prepared.spotter, rescorer = prepared.rescorer
         var spottingSeconds = 0.0, comparisonSeconds = 0.0
         do {
-            let file = try AVAudioFile(forReading: fileURL)
-            let duration = Double(file.length) / 16_000
+            let audio = try openAudio()
+            let duration = Double(audio.frameCount) / 16_000
             var replacements: [VocabularyReplacement] = []
             var coreStart = 0.0
             while coreStart < duration {
@@ -99,14 +123,9 @@ public enum OfflineVocabularyRescorer {
                                 endTime: $0.endTime - start, confidence: $0.confidence)
                 }
                 if !localTokens.isEmpty {
-                    file.framePosition = AVAudioFramePosition((start * 16_000).rounded())
-                    let count = AVAudioFrameCount(((end - start) * 16_000).rounded())
-                    guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: count) else {
-                        throw CocoaError(.fileReadUnknown)
-                    }
-                    try file.read(into: buffer, frameCount: count)
-                    guard let channel = buffer.floatChannelData?[0] else { throw CocoaError(.fileReadUnknown) }
-                    let samples = Array(UnsafeBufferPointer(start: channel, count: Int(buffer.frameLength)))
+                    let firstFrame = Int((start * 16_000).rounded())
+                    let frameCount = Int(((end - start) * 16_000).rounded())
+                    let samples = try audio.read(firstFrame..<(firstFrame + frameCount))
                     let spotStarted = ContinuousClock.now
                     let spotted = try await spotter.spotKeywordsWithLogProbs(audioSamples: samples, customVocabulary: context)
                     let compareStarted = ContinuousClock.now
@@ -155,6 +174,36 @@ public enum OfflineVocabularyRescorer {
         } catch {
             return .init(text: text, replacements: [], warning: "vocabulary_assets_unavailable", booster: report,
                          spottingSeconds: spottingSeconds, comparisonSeconds: comparisonSeconds)
+        }
+    }
+
+    struct AudioSamples {
+        let frameCount: Int
+        let read: (Range<Int>) throws -> [Float]
+
+        init(fileURL: URL) throws {
+            let file = try AVAudioFile(forReading: fileURL)
+            frameCount = Int(file.length)
+            read = { frames in
+                file.framePosition = AVAudioFramePosition(frames.lowerBound)
+                let count = AVAudioFrameCount(frames.count)
+                guard let chunk = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: count) else {
+                    throw CocoaError(.fileReadUnknown)
+                }
+                try file.read(into: chunk, frameCount: count)
+                guard let channel = chunk.floatChannelData?[0] else { throw CocoaError(.fileReadUnknown) }
+                return Array(UnsafeBufferPointer(start: channel, count: Int(chunk.frameLength)))
+            }
+        }
+
+        init(buffer: AVAudioPCMBuffer) {
+            let count = Int(buffer.frameLength)
+            frameCount = count
+            read = { frames in
+                guard frames.lowerBound >= 0, frames.upperBound <= count,
+                      let channel = buffer.floatChannelData?[0] else { throw CocoaError(.fileReadUnknown) }
+                return Array(UnsafeBufferPointer(start: channel + frames.lowerBound, count: frames.count))
+            }
         }
     }
 

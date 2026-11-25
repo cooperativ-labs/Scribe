@@ -170,7 +170,35 @@ public enum TranscriptionSpeakerMatching: String, Codable, Sendable, Equatable {
     case disabled
 }
 
+/// Paths shared by capture, processing, and transcription for managed recordings.
+public enum RecorderMeetingDirectory {
+    public static let sourceFileName = "source.m4a"
+    public static let captureDirectoryName = "capture"
+    private static let diagnosticTrackFileNames = ["system.flac", "microphone.flac"]
+
+    public static func removeCaptureAudio(in directory: URL, fileManager: FileManager = .default) throws {
+        for name in [captureDirectoryName] + diagnosticTrackFileNames {
+            let item = directory.appendingPathComponent(name)
+            if fileManager.fileExists(atPath: item.path) {
+                try fileManager.removeItem(at: item)
+            }
+        }
+    }
+
+    public static func name(for sessionID: UUID) -> String {
+        "meeting--recorder-\(sessionID.uuidString.lowercased())"
+    }
+
+    public static func contains(_ directory: URL, sessionID: UUID, in library: URL) -> Bool {
+        let resolved = directory.resolvingSymlinksInPath().standardizedFileURL
+        return resolved.lastPathComponent == name(for: sessionID)
+            && resolved.deletingLastPathComponent().path == library.resolvingSymlinksInPath().standardizedFileURL.path
+    }
+}
+
 public struct TranscriptionProvenance: Codable, Sendable, Equatable {
+    public static let recorderProducerID = "com.scribe.recorder"
+
     public let producerID: String
     public let sessionID: UUID
 

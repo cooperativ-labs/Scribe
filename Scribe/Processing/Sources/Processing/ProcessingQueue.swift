@@ -240,6 +240,9 @@ public struct SessionProcessor: Sendable {
     private func replaceProcessingState(in sessionDirectory: URL, with state: ProcessingState, error: Error?) throws {
         let manifestURL = sessionDirectory.appendingPathComponent("metadata.json")
         let current = try RecorderSessionManifestCodec.decode(Data(contentsOf: manifestURL))
+        if state == .running {
+            try MixdownService.validateSourceCanBeReplaced(in: sessionDirectory, manifest: current)
+        }
         var errors = current.processing.errors
         if let error {
             let record = ManifestError(code: "processing.pipeline", message: String(describing: error))

@@ -291,41 +291,50 @@ private enum PreparedAudio {
         let sourceFile = try AVAudioFile(forReading: source)
         let sourceFormat = sourceFile.processingFormat
         let duration = Double(sourceFile.length) / sourceFormat.sampleRate
-        if abs(sourceFormat.sampleRate - 16_000) < 0.001, sourceFormat.channelCount == 1 {
-            try replaceWithCopy(source: source, destination: destination)
-            return duration
-        }
-        guard let targetFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16_000, channels: 1, interleaved: false),
+        guard let targetFormat = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 16_000, channels: 1, interleaved: true),
+              let input = AVAudioPCMBuffer(pcmFormat: sourceFormat, frameCapacity: 4_096),
+              let converted = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: 4_096),
               let converter = AVAudioConverter(from: sourceFormat, to: targetFormat) else {
             throw WorkerJobRunner.Error.invalidPath("Could not create a 16 kHz mono audio conversion path.")
         }
         let temporary = destination.deletingLastPathComponent().appending(path: ".prepared-\(UUID().uuidString).wav")
-        let output = try AVAudioFile(forWriting: temporary, settings: targetFormat.settings, commonFormat: .pcmFormatFloat32, interleaved: false)
-        while sourceFile.framePosition < sourceFile.length {
-            guard let input = AVAudioPCMBuffer(pcmFormat: sourceFormat, frameCapacity: 4_096) else { break }
-            try sourceFile.read(into: input)
-            guard input.frameLength > 0 else { break }
-            let capacity = AVAudioFrameCount((Double(input.frameLength) * targetFormat.sampleRate / sourceFormat.sampleRate).rounded(.up)) + 32
-            guard let converted = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: capacity) else { break }
-            var supplied = false
-            var conversionError: NSError?
-            let status = converter.convert(to: converted, error: &conversionError) { _, inputStatus in
-                if supplied { inputStatus.pointee = .noDataNow; return nil }
-                supplied = true
-                inputStatus.pointee = .haveData
-                return input
+        defer { try? FileManager.default.removeItem(at: temporary) }
+        do {
+            let output = try AVAudioFile(forWriting: temporary, settings: targetFormat.settings, commonFormat: .pcmFormatInt16, interleaved: true)
+            var inputEnded = false
+            var readError: Swift.Error?
+            let sourceFrames = sourceFile.length
+            while true {
+                converted.frameLength = 0
+                var conversionError: NSError?
+                let status = converter.convert(to: converted, error: &conversionError) { requestedFrames, inputStatus in
+                    let remaining = sourceFrames - sourceFile.framePosition
+                    if !inputEnded, remaining > 0 {
+                        do {
+                            let count = min(Int64(requestedFrames), Int64(input.frameCapacity), remaining)
+                            try sourceFile.read(into: input, frameCount: AVAudioFrameCount(count))
+                            if input.frameLength > 0 {
+                                inputStatus.pointee = .haveData
+                                return input
+                            }
+                        } catch {
+                            readError = error
+                        }
+                        inputEnded = true
+                    }
+                    inputStatus.pointee = .endOfStream
+                    return nil
+                }
+                if let readError { throw readError }
+                guard status != .error else {
+                    throw conversionError ?? WorkerJobRunner.Error.invalidPath("Audio conversion failed.")
+                }
+                if converted.frameLength > 0 { try output.write(from: converted) }
+                if status == .endOfStream { break }
             }
-            guard status != .error else { throw conversionError ?? WorkerJobRunner.Error.invalidPath("Audio conversion failed.") }
-            if converted.frameLength > 0 { try output.write(from: converted) }
         }
         try AtomicFilePublisher.publish(temporary, to: destination)
         return duration
-    }
-
-    private static func replaceWithCopy(source: URL, destination: URL) throws {
-        let temporary = destination.deletingLastPathComponent().appending(path: ".prepared-\(UUID().uuidString).wav")
-        try FileManager.default.copyItem(at: source, to: temporary)
-        try AtomicFilePublisher.publish(temporary, to: destination)
     }
 }
 

@@ -150,7 +150,17 @@ public actor TranscriptionCoordinator {
         let snapshot: SourceSnapshot
         do {
             fingerprint = try ImportFingerprint(fileAt: request.sourceURL, configuration: importConfiguration)
-            snapshot = try snapshotService.createSnapshot(of: request.sourceURL, fingerprint: fingerprint)
+            if let provenance = request.provenance,
+               provenance.producerID == TranscriptionProvenance.recorderProducerID,
+               RecorderMeetingDirectory.contains(
+                   request.sourceURL.deletingLastPathComponent(),
+                   sessionID: provenance.sessionID,
+                   in: configuration.transcriptStoreURL
+               ) {
+                snapshot = try registerRecorderSource(request, sessionID: provenance.sessionID, fingerprint: fingerprint)
+            } else {
+                snapshot = try snapshotService.createSnapshot(of: request.sourceURL, fingerprint: fingerprint)
+            }
         } catch {
             throw TranscriptionCoordinatorError.sourceSnapshotFailed(error.localizedDescription)
         }
@@ -309,6 +319,24 @@ public actor TranscriptionCoordinator {
             title: title
         )
         return try enqueueDerivedRun(from: previous, request: request)
+    }
+
+    private func registerRecorderSource(
+        _ request: TranscriptionRequest,
+        sessionID: UUID,
+        fingerprint: ImportFingerprint
+    ) throws -> SourceSnapshot {
+        let directory = request.sourceURL.deletingLastPathComponent()
+        let manifest = try RecorderSessionManifestCodec.decode(Data(contentsOf: directory.appendingPathComponent("metadata.json")))
+        let values = try request.sourceURL.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+        guard manifest.sessionID == sessionID, manifest.processing.state == .complete,
+              let finalTrack = manifest.tracks.finalTrack,
+              finalTrack.fileName == RecorderMeetingDirectory.sourceFileName,
+              finalTrack.checksum.caseInsensitiveCompare(fingerprint.contentHash) == .orderedSame,
+              values.isRegularFile == true, values.isSymbolicLink == false else {
+            throw SourceSnapshotError.sourceChangedDuringCopy(detail: "The recording does not match its completed session manifest.")
+        }
+        return try snapshotService.registerRecorderSource(at: request.sourceURL, sessionID: sessionID, fingerprint: fingerprint, now: now())
     }
 
     private func retainedSourceRequest(

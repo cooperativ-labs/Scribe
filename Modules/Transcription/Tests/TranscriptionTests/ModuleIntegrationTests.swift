@@ -27,6 +27,68 @@ final class ModuleIntegrationTests: XCTestCase {
 
     override func tearDownWithError() throws { try? FileManager.default.removeItem(at: root) }
 
+    func testRecorderHandoffUsesOneMeetingSourceAndDeletesAllManagedAudio() async throws {
+        let sessionID = UUID()
+        let meeting = storeURL.appending(path: RecorderMeetingDirectory.name(for: sessionID), directoryHint: .isDirectory)
+        let capture = meeting.appending(path: RecorderMeetingDirectory.captureDirectoryName, directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: capture, withIntermediateDirectories: true)
+        let raw = capture.appending(path: "microphone.caf")
+        try Data("original capture".utf8).write(to: raw)
+        let source = meeting.appending(path: RecorderMeetingDirectory.sourceFileName)
+        let audio = Data("verified recorder mix".utf8)
+        try audio.write(to: source)
+        let manifest = RecorderSessionManifest(
+            sessionID: sessionID,
+            appBuild: "tests",
+            macOSVersion: "tests",
+            startedAt: Date(timeIntervalSince1970: 0),
+            completionStatus: .complete,
+            capture: CaptureMetadata(
+                state: .complete,
+                scope: CaptureScope(applicationBundleIdentifiers: [], processIdentifiers: []),
+                microphone: AudioDeviceIdentity(uniqueID: "mic", name: "Microphone")
+            ),
+            tracks: RecorderTrackCollection(finalTrack: RecorderTrackManifest(
+                sourceFormat: AudioSourceFormat(sampleRate: 48_000, channelCount: 1, formatDescription: "aac-lc"),
+                firstMediaTimestampSeconds: 0,
+                frameCount: 48_000,
+                fileName: source.lastPathComponent,
+                checksum: FileContentHash.sha256(of: audio)
+            )),
+            processing: ProcessingMetadata(state: .complete)
+        )
+        try RecorderSessionManifestCodec.encode(manifest).write(to: meeting.appending(path: "metadata.json"))
+        let coordinator = try TranscriptionCoordinator(
+            configuration: .init(transcriptStoreURL: storeURL),
+            stageRunner: ScriptedWorkerStageRunner(hostStageRunner: TranscriptAssemblyStageRunner())
+        )
+
+        let job = try await coordinator.enqueue(TranscriptionRequest(
+            sourceURL: source,
+            recorderSessionDirectory: meeting,
+            modelProfileID: "parakeet-v3",
+            provenance: TranscriptionProvenance(producerID: TranscriptionProvenance.recorderProducerID, sessionID: sessionID)
+        ))
+
+        XCTAssertEqual(job.sourceSnapshotURL.path, source.path)
+        XCTAssertEqual(job.meetingDirectoryURL.path, meeting.path)
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: storeURL.path).filter { !$0.hasPrefix(".") }, [meeting.lastPathComponent])
+
+        await coordinator.runPending()
+        let rerun = try await coordinator.retranscribe(job, modelProfileID: "parakeet-v3", speakerCount: .automatic)
+        XCTAssertEqual(rerun.sourceSnapshotURL.path, source.path)
+        XCTAssertEqual(rerun.meetingDirectoryURL.path, meeting.path)
+        await coordinator.runPending()
+
+        let store = TranscriptStore(storeDirectoryURL: storeURL)
+        try store.deleteAudio(containingRunID: rerun.runID)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: source.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: capture.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: job.runDirectoryURL.appending(path: "prepared.wav").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: rerun.runDirectoryURL.appending(path: "prepared.wav").path))
+        XCTAssertNotNil(store.run(withRunID: rerun.runID)?.transcript)
+    }
+
     func testAChosenFolderReachesEveryExportFormatThroughReview() async throws {
         let ffprobe = try findExecutable(named: "ffprobe")
         let folder = root.appending(path: "Recordings", directoryHint: .isDirectory)

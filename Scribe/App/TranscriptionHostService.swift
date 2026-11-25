@@ -44,6 +44,7 @@ final class TranscriptionHostService {
     private let coordinator: TranscriptionCoordinator
     private let store: TranscriptStore
     private let outbox: TranscriptionRequestOutbox
+    private let legacyOutbox: TranscriptionRequestOutbox?
     private let settings: ScribeSettings
     private let importer: FolderImportService?
     /// The same content-based prober the folder importer uses, held on its
@@ -130,7 +131,10 @@ final class TranscriptionHostService {
         self.modelProfileID = modelProfileID
         hasScheduler = scheduler != nil
         store = TranscriptStore(storeDirectoryURL: storeDirectoryURL)
-        outbox = .inRecordingsDirectory(settings.recordingsFolderURL)
+        outbox = .inRecordingsDirectory(storeDirectoryURL)
+        let legacyRecordingsDirectory = settings.recordingsFolderURL
+        legacyOutbox = legacyRecordingsDirectory.standardizedFileURL.path == storeDirectoryURL.standardizedFileURL.path
+            ? nil : .inRecordingsDirectory(legacyRecordingsDirectory)
         speakerStore = try? SpeakerProfileStore.openApplicationSupportLibrary()
 
         let assembly = TranscriptAssemblyStageRunner(speakerLibrary: speakerStore)
@@ -379,8 +383,11 @@ final class TranscriptionHostService {
     func reconcileDrafts(isLaunch: Bool) async {
         if drafts == nil { await openDrafts() }
         guard let drafts else { return }
-        reviewSessions = RecorderSessionEvidence.scan(recordingsDirectory: settings.recordingsFolderURL)
+        reviewSessions = scanRecorderSessions()
         reviewPendingRequests = (try? await outbox.pendingRequests()) ?? []
+        if let legacyOutbox {
+            reviewPendingRequests += (try? await legacyOutbox.pendingRequests()) ?? []
+        }
         await drafts.reconcile(
             sessions: reviewSessions,
             pendingRequests: reviewPendingRequests,
@@ -402,6 +409,14 @@ final class TranscriptionHostService {
             Task { [weak self] in await self?.runPending() }
         }
         return failure
+    }
+
+    private func scanRecorderSessions() -> [UUID: RecorderSessionEvidence] {
+        let librarySessions = RecorderSessionEvidence.scan(recordingsDirectory: storeDirectoryURL)
+        guard legacyOutbox != nil else { return librarySessions }
+        return librarySessions.merging(
+            RecorderSessionEvidence.scan(recordingsDirectory: settings.recordingsFolderURL)
+        ) { current, _ in current }
     }
 
     private func reviewEnvironment(live: LiveCaptureState?) -> MeetingDraftReviewMerger.Environment {
@@ -450,6 +465,11 @@ final class TranscriptionHostService {
     /// rather than losing the meeting. Requeueing the same source is harmless:
     /// the fingerprint identifies it as a repeat import.
     func consumeHandoffRequests() async {
+        if let legacyOutbox { await consumeHandoffRequests(from: legacyOutbox) }
+        await consumeHandoffRequests(from: outbox)
+    }
+
+    private func consumeHandoffRequests(from outbox: TranscriptionRequestOutbox) async {
         do {
             let consumer = TranscriptionHandoffConsumer(source: outbox) { @MainActor [weak self] request, job in
                 // Bound before the recorder's files go: the job record carries
@@ -469,9 +489,8 @@ final class TranscriptionHostService {
         }
     }
 
-    /// Removes the recorder's raw workspace only after `enqueue` has copied the
-    /// final mix into the transcription store. Source-energy evidence is also
-    /// committed beside the job first because producing it needs the raw tracks.
+    /// Retires raw tracks after the job and any source-energy evidence are
+    /// durable. Legacy sessions still own a separate, disposable directory.
     private func retireRecorderSession(afterQueuing request: TranscriptionRequest, job: TranscriptionJob) {
         guard !settings.keepRecordingFilesForDebugging,
               let sessionDirectory = request.recorderSessionDirectory
@@ -484,10 +503,13 @@ final class TranscriptionHostService {
                let timeline = try SourceEnergyPreparation.timeline(sessionDirectory: sessionDirectory) {
                 try SourceEnergyCheckpoint.write(timeline, in: job.runDirectoryURL)
             }
-            try RecorderSessionCleanup.removeSession(
-                at: sessionDirectory,
-                from: settings.recordingsFolderURL
-            )
+            if let provenance = request.provenance,
+               provenance.producerID == TranscriptionProvenance.recorderProducerID,
+               RecorderMeetingDirectory.contains(sessionDirectory, sessionID: provenance.sessionID, in: storeDirectoryURL) {
+                try RecorderMeetingDirectory.removeCaptureAudio(in: sessionDirectory)
+            } else {
+                try RecorderSessionCleanup.removeSession(at: sessionDirectory, from: settings.recordingsFolderURL)
+            }
         } catch {
             report(failure: "The recording was queued for transcription, but its component files could not be removed: \(error.localizedDescription)")
         }
@@ -925,7 +947,7 @@ extension TranscriptionHostService: MeetingDraftEditing {
 
     func transcribeNow(draftID: UUID) async -> String? {
         guard let drafts else { return "Transcription is not available right now." }
-        reviewSessions = RecorderSessionEvidence.scan(recordingsDirectory: settings.recordingsFolderURL)
+        reviewSessions = scanRecorderSessions()
         let failure = await drafts.transcribeNow(draftID: draftID)
         await reconcileDrafts(isLaunch: false)
         return failure

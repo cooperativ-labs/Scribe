@@ -152,7 +152,7 @@ public actor WorkerDictationSession {
                 "confidence": .number(Double(token.confidence)),
             ])
         }
-        let corrected = await OfflineVocabularyRescorer.rescore(booster: booster, fileURL: audioURL, text: result.text,
+        let corrected = await OfflineVocabularyRescorer.rescore(booster: booster, buffer: buffer, text: result.text,
             tokens: (result.tokenTimings ?? []).filter { $0.startTime < duration }.map {
                 TokenTiming(token: $0.token, tokenId: $0.tokenId, startTime: $0.startTime, endTime: min(duration, $0.endTime), confidence: $0.confidence)
             }, snapshot: snapshot, manifestURL: configuration.manifestURL, modelsDirectory: configuration.modelsDirectory)
